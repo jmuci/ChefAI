@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">ChefAI</string>
     <string name="title_home">Home</string>
-    <string name="title_dashboard">Dashboard</string>
-    <string name="title_notifications">Notifications</string>
+    <string name="title_recipes">Recipes</string>
+    <string name="title_meal_plans">Meal Plans</string>
 </resources>
