@@ -13,13 +13,13 @@
 
     <fragment
         android:id="@+id/navigation_dashboard"
-        android:name="com.tenmilelabs.chefai.ui.dashboard.DashboardFragment"
-        android:label="@string/title_dashboard"
-        tools:layout="@layout/fragment_dashboard" />
+        android:name="com.tenmilelabs.chefai.ui.recipes.RecipesFragment"
+        android:label="@string/title_recipes"
+        tools:layout="@layout/fragment_recipes" />
 
     <fragment
         android:id="@+id/navigation_notifications"
-        android:name="com.tenmilelabs.chefai.ui.notifications.NotificationsFragment"
-        android:label="@string/title_notifications"
-        tools:layout="@layout/fragment_notifications" />
+        android:name="com.tenmilelabs.chefai.ui.mealplans.MealPlansFragment"
+        android:label="@string/title_meal_plans"
+        tools:layout="@layout/fragment_mealplans" />
 </navigation>
