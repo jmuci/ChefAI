@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.ViewModelProvider
 import com.tenmilelabs.chefai.databinding.FragmentRecipesBinding
 
@@ -22,8 +23,7 @@ class RecipesFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        val recipesViewModel =
-            ViewModelProvider(this).get(RecipesViewModel::class.java)
+        val recipesViewModel: RecipesViewModel by viewModels()
 
         _binding = FragmentRecipesBinding.inflate(inflater, container, false)
         val root: View = binding.root
