@@ -11,5 +11,6 @@ data class RecipeEntity(
     val description: String,
     val prepTime: Int,
     val recipeUrl: String,
-    val imageUrl: String
+    val imageUrl: String,
+    val imageUrlThumbnail: String
 )

@@ -18,6 +18,7 @@ class DefaultRecipeRepositoryTest {
         title = "Title1",
         description = "Description1",
         imageUrl = "ImageUrl1",
+        thumbnailUrl = "ThumbnailUrl1",
         prepTime = 10,
         recipeUrl = "RecipeUrl1",
         label = "Label1"
@@ -27,6 +28,7 @@ class DefaultRecipeRepositoryTest {
         title = "Title2",
         description = "Description2",
         imageUrl = "ImageUrl2",
+        thumbnailUrl = "ThumbnailUrl1",
         prepTime = 10,
         recipeUrl = "RecipeUrl2",
         label = "Label2"
@@ -36,6 +38,7 @@ class DefaultRecipeRepositoryTest {
         title = "Title3",
         description = "Description3",
         imageUrl = "ImageUrl3",
+        thumbnailUrl = "ThumbnailUrl3",
         prepTime = 10,
         recipeUrl = "RecipeUrl3",
         label = "Label3"
@@ -91,16 +94,17 @@ class DefaultRecipeRepositoryTest {
     @Test
     fun createRecipe_newRecipeSavedInLocalSource() = testScope.runTest {
         val newRecipe = Recipe(
-            uuid = "4",
+            uuid = "uuid4",
             title = "Title4",
             description = "Description4",
             imageUrl = "ImageUrl4",
+            thumbnailUrl = "ThumbnailUrl4",
             prepTime = 10,
             recipeUrl = "RecipeUrl4",
             label = "Label4"
         )
-        val newRecipeId = recipeRepository.createRecipe(newRecipe)
-        assertThat(localDataSource.recipes?.contains(newRecipe.toRecipeEntity()))
+        val newRecipeId = recipeRepository.createRecipe(newRecipe, "uuid4")
+        assertThat(newRecipe.toRecipeEntity()).isIn(localDataSource.recipes)
         assertThat(localDataSource.recipes?.map { it.uuid }).contains(newRecipeId)
     }
 
@@ -111,6 +115,7 @@ class DefaultRecipeRepositoryTest {
             title = "Title4",
             description = "Description4",
             imageUrl = "ImageUrl4",
+            thumbnailUrl = "ThumbnailUrl4",
             prepTime = 10,
             recipeUrl = "RecipeUrl4",
             label = "Label4"

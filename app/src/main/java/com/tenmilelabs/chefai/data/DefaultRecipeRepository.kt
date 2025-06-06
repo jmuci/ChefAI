@@ -41,15 +41,21 @@ class DefaultRecipeRepository(
         return localDatSource.getRecipeById(uuid)?.toExternal()
     }
 
-    override suspend fun createRecipe(recipe: Recipe): String {
+    /**
+     * Creates a new [Recipe] in the local data source.
+     * The optional uuid parameter should only be used for testing
+     */
+    override suspend fun createRecipe(recipe: Recipe, uuid: String): String {
         // ID creation might be a complex operation so it's executed using the supplied
         // coroutine dispatcher
-        val recipeUid = withContext(dispatcher) {
-            UUID.randomUUID().toString()
+        val recipeUuid = withContext(dispatcher) {
+            uuid.ifEmpty {
+                UUID.randomUUID().toString()
+            }
         }
 
-        localDatSource.upsertRecipe(recipe.copy(uuid = recipeUid).toRecipeEntity())
-        return recipeUid
+        localDatSource.upsertRecipe(recipe.copy(uuid = recipeUuid).toRecipeEntity())
+        return recipeUuid
     }
 
     override suspend fun updateRecipe(recipe: Recipe) {
