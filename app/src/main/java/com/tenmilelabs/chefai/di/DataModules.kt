@@ -2,7 +2,10 @@ package com.tenmilelabs.chefai.di
 
 import android.content.Context
 import androidx.room.Room
+import com.tenmilelabs.chefai.data.DefaultRecipeRepository
+import com.tenmilelabs.chefai.data.RecipesRepository
 import com.tenmilelabs.chefai.data.source.local.ChefAIDataBase
+import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -12,15 +15,24 @@ import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
+abstract class RepositoryModule {
+    @Singleton
+    @Binds
+    abstract fun bindRecipeRepository(repository: DefaultRecipeRepository): RecipesRepository
+}
+
+@Module
+@InstallIn(SingletonComponent::class)
 object DatabaseModules {
 
     @Singleton
+    @Provides
     fun provideDataBase(@ApplicationContext context: Context): ChefAIDataBase {
         return Room.databaseBuilder(
             context,
             ChefAIDataBase::class.java,
             "Recipes.db"
-        ).build()
+        ).createFromAsset("database/ChefAI.sql").build()
     }
 
     @Provides

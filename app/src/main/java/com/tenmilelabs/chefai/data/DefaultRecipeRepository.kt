@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.data
 
 import com.tenmilelabs.chefai.data.source.local.RecipeDao
 import com.tenmilelabs.chefai.data.source.local.RecipeEntity
+import com.tenmilelabs.chefai.di.ApplicationScope
 import com.tenmilelabs.chefai.di.DefaultDispatcher
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
@@ -10,13 +11,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.util.UUID
+import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class DefaultRecipeRepository(
+class DefaultRecipeRepository @Inject constructor(
     private val localDatSource: RecipeDao,
     @DefaultDispatcher private val dispatcher: CoroutineDispatcher,
-    @ApplicationContext private val scope: CoroutineScope,
+    @ApplicationScope private val scope: CoroutineScope,
 ) : RecipesRepository {
 
     override suspend fun getRecipes(): List<Recipe> {
