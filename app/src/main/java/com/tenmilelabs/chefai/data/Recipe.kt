@@ -9,5 +9,6 @@ data class Recipe(
     val prepTime: Int,
     val recipeUrl: String,
     val imageUrl: String,
+    val thumbnailUrl: String,
     val uuid: String = "", // Default value for id not set.
 )

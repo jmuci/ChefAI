@@ -9,7 +9,7 @@ interface RecipesRepository {
     fun getRecipeStream(uuid: String): Flow<Recipe?>
     suspend fun getRecipe(uuid: String): Recipe?
 
-    suspend fun createRecipe(recipe: Recipe): String
+    suspend fun createRecipe(recipe: Recipe, uuid: String = ""): String
 
     suspend fun updateRecipe(recipe: Recipe)
 

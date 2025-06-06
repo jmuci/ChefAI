@@ -25,6 +25,7 @@ fun Recipe.toRecipeEntity(): RecipeEntity = RecipeEntity(
     prepTime = prepTime,
     recipeUrl = recipeUrl,
     imageUrl = imageUrl,
+    imageUrlThumbnail = thumbnailUrl,
     uuid = uuid,
 )
 
@@ -37,6 +38,7 @@ fun RecipeEntity.toExternal() = Recipe(
     prepTime = prepTime,
     recipeUrl = recipeUrl,
     imageUrl = imageUrl,
+    thumbnailUrl = imageUrlThumbnail,
     uuid = uuid,
 )
 fun List<RecipeEntity>.toExternal() = map (RecipeEntity::toExternal)
