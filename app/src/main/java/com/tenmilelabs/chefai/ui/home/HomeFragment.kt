@@ -7,7 +7,6 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
-import androidx.lifecycle.ViewModelProvider
 import com.tenmilelabs.chefai.databinding.FragmentHomeBinding
 
 class HomeFragment : Fragment() {
@@ -25,6 +24,7 @@ class HomeFragment : Fragment() {
     ): View {
 
         val homeViewModel: HomeViewModel by viewModels()
+        //        val homeViewModel: HomeViewModel = hiltViewModel()
 
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
         val root: View = binding.root
