@@ -79,6 +79,8 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
     // Optional - Add window size utils
     implementation(libs.androidx.adaptive)
+    // Compose Navigation
+    implementation(libs.androidx.navigation.compose)
 
 
     debugImplementation(libs.androidx.ui.tooling)
