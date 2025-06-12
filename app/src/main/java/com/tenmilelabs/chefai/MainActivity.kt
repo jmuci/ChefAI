@@ -6,7 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
-import com.tenmilelabs.chefai.ui.MainScreen
+import com.tenmilelabs.chefai.ui.navigation.ChefAINavGraph
 import com.tenmilelabs.chefai.ui.theme.ChefAITheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -18,7 +18,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             ChefAITheme {
-                MainScreen(modifier = Modifier.fillMaxSize())
+                ChefAINavGraph(modifier = Modifier.fillMaxSize())
             }
         }
     }

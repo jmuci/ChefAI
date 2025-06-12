@@ -4,9 +4,7 @@ import android.content.res.Configuration.UI_MODE_NIGHT_YES
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.QuestionMark
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -14,19 +12,18 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavController
-import com.tenmilelabs.chefai.ui.theme.ChefAITheme
-import com.tenmilelabs.chefai.ui.theme.DarkGreen
 import com.tenmilelabs.chefai.ui.theme.FaintGreen
-import com.tenmilelabs.chefai.ui.theme.LightGreen
 import com.tenmilelabs.chefai.ui.theme.MdThemeOnPrimary
 import com.tenmilelabs.chefai.ui.theme.MdThemePrimary
 import com.tenmilelabs.chefai.ui.theme.MediumGreen
-import com.tenmilelabs.chefai.ui.theme.Teal200
+import com.tenmilelabs.chefai.R
+
 
 data class NavigationItem(
     val title: String,
@@ -55,8 +52,9 @@ fun BottomNavigationBar(
         ),
         NavigationItem(
             title = "Meal Plans",
-            //icon = ImageVector.vectorResource(id = R.drawable.ic_meal_plans),
-            icon = Icons.Filled.QuestionMark,
+            //icon = painterResource(id = R.drawable.ic_chef_hat_black_24),
+            icon = ImageVector.vectorResource(id = R.drawable.ic_chef_hat_black_24dp),
+            //icon = Icons.Filled.QuestionMark,
             route = Screen.MealPlans.route
         ),
     )

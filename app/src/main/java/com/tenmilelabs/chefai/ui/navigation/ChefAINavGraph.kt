@@ -1,4 +1,4 @@
-package com.tenmilelabs.chefai.ui
+package com.tenmilelabs.chefai.ui.navigation
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -12,13 +12,10 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.createGraph
 import com.tenmilelabs.chefai.ui.home.HomeScreen
 import com.tenmilelabs.chefai.ui.mealplans.MealPlansScreen
-import com.tenmilelabs.chefai.ui.navigation.BottomNavigationBar
-import com.tenmilelabs.chefai.ui.navigation.Screen
 import com.tenmilelabs.chefai.ui.recipes.RecipesScreen
-import com.tenmilelabs.chefai.ui.theme.ChefAITheme
 
 @Composable
-fun MainScreen(modifier: Modifier) {
+fun ChefAINavGraph(modifier: Modifier) {
     val navController = rememberNavController()
     val graph = navController.createGraph(startDestination = Screen.Home.route) {
         composable(route = Screen.Home.route) {
@@ -43,10 +40,9 @@ fun MainScreen(modifier: Modifier) {
     }
 }
 
+
 @Preview
 @Composable
-fun MainScreenPreview() {
-    ChefAITheme {
-        MainScreen(Modifier.fillMaxSize())
-    }
+fun ChefAINavGraphPreview() {
+    ChefAINavGraph(Modifier.fillMaxSize())
 }
