@@ -1,7 +1,5 @@
 package com.tenmilelabs.chefai.data
 
-import com.tenmilelabs.chefai.data.source.local.RecipeEntity
-
 data class Recipe(
     val title: String,
     val label: String,

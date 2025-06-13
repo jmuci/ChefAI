@@ -11,6 +11,7 @@ class FakeRecipeDao(initialRecipes: List<RecipeEntity> = emptyList()) : RecipeDa
         set(newRecipes) {
             _recipes = newRecipes?.associateBy { it.uuid }?.toMutableMap()
         }
+
     init {
         recipes = initialRecipes
     }

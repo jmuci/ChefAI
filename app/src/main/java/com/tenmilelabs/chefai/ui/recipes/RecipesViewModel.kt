@@ -17,9 +17,9 @@ class RecipesViewModel @Inject constructor(
         value = "This is recipes Fragment"
     }
 
-/*    private val _recipes = recipesRepository.getRecipesObservable().onCompletion {
-        recipes -> Log.d("RecipesViewModel", "Loaded ${recipes} Recipes from the DB ")
-    }*/
+    /*    private val _recipes = recipesRepository.getRecipesObservable().onCompletion {
+            recipes -> Log.d("RecipesViewModel", "Loaded ${recipes} Recipes from the DB ")
+        }*/
     //var accessedDatabase: SupportSQLiteDatabase? = db.getOpenHelper().getWritableDatabase()
 
     val text: LiveData<String> = _text

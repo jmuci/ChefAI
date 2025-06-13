@@ -29,7 +29,7 @@ fun Recipe.toRecipeEntity(): RecipeEntity = RecipeEntity(
     uuid = uuid,
 )
 
-fun List<Recipe>.toLocal() = map (Recipe::toRecipeEntity)
+fun List<Recipe>.toLocal() = map(Recipe::toRecipeEntity)
 
 fun RecipeEntity.toExternal() = Recipe(
     title = title,
@@ -41,4 +41,5 @@ fun RecipeEntity.toExternal() = Recipe(
     thumbnailUrl = imageUrlThumbnail,
     uuid = uuid,
 )
-fun List<RecipeEntity>.toExternal() = map (RecipeEntity::toExternal)
+
+fun List<RecipeEntity>.toExternal() = map(RecipeEntity::toExternal)
