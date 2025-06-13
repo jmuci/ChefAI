@@ -30,7 +30,7 @@ fun ChefAINavGraph(modifier: Modifier) {
     }
     Scaffold(
         modifier,
-        bottomBar = { BottomNavigationBar(navController) }
+        bottomBar = { BottomNavigationBar(navController) },
     ) { innerPadding ->
         NavHost(
             navController = navController,
