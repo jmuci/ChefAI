@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.ksp)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.room)
+    alias(libs.plugins.kotlin.compose)
 }
 
 android {
@@ -37,6 +38,9 @@ android {
         jvmTarget = "11"
     }
     buildFeatures {
+        compose = true
+    }
+    buildFeatures {
         viewBinding = true
     }
 }
@@ -57,8 +61,33 @@ dependencies {
     implementation(libs.androidx.navigation.ui.ktx)
     implementation(libs.kotlinx.coroutines.android)
 
+    // Jetpack Compose ===
+    val composeBom = platform("androidx.compose:compose-bom:2025.05.00")
+    implementation(composeBom)
+    androidTestImplementation(composeBom)
+    // Material Design 3
+    implementation(libs.androidx.material3)
+
+    implementation(libs.androidx.ui)
+    implementation(libs.androidx.ui.graphics)
+    // Optional - Integration with activities
+    implementation(libs.androidx.activity.compose)
+    // Optional - Integration with ViewModels
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    // Android Studio Preview support
+    implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.androidx.material.icons.extended)
+    // Optional - Add window size utils
+    implementation(libs.androidx.adaptive)
+    // Compose Navigation
+    implementation(libs.androidx.navigation.compose)
+
+
+    debugImplementation(libs.androidx.ui.tooling)
+
     // Hilt DI
     implementation(libs.hilt.android)
+    implementation(libs.androidx.hilt.navigation.compose)
     ksp(libs.hilt.android.compiler)
 
     // Room Database
@@ -76,16 +105,20 @@ dependencies {
     testImplementation(libs.androidx.room.testing)
 
 
-    // Dependencies for local unit tests
+    // Dependencies for local unit tests ====
     testImplementation(libs.junit)
     testImplementation(libs.androidx.archcore.testing)
     testImplementation(libs.kotlinx.coroutines.android)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.google.truth)
 
-    // Dependencies for Android tests
+    // Dependencies for Android tests ====
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.kotlinx.coroutines.android)
     androidTestImplementation(libs.kotlinx.coroutines.test)
+
+    //Compose
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
