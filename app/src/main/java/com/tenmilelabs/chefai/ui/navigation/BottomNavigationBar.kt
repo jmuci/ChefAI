@@ -14,15 +14,14 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavController
+import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.ui.theme.FaintGreen
 import com.tenmilelabs.chefai.ui.theme.MdThemeOnPrimary
 import com.tenmilelabs.chefai.ui.theme.MdThemePrimary
 import com.tenmilelabs.chefai.ui.theme.MediumGreen
-import com.tenmilelabs.chefai.R
 
 
 data class NavigationItem(
@@ -52,9 +51,7 @@ fun BottomNavigationBar(
         ),
         NavigationItem(
             title = "Meal Plans",
-            //icon = painterResource(id = R.drawable.ic_chef_hat_black_24),
             icon = ImageVector.vectorResource(id = R.drawable.ic_chef_hat_black_24dp),
-            //icon = Icons.Filled.QuestionMark,
             route = Screen.MealPlans.route
         ),
     )

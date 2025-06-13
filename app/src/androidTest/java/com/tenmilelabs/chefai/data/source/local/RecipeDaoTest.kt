@@ -29,7 +29,16 @@ class RecipeDaoTest {
     @Test
     fun insertRecipeAndGetById() = runTest {
         // GIVEN - Insert a recipe
-        val recipe = RecipeEntity("1", "Title1", "Label1", "Description1", 10, "RecipeUrl1", "ImageUrl1", "ImageUrlThumbnail1")
+        val recipe = RecipeEntity(
+            "1",
+            "Title1",
+            "Label1",
+            "Description1",
+            10,
+            "RecipeUrl1",
+            "ImageUrl1",
+            "ImageUrlThumbnail1"
+        )
 
         database.recipeDao().upsertRecipe(recipe)
 
@@ -45,10 +54,28 @@ class RecipeDaoTest {
     @Test
     fun insertRecipeReplacesOnConflict() = runTest {
         // Given that a recipe is inserted
-        val recipe = RecipeEntity("1", "Title1", "Label1", "Description1", 10, "RecipeUrl1", "ImageUrl1", "ImageUrlThumbnail1")
+        val recipe = RecipeEntity(
+            "1",
+            "Title1",
+            "Label1",
+            "Description1",
+            10,
+            "RecipeUrl1",
+            "ImageUrl1",
+            "ImageUrlThumbnail1"
+        )
         database.recipeDao().upsertRecipe(recipe)
         // When a recipe with the same id is inserted
-        val newRecipe = RecipeEntity("1", "Title2", "Label2", "Description2", 10, "RecipeUrl2", "ImageUrl2", "ImageUrlThumbnail2")
+        val newRecipe = RecipeEntity(
+            "1",
+            "Title2",
+            "Label2",
+            "Description2",
+            10,
+            "RecipeUrl2",
+            "ImageUrl2",
+            "ImageUrlThumbnail2"
+        )
         database.recipeDao().upsertRecipe(newRecipe)
         // THEN - The loaded data contains the expected values
         val loaded = database.recipeDao().getRecipeById("1")
@@ -56,4 +83,4 @@ class RecipeDaoTest {
         assertEquals(loaded.uuid, newRecipe.uuid)
         assertEquals(loaded.title, newRecipe.title)
     }
- }
+}

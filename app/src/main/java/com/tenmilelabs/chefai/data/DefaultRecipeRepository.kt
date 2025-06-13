@@ -1,10 +1,8 @@
 package com.tenmilelabs.chefai.data
 
 import com.tenmilelabs.chefai.data.source.local.RecipeDao
-import com.tenmilelabs.chefai.data.source.local.RecipeEntity
 import com.tenmilelabs.chefai.di.ApplicationScope
 import com.tenmilelabs.chefai.di.DefaultDispatcher
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
