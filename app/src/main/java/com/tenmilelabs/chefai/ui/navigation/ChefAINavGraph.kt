@@ -1,5 +1,7 @@
 package com.tenmilelabs.chefai.ui.navigation
 
+import android.content.res.Configuration.UI_MODE_NIGHT_NO
+import android.content.res.Configuration.UI_MODE_NIGHT_YES
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -40,8 +42,16 @@ fun ChefAINavGraph(modifier: Modifier) {
     }
 }
 
-
-@Preview
+@Preview(
+    uiMode = UI_MODE_NIGHT_YES,
+    name = "DefaultPreviewDark",
+    showBackground = true
+)
+@Preview(
+    uiMode = UI_MODE_NIGHT_NO,
+    name = "DefaultPreviewLight",
+    showBackground = true
+)
 @Composable
 fun ChefAINavGraphPreview() {
     ChefAINavGraph(Modifier.fillMaxSize())

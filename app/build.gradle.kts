@@ -63,6 +63,7 @@ dependencies {
     androidTestImplementation(composeBom)
     // Material Design 3
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.ui.text.google.fonts)
 
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
