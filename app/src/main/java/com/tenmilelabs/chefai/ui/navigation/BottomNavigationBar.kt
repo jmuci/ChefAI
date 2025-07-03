@@ -5,6 +5,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -18,10 +19,7 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavController
 import com.tenmilelabs.chefai.R
-import com.tenmilelabs.chefai.ui.theme.FaintGreen
-import com.tenmilelabs.chefai.ui.theme.MdThemeOnPrimary
-import com.tenmilelabs.chefai.ui.theme.MdThemePrimary
-import com.tenmilelabs.chefai.ui.theme.MediumGreen
+import com.tenmilelabs.chefai.ui.theme.ChefAITheme
 
 
 data class NavigationItem(
@@ -56,7 +54,7 @@ fun BottomNavigationBar(
         ),
     )
     NavigationBar(
-        containerColor = MdThemePrimary,
+        containerColor = MaterialTheme.colorScheme.primaryContainer,
     ) {
         navigationItems.forEachIndexed { index, item ->
             NavigationBarItem(
@@ -71,17 +69,13 @@ fun BottomNavigationBar(
                 label = {
                     Text(
                         item.title,
-                        color = if (index == selectedNavigationIndex.intValue)
-                            MdThemeOnPrimary
-                        else FaintGreen
                     )
                 },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = MediumGreen,
-                    indicatorColor = MdThemeOnPrimary,
-                    unselectedIconColor = FaintGreen,
+                    selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    indicatorColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    unselectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
-
             )
         }
     }
@@ -94,6 +88,8 @@ fun BottomNavigationBar(
 @Preview
 @Composable
 fun BottomNavigationBarPreview() {
-    BottomNavigationBar(navController = NavController(LocalContext.current))
+    ChefAITheme {
+        BottomNavigationBar(navController = NavController(LocalContext.current))
+    }
 }
 
