@@ -110,7 +110,7 @@ fun RecipeCardPreview() {
                 recipe = Recipe(
                     title = "Recipe Title",
                     label = "Recipe Label",
-                    description = "Recipe Description. This is how you do this. Follow exactly the following steps to achieve sucesss. \n No cutting corners.",
+                    description = "Recipe Description. This is how you do this. Follow exactly the following steps to achieve success. \n No cutting corners.",
                     prepTime = 10,
                     recipeUrl = "https://www.google.com",
                     imageUrl = "https://www.google.com",

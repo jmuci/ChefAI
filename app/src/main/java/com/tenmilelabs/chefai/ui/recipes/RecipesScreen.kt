@@ -6,12 +6,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.dimensionResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.data.Recipe
 import com.tenmilelabs.chefai.ui.components.RecipeCard
@@ -19,8 +27,33 @@ import com.tenmilelabs.chefai.ui.theme.ChefAITheme
 
 @Composable
 fun RecipesScreen(
-    recipes: List<Recipe> = emptyList()
+    viewModel: RecipesViewModel = hiltViewModel(),
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    RecipesContent(
+        loading = uiState.isLoading,
+        recipes = uiState.items
+    )
+
+    // Check for user messages to display on the screen
+    uiState.userMessage?.let { message ->
+        val snackbarText = stringResource(message)
+        LaunchedEffect(snackbarHostState, viewModel, message, snackbarText) {
+            snackbarHostState.showSnackbar(snackbarText)
+            viewModel.snackbarMessageShown()
+        }
+    }
+
+}
+
+@Composable
+fun RecipesContent(
+    loading: Boolean,
+    recipes: List<Recipe>,
+    modifier: Modifier = Modifier
+) {
+    //TODO Add loading state
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -59,7 +92,7 @@ fun RecipesScreenPreview() {
     }
     ChefAITheme {
         Surface {
-            RecipesScreen(recipes)
+            RecipesContent(false, recipes)
         }
     }
 }
