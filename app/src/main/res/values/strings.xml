@@ -5,4 +5,6 @@
     <string name="title_meal_plans">Meal Plans</string>
     <string name="recipe_image_content_description">Recipe Image</string>
     <string name="loading_recipes_error">Error while loading recipes!</string>
+    <string name="recipe_steps">Recipe Instructions</string>
+    <string name="recipe_hyperlink">See original recipe online</string>
 </resources>

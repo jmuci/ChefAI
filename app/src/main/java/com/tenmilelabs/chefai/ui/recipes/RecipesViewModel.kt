@@ -12,6 +12,7 @@ import com.tenmilelabs.chefai.util.WhileUiSubscribed
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -25,13 +26,13 @@ import javax.inject.Inject
 data class RecipesUiState(
     val items: List<Recipe> = emptyList(),
     val isLoading: Boolean = false,
-    val userMessage: Int? = null
+    val userMessage: Int? = null,
 )
 
 
 @HiltViewModel
 class RecipesViewModel @Inject constructor(
-    private val recipesRepository: RecipesRepository
+    recipesRepository: RecipesRepository
 ) : ViewModel() {
 
     private val _isLoading = MutableStateFlow(false)
@@ -66,6 +67,7 @@ class RecipesViewModel @Inject constructor(
     fun snackbarMessageShown() {
         _userMessage.value = null
     }
+    //val uiState: StateFlow<RecipesUiState> = _uiState.asStateFlow()
 
     // TODO Add a refresh function to refresh content.
 
@@ -73,6 +75,21 @@ class RecipesViewModel @Inject constructor(
         value = "This is recipes Fragment"
     }
 
+/*    fun navigateToDetailsScreen(recipeId : String) {
+        val recipe = _uiState.value.items.find { it.uuid == recipeId }
+        _uiState.value = uiState.value.copy(
+            selectedRecipe = recipe,
+            isDetailOnlyOpen = true
+        )
+    }
+
+    fun closeDetailScreen() {
+        _uiState.value = _uiState
+            .value.copy(
+                selectedRecipe = _uiState.value.items.first(),
+                isDetailOnlyOpen = false
+            )
+    }*/
     /*    private val _recipes = recipesRepository.getRecipesObservable().onCompletion {
             recipes -> Log.d("RecipesViewModel", "Loaded ${recipes} Recipes from the DB ")
         }*/

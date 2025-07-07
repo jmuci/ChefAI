@@ -32,11 +32,14 @@ import com.tenmilelabs.chefai.data.Recipe
 import com.tenmilelabs.chefai.ui.theme.ChefAITheme
 
 @Composable
-fun RecipeCard(recipe: Recipe) {
+fun RecipeCard(recipe: Recipe,
+               closeDetailScreen: () -> Unit = {},
+               navigateToDetail: (String) -> Unit = {}) {
     Card(
         modifier = Modifier
             .padding(dimensionResource(id = R.dimen.padding_small)),
-        colors = CardDefaults.cardColors(MaterialTheme.colorScheme.primaryContainer)
+        colors = CardDefaults.cardColors(MaterialTheme.colorScheme.primaryContainer),
+        onClick = { navigateToDetail(recipe.uuid) }
     ) {
         Row {
             Column(
@@ -50,7 +53,7 @@ fun RecipeCard(recipe: Recipe) {
                         .data(recipe.thumbnailUrl)
                         .crossfade(true)
                         .build(),
-                    placeholder = painterResource(R.drawable.ic_img_error),
+                    placeholder = painterResource(R.drawable.ic_img_placeholder),
                     error = painterResource(R.drawable.ic_img_error),
                     contentDescription = stringResource(R.string.recipe_image_content_description),
                     contentScale = ContentScale.Crop,
@@ -71,34 +74,8 @@ fun RecipeCard(recipe: Recipe) {
                     modifier = Modifier
                         .padding(horizontal = dimensionResource(id = R.dimen.padding_small))
                 )
-                Row(
-                    modifier = Modifier
-                        .padding(vertical = dimensionResource(id = R.dimen.padding_extra_extra_small))
-                ) {
-                    Column {
-                        Text(
-                            text = "${recipe.prepTime} min",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier
-                                .padding(horizontal = dimensionResource(id = R.dimen.padding_small))
-                        )
-                    }
-                    Column {
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.tertiaryContainer
-                        ) {
-                            Text(
-                                text = recipe.label,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier
-                                    .padding(horizontal = dimensionResource(id = R.dimen.padding_small))
-                            )
-                        }
-                    }
-                }
+                RecipeTimeAndLabelRow(recipe.prepTime, recipe.label)
+
                 Text(
                     text = recipe.description,
                     style = MaterialTheme.typography.bodyMedium,
@@ -110,6 +87,38 @@ fun RecipeCard(recipe: Recipe) {
             }
         }
 
+    }
+}
+
+@Composable
+fun RecipeTimeAndLabelRow(prepTime: Int, label: String) {
+    Row(
+        modifier = Modifier
+            .padding(vertical = dimensionResource(id = R.dimen.padding_extra_extra_small))
+    ) {
+        Column {
+            Text(
+                text = "${prepTime} min",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .padding(horizontal = dimensionResource(id = R.dimen.padding_small))
+            )
+        }
+        Column {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.tertiaryContainer
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .padding(horizontal = dimensionResource(id = R.dimen.padding_small))
+                )
+            }
+        }
     }
 }
 
