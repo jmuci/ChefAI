@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.ui.recipes
 
+import android.util.Log
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -43,7 +45,7 @@ import com.tenmilelabs.chefai.ui.theme.ChefAITheme
 @Composable
 fun RecipesScreen(
     viewModel: RecipesViewModel = hiltViewModel(),
-    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    snackbarHostState: SnackbarHostState,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     RecipesContent(
@@ -55,7 +57,7 @@ fun RecipesScreen(
     uiState.userMessage?.let { message ->
         val snackbarText = stringResource(message)
         LaunchedEffect(snackbarHostState, viewModel, message, snackbarText) {
-            snackbarHostState.showSnackbar(snackbarText)
+            snackbarHostState.showSnackbar(message = snackbarText,  duration = SnackbarDuration.Short)
             viewModel.snackbarMessageShown()
         }
     }

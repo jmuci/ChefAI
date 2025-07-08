@@ -5,7 +5,10 @@ import android.content.res.Configuration.UI_MODE_NIGHT_YES
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.compose.NavHost
@@ -19,12 +22,14 @@ import com.tenmilelabs.chefai.ui.recipes.RecipesScreen
 @Composable
 fun ChefAINavGraph(modifier: Modifier) {
     val navController = rememberNavController()
+    val snackbarHostState = remember { SnackbarHostState() }
+
     val graph = navController.createGraph(startDestination = Screen.Home.route) {
         composable(route = Screen.Home.route) {
             HomeScreen()
         }
         composable(route = Screen.Recipes.route) {
-            RecipesScreen()
+            RecipesScreen(snackbarHostState = snackbarHostState)
         }
         composable(route = Screen.MealPlans.route) {
             MealPlansScreen()
@@ -32,6 +37,7 @@ fun ChefAINavGraph(modifier: Modifier) {
     }
     Scaffold(
         modifier,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = { BottomNavigationBar(navController) },
     ) { innerPadding ->
         NavHost(

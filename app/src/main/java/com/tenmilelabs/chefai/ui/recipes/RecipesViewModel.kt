@@ -1,7 +1,5 @@
 package com.tenmilelabs.chefai.ui.recipes
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.R
@@ -12,7 +10,6 @@ import com.tenmilelabs.chefai.util.WhileUiSubscribed
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -54,7 +51,7 @@ class RecipesViewModel @Inject constructor(
                     RecipesUiState(
                         items = recipesAsync.data,
                         isLoading = isLoading,
-                        userMessage = userMessage)
+                        userMessage = R.string.loading_recipes_success)
                 }
             }
         }
@@ -67,13 +64,8 @@ class RecipesViewModel @Inject constructor(
     fun snackbarMessageShown() {
         _userMessage.value = null
     }
-    //val uiState: StateFlow<RecipesUiState> = _uiState.asStateFlow()
 
     // TODO Add a refresh function to refresh content.
-
-    private val _text = MutableLiveData<String>().apply {
-        value = "This is recipes Fragment"
-    }
 
 /*    fun navigateToDetailsScreen(recipeId : String) {
         val recipe = _uiState.value.items.find { it.uuid == recipeId }
@@ -90,10 +82,5 @@ class RecipesViewModel @Inject constructor(
                 isDetailOnlyOpen = false
             )
     }*/
-    /*    private val _recipes = recipesRepository.getRecipesObservable().onCompletion {
-            recipes -> Log.d("RecipesViewModel", "Loaded ${recipes} Recipes from the DB ")
-        }*/
-    //var accessedDatabase: SupportSQLiteDatabase? = db.getOpenHelper().getWritableDatabase()
 
-    val text: LiveData<String> = _text
 }
