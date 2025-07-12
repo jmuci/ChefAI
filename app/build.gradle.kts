@@ -101,6 +101,10 @@ dependencies {
     // optional - Test helpers
     testImplementation(libs.androidx.room.testing)
 
+    // Coil Image Loader
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
+
 
     // Dependencies for local unit tests ====
     testImplementation(libs.junit)

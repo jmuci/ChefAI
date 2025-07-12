@@ -31,8 +31,8 @@ object DatabaseModules {
         return Room.databaseBuilder(
             context,
             ChefAIDataBase::class.java,
-            "Recipes.db"
-        ).createFromAsset("database/ChefAI.sql").build()
+            "ChefAI.db"
+        ).createFromAsset("database/ChefAI.db").build()
     }
 
     @Provides

@@ -1,26 +1,86 @@
 package com.tenmilelabs.chefai.ui.recipes
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.data.Recipe
 import com.tenmilelabs.chefai.data.RecipesRepository
+import com.tenmilelabs.chefai.util.Async
+import com.tenmilelabs.chefai.util.WhileUiSubscribed
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
+
+
+/**
+ * UiState for the task list screen.
+ */
+data class RecipesUiState(
+    val items: List<Recipe> = emptyList(),
+    val isLoading: Boolean = false,
+    val userMessage: Int? = null,
+)
 
 
 @HiltViewModel
 class RecipesViewModel @Inject constructor(
-    private val recipesRepository: RecipesRepository
+    recipesRepository: RecipesRepository
 ) : ViewModel() {
 
-    private val _text = MutableLiveData<String>().apply {
-        value = "This is recipes Fragment"
+    private val _isLoading = MutableStateFlow(false)
+    private val _userMessage: MutableStateFlow<Int?> = MutableStateFlow(null)
+    private val _recipesAsync = recipesRepository.getRecipesObservable()
+        .map { Async.Success(it) }
+        .catch<Async<List<Recipe>>> { emit(Async.Error(R.string.loading_recipes_error)) }
+
+    val uiState: StateFlow<RecipesUiState> = combine(_isLoading, _recipesAsync, _userMessage)
+        { isLoading, recipesAsync, userMessage ->
+            when (recipesAsync) {
+                Async.Loading -> {
+                    RecipesUiState(isLoading = true)
+                }
+                is Async.Error -> {
+                    RecipesUiState(userMessage = recipesAsync.errorMessage)
+                }
+                is Async.Success -> {
+                    RecipesUiState(
+                        items = recipesAsync.data,
+                        isLoading = isLoading,
+                        userMessage = R.string.loading_recipes_success)
+                }
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = WhileUiSubscribed,
+            initialValue = RecipesUiState(isLoading = true)
+        )
+
+    fun snackbarMessageShown() {
+        _userMessage.value = null
     }
 
-    /*    private val _recipes = recipesRepository.getRecipesObservable().onCompletion {
-            recipes -> Log.d("RecipesViewModel", "Loaded ${recipes} Recipes from the DB ")
-        }*/
-    //var accessedDatabase: SupportSQLiteDatabase? = db.getOpenHelper().getWritableDatabase()
+    // TODO Add a refresh function to refresh content.
 
-    val text: LiveData<String> = _text
+/*    fun navigateToDetailsScreen(recipeId : String) {
+        val recipe = _uiState.value.items.find { it.uuid == recipeId }
+        _uiState.value = uiState.value.copy(
+            selectedRecipe = recipe,
+            isDetailOnlyOpen = true
+        )
+    }
+
+    fun closeDetailScreen() {
+        _uiState.value = _uiState
+            .value.copy(
+                selectedRecipe = _uiState.value.items.first(),
+                isDetailOnlyOpen = false
+            )
+    }*/
+
 }

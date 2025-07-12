@@ -1,10 +1,9 @@
 package com.tenmilelabs.chefai.ui.components
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -14,9 +13,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -24,16 +23,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import coil3.annotation.ExperimentalCoilApi
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.data.Recipe
 import com.tenmilelabs.chefai.ui.theme.ChefAITheme
 
 @Composable
-fun RecipeCard(recipe: Recipe) {
+fun RecipeCard(recipe: Recipe,
+               closeDetailScreen: () -> Unit = {},
+               navigateToDetail: (String) -> Unit = {}) {
     Card(
         modifier = Modifier
             .padding(dimensionResource(id = R.dimen.padding_small)),
-        colors = CardDefaults.cardColors(MaterialTheme.colorScheme.primaryContainer)
+        colors = CardDefaults.cardColors(MaterialTheme.colorScheme.primaryContainer),
+        onClick = { navigateToDetail(recipe.uuid) }
     ) {
         Row {
             Column(
@@ -42,19 +48,24 @@ fun RecipeCard(recipe: Recipe) {
                     .align(Alignment.CenterVertically)
                     .padding(dimensionResource(id = R.dimen.padding_small))
             ) {
-                Image(
-                    modifier = Modifier.fillMaxWidth(),
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(recipe.thumbnailUrl)
+                        .crossfade(true)
+                        .build(),
+                    placeholder = painterResource(R.drawable.ic_img_placeholder),
+                    error = painterResource(R.drawable.ic_img_error),
+                    contentDescription = stringResource(R.string.recipe_image_content_description),
+                    contentScale = ContentScale.Crop,
                     alignment = Alignment.Center,
-                    contentScale = ContentScale.FillWidth,
-                    colorFilter = ColorFilter.tint(Color.Gray),
-                    painter = painterResource(id = R.drawable.ic_img_error),
-                    contentDescription = stringResource(id = R.string.recipe_image_content_description)
+                    modifier = Modifier.size(120.dp, 70.dp)
+                        .clip(RoundedCornerShape(5.dp))
                 )
             }
             Column(
                 modifier = Modifier
-                    .weight(4f)
-                    .padding(dimensionResource(id = R.dimen.padding_small))
+                    .weight(3f)
+                    .padding(dimensionResource(id = R.dimen.padding_extra_small))
             ) {
                 Text(
                     text = recipe.title,
@@ -63,30 +74,8 @@ fun RecipeCard(recipe: Recipe) {
                     modifier = Modifier
                         .padding(horizontal = dimensionResource(id = R.dimen.padding_small))
                 )
-                Row(modifier = Modifier
-                    .padding(vertical = dimensionResource(id = R.dimen.padding_extra_extra_small))) {
-                    Column {
-                        Text(
-                            text = "${recipe.prepTime} min",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier
-                                .padding(horizontal = dimensionResource(id = R.dimen.padding_small))
-                        )
-                    }
-                    Column {
-                        Surface(shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.tertiaryContainer) {
-                            Text(
-                                text = recipe.label,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier
-                                    .padding(horizontal = dimensionResource(id = R.dimen.padding_small))
-                            )
-                        }
-                    }
-                }
+                RecipeTimeAndLabelRow(recipe.prepTime, recipe.label)
+
                 Text(
                     text = recipe.description,
                     style = MaterialTheme.typography.bodyMedium,
@@ -101,6 +90,39 @@ fun RecipeCard(recipe: Recipe) {
     }
 }
 
+@Composable
+fun RecipeTimeAndLabelRow(prepTime: Int, label: String) {
+    Row(
+        modifier = Modifier
+            .padding(vertical = dimensionResource(id = R.dimen.padding_extra_extra_small))
+    ) {
+        Column {
+            Text(
+                text = "${prepTime} min",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .padding(horizontal = dimensionResource(id = R.dimen.padding_small))
+            )
+        }
+        Column {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.tertiaryContainer
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .padding(horizontal = dimensionResource(id = R.dimen.padding_small))
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalCoilApi::class)
 @Preview
 @Composable
 fun RecipeCardPreview() {
@@ -110,7 +132,7 @@ fun RecipeCardPreview() {
                 recipe = Recipe(
                     title = "Recipe Title",
                     label = "Recipe Label",
-                    description = "Recipe Description. This is how you do this. Follow exactly the following steps to achieve sucesss. \n No cutting corners.",
+                    description = "Recipe Description. This is how you do this. Follow exactly the following steps to achieve success. \n No cutting corners.",
                     prepTime = 10,
                     recipeUrl = "https://www.google.com",
                     imageUrl = "https://www.google.com",
