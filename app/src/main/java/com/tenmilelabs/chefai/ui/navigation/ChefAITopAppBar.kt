@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.ui.navigation
 
+import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -11,12 +12,17 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.navigation.NavController
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChefAITopAppBar(navController: NavController) {
+fun ChefAITopAppBar(
+    @StringRes titleResId: Int,
+    onNavigationClick: (() -> Unit)? = null,
+) {
+
     return CenterAlignedTopAppBar(
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -24,17 +30,19 @@ fun ChefAITopAppBar(navController: NavController) {
         ),
         title = {
             Text(
-                "Center Top App Bar", // TODO: Replace with screen name.
+                stringResource(titleResId),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         },
         navigationIcon = {
-            IconButton(onClick = { /* do something */ }) {
+            if(onNavigationClick != null) {
+            IconButton(onClick = onNavigationClick) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Localized description"
                 )
+            }
             }
         },
         scrollBehavior =  TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())

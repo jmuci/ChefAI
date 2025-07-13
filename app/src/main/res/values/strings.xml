@@ -12,4 +12,9 @@
     <string name="meal_plans_screen_title">Meal Plans</string>
     <string name="recipes_screen_title">Recipes</string>
     <string name="recipe_details_screen_title">Recipe Steps</string>
+    <string name="app_dest_title_meal_plans">Meal Plans</string>
+    <string name="app_dest_title_home">Home</string>
+    <string name="app_dest_title_recipes">Recipes</string>
+    <string name="app_dest_title_recipe_details">Recipe Details</string>
+    <string name="app_dest_title_settings">Settings</string>
 </resources>

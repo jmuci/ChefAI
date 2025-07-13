@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavController
@@ -57,11 +58,11 @@ fun BottomNavigationBar(
                     navController.navigate(item.appDestination.route)
                 },
                 icon = {
-                    Icon(imageVector = ImageVector.vectorResource(id = item.icon), contentDescription = item.appDestination.title)
+                    Icon(imageVector = ImageVector.vectorResource(id = item.icon), contentDescription = stringResource(item.appDestination.title))
                 },
                 label = {
                     Text(
-                        item.appDestination.title,
+                        stringResource(item.appDestination.title),
                     )
                 },
                 colors = NavigationBarItemDefaults.colors(
