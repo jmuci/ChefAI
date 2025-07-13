@@ -1,9 +1,6 @@
 package com.tenmilelabs.chefai.ui.navigation
 
 import android.content.res.Configuration.UI_MODE_NIGHT_YES
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.LibraryBooks
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -21,12 +18,25 @@ import androidx.navigation.NavController
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.ui.theme.ChefAITheme
 
+/**
+ * Destinations used in the [ChefAIApp] Bottom Nav Bar.
+ */
 
-data class NavigationItem(
-    val title: String,
-    val icon: ImageVector,
-    val route: String
-)
+enum class TopLevelDestination(
+    val icon: Int,
+    val appDestination: AppDestinations
+) {
+    HOME(
+        icon = R.drawable.ic_home_black_24dp,
+        appDestination = AppDestinations.HOME),
+    RECIPES(
+        icon = R.drawable.ic_recipe_library_24dp,
+        appDestination = AppDestinations.RECIPES),
+    MEAL_PLANS(
+        icon = R.drawable.ic_chef_hat_black_24dp,
+        appDestination = AppDestinations.MEAL_PLANS
+    ),
+}
 
 @Composable
 fun BottomNavigationBar(
@@ -36,39 +46,22 @@ fun BottomNavigationBar(
         mutableIntStateOf(0)
     }
 
-    val navigationItems = listOf(
-        NavigationItem(
-            title = "Home",
-            icon = Icons.Filled.Home,
-            route = Screen.Home.route
-        ),
-        NavigationItem(
-            title = "Recipes",
-            icon = Icons.AutoMirrored.Filled.LibraryBooks,
-            route = Screen.Recipes.route
-        ),
-        NavigationItem(
-            title = "Meal Plans",
-            icon = ImageVector.vectorResource(id = R.drawable.ic_chef_hat_black_24dp),
-            route = Screen.MealPlans.route
-        ),
-    )
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.primaryContainer,
     ) {
-        navigationItems.forEachIndexed { index, item ->
+        TopLevelDestination.entries.forEachIndexed { index, item ->
             NavigationBarItem(
                 selected = selectedNavigationIndex.intValue == index,
                 onClick = {
                     selectedNavigationIndex.intValue = index
-                    navController.navigate(item.route)
+                    navController.navigate(item.appDestination.route)
                 },
                 icon = {
-                    Icon(imageVector = item.icon, contentDescription = item.title)
+                    Icon(imageVector = ImageVector.vectorResource(id = item.icon), contentDescription = item.appDestination.title)
                 },
                 label = {
                     Text(
-                        item.title,
+                        item.appDestination.title,
                     )
                 },
                 colors = NavigationBarItemDefaults.colors(
