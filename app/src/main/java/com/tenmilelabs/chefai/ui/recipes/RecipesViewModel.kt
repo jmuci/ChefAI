@@ -65,6 +65,4 @@ class RecipesViewModel @Inject constructor(
         _userMessage.value = null
     }
 
-    // TODO Add a refresh function to refresh content.
-
 }

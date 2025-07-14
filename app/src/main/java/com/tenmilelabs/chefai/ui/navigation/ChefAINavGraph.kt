@@ -66,13 +66,9 @@ fun ChefAINavGraph(
     var titleRes by rememberSaveable { mutableIntStateOf(R.string.app_name) }
 
     navController.addOnDestinationChangedListener { _, destination, _ ->
-        // TODO make the mapping programmatic by looking for destination route in AppDestinations
-        when (destination.route) {
-            AppDestinations.HOME.route -> titleRes = R.string.app_dest_title_home
-            AppDestinations.RECIPES.route -> titleRes = R.string.app_dest_title_recipes
-            AppDestinations.MEAL_PLANS.route -> titleRes = R.string.app_dest_title_meal_plans
-            AppDestinations.RECIPE_DETAILS.route -> titleRes = R.string.app_dest_title_recipe_details
-        }
+        titleRes = AppDestinations.entries
+            .filter { it.route == destination.route }
+            .map { it.title }.first()
     }
 
     Scaffold(

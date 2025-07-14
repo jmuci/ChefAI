@@ -75,7 +75,7 @@ fun RecipesContent(
                 items(recipes) { recipe ->
                     RecipeCard(
                         recipe = recipe,
-                        navigateToDetail = { recipeCardOnClick(recipe.uuid) }) // TODO add Nav Command
+                        navigateToDetail = { recipeCardOnClick(recipe.uuid) })
                 }
             }
         }
