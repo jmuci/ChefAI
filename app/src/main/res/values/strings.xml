@@ -5,6 +5,7 @@
     <string name="title_meal_plans">Meal Plans</string>
     <string name="recipe_image_content_description">Recipe Image</string>
     <string name="recipe_not_found_error">Recipe Not Found!</string>
+    <string name="recipe_not_found_error_subtitle">Oops! This was not supposed to happen. Please navigate back and try again later.</string>
     <string name="loading_recipes_error">Error while loading recipes!</string>
     <string name="loading_recipe_details_error">Failed to load recipe details</string>
     <string name="loading_recipes_success">Successfully loaded recipes!</string>
@@ -20,4 +21,6 @@
     <string name="app_dest_title_recipe_details">Recipe Details</string>
     <string name="app_dest_title_settings">Settings</string>
     <string name="recipe_details_error">Failed to open the detailed view. Please try again later.</string>
+    <string name="no_recipes_title">No recipes in your collection</string>
+    <string name="no_recipes_subtitle">Start browsing recipes and bookmark the ones you like to populate your colleciton.\n</string>
 </resources>

@@ -5,11 +5,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -23,6 +21,8 @@ import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.data.Recipe
 import com.tenmilelabs.chefai.ui.components.RecipeCard
 import com.tenmilelabs.chefai.ui.theme.ChefAITheme
+import com.tenmilelabs.chefai.util.EmptyContent
+import com.tenmilelabs.chefai.util.LoadingContent
 
 @Composable
 fun RecipesScreen(
@@ -41,11 +41,13 @@ fun RecipesScreen(
     uiState.userMessage?.let { message ->
         val snackbarText = stringResource(message)
         LaunchedEffect(snackbarHostState, viewModel, message, snackbarText) {
-            snackbarHostState.showSnackbar(message = snackbarText,  duration = SnackbarDuration.Short)
+            snackbarHostState.showSnackbar(
+                message = snackbarText,
+                duration = SnackbarDuration.Short
+            )
             viewModel.snackbarMessageShown()
         }
     }
-
 }
 
 @Composable
@@ -53,18 +55,22 @@ fun RecipesContent(
     loading: Boolean,
     recipes: List<Recipe>,
     recipeCardOnClick: (String) -> Unit = {},
-    ) {
-
-        //TODO Add loading state
+) {
+    if (loading) {
+        LoadingContent()
+    } else {
+        if (recipes.isEmpty()) {
+            EmptyContent(
+                R.string.no_recipes_title,
+                R.string.no_recipes_subtitle,
+                R.drawable.ic_chef_hat_black_24dp
+            )
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = dimensionResource(id = R.dimen.padding_medium)),
         ) {
-            Text(
-                text = "My Recipes",
-                style = MaterialTheme.typography.headlineLarge
-            )
             LazyColumn {
                 items(recipes) { recipe ->
                     RecipeCard(
@@ -73,7 +79,9 @@ fun RecipesContent(
                 }
             }
         }
+    }
 }
+
 
 
 @Preview
@@ -94,6 +102,17 @@ fun RecipessListScreenPreview() {
             )
         }
     }
+    ChefAITheme {
+        Surface {
+            RecipesContent(false, recipes)
+        }
+    }
+}
+
+@Preview
+@Composable
+fun RecipesListScreenEmptyPreview() {
+    val recipes: List<Recipe> = emptyList()
     ChefAITheme {
         Surface {
             RecipesContent(false, recipes)

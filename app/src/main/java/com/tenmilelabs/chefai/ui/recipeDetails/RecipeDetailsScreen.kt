@@ -33,6 +33,8 @@ import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.data.Recipe
 import com.tenmilelabs.chefai.ui.components.RecipeTimeAndLabelRow
 import com.tenmilelabs.chefai.ui.theme.ChefAITheme
+import com.tenmilelabs.chefai.util.EmptyContent
+import com.tenmilelabs.chefai.util.LoadingContent
 
 
 @Composable
@@ -41,11 +43,19 @@ fun RecipeDetailsScreen(
     snackbarHostState: SnackbarHostState,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    if (uiState.recipe != null) {
-        RecipeDetailsContent(uiState.recipe!!)
-    } else{
-        Log.e("Receipe not found", "Recipe Loading error!")
-        // TODO add loading state for this case too
+    if (uiState.isLoading) {
+        LoadingContent()
+    } else {
+        if (uiState.recipe != null) {
+            RecipeDetailsContent(uiState.recipe!!)
+        } else {
+            EmptyContent(
+                title = R.string.recipe_not_found_error,
+                subtitle = R.string.recipe_not_found_error_subtitle,
+                noRecipesIconRes = R.drawable.ic_chef_hat_black_24dp
+            )
+            Log.e("RecipeDetailsScreen", "Recipe Not Found Loading error!")
+        }
     }
 
     // Check for user messages to display on the screen

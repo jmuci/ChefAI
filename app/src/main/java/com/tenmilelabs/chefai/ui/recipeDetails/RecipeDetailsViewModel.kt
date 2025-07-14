@@ -7,7 +7,6 @@ import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.data.Recipe
 import com.tenmilelabs.chefai.data.RecipesRepository
 import com.tenmilelabs.chefai.ui.navigation.AppDestinationArgs
-import com.tenmilelabs.chefai.ui.navigation.AppDestinations
 import com.tenmilelabs.chefai.util.Async
 import com.tenmilelabs.chefai.util.WhileUiSubscribed
 import dagger.hilt.android.lifecycle.HiltViewModel
