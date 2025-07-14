@@ -25,7 +25,7 @@ class DefaultRecipeRepository @Inject constructor(
         }
     }
 
-    override fun getRecipesObservable(): Flow<List<Recipe>> {
+    override fun getRecipesFlow(): Flow<List<Recipe>> {
         return localDatSource.observeAll().map { recipes ->
             withContext(dispatcher) {
                 recipes.toExternal()
@@ -33,7 +33,7 @@ class DefaultRecipeRepository @Inject constructor(
         }
     }
 
-    override fun getRecipeStream(uuid: String): Flow<Recipe> {
+    override fun getRecipeFlow(uuid: String): Flow<Recipe?> {
         return localDatSource.observeRecipeById(uuid).map { it.toExternal() }
     }
 

@@ -2,22 +2,23 @@ package com.tenmilelabs.chefai.ui.navigation
 
 import android.content.res.Configuration.UI_MODE_NIGHT_NO
 import android.content.res.Configuration.UI_MODE_NIGHT_YES
-import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -25,74 +26,59 @@ import androidx.navigation.createGraph
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.ui.home.HomeScreen
 import com.tenmilelabs.chefai.ui.mealplans.MealPlansScreen
+import com.tenmilelabs.chefai.ui.recipeDetails.RecipeDetailsScreen
 import com.tenmilelabs.chefai.ui.recipes.RecipesScreen
 
-/**
- * App destinations associated with screens users can navigate to.
- */
-enum class AppDestinations(
-    @StringRes val title: Int,
-    val route: String,
-    val topLevelDestination: Boolean = false,
-) {
-    HOME(
-        title = R.string.app_dest_title_home,
-        route = Screen.Home.route,
-        topLevelDestination = true
-    ),
-    MEAL_PLANS(
-        title = R.string.app_dest_title_meal_plans,
-        route = Screen.MealPlans.route,
-        topLevelDestination = true,
-    ),
-    RECIPES(
-        title = R.string.app_dest_title_recipes,
-        route = Screen.Recipes.route,
-        topLevelDestination = true
-    ),
-    RECIPE_DETAILS(
-        title = R.string.app_dest_title_recipe_details,
-        route = Screen.RecipeDetails.route
-    ),
-    SETTINGS(
-        title = R.string.app_dest_title_settings,
-        route = Screen.Settings.route
-    ),
-}
-
 @Composable
-fun ChefAINavGraph(modifier: Modifier) {
-    val navController = rememberNavController()
+fun ChefAINavGraph(
+    modifier: Modifier,
+    navController: NavHostController = rememberNavController(),
+    navActions: NavigationActions = remember(navController) {
+        NavigationActions(navController)
+    }
+) {
     val snackbarHostState = remember { SnackbarHostState() }
+    val userMessages = remember { mutableListOf<Int>() } //TODO list or single message?
 
-    val graph = navController.createGraph(startDestination = Screen.Home.route) {
-        composable(route = Screen.Home.route) {
+    val graph = navController.createGraph(startDestination = AppDestinations.HOME.route) {
+        composable(route = AppDestinations.HOME.route) {
             HomeScreen()
         }
-        composable(route = Screen.Recipes.route) {
-            RecipesScreen(snackbarHostState = snackbarHostState)
+        composable(route = AppDestinations.RECIPES.route) {
+            RecipesScreen(
+                snackbarHostState = snackbarHostState,
+                onRecipeCardClick = { recipeUid ->
+                    navActions.navigateToRecipeDetail(recipeUid)
+                }
+            )
         }
-        composable(route = Screen.MealPlans.route) {
+        composable(route = AppDestinations.MEAL_PLANS.route) {
             MealPlansScreen()
         }
+        composable(
+            route = AppDestinations.RECIPE_DETAILS.route,
+        ) {
+            RecipeDetailsScreen(snackbarHostState = snackbarHostState)
+
+        }
     }
-    // TODO get nav destination from App State to get page tilte and back nav icon viz
 
     var titleRes by rememberSaveable { mutableIntStateOf(R.string.app_name) }
 
     navController.addOnDestinationChangedListener { _, destination, _ ->
         // TODO make the mapping programmatic by looking for destination route in AppDestinations
         when (destination.route) {
-            Screen.Home.route -> titleRes = R.string.app_dest_title_home
-            Screen.Recipes.route -> titleRes = R.string.app_dest_title_recipes
-            Screen.MealPlans.route -> titleRes = R.string.app_dest_title_meal_plans
+            AppDestinations.HOME.route -> titleRes = R.string.app_dest_title_home
+            AppDestinations.RECIPES.route -> titleRes = R.string.app_dest_title_recipes
+            AppDestinations.MEAL_PLANS.route -> titleRes = R.string.app_dest_title_meal_plans
+            AppDestinations.RECIPE_DETAILS.route -> titleRes = R.string.app_dest_title_recipe_details
         }
     }
 
     Scaffold(
         modifier,
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {ChefAITopAppBar(titleRes)}, // TODO pass back nav click for non top level destinations
+        topBar = { ChefAITopAppBar(titleRes) }, // TODO pass back nav click for non top level destinations
         bottomBar = { BottomNavigationBar(navController) },
     ) { innerPadding ->
         NavHost(
@@ -101,6 +87,19 @@ fun ChefAINavGraph(modifier: Modifier) {
             modifier = Modifier.padding(innerPadding)
         )
     }
+
+    // Check for user messages to display on the screen
+    userMessages.map { message ->
+        val snackbarText = stringResource(message)
+        LaunchedEffect(snackbarHostState, message, snackbarText) {
+            snackbarHostState.showSnackbar(
+                message = snackbarText,
+                duration = SnackbarDuration.Short
+            )
+            userMessages.remove(message) // Remove it from the list after displaying it
+        }
+    }
+
 }
 
 @Preview(

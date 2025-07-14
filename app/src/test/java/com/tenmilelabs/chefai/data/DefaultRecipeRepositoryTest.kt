@@ -77,13 +77,13 @@ class DefaultRecipeRepositoryTest {
     }
 
     @Test
-    fun getRecipesObservable() = testScope.runTest {
-        assertThat(recipeRepository.getRecipesObservable().first().size).isEqualTo(2)
+    fun getRecipesFlow() = testScope.runTest {
+        assertThat(recipeRepository.getRecipesFlow().first().size).isEqualTo(2)
     }
 
     @Test
     fun getRecipeStream() = testScope.runTest {
-        assertThat(recipeRepository.getRecipeStream("1").first()).isEqualTo(recipe1)
+        assertThat(recipeRepository.getRecipeFlow("1").first()).isEqualTo(recipe1)
     }
 
     @Test

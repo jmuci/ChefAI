@@ -34,7 +34,7 @@ class RecipesViewModel @Inject constructor(
 
     private val _isLoading = MutableStateFlow(false)
     private val _userMessage: MutableStateFlow<Int?> = MutableStateFlow(null)
-    private val _recipesAsync = recipesRepository.getRecipesObservable()
+    private val _recipesAsync = recipesRepository.getRecipesFlow()
         .map { Async.Success(it) }
         .catch<Async<List<Recipe>>> { emit(Async.Error(R.string.loading_recipes_error)) }
 
@@ -66,21 +66,5 @@ class RecipesViewModel @Inject constructor(
     }
 
     // TODO Add a refresh function to refresh content.
-
-/*    fun navigateToDetailsScreen(recipeId : String) {
-        val recipe = _uiState.value.items.find { it.uuid == recipeId }
-        _uiState.value = uiState.value.copy(
-            selectedRecipe = recipe,
-            isDetailOnlyOpen = true
-        )
-    }
-
-    fun closeDetailScreen() {
-        _uiState.value = _uiState
-            .value.copy(
-                selectedRecipe = _uiState.value.items.first(),
-                isDetailOnlyOpen = false
-            )
-    }*/
 
 }
