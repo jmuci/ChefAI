@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -64,17 +65,29 @@ fun ChefAINavGraph(
     }
 
     var titleRes by rememberSaveable { mutableIntStateOf(R.string.app_name) }
+    var isTopLevelDestination by rememberSaveable { mutableStateOf(false) }
 
     navController.addOnDestinationChangedListener { _, destination, _ ->
         titleRes = AppDestinations.entries
             .filter { it.route == destination.route }
             .map { it.title }.first()
+        isTopLevelDestination =
+            TopLevelDestination.entries.any { it.appDestination.route == destination.route }
     }
 
     Scaffold(
         modifier,
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = { ChefAITopAppBar(titleRes) }, // TODO pass back nav click for non top level destinations
+        topBar = {
+            ChefAITopAppBar(
+                titleRes,
+                onNavigationClick = if (!isTopLevelDestination) {
+                    { navController.popBackStack() }
+                } else {
+                    null
+                }
+            )
+        }, // TODO pass back nav click for non top level destinations
         bottomBar = { BottomNavigationBar(navController) },
     ) { innerPadding ->
         NavHost(

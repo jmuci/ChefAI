@@ -13,8 +13,12 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.navigation.NavController
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.sp
+import com.tenmilelabs.chefai.R
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,20 +35,30 @@ fun ChefAITopAppBar(
         title = {
             Text(
                 stringResource(titleResId),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         },
         navigationIcon = {
-            if(onNavigationClick != null) {
-            IconButton(onClick = onNavigationClick) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Localized description"
-                )
-            }
+            if (onNavigationClick != null) {
+                IconButton(onClick = onNavigationClick) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Localized description"
+                    )
+                }
             }
         },
-        scrollBehavior =  TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
+        scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     )
+}
+
+@Preview
+@Composable
+fun ChefAITopBarPreview() {
+    ChefAITopAppBar(R.string.app_name)
 }
