@@ -5,6 +5,7 @@ import com.tenmilelabs.chefai.di.ApplicationScope
 import com.tenmilelabs.chefai.di.DefaultDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -25,7 +26,7 @@ class DefaultRecipeRepository @Inject constructor(
         }
     }
 
-    override fun getRecipesObservable(): Flow<List<Recipe>> {
+    override fun getRecipesFlow(): Flow<List<Recipe>> {
         return localDatSource.observeAll().map { recipes ->
             withContext(dispatcher) {
                 recipes.toExternal()
@@ -33,7 +34,7 @@ class DefaultRecipeRepository @Inject constructor(
         }
     }
 
-    override fun getRecipeStream(uuid: String): Flow<Recipe> {
+    override fun getRecipeFlow(uuid: String): Flow<Recipe?> {
         return localDatSource.observeRecipeById(uuid).map { it.toExternal() }
     }
 
