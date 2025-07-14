@@ -112,6 +112,8 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.android)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.google.truth)
+    testImplementation(libs.turbine)
+
 
     // Dependencies for Android tests ====
     androidTestImplementation(libs.androidx.junit)
