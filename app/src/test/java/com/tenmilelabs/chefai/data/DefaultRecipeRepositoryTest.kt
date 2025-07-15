@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 
@@ -135,6 +136,5 @@ class DefaultRecipeRepositoryTest {
         recipeRepository.deleteRecipe("1")
         assertThat(localDataSource.recipes?.size).isEqualTo(1)
         assertThat(localDataSource.recipes?.map { it.uuid }).doesNotContain("1")
-
     }
 }
