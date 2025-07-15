@@ -137,9 +137,4 @@ class DefaultRecipeRepositoryTest {
         assertThat(localDataSource.recipes?.size).isEqualTo(1)
         assertThat(localDataSource.recipes?.map { it.uuid }).doesNotContain("1")
     }
-
-    @Test
-    fun failTest() = testScope.runTest {
-        fail("This test fails")
-    }
 }

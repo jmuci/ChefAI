@@ -54,11 +54,11 @@ class FakeRecipesRepository : RecipesRepository {
         recipesListFlow.tryEmit(recipesToEmitGeneral)
     }
 
-    override fun getRecipeFlow(recipeId: String): Flow<Recipe?> {
+    override fun getRecipeFlow(uuid: String): Flow<Recipe?> {
         if (shouldReturnErrorForGetRecipe) {
             return flow { throw (exceptionForGetRecipe ?: Exception("Configured repository error")) }
         }
-        return getFlowForRecipe(recipeId)
+        return getFlowForRecipe(uuid)
     }
 
     override suspend fun createRecipe(
