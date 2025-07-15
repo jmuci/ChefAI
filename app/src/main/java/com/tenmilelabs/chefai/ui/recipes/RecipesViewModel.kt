@@ -26,7 +26,6 @@ data class RecipesUiState(
     val userMessage: Int? = null,
 )
 
-
 @HiltViewModel
 class RecipesViewModel @Inject constructor(
     recipesRepository: RecipesRepository

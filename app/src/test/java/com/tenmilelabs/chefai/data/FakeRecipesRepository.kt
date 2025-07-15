@@ -9,12 +9,22 @@ class FakeRecipesRepository : RecipesRepository {
     // For general recipes list if needed by other ViewModels
     private val recipesListFlow = MutableSharedFlow<List<Recipe>>(replay = 1)
     private var recipesToEmitGeneral: List<Recipe> = emptyList()
+    private var shouldReturnErrorForGetRecipes = false
+    private var exceptionForGetRecipes: Exception? = null
 
     // For specific recipe details
     private val recipeDetailFlows = mutableMapOf<String, MutableSharedFlow<Recipe?>>()
     private var shouldReturnErrorForGetRecipe = false
     private var exceptionForGetRecipe: Exception? = null
 
+    fun setRecipesToEmit(recipes: List<Recipe>) {
+        recipesListFlow.tryEmit(recipes)
+    }
+
+    fun setShouldReturnErrorForGetRecipes(value: Boolean, exception: Exception? = null) {
+        shouldReturnErrorForGetRecipes = value
+        this.exceptionForGetRecipes = exception ?: Exception("Test repository error for getRecipes")
+    }
 
     fun setShouldReturnErrorForGetRecipe(value: Boolean, exception: Exception? = null) {
         shouldReturnErrorForGetRecipe = value
@@ -42,6 +52,9 @@ class FakeRecipesRepository : RecipesRepository {
     }
 
     override fun getRecipesFlow(): Flow<List<Recipe>> {
+        if (shouldReturnErrorForGetRecipes) {
+            return flow { throw (exceptionForGetRecipes ?: Exception("Configured repository error")) }
+        }
         return recipesListFlow
     }
 
