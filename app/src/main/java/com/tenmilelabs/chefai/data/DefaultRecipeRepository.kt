@@ -1,22 +1,28 @@
 package com.tenmilelabs.chefai.data
 
+import android.util.Log
 import com.tenmilelabs.chefai.data.source.local.RecipeDao
+import com.tenmilelabs.chefai.data.source.network.ChefAIApiService
+import com.tenmilelabs.chefai.data.source.network.NetworkRecipeList
 import com.tenmilelabs.chefai.di.ApplicationScope
-import com.tenmilelabs.chefai.di.DefaultDispatcher
+import com.tenmilelabs.chefai.di.IoDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.jvm.Throws
 
 @Singleton
 class DefaultRecipeRepository @Inject constructor(
     private val localDatSource: RecipeDao,
-    @DefaultDispatcher private val dispatcher: CoroutineDispatcher,
+    private val networkDataSource: ChefAIApiService,
+    @IoDispatcher private val dispatcher: CoroutineDispatcher,
     @ApplicationScope private val scope: CoroutineScope,
 ) : RecipesRepository {
 
@@ -26,10 +32,27 @@ class DefaultRecipeRepository @Inject constructor(
         }
     }
 
+    fun getAllItems(): Flow<List<Recipe>> = flow {
+        try {
+            val recipes: List<Recipe> = networkDataSource.getRecipes().toRecipe()
+            Log.d("RecipesRepository", "Fetched  ${recipes.size} recipes from the BE")
+            emit(recipes)
+        } catch (e: Exception) {
+            // Handle error, e.g., emit an empty list or an error state
+            println("Error fetching items: ${e.message}")
+            emit(emptyList())
+            throw e
+        }
+    }
+
     override fun getRecipesFlow(): Flow<List<Recipe>> {
-        return localDatSource.observeAll().map { recipes ->
-            withContext(dispatcher) {
-                recipes.toExternal()
+        return if (true) {
+            getAllItems()
+        } else {
+            return localDatSource.observeAll().map { recipes ->
+                withContext(dispatcher) {
+                    recipes.toExternal()
+                }
             }
         }
     }

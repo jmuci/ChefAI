@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.room)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -17,7 +18,6 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -43,6 +43,12 @@ android {
     buildFeatures {
         viewBinding = true
     }
+    packaging {
+        resources {
+            excludes += "/META-INF/INDEX.LIST"
+        }
+    }
+
 }
 
 room {
@@ -104,6 +110,20 @@ dependencies {
     // Coil Image Loader
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+
+    // Networking Client
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.cio)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.kotlinx.serialization.json) // latest for 2.x Kotlin
+
+
+    // Login for Ktor requests
+    //implementation(libs.logback.classic)
+    implementation(libs.logback.core)
+    implementation(libs.slf4j.android)
+    implementation(libs.ktor.client.logging)
 
 
     // Dependencies for local unit tests ====
