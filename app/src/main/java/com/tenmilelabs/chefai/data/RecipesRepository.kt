@@ -4,7 +4,7 @@ import kotlinx.coroutines.flow.Flow
 
 interface RecipesRepository {
     suspend fun getRecipes(): List<Recipe>
-    fun getRecipesFlow(): Flow<List<Recipe>>
+    fun getRecipesFlow(refresh: Boolean = false): Flow<List<Recipe>>
 
     suspend fun getRecipe(uuid: String): Recipe?
     fun getRecipeFlow(uuid: String): Flow<Recipe?>
