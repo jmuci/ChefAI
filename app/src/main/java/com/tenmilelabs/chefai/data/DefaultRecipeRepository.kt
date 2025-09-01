@@ -1,31 +1,35 @@
 package com.tenmilelabs.chefai.data
 
-import android.util.Log
 import com.tenmilelabs.chefai.data.source.local.RecipeDao
-import com.tenmilelabs.chefai.data.source.network.ChefAIApiService
-import com.tenmilelabs.chefai.data.source.network.NetworkRecipeList
+import com.tenmilelabs.chefai.data.source.network.RecipeNetworkDataSource
 import com.tenmilelabs.chefai.di.ApplicationScope
 import com.tenmilelabs.chefai.di.IoDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.jvm.Throws
 
 @Singleton
 class DefaultRecipeRepository @Inject constructor(
     private val localDatSource: RecipeDao,
-    private val networkDataSource: ChefAIApiService,
+    private val networkDataSource: RecipeNetworkDataSource,
     @IoDispatcher private val dispatcher: CoroutineDispatcher,
-    @ApplicationScope private val scope: CoroutineScope,
+    @ApplicationScope private val appScope: CoroutineScope,
 ) : RecipesRepository {
 
+    // TODO Cache in memory list of recipes (paginated?)
+    // TODO Decide when to read from local DB or network / cache
+    //  -> Implement Data Merging Strategy (based on some form of timeStamps Perhaps)
+    // TODO Use appScope to make sure coroutines don't get cancelled
+    //TODO Follow those docs : https://developer.android.com/topic/architecture/data-layer
+    // TODO Read https://developer.android.com/topic/architecture/data-layer/offline-first
+    // TODO obs internet connection state
     override suspend fun getRecipes(): List<Recipe> {
         return withContext(dispatcher) {
             localDatSource.getAllRecipes().toExternal()
@@ -33,22 +37,22 @@ class DefaultRecipeRepository @Inject constructor(
     }
 
     fun getAllItems(): Flow<List<Recipe>> = flow {
-        try {
             val recipes: List<Recipe> = networkDataSource.getRecipes().toRecipe()
-            Log.d("RecipesRepository", "Fetched  ${recipes.size} recipes from the BE")
+            // TODO(timber) Replace with Timber Logging
+            //Log.d("RecipesRepository", "Fetched  ${recipes.size} recipes from the BE")
             emit(recipes)
-        } catch (e: Exception) {
-            // Handle error, e.g., emit an empty list or an error state
-            println("Error fetching items: ${e.message}")
-            emit(emptyList())
-            throw e
-        }
+    }.catch { e->
+        // TODO(timber) Replace with Timber Logging
+        // Handle error, e.g., emit an empty list or an error state
+        println("Error fetching items: ${e.message}")
+        emit(emptyList())
+        throw e
     }
 
     override fun getRecipesFlow(): Flow<List<Recipe>> {
-        return if (true) {
+        return if (true) { // Network
             getAllItems()
-        } else {
+        } else {        // Local
             return localDatSource.observeAll().map { recipes ->
                 withContext(dispatcher) {
                     recipes.toExternal()

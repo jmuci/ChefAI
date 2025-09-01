@@ -1,5 +1,8 @@
 package com.tenmilelabs.chefai.di
 
+import com.tenmilelabs.chefai.data.source.network.ChefAIApiService
+import com.tenmilelabs.chefai.data.source.network.RecipeNetworkDataSource
+import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -17,7 +20,17 @@ import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
-internal object NetworkModule {
+abstract class NetworkDataSourceModule {
+
+    @Binds
+    abstract fun bindRecipeNetworkDataSource(
+        chefAIApiService: ChefAIApiService
+    ): RecipeNetworkDataSource
+}
+
+@Module
+@InstallIn(SingletonComponent::class)
+object NetworkModule {
 
     @Provides
     @Singleton
