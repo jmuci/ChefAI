@@ -1,6 +1,8 @@
 package com.tenmilelabs.chefai.data
 
 import com.tenmilelabs.chefai.data.source.local.RecipeEntity
+import com.tenmilelabs.chefai.data.source.network.NetworkRecipe
+import com.tenmilelabs.chefai.data.source.network.NetworkRecipeList
 
 
 /**
@@ -31,6 +33,19 @@ fun Recipe.toRecipeEntity(): RecipeEntity = RecipeEntity(
 
 fun List<Recipe>.toLocal() = map(Recipe::toRecipeEntity)
 
+fun Recipe.toNetworkRecipe() : NetworkRecipe = NetworkRecipe(
+    uuid = uuid,
+    title = title,
+    label = label,
+    description = description,
+    preparationTimeMinutes = prepTime,
+    recipeUrl = recipeUrl,
+    imageUrl = imageUrl,
+    imageUrlThumbnail = thumbnailUrl,
+)
+
+fun List<Recipe>.toNetwork() = map(Recipe::toNetworkRecipe)
+
 fun RecipeEntity.toExternal() = Recipe(
     title = title,
     label = label,
@@ -43,3 +58,17 @@ fun RecipeEntity.toExternal() = Recipe(
 )
 
 fun List<RecipeEntity>.toExternal() = map(RecipeEntity::toExternal)
+
+fun NetworkRecipe.toRecipe() = Recipe(
+    uuid = uuid,
+    title = title,
+    label = label,
+    description = description,
+    prepTime = preparationTimeMinutes,
+    recipeUrl = recipeUrl,
+    imageUrl = imageUrl,
+    thumbnailUrl = imageUrlThumbnail,
+)
+
+fun List<NetworkRecipe>.toRecipe() = map(NetworkRecipe::toRecipe)
+fun NetworkRecipeList.toRecipe() = this.recipes.map(NetworkRecipe::toRecipe)
