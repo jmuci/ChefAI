@@ -25,6 +25,7 @@ navigationCompose = "2.9.0"
 navigationUiKtx = "2.9.0"
 roomRuntime = "2.7.1"
 slf4jAndroid = "1.7.36"
+timber = "5.0.1"
 truth = "1.4.4"
 turbine = "1.2.1"
 uiTextGoogleFonts = "1.8.3"
@@ -73,6 +74,7 @@ androidx-lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifec
 androidx-navigation-ui-ktx = { group = "androidx.navigation", name = "navigation-ui-ktx", version.ref = "navigationUiKtx" }
 google-truth = { group = "com.google.truth", name = "truth", version.ref = "truth" }
 slf4j-android = { module = "org.slf4j:slf4j-android", version.ref = "slf4jAndroid" }
+timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 
 

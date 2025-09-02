@@ -35,6 +35,7 @@ import com.tenmilelabs.chefai.ui.components.RecipeTimeAndLabelRow
 import com.tenmilelabs.chefai.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.util.EmptyContent
 import com.tenmilelabs.chefai.util.LoadingContent
+import timber.log.Timber
 
 
 @Composable
@@ -54,7 +55,7 @@ fun RecipeDetailsScreen(
                 subtitle = R.string.recipe_not_found_error_subtitle,
                 noRecipesIconRes = R.drawable.ic_chef_hat_black_24dp
             )
-            Log.e("RecipeDetailsScreen", "Recipe Not Found Loading error!")
+            Timber.e("Recipe Not Found Loading error!")
         }
     }
 
@@ -62,10 +63,7 @@ fun RecipeDetailsScreen(
     uiState.userMessage?.let { message ->
         val snackbarText = stringResource(message)
         LaunchedEffect(snackbarHostState, viewModel, message, snackbarText) {
-            snackbarHostState.showSnackbar(
-                message = snackbarText,
-                duration = SnackbarDuration.Short
-            )
+            snackbarHostState.showSnackbar(message = snackbarText,  duration = SnackbarDuration.Short)
             viewModel.snackbarMessageShown()
         }
     }
