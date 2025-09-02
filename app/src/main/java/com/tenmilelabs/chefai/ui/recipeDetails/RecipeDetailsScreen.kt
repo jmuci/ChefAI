@@ -62,7 +62,10 @@ fun RecipeDetailsScreen(
     uiState.userMessage?.let { message ->
         val snackbarText = stringResource(message)
         LaunchedEffect(snackbarHostState, viewModel, message, snackbarText) {
-            snackbarHostState.showSnackbar(message = snackbarText,  duration = SnackbarDuration.Short)
+            snackbarHostState.showSnackbar(
+                message = snackbarText,
+                duration = SnackbarDuration.Short
+            )
             viewModel.snackbarMessageShown()
         }
     }

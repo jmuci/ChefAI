@@ -29,10 +29,12 @@ enum class TopLevelDestination(
 ) {
     HOME(
         icon = R.drawable.ic_home_black_24dp,
-        appDestination = AppDestinations.HOME),
+        appDestination = AppDestinations.HOME
+    ),
     RECIPES(
         icon = R.drawable.ic_recipe_library_24dp,
-        appDestination = AppDestinations.RECIPES),
+        appDestination = AppDestinations.RECIPES
+    ),
     MEAL_PLANS(
         icon = R.drawable.ic_chef_hat_black_24dp,
         appDestination = AppDestinations.MEAL_PLANS
@@ -58,7 +60,10 @@ fun BottomNavigationBar(
                     navController.navigate(item.appDestination.route)
                 },
                 icon = {
-                    Icon(imageVector = ImageVector.vectorResource(id = item.icon), contentDescription = stringResource(item.appDestination.title))
+                    Icon(
+                        imageVector = ImageVector.vectorResource(id = item.icon),
+                        contentDescription = stringResource(item.appDestination.title)
+                    )
                 },
                 label = {
                     Text(

@@ -33,7 +33,7 @@ fun Recipe.toRecipeEntity(): RecipeEntity = RecipeEntity(
 
 fun List<Recipe>.toLocal() = map(Recipe::toRecipeEntity)
 
-fun Recipe.toNetworkRecipe() : NetworkRecipe = NetworkRecipe(
+fun Recipe.toNetworkRecipe(): NetworkRecipe = NetworkRecipe(
     uuid = uuid,
     title = title,
     label = label,
