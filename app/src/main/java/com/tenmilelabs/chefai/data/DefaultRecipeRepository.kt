@@ -23,25 +23,19 @@ class DefaultRecipeRepository @Inject constructor(
     @ApplicationScope private val appScope: CoroutineScope,
 ) : RecipesRepository {
 
-    // TODO Cache in memory list of recipes (paginated?)
-    // TODO Decide when to read from local DB or network / cache
-    //  -> Implement Data Merging Strategy (based on some form of timeStamps Perhaps)
-    // TODO Use appScope to make sure coroutines don't get cancelled
-    //TODO Follow those docs : https://developer.android.com/topic/architecture/data-layer
-    // TODO Read https://developer.android.com/topic/architecture/data-layer/offline-first
-    // TODO obs internet connection state
+    // Fire and forget
     override suspend fun getRecipes(): List<Recipe> {
         return withContext(dispatcher) {
             localDatSource.getAllRecipes().toExternal()
         }
     }
 
-    fun getAllItems(): Flow<List<Recipe>> = flow {
-            val recipes: List<Recipe> = networkDataSource.getRecipes().toRecipe()
-            // TODO(timber) Replace with Timber Logging
-            //Log.d("RecipesRepository", "Fetched  ${recipes.size} recipes from the BE")
-            emit(recipes)
-    }.catch { e->
+    private fun getAllItems(): Flow<List<Recipe>> = flow {
+        val recipes: List<Recipe> = networkDataSource.getRecipes().toRecipe()
+        // TODO(timber) Replace with Timber Logging
+        //Log.d("RecipesRepository", "Fetched  ${recipes.size} recipes from the BE")
+        emit(recipes)
+    }.catch { e ->
         // TODO(timber) Replace with Timber Logging
         // Handle error, e.g., emit an empty list or an error state
         println("Error fetching items: ${e.message}")
@@ -49,7 +43,7 @@ class DefaultRecipeRepository @Inject constructor(
         throw e
     }
 
-    override fun getRecipesFlow(): Flow<List<Recipe>> {
+    override fun getRecipesStrem(): Flow<List<Recipe>> {
         return if (true) { // Network
             getAllItems()
         } else {        // Local
@@ -61,7 +55,7 @@ class DefaultRecipeRepository @Inject constructor(
         }
     }
 
-    override fun getRecipeFlow(uuid: String): Flow<Recipe?> {
+    override fun getRecipeStream(uuid: String): Flow<Recipe?> {
         return localDatSource.observeRecipeById(uuid).map { it.toExternal() }
     }
 

@@ -54,12 +54,12 @@ class DefaultRecipeRepositoryTest {
     @Test
     fun getRecipesFlow() = testScope.runTest {
         networkRecipes
-        assertThat(recipeRepository.getRecipesFlow().first().size).isEqualTo(3)
+        assertThat(recipeRepository.getRecipesStrem().first().size).isEqualTo(3)
     }
 
     @Test
     fun getRecipeStream() = testScope.runTest {
-        assertThat(recipeRepository.getRecipeFlow("1").first()).isEqualTo(recipe1)
+        assertThat(recipeRepository.getRecipeStream("1").first()).isEqualTo(recipe1)
     }
 
     @Test

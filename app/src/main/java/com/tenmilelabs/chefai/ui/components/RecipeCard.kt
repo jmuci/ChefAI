@@ -32,9 +32,11 @@ import com.tenmilelabs.chefai.data.Recipe
 import com.tenmilelabs.chefai.ui.theme.ChefAITheme
 
 @Composable
-fun RecipeCard(recipe: Recipe,
-               closeDetailScreen: () -> Unit = {},
-               navigateToDetail: (String) -> Unit = {}) {
+fun RecipeCard(
+    recipe: Recipe,
+    closeDetailScreen: () -> Unit = {},
+    navigateToDetail: (String) -> Unit = {}
+) {
     Card(
         modifier = Modifier
             .padding(dimensionResource(id = R.dimen.padding_small)),
@@ -58,7 +60,8 @@ fun RecipeCard(recipe: Recipe,
                     contentDescription = stringResource(R.string.recipe_image_content_description),
                     contentScale = ContentScale.Crop,
                     alignment = Alignment.Center,
-                    modifier = Modifier.size(120.dp, 70.dp)
+                    modifier = Modifier
+                        .size(120.dp, 70.dp)
                         .clip(RoundedCornerShape(5.dp))
                 )
             }
