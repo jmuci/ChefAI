@@ -4,10 +4,10 @@ import kotlinx.coroutines.flow.Flow
 
 interface RecipesRepository {
     suspend fun getRecipes(): List<Recipe>
-    fun getRecipesFlow(): Flow<List<Recipe>>
+    fun getRecipesStrem(): Flow<List<Recipe>>
 
     suspend fun getRecipe(uuid: String): Recipe?
-    fun getRecipeFlow(uuid: String): Flow<Recipe?>
+    fun getRecipeStream(uuid: String): Flow<Recipe?>
 
     suspend fun createRecipe(recipe: Recipe, uuid: String = ""): String
 
