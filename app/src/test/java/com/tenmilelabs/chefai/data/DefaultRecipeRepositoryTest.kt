@@ -34,7 +34,7 @@ class DefaultRecipeRepositoryTest {
         localDataSource = FakeRecipeDao(localRecipes.toMutableList())
         remoteDataSource = FakeApiService(networkRecipes.toMutableList())
         recipeRepository =
-            DefaultRecipeRepository(localDataSource, remoteDataSource, testDispatcher, testScope)
+            DefaultRecipeRepository(localDataSource, remoteDataSource, testDispatcher)
     }
 
     @Test

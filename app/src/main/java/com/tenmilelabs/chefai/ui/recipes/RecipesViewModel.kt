@@ -33,30 +33,27 @@ class RecipesViewModel @Inject constructor(
 
     private val _isLoading = MutableStateFlow(false)
     private val _userMessage: MutableStateFlow<Int?> = MutableStateFlow(null)
-    private val _recipesAsync = recipesRepository.getRecipesStrem()
+     private val _recipesAsync = recipesRepository.getRecipesStrem()
         .map { Async.Success(it) }
         .catch<Async<List<Recipe>>> { emit(Async.Error(R.string.loading_recipes_error)) }
 
     val uiState: StateFlow<RecipesUiState> = combine(_isLoading, _recipesAsync, _userMessage)
-    { isLoading, recipesAsync, userMessage ->
-        when (recipesAsync) {
-            Async.Loading -> {
-                RecipesUiState(isLoading = true)
-            }
-
-            is Async.Error -> {
-                RecipesUiState(userMessage = recipesAsync.errorMessage)
-            }
-
-            is Async.Success -> {
-                RecipesUiState(
-                    items = recipesAsync.data,
-                    isLoading = isLoading,
-                    userMessage = R.string.loading_recipes_success
-                )
+        { isLoading, recipesAsync, userMessage ->
+            when (recipesAsync) {
+                Async.Loading -> {
+                    RecipesUiState(isLoading = true)
+                }
+                is Async.Error -> {
+                    RecipesUiState(userMessage = recipesAsync.errorMessage)
+                }
+                is Async.Success -> {
+                    RecipesUiState(
+                        items = recipesAsync.data,
+                        isLoading = isLoading,
+                        userMessage = R.string.loading_recipes_success)
+                }
             }
         }
-    }
         .stateIn(
             scope = viewModelScope,
             started = WhileUiSubscribed,
