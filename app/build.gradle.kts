@@ -29,6 +29,10 @@ android {
                 "proguard-rules.pro"
             )
         }
+        debug {
+            isMinifyEnabled = false
+            isDebuggable = true
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -39,10 +43,8 @@ android {
     }
     buildFeatures {
         compose = true
-        buildConfig = true
-    }
-    buildFeatures {
         viewBinding = true
+        buildConfig = true
     }
     packaging {
         resources {
@@ -125,6 +127,8 @@ dependencies {
     implementation(libs.slf4j.android)
     implementation(libs.ktor.client.logging)
 
+    implementation(libs.timber)
+
 
     // Dependencies for local unit tests ====
     testImplementation(libs.junit)
@@ -145,8 +149,4 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.test.manifest)
     testImplementation(kotlin("test"))
-
-    // Logging
-    implementation(libs.timber)
-
 }

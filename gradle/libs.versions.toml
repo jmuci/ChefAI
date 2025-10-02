@@ -1,6 +1,6 @@
 [versions]
 activityCompose = "1.10.1"
-agp = "8.10.1"
+agp = "8.13.0"
 androidxArchCore = "2.2.0"
 androidxHiltNavigationCompose = "1.2.0"
 coilCompose = "3.2.0"
@@ -25,11 +25,10 @@ navigationCompose = "2.9.0"
 navigationUiKtx = "2.9.0"
 roomRuntime = "2.7.1"
 slf4jAndroid = "1.7.36"
-timber = "5.0.1"
 truth = "1.4.4"
 turbine = "1.2.1"
 uiTextGoogleFonts = "1.8.3"
-
+timber = "5.0.1"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
