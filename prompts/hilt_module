@@ -1,0 +1,10 @@
+Create Hilt DI module with:
+
+- @Module @InstallIn(SingletonComponent::class)
+- Provides database, DAO, repository
+- Provides network API client
+- Use interfaces for repositories
+
+Best practices:
+- Avoid singletons unless required
+- Constructor injection when possible
