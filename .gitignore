@@ -38,3 +38,5 @@ google-services.json
 # AI working folders
 /.ai/
 /.prompts_history/
+#Obsidian
+docs/.obsidian/
