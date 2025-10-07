@@ -4,8 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.R
-import com.tenmilelabs.chefai.data.Recipe
-import com.tenmilelabs.chefai.data.RecipesRepository
+import com.tenmilelabs.chefai.domain.model.Recipe
+import com.tenmilelabs.chefai.domain.repository.RecipesRepository
 import com.tenmilelabs.chefai.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.util.Async
 import com.tenmilelabs.chefai.util.WhileUiSubscribed

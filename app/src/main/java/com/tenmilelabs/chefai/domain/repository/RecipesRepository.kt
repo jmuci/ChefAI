@@ -1,5 +1,6 @@
-package com.tenmilelabs.chefai.data
+package com.tenmilelabs.chefai.domain.repository
 
+import com.tenmilelabs.chefai.domain.model.Recipe
 import kotlinx.coroutines.flow.Flow
 
 interface RecipesRepository {

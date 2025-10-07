@@ -1,6 +1,5 @@
 package com.tenmilelabs.chefai.ui.recipeDetails
 
-import android.util.Log
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -30,7 +29,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.tenmilelabs.chefai.R
-import com.tenmilelabs.chefai.data.Recipe
+import com.tenmilelabs.chefai.domain.model.Recipe
 import com.tenmilelabs.chefai.ui.components.RecipeTimeAndLabelRow
 import com.tenmilelabs.chefai.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.util.EmptyContent

@@ -1,21 +1,26 @@
-package com.tenmilelabs.chefai.data
+package com.tenmilelabs.chefai.data.repository
 
+import com.tenmilelabs.chefai.data.mapper.toDomain
+import com.tenmilelabs.chefai.data.mapper.toRecipeEntity
 import com.tenmilelabs.chefai.data.source.local.RecipeDao
 import com.tenmilelabs.chefai.data.source.network.RecipeNetworkDataSource
 import com.tenmilelabs.chefai.di.ApplicationScope
 import com.tenmilelabs.chefai.di.IoDispatcher
+import com.tenmilelabs.chefai.domain.model.Recipe
+import com.tenmilelabs.chefai.domain.repository.RecipesRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.io.IOException
 import timber.log.Timber
+import java.nio.channels.UnresolvedAddressException
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.cancellation.CancellationException
 
 @Singleton
 class DefaultRecipeRepository @Inject constructor(
@@ -34,7 +39,7 @@ class DefaultRecipeRepository @Inject constructor(
     // TODO obs internet connection state
     override suspend fun getRecipes(): List<Recipe> {
         return withContext(dispatcher) {
-            localDatSource.getAllRecipes().toExternal()
+            localDatSource.getAllRecipes().toDomain()
         }
     }
 
@@ -46,16 +51,22 @@ class DefaultRecipeRepository @Inject constructor(
         } else {        // Local
             return localDatSource.observeAll().map { recipes ->
                 withContext(dispatcher) {
-                    recipes.toExternal()
+                    recipes.toDomain()
                 }
             }
         }
     }
 
     private suspend fun getAllItemsFromNetwork(): List<Recipe> = try {
-        val recipes = networkDataSource.getRecipes().toRecipe()
+        val recipes = networkDataSource.getRecipes().toDomain()
         Timber.d("Fetched ${recipes.size} recipes from the BE")
         recipes
+    } catch (e: CancellationException) {
+        Timber.e("Error fetching recipe items from network. Coroutine cancelled!")
+        throw e
+    } catch (e: UnresolvedAddressException) {
+        Timber.e("Failed to reach the Backend. Client offline or DNS issue.")
+        throw e
     } catch(e: IOException)  {
         // Handle error, e.g., emit an empty list or an error state
         Timber.e("Error fetching recipe items from network. Error: ${e.message}")
@@ -63,11 +74,11 @@ class DefaultRecipeRepository @Inject constructor(
     }
 
     override fun getRecipeStream(uuid: String): Flow<Recipe?> {
-        return localDatSource.observeRecipeById(uuid).map { it.toExternal() }
+        return localDatSource.observeRecipeById(uuid).map { it.toDomain() }
     }
 
     override suspend fun getRecipe(uuid: String): Recipe? {
-        return localDatSource.getRecipeById(uuid)?.toExternal()
+        return localDatSource.getRecipeById(uuid)?.toDomain()
     }
 
     /**
