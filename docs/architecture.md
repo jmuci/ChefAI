@@ -39,6 +39,10 @@ Domain (Use Cases, Domain Entities, Repository Interfaces)
 - Owns the **single source of truth** for persisted or cached data.
 - Responsible for coordinating between network, local storage, and mapping to/from domain.
 
+Current DB Schema as of 11/11/2025
+
+![Database Schema Details](img/chefAI-datamodel.png)
+
 ---
 
 ## 🔄 Unidirectional Data Flow (UDF)

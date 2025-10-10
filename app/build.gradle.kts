@@ -87,6 +87,9 @@ dependencies {
     // Compose Navigation
     implementation(libs.androidx.navigation.compose)
 
+    //UUID v7 gen
+    implementation(libs.block.uuidv7)
+
 
     debugImplementation(libs.androidx.ui.tooling)
 
