@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import com.tenmilelabs.chefai.data.source.local.util.SyncState
+import com.tenmilelabs.chefai.data.source.local.util.SyncableCrossRef
 import java.util.UUID
 
 @Entity(
@@ -34,7 +35,7 @@ data class RecipeIngredientEntity(
     val quantity: Double,
     val unit: String?,
     val notes: String? = null,
-    val updatedAt: Long,
-    val deletedAt: Long?,
-    val syncState: SyncState = SyncState.PENDING
-)
+    override val updatedAt: Long,
+    override val deletedAt: Long?,
+    override val syncState: SyncState
+): SyncableCrossRef

@@ -9,6 +9,12 @@ interface SyncableEntity {
     val syncState: SyncState
 }
 
+interface SyncableCrossRef {
+    val updatedAt: Long
+    val deletedAt: Long?
+    val syncState: SyncState
+}
+
 enum class SyncState {
     PENDING,  // newly created or edited locally
     SYNCED,   // in sync with backend

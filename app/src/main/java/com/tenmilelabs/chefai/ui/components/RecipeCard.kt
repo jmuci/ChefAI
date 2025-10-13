@@ -28,13 +28,16 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.domain.model.Label
 import com.tenmilelabs.chefai.domain.model.Recipe
 import com.tenmilelabs.chefai.ui.theme.ChefAITheme
+import xyz.block.uuidv7.UUIDv7
+import java.util.UUID
 
 @Composable
 fun RecipeCard(recipe: Recipe,
                closeDetailScreen: () -> Unit = {},
-               navigateToDetail: (String) -> Unit = {}) {
+               navigateToDetail: (UUID) -> Unit = {}) {
     Card(
         modifier = Modifier
             .padding(dimensionResource(id = R.dimen.padding_small)),
@@ -50,7 +53,7 @@ fun RecipeCard(recipe: Recipe,
             ) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
-                        .data(recipe.thumbnailUrl)
+                        .data(recipe.imageUrlThumbnail)
                         .crossfade(true)
                         .build(),
                     placeholder = painterResource(R.drawable.ic_img_placeholder),
@@ -74,7 +77,8 @@ fun RecipeCard(recipe: Recipe,
                     modifier = Modifier
                         .padding(horizontal = dimensionResource(id = R.dimen.padding_small))
                 )
-                RecipeTimeAndLabelRow(recipe.prepTime, recipe.label)
+                //TODO (Display List of Labels)
+                RecipeTimeAndLabelRow(recipe.prepTimeMinutes, recipe.labels.first().displayName)
 
                 Text(
                     text = recipe.description,
@@ -126,17 +130,31 @@ fun RecipeTimeAndLabelRow(prepTime: Int, label: String) {
 @Preview
 @Composable
 fun RecipeCardPreview() {
+    val previewUser = com.tenmilelabs.chefai.domain.model.User(
+        uuid = UUIDv7.generate(),
+        displayName = "ChefAI Preview",
+        email = "preview@chefai.app",
+        avatarUrl = null
+    )
     ChefAITheme {
         Surface {
             RecipeCard(
                 recipe = Recipe(
-                    title = "Recipe Title",
-                    label = "Recipe Label",
-                    description = "Recipe Description. This is how you do this. Follow exactly the following steps to achieve success. \n No cutting corners.",
-                    prepTime = 10,
-                    recipeUrl = "https://www.google.com",
-                    imageUrl = "https://www.google.com",
-                    thumbnailUrl = "https://www.google.com",
+                    uuid = UUIDv7.generate(),
+                    title = "Mediterranean Grilled Chicken",
+                    description = "A light and flavorful grilled chicken recipe with classic Mediterranean herbs and a lemon-garlic marinade.",
+                    imageUrl = "https://via.placeholder.com/150",
+                    imageUrlThumbnail = "https://via.placeholder.com/150",
+                    prepTimeMinutes = 15,
+                    cookTimeMinutes = 20,
+                    servings = 4,
+                    creator = previewUser,
+                    recipeExternalUrl = "https://example.com/recipe",
+                    ingredients = emptyList(),
+                    steps = emptyList(),
+                    tags = emptyList(),
+                    labels = listOf(Label(UUIDv7.generate(), "Mediterranean")),
+                    updatedAt = System.currentTimeMillis()
                 )
             )
         }

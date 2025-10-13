@@ -22,19 +22,12 @@ import java.util.UUID
             entity = SourceClassificationEntity::class,
             parentColumns = ["uuid"],
             childColumns = ["sourcePrimaryId"],
-            onDelete = ForeignKey.RESTRICT
-        ),
-        ForeignKey(
-            entity = SourceClassificationEntity::class,
-            parentColumns = ["uuid"],
-            childColumns = ["sourceSecondaryId"],
             onDelete = ForeignKey.SET_NULL
         )
     ],
     indices = [
         Index("allergenId"), 
-        Index("sourcePrimaryId"), 
-        Index("sourceSecondaryId"),
+        Index("sourcePrimaryId"),
         Index(value = ["syncState", "updatedAt"])
     ]
 )
@@ -43,7 +36,6 @@ data class IngredientEntity(
     val displayName: String,
     val allergenId: UUID?,
     val sourcePrimaryId: UUID?,   // e.g. "Animal"
-    val sourceSecondaryId: UUID?,  // e.g. "Fish"
     override val updatedAt: Long,
     override val deletedAt: Long?,
     override val syncState: SyncState = SyncState.PENDING

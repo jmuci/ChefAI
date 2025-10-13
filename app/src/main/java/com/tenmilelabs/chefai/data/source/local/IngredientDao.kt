@@ -5,6 +5,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
 import com.tenmilelabs.chefai.data.source.local.room.IngredientEntity
+import com.tenmilelabs.chefai.data.source.local.room.relations.IngredientWithDetails
 import com.tenmilelabs.chefai.data.source.local.room.relations.IngredientWithRecipes
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
@@ -33,6 +34,14 @@ interface IngredientDao {
     @Transaction
     @Query("SELECT * FROM ingredients")
     fun observeIngredientsWithRecipes(): Flow<List<IngredientWithRecipes>>
+
+    @Transaction
+    @Query("SELECT * FROM ingredients WHERE uuid = :uuid")
+    suspend fun getIngredientWithDetails(uuid: UUID): IngredientWithDetails?
+
+    @Transaction
+    @Query("SELECT * FROM ingredients")
+    fun observeIngredientsWithDetails(): Flow<List<IngredientWithDetails>>
 
     @Query("DELETE FROM ingredients WHERE uuid = :uuid")
     suspend fun deleteIngredient(uuid: UUID)
