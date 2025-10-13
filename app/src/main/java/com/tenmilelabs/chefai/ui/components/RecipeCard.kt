@@ -28,6 +28,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.data.source.local.util.generateUuid7
 import com.tenmilelabs.chefai.domain.model.Label
 import com.tenmilelabs.chefai.domain.model.Recipe
 import com.tenmilelabs.chefai.ui.theme.ChefAITheme
@@ -131,7 +132,7 @@ fun RecipeTimeAndLabelRow(prepTime: Int, label: String) {
 @Composable
 fun RecipeCardPreview() {
     val previewUser = com.tenmilelabs.chefai.domain.model.User(
-        uuid = UUIDv7.generate(),
+        uuid = generateUuid7(),
         displayName = "ChefAI Preview",
         email = "preview@chefai.app",
         avatarUrl = null
@@ -140,7 +141,7 @@ fun RecipeCardPreview() {
         Surface {
             RecipeCard(
                 recipe = Recipe(
-                    uuid = UUIDv7.generate(),
+                    uuid = generateUuid7(),
                     title = "Mediterranean Grilled Chicken",
                     description = "A light and flavorful grilled chicken recipe with classic Mediterranean herbs and a lemon-garlic marinade.",
                     imageUrl = "https://via.placeholder.com/150",
@@ -153,7 +154,7 @@ fun RecipeCardPreview() {
                     ingredients = emptyList(),
                     steps = emptyList(),
                     tags = emptyList(),
-                    labels = listOf(Label(UUIDv7.generate(), "Mediterranean")),
+                    labels = listOf(Label(generateUuid7(), "Mediterranean")),
                     updatedAt = System.currentTimeMillis()
                 )
             )

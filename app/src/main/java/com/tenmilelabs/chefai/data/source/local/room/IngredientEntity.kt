@@ -6,7 +6,6 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.tenmilelabs.chefai.data.source.local.util.SyncState
 import com.tenmilelabs.chefai.data.source.local.util.SyncableEntity
-import com.tenmilelabs.chefai.data.source.local.util.generateUuid7
 import java.util.UUID
 
 @Entity(
@@ -32,7 +31,7 @@ import java.util.UUID
     ]
 )
 data class IngredientEntity(
-    @PrimaryKey override val uuid: UUID = generateUuid7(),
+    @PrimaryKey override val uuid: UUID,
     val displayName: String,
     val allergenId: UUID?,
     val sourcePrimaryId: UUID?,   // e.g. "Animal"
