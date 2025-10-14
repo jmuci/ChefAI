@@ -5,6 +5,7 @@ import com.tenmilelabs.chefai.domain.repository.RecipesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.flow
+import java.util.UUID
 
 class FakeRecipesRepository : RecipesRepository {
 
@@ -15,7 +16,7 @@ class FakeRecipesRepository : RecipesRepository {
     private var exceptionForGetRecipes: Exception? = null
 
     // For specific recipe details
-    private val recipeDetailFlows = mutableMapOf<String, MutableSharedFlow<Recipe?>>()
+    private val recipeDetailFlows = mutableMapOf<UUID, MutableSharedFlow<Recipe?>>()
     private var shouldReturnErrorForGetRecipe = false
     private var exceptionForGetRecipe: Exception? = null
 
@@ -33,11 +34,11 @@ class FakeRecipesRepository : RecipesRepository {
         this.exceptionForGetRecipe = exception ?: Exception("Test repository error for getRecipe")
     }
 
-    fun emitRecipe(recipeId: String, recipe: Recipe?) {
+    fun emitRecipe(recipeId: UUID, recipe: Recipe?) {
         getFlowForRecipe(recipeId).tryEmit(recipe)
     }
 
-    fun emitErrorForRecipe(recipeId: String, error: Throwable) {
+    fun emitErrorForRecipe(recipeId: UUID, error: Throwable) {
         getFlowForRecipe(recipeId).tryEmit(null) // Or handle error emission differently if your flow supports it
         // A more robust way would be to make recipeDetailFlows emit Result<Recipe?> or similar
         // For simplicity with current ViewModel, emitting null on error from flow might be how it's handled
@@ -45,7 +46,7 @@ class FakeRecipesRepository : RecipesRepository {
     }
 
 
-    private fun getFlowForRecipe(recipeId: String): MutableSharedFlow<Recipe?> {
+    private fun getFlowForRecipe(recipeId: UUID): MutableSharedFlow<Recipe?> {
         return recipeDetailFlows.getOrPut(recipeId) { MutableSharedFlow(replay = 1) }
     }
 
@@ -55,12 +56,14 @@ class FakeRecipesRepository : RecipesRepository {
 
     override fun getRecipesStream(): Flow<List<Recipe>> {
         if (shouldReturnErrorForGetRecipes) {
-            return flow { throw (exceptionForGetRecipes ?: Exception("Configured repository error")) }
+            return flow {
+                throw (exceptionForGetRecipes ?: Exception("Configured repository error"))
+            }
         }
         return recipesListFlow
     }
 
-    override suspend fun getRecipe(uuid: String): Recipe? {
+    override suspend fun getRecipe(uuid: UUID): Recipe? {
         TODO("Not yet implemented")
     }
 
@@ -69,17 +72,16 @@ class FakeRecipesRepository : RecipesRepository {
         recipesListFlow.tryEmit(recipesToEmitGeneral)
     }
 
-    override fun getRecipeStream(uuid: String): Flow<Recipe?> {
+    override fun getRecipeStream(uuid: UUID): Flow<Recipe?> {
         if (shouldReturnErrorForGetRecipe) {
-            return flow { throw (exceptionForGetRecipe ?: Exception("Configured repository error")) }
+            return flow {
+                throw (exceptionForGetRecipe ?: Exception("Configured repository error"))
+            }
         }
         return getFlowForRecipe(uuid)
     }
 
-    override suspend fun createRecipe(
-        recipe: Recipe,
-        uuid: String
-    ): String {
+    override suspend fun createRecipe(recipe: Recipe) {
         TODO("Not yet implemented")
     }
 
@@ -91,7 +93,7 @@ class FakeRecipesRepository : RecipesRepository {
         TODO("Not yet implemented")
     }
 
-    override suspend fun deleteRecipe(recipeId: String) {
+    override suspend fun deleteRecipe(recipeId: UUID) {
         // No-op
     }
 }

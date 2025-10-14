@@ -51,7 +51,8 @@ class FakeRecipeDao(
     }
 
     override suspend fun getRecipeWithDetails(uuid: UUID): RecipeWithDetails? {
-        TODO("Not yet implemented. Use observeRecipeWithDetails instead.")
+        val recipe = _recipes[uuid] ?: return null
+        return recipe
     }
 
     override fun observeRecipeWithDetails(uuid: UUID): Flow<RecipeWithDetails?> {
