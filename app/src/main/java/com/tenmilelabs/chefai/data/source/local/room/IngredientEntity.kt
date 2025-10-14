@@ -38,4 +38,5 @@ data class IngredientEntity(
     override val updatedAt: Long,
     override val deletedAt: Long?,
     override val syncState: SyncState = SyncState.PENDING
+    // TODO add grocery section ?
 ): SyncableEntity

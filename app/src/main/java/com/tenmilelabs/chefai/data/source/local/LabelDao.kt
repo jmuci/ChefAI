@@ -42,10 +42,4 @@ interface LabelDao {
 
     @Upsert
     suspend fun upsertLabel(label: LabelEntity)
-
-    @Upsert
-    suspend fun upsertAll(labels: List<LabelEntity>)
-
-    @Query("SELECT * FROM labels WHERE syncState = 'PENDING'")
-    suspend fun getDirty(): List<LabelEntity>
 }

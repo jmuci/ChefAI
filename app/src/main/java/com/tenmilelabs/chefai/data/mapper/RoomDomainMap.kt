@@ -113,7 +113,6 @@ fun Recipe.toRoomEntity(): RecipeEntity = RecipeEntity(
 )
 fun List<Recipe>.toRoomEntity() = map(Recipe::toRoomEntity)
 
-
 fun Ingredient.toRoomEntity(): IngredientEntity = IngredientEntity(
     uuid = uuid,
     displayName = displayName,

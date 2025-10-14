@@ -7,9 +7,6 @@ import com.tenmilelabs.chefai.data.source.local.room.RecipeStepEntity
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
-/**
- * Data Access Object for the recipe_steps table.
- */
 @Dao
 interface RecipeStepDao {
     @Query("SELECT * FROM recipe_steps")
@@ -31,11 +28,5 @@ interface RecipeStepDao {
     suspend fun deleteAllRecipeSteps()
 
     @Upsert
-    suspend fun upsertRecipeStep(recipeStep: RecipeStepEntity)
-
-    @Upsert
-    suspend fun upsertAll(recipeSteps: List<RecipeStepEntity>)
-
-    @Query("SELECT * FROM recipe_steps WHERE syncState = 'PENDING'")
-    suspend fun getDirty(): List<RecipeStepEntity>
+    suspend fun upsertStep(step: RecipeStepEntity)
 }

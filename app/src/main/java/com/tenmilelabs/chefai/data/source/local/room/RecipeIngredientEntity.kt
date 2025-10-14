@@ -33,9 +33,8 @@ data class RecipeIngredientEntity(
     val recipeId: UUID,
     val ingredientId: UUID,
     val quantity: Double,
-    val unit: String?,
-    val notes: String? = null,
+    val unit: String, //TODO Make enum
     override val updatedAt: Long,
-    override val deletedAt: Long?,
-    override val syncState: SyncState
+    override val deletedAt: Long? = null,
+    override val syncState: SyncState = SyncState.PENDING
 ): SyncableCrossRef
