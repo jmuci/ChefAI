@@ -5,7 +5,9 @@ import com.tenmilelabs.chefai.data.source.local.room.IngredientEntity
 import com.tenmilelabs.chefai.data.source.local.room.LabelEntity
 import com.tenmilelabs.chefai.data.source.local.room.RecipeEntity
 import com.tenmilelabs.chefai.data.source.local.room.RecipeIngredientEntity
+import com.tenmilelabs.chefai.data.source.local.room.RecipeLabelCrossRef
 import com.tenmilelabs.chefai.data.source.local.room.RecipeStepEntity
+import com.tenmilelabs.chefai.data.source.local.room.RecipeTagCrossRef
 import com.tenmilelabs.chefai.data.source.local.room.TagEntity
 import com.tenmilelabs.chefai.data.source.local.room.UserEntity
 import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeWithDetails
@@ -170,6 +172,15 @@ val testRecipeIngredients = listOf(
         updatedAt = updatedTimeSt
     )
 )
+val recipeLabel1 = RecipeLabelCrossRef(recipeId = recipeId1, labelId = testLabels[0].uuid, updatedAt = System.currentTimeMillis(), deletedAt = null)
+val recipeLabel2 = RecipeLabelCrossRef(recipeId = recipeId1, labelId = testLabels[1].uuid, updatedAt = System.currentTimeMillis(), deletedAt = null)
+val recipeLabel3 = RecipeLabelCrossRef(recipeId = recipeId2, labelId = testLabels[0].uuid, updatedAt = System.currentTimeMillis(), deletedAt = null)
+val recipeLabel4 = RecipeLabelCrossRef(recipeId = recipeId3, labelId = testLabels[2].uuid, updatedAt = System.currentTimeMillis(), deletedAt = null)
+val testRecipeLabels = listOf(recipeLabel1, recipeLabel2, recipeLabel3, recipeLabel4)
+
+val recipeTag1 = RecipeTagCrossRef(recipeId = recipeId1, tagId = testTags[0].uuid, updatedAt = System.currentTimeMillis(), deletedAt = null)
+val recipeTag2 = RecipeTagCrossRef(recipeId = recipeId1, tagId = testTags[1].uuid, updatedAt = System.currentTimeMillis(), deletedAt = null)
+val testRecipeTags = listOf(recipeTag1, recipeTag2)
 
 val testSteps1 = listOf(
     RecipeStepEntity(
