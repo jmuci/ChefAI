@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.data.source.local
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
 import com.tenmilelabs.chefai.data.source.local.room.AllergenEntity
 import com.tenmilelabs.chefai.data.source.local.room.IngredientEntity
 import com.tenmilelabs.chefai.data.source.local.room.LabelEntity
@@ -13,6 +14,7 @@ import com.tenmilelabs.chefai.data.source.local.room.RecipeTagCrossRef
 import com.tenmilelabs.chefai.data.source.local.room.SourceClassificationEntity
 import com.tenmilelabs.chefai.data.source.local.room.TagEntity
 import com.tenmilelabs.chefai.data.source.local.room.UserEntity
+import com.tenmilelabs.chefai.data.source.local.room.UuidConverters
 
 @Database(
     entities = [
@@ -30,6 +32,10 @@ import com.tenmilelabs.chefai.data.source.local.room.UserEntity
     ],
     version = 1,
     exportSchema = true
+)
+@TypeConverters(
+    UuidConverters::class,
+
 )
 abstract class ChefAIDataBase : RoomDatabase() {
     abstract fun allergenDao(): AllergenDao
