@@ -7,7 +7,9 @@ import com.tenmilelabs.chefai.data.source.local.util.SyncState
 import com.tenmilelabs.chefai.data.source.local.util.SyncableCrossRef
 import java.util.UUID
 
-@Entity(primaryKeys = ["recipeId", "tagId"],
+@Entity(
+    tableName = "recipe_tags",
+    primaryKeys = ["recipeId", "tagId"],
     foreignKeys = [
         ForeignKey(
             entity = RecipeEntity::class,
