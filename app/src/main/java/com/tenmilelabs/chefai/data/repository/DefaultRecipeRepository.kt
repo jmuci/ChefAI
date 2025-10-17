@@ -11,6 +11,7 @@ import com.tenmilelabs.chefai.domain.repository.RecipesRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -38,7 +39,7 @@ class DefaultRecipeRepository @Inject constructor(
     }
 
     override fun getRecipesStream(): Flow<List<Recipe>> {
-        return if (true) { // Network
+        return if (false) { // Network
             flow {
                 emit(getAllItemsFromNetwork())
             }
@@ -47,6 +48,14 @@ class DefaultRecipeRepository @Inject constructor(
                 withContext(dispatcher) {
                     recipes.toDomain()
                 }
+            }.catch { e ->
+                // TODO try to recover by potentially wiping the DB, recreating and re-syncing
+                if (e is IllegalStateException) {
+                    Timber.e(e, "Error observing recipes: ${e.message}")
+                    Timber.d("StackTrace: " + e.stackTrace)
+                    emit(emptyList())
+                }
+                throw e
             }
         }
     }
