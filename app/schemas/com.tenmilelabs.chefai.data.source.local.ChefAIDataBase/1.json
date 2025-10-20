@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "ccbba1d58abb4f21caeb421192a9d3ea",
+    "identityHash": "fe06482068f2842f3932b8db67ec6c58",
     "entities": [
       {
         "tableName": "allergens",
@@ -452,7 +452,7 @@
         ]
       },
       {
-        "tableName": "RecipeLabelCrossRef",
+        "tableName": "recipe_labels",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`recipeId` BLOB NOT NULL, `labelId` BLOB NOT NULL, `updatedAt` INTEGER NOT NULL, `deletedAt` INTEGER, `syncState` TEXT NOT NULL, PRIMARY KEY(`recipeId`, `labelId`), FOREIGN KEY(`recipeId`) REFERENCES `recipes`(`uuid`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`labelId`) REFERENCES `labels`(`uuid`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
         "fields": [
           {
@@ -494,23 +494,23 @@
         },
         "indices": [
           {
-            "name": "index_RecipeLabelCrossRef_labelId",
+            "name": "index_recipe_labels_labelId",
             "unique": false,
             "columnNames": [
               "labelId"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_RecipeLabelCrossRef_labelId` ON `${TABLE_NAME}` (`labelId`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_recipe_labels_labelId` ON `${TABLE_NAME}` (`labelId`)"
           },
           {
-            "name": "index_RecipeLabelCrossRef_syncState_updatedAt",
+            "name": "index_recipe_labels_syncState_updatedAt",
             "unique": false,
             "columnNames": [
               "syncState",
               "updatedAt"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_RecipeLabelCrossRef_syncState_updatedAt` ON `${TABLE_NAME}` (`syncState`, `updatedAt`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_recipe_labels_syncState_updatedAt` ON `${TABLE_NAME}` (`syncState`, `updatedAt`)"
           }
         ],
         "foreignKeys": [
@@ -626,7 +626,7 @@
         ]
       },
       {
-        "tableName": "RecipeTagCrossRef",
+        "tableName": "recipe_tags",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`recipeId` BLOB NOT NULL, `tagId` BLOB NOT NULL, `updatedAt` INTEGER NOT NULL, `deletedAt` INTEGER, `syncState` TEXT NOT NULL, PRIMARY KEY(`recipeId`, `tagId`), FOREIGN KEY(`recipeId`) REFERENCES `recipes`(`uuid`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`tagId`) REFERENCES `tags`(`uuid`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
         "fields": [
           {
@@ -668,23 +668,23 @@
         },
         "indices": [
           {
-            "name": "index_RecipeTagCrossRef_tagId",
+            "name": "index_recipe_tags_tagId",
             "unique": false,
             "columnNames": [
               "tagId"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_RecipeTagCrossRef_tagId` ON `${TABLE_NAME}` (`tagId`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_recipe_tags_tagId` ON `${TABLE_NAME}` (`tagId`)"
           },
           {
-            "name": "index_RecipeTagCrossRef_syncState_updatedAt",
+            "name": "index_recipe_tags_syncState_updatedAt",
             "unique": false,
             "columnNames": [
               "syncState",
               "updatedAt"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_RecipeTagCrossRef_syncState_updatedAt` ON `${TABLE_NAME}` (`syncState`, `updatedAt`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_recipe_tags_syncState_updatedAt` ON `${TABLE_NAME}` (`syncState`, `updatedAt`)"
           }
         ],
         "foreignKeys": [
@@ -889,7 +889,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'ccbba1d58abb4f21caeb421192a9d3ea')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'fe06482068f2842f3932b8db67ec6c58')"
     ]
   }
 }
