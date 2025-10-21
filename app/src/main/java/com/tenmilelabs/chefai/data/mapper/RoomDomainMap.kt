@@ -47,20 +47,24 @@ fun RecipeWithDetails.toDomain(): Recipe {
 @JvmName("toFullRecipeDomain")
 fun List<RecipeWithDetails>.toDomain() = map(RecipeWithDetails::toDomain)
 
-fun RecipeEntity.toDomain(): RecipePreview = RecipePreview(
-    uuid = uuid,
-    title = title,
-    description = description,
-    imageUrlThumbnail = imageUrlThumbnail,
-    prepTimeMinutes = prepTimeMinutes,
-    cookTimeMinutes = cookTimeMinutes,
-    servings = servings,
-    creatorId = creatorId,
-    tags = emptyList(),
-    labels = emptyList()
-)
+fun RecipeWithDetails.toPreviewDomain(): RecipePreview {
+    return RecipePreview(
+        uuid = recipe.uuid,
+        title = recipe.title,
+        description = recipe.description,
+        imageUrlThumbnail = recipe.imageUrlThumbnail,
+        prepTimeMinutes = recipe.prepTimeMinutes,
+        cookTimeMinutes = recipe.cookTimeMinutes,
+        servings = recipe.servings,
+        creatorId = creator.uuid,
+        tags = tags.map { it.toDomain() },
+        labels = labels.map { it.toDomain() },
+    )
+}
+
 @JvmName("toRecipePreviewDomain")
-fun List<RecipeEntity>.toDomain() = map(RecipeEntity::toDomain)
+fun List<RecipeWithDetails>.toRecipePreviewDomain() = map(RecipeWithDetails::toPreviewDomain)
+
 fun UserEntity.toDomain(): User = User(
     uuid = uuid,
     displayName = displayName,
