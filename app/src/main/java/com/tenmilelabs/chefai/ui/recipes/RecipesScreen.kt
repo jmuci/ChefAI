@@ -16,12 +16,11 @@ import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.data.source.local.util.generateUuid7
 import com.tenmilelabs.chefai.domain.model.RecipePreview
-import com.tenmilelabs.chefai.domain.model.User
 import com.tenmilelabs.chefai.ui.components.RecipeListCard
 import com.tenmilelabs.chefai.ui.preview.PreviewData
 import com.tenmilelabs.chefai.ui.preview.RecipePreviewProvider
@@ -45,10 +44,10 @@ fun RecipesScreen(
 
     // Check for user messages to display on the screen
     uiState.userMessage?.let { message ->
-        val snackbarText = stringResource(message)
-        LaunchedEffect(snackbarHostState, viewModel, message, snackbarText) {
+        val snackBarText = stringResource(message)
+        LaunchedEffect(snackbarHostState, viewModel, message, snackBarText) {
             snackbarHostState.showSnackbar(
-                message = snackbarText,
+                message = snackBarText,
                 duration = SnackbarDuration.Short
             )
             viewModel.snackbarMessageShown()
@@ -91,7 +90,7 @@ fun RecipesContent(
 
 @Preview
 @Composable
-fun RecipessListScreenPreview() {
+fun RecipesListScreenPreview() {
     val previewUser = com.tenmilelabs.chefai.domain.model.User(
         uuid = generateUuid7(),
         displayName = "ChefAI Preview",
