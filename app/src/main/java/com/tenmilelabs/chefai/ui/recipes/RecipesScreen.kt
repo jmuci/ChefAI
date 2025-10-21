@@ -15,18 +15,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.data.source.local.util.generateUuid7
-import com.tenmilelabs.chefai.domain.model.Label
-import com.tenmilelabs.chefai.domain.model.Recipe
+import com.tenmilelabs.chefai.domain.model.RecipePreview
 import com.tenmilelabs.chefai.domain.model.User
-import com.tenmilelabs.chefai.ui.components.RecipeCard
+import com.tenmilelabs.chefai.ui.components.RecipeListCard
+import com.tenmilelabs.chefai.ui.preview.PreviewData
+import com.tenmilelabs.chefai.ui.preview.RecipePreviewProvider
 import com.tenmilelabs.chefai.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.util.EmptyContent
 import com.tenmilelabs.chefai.util.LoadingContent
-import xyz.block.uuidv7.UUIDv7
 import java.util.UUID
 
 @Composable
@@ -58,7 +59,7 @@ fun RecipesScreen(
 @Composable
 fun RecipesContent(
     loading: Boolean,
-    recipes: List<Recipe>,
+    recipes: List<RecipePreview>,
     recipeCardOnClick: (UUID) -> Unit = {},
 ) {
     if (loading) {
@@ -78,7 +79,7 @@ fun RecipesContent(
         ) {
             LazyColumn {
                 items(recipes) { recipe ->
-                    RecipeCard(
+                    RecipeListCard(
                         recipe = recipe,
                         navigateToDetail = { recipeCardOnClick(recipe.uuid) })
                 }
@@ -86,7 +87,6 @@ fun RecipesContent(
         }
     }
 }
-
 
 
 @Preview
@@ -98,27 +98,9 @@ fun RecipessListScreenPreview() {
         email = "preview@chefai.app",
         avatarUrl = null
     )
-    val recipes: List<Recipe> = buildList {
+    val recipes: List<RecipePreview> = buildList {
         for (i in 1..60) {
-            add(
-                Recipe(
-                    uuid = generateUuid7(),
-                    title = "Mediterranean Grilled Chicken",
-                    description = "A light and flavorful grilled chicken recipe with classic Mediterranean herbs and a lemon-garlic marinade.",
-                    imageUrl = "https://via.placeholder.com/150",
-                    imageUrlThumbnail = "https://via.placeholder.com/150",
-                    prepTimeMinutes = 15,
-                    cookTimeMinutes = 20,
-                    servings = 4,
-                    creator = previewUser,
-                    recipeExternalUrl = "https://example.com/recipe",
-                    ingredients = emptyList(),
-                    steps = emptyList(),
-                    tags = emptyList(),
-                    labels = listOf(Label(generateUuid7(), "Mediterranean")),
-                    updatedAt = System.currentTimeMillis()
-                )
-            )
+            add(PreviewData.recipePreview)
         }
     }
     ChefAITheme {
@@ -131,7 +113,7 @@ fun RecipessListScreenPreview() {
 @Preview
 @Composable
 fun RecipesListScreenEmptyPreview() {
-    val recipes: List<Recipe> = emptyList()
+    val recipes: List<RecipePreview> = emptyList()
     ChefAITheme {
         Surface {
             RecipesContent(false, recipes)
@@ -141,34 +123,12 @@ fun RecipesListScreenEmptyPreview() {
 
 @Preview
 @Composable
-fun RecipeCardPreview() {
-    val previewUser = User(
-        uuid = UUID.randomUUID(),
-        displayName = "Preview User",
-        email = "user@preview.com",
-        avatarUrl = null
-    )
+fun RecipeListCardPreview(
+    @PreviewParameter(RecipePreviewProvider::class) recipe: RecipePreview
+) {
     ChefAITheme {
         Surface {
-            RecipeCard(
-                recipe = Recipe(
-                    uuid = UUID.randomUUID(),
-                    title = "Delicious Grilled Chicken",
-                    description = "A very tasty and easy to make grilled chicken recipe. Perfect for a summer barbecue. Follow the steps carefully for the best results.",
-                    imageUrl = "https://via.placeholder.com/200",
-                    imageUrlThumbnail = "https://via.placeholder.com/200",
-                    prepTimeMinutes = 15,
-                    cookTimeMinutes = 20,
-                    servings = 4,
-                    creator = previewUser,
-                    recipeExternalUrl = "https://example.com/grilled-chicken",
-                    ingredients = emptyList(),
-                    steps = emptyList(),
-                    tags = emptyList(),
-                    labels = listOf(Label(UUID.randomUUID(), "Grill")),
-                    updatedAt = System.currentTimeMillis()
-                )
-            )
+            RecipeListCard(recipe)
         }
     }
 }

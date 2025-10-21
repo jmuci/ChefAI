@@ -22,6 +22,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import coil3.annotation.ExperimentalCoilApi
 import coil3.compose.AsyncImage
@@ -29,16 +30,17 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.data.source.local.util.generateUuid7
-import com.tenmilelabs.chefai.domain.model.Label
-import com.tenmilelabs.chefai.domain.model.Recipe
+import com.tenmilelabs.chefai.domain.model.RecipePreview
+import com.tenmilelabs.chefai.ui.preview.RecipePreviewProvider
 import com.tenmilelabs.chefai.ui.theme.ChefAITheme
-import xyz.block.uuidv7.UUIDv7
 import java.util.UUID
 
 @Composable
-fun RecipeCard(recipe: Recipe,
-               closeDetailScreen: () -> Unit = {},
-               navigateToDetail: (UUID) -> Unit = {}) {
+fun RecipeListCard(
+    recipe: RecipePreview,
+    closeDetailScreen: () -> Unit = {},
+    navigateToDetail: (UUID) -> Unit = {}
+) {
     Card(
         modifier = Modifier
             .padding(dimensionResource(id = R.dimen.padding_small)),
@@ -62,7 +64,8 @@ fun RecipeCard(recipe: Recipe,
                     contentDescription = stringResource(R.string.recipe_image_content_description),
                     contentScale = ContentScale.Crop,
                     alignment = Alignment.Center,
-                    modifier = Modifier.size(120.dp, 70.dp)
+                    modifier = Modifier
+                        .size(120.dp, 70.dp)
                         .clip(RoundedCornerShape(5.dp))
                 )
             }
@@ -130,7 +133,9 @@ fun RecipeTimeAndLabelRow(prepTime: Int, label: String) {
 @OptIn(ExperimentalCoilApi::class)
 @Preview
 @Composable
-fun RecipeCardPreview() {
+fun RecipeListCardPreview(
+    @PreviewParameter(RecipePreviewProvider::class) recipe: RecipePreview
+) {
     val previewUser = com.tenmilelabs.chefai.domain.model.User(
         uuid = generateUuid7(),
         displayName = "ChefAI Preview",
@@ -139,25 +144,7 @@ fun RecipeCardPreview() {
     )
     ChefAITheme {
         Surface {
-            RecipeCard(
-                recipe = Recipe(
-                    uuid = generateUuid7(),
-                    title = "Mediterranean Grilled Chicken",
-                    description = "A light and flavorful grilled chicken recipe with classic Mediterranean herbs and a lemon-garlic marinade.",
-                    imageUrl = "https://via.placeholder.com/150",
-                    imageUrlThumbnail = "https://via.placeholder.com/150",
-                    prepTimeMinutes = 15,
-                    cookTimeMinutes = 20,
-                    servings = 4,
-                    creator = previewUser,
-                    recipeExternalUrl = "https://example.com/recipe",
-                    ingredients = emptyList(),
-                    steps = emptyList(),
-                    tags = emptyList(),
-                    labels = listOf(Label(generateUuid7(), "Mediterranean")),
-                    updatedAt = System.currentTimeMillis()
-                )
-            )
+            RecipeListCard(recipe)
         }
     }
 }
