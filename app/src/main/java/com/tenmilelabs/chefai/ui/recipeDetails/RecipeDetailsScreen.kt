@@ -37,6 +37,7 @@ import com.tenmilelabs.chefai.domain.model.User
 import com.tenmilelabs.chefai.ui.components.InfoChip
 import com.tenmilelabs.chefai.ui.components.InfoChipType
 import com.tenmilelabs.chefai.ui.components.RecipeTimeRow
+import com.tenmilelabs.chefai.ui.preview.RecipeData
 import com.tenmilelabs.chefai.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.util.EmptyContent
 import com.tenmilelabs.chefai.util.LoadingContent
@@ -138,31 +139,7 @@ fun RecipeDetailsContent(
 @Preview(showBackground = true)
 @Composable
 fun RecipeDetailsFullScreenPreview() {
-    val previewUser = User(
-        uuid = UUID.randomUUID(),
-        displayName = "Preview User",
-        email = "user@preview.com",
-        avatarUrl = null
-    )
     ChefAITheme {
-        RecipeDetailsContent(
-            Recipe(
-                uuid = UUID.randomUUID(),
-                title = "Delicious Grilled Chicken",
-                description = "A very tasty and easy to make grilled chicken recipe. Perfect for a summer barbecue. Follow the steps carefully for the best results.",
-                imageUrl = "https://via.placeholder.com/200",
-                imageUrlThumbnail = "https://via.placeholder.com/200",
-                prepTimeMinutes = 15,
-                cookTimeMinutes = 20,
-                servings = 4,
-                creator = previewUser,
-                recipeExternalUrl = "https://example.com/grilled-chicken",
-                ingredients = emptyList(),
-                steps = emptyList(),
-                tags = emptyList(),
-                labels = listOf(Label(UUID.randomUUID(), "Grill")),
-                updatedAt = System.currentTimeMillis()
-            )
-        )
+        RecipeDetailsContent(RecipeData.recipe)
     }
 }
