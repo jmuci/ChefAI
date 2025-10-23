@@ -8,7 +8,7 @@ object RecipeData {
     val recipe =
         Recipe(
             uuid = UUID.randomUUID(),
-            title = "Delicious Grilled Chicken",
+            title = "Spaghetti Carbonara",
             description = "A very tasty and easy to make grilled chicken recipe. Perfect for a summer barbecue. Follow the steps carefully for the best results.",
             imageUrl = "https://via.placeholder.com/200",
             imageUrlThumbnail = "https://via.placeholder.com/200",
@@ -17,10 +17,10 @@ object RecipeData {
             servings = 4,
             creator = SharedData.user,
             recipeExternalUrl = "https://example.com/grilled-chicken",
-            ingredients = emptyList(),
-            steps = emptyList(),
-            tags = emptyList(),
-            labels = listOf(Label(UUID.randomUUID(), "Grill")),
+            ingredients = SharedData.carbonaraIngredients,
+            steps = SharedData.carbonaraSteps,
+            tags = listOf(SharedData.tagQuick, SharedData.tagEasy),
+            labels = listOf(SharedData.labelVegetarian, SharedData.labelMediterranean),
             updatedAt = System.currentTimeMillis()
         )
 }

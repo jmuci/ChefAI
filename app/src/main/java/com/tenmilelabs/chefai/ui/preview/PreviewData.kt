@@ -18,7 +18,7 @@ object PreviewData {
         servings = 4,
         creatorId = SharedData.user.uuid,
         tags = listOf(Tag(generateUuid7(), "Healthy"), Tag(generateUuid7(), "Quick")),
-        labels = listOf(com.tenmilelabs.chefai.domain.model.Label(generateUuid7(), "Dinner")),
+        labels = listOf(Label(generateUuid7(), "Dinner")),
     )
 
     val recipePreviewLongTitle = RecipePreview(
@@ -58,6 +58,19 @@ object PreviewData {
         creatorId = SharedData.user.uuid,
         tags = emptyList(),
         labels = listOf(Label(generateUuid7(), "Mediterranean")),
+    )
+
+    val recipePreviewManyLabelsAndTags = RecipePreview(
+        uuid = generateUuid7(),
+        title = "Mediterranean Grilled Chicken",
+        description = "A light and flavorful grilled chicken recipe with classic Mediterranean herbs and a lemon-garlic marinade.",
+        imageUrlThumbnail = "https://www.themediterraneandish.com/wp-content/uploads/2015/05/mediterranean-grilled-chicken-recipe-13.jpg",
+        prepTimeMinutes = 15,
+        cookTimeMinutes = 20,
+        servings = 4,
+        creatorId = SharedData.user.uuid,
+        tags = SharedData.multipleTags,
+        labels = SharedData.multipleLabels,
     )
 
     val recipePreviewList = listOf(
