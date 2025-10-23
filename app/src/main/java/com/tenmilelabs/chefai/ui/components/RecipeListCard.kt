@@ -19,7 +19,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.dimensionResource
@@ -108,18 +107,6 @@ fun RecipeListCard(
             }
         }
     }
-}
-
-@Composable
-fun RecipeTimeRow(prepTime: Int, cookTime: Int) {
-    val totalTime = prepTime + cookTime
-    Text(
-        text = "Prep: ${prepTime}m  ·  Cook: ${cookTime}m  ·  Total: ${totalTime}m",
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis
-    )
 }
 
 

@@ -1,7 +1,6 @@
 package com.tenmilelabs.chefai.data.repository
 
 import com.tenmilelabs.chefai.data.mapper.toDomain
-import com.tenmilelabs.chefai.data.mapper.toPreviewDomain
 import com.tenmilelabs.chefai.data.mapper.toRecipePreviewDomain
 import com.tenmilelabs.chefai.data.mapper.toRoomEntity
 import com.tenmilelabs.chefai.data.source.local.RecipeDao
