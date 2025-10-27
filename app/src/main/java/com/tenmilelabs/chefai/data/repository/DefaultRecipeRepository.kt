@@ -7,18 +7,15 @@ import com.tenmilelabs.chefai.data.source.local.RecipeDao
 import com.tenmilelabs.chefai.data.source.local.util.decodeHex
 import com.tenmilelabs.chefai.data.source.local.util.toUuid
 import com.tenmilelabs.chefai.data.source.network.RecipeNetworkDataSource
-import com.tenmilelabs.chefai.di.ApplicationScope
 import com.tenmilelabs.chefai.di.IoDispatcher
 import com.tenmilelabs.chefai.domain.model.Recipe
 import com.tenmilelabs.chefai.domain.model.RecipePreview
 import com.tenmilelabs.chefai.domain.repository.RecipesRepository
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -34,16 +31,9 @@ import kotlin.coroutines.cancellation.CancellationException
 class DefaultRecipeRepository @Inject constructor(
     private val localDatSource: RecipeDao,
     private val networkDataSource: RecipeNetworkDataSource,
-    @param:IoDispatcher private val dispatcher: CoroutineDispatcher,
-    @param:ApplicationScope private val appScope: CoroutineScope,
-) : RecipesRepository {
+    @param:IoDispatcher private val dispatcher: CoroutineDispatcher) : RecipesRepository {
     //TODO implement authentication
     val testUserId = "F47AC10B58CC4372A5670E02B2C3D479".decodeHex().toUuid()
-    override suspend fun getRecipes(): List<Recipe> {
-        return withContext(dispatcher) {
-            localDatSource.observeRecipesWithDetailsForUser(testUserId).first().map { it.toDomain() }
-        }
-    }
 
     override fun getRecipesPreviewStream(): Flow<List<RecipePreview>> {
         return localDatSource.observeRecipesWithDetailsForUser(testUserId).map { recipes ->

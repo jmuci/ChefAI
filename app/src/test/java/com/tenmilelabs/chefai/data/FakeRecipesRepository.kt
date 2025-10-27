@@ -52,10 +52,6 @@ class FakeRecipesRepository : RecipesRepository {
         return recipeDetailFlows.getOrPut(recipeId) { MutableSharedFlow(replay = 1) }
     }
 
-    override suspend fun getRecipes(): List<Recipe> {
-        TODO("Not yet implemented")
-    }
-
     override fun getRecipesPreviewStream(): Flow<List<RecipePreview>> {
         if (shouldReturnErrorForGetRecipes) {
             return flow {
