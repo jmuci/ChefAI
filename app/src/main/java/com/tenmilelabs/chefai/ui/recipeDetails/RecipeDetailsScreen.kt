@@ -33,13 +33,14 @@ import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.tenmilelabs.chefai.R
-import com.tenmilelabs.chefai.domain.model.Ingredient
+import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.domain.model.Recipe
 import com.tenmilelabs.chefai.domain.model.RecipeStep
 import com.tenmilelabs.chefai.ui.components.InfoChip
@@ -49,6 +50,7 @@ import com.tenmilelabs.chefai.ui.preview.RecipeData
 import com.tenmilelabs.chefai.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.util.EmptyContent
 import com.tenmilelabs.chefai.util.LoadingContent
+import com.tenmilelabs.chefai.util.MathUtils
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -78,7 +80,10 @@ fun RecipeDetailsScreen(
     uiState.userMessage?.let { message ->
         val snackbarText = stringResource(message)
         LaunchedEffect(snackbarHostState, viewModel, message, snackbarText) {
-            snackbarHostState.showSnackbar(message = snackbarText, duration = SnackbarDuration.Short)
+            snackbarHostState.showSnackbar(
+                message = snackbarText,
+                duration = SnackbarDuration.Short
+            )
             viewModel.snackbarMessageShown()
         }
     }
@@ -161,16 +166,26 @@ fun RecipeDetailsContent(
     }
 }
 
-@Composable fun IngredientsList(ingredients: List<Ingredient>) {
+@Composable
+fun IngredientsList(ingredients: List<RecipeIngredient>) {
     LazyColumn(contentPadding = PaddingValues(all = dimensionResource(id = R.dimen.padding_medium))) {
         items(ingredients) { ingredient ->
-            Text(
-                text = ingredient.displayName,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = dimensionResource(id = R.dimen.padding_small)),
-                style = MaterialTheme.typography.bodyLarge
-            )
+            Row() {
+                Text(
+                    text = ingredient.ingredientDisplayName,
+                    modifier = Modifier
+                        .padding(vertical = dimensionResource(id = R.dimen.padding_small)),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = MathUtils.removeTrailingZeros(ingredient.quantity.toString()) + " " + ingredient.unit,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = dimensionResource(id = R.dimen.padding_small)),
+                    textAlign = TextAlign.End,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
             HorizontalDivider()
         }
     }

@@ -9,6 +9,7 @@ import com.tenmilelabs.chefai.data.source.local.room.SourceClassificationEntity
 import com.tenmilelabs.chefai.data.source.local.room.TagEntity
 import com.tenmilelabs.chefai.data.source.local.room.UserEntity
 import com.tenmilelabs.chefai.data.source.local.room.relations.IngredientWithDetails
+import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeWithDetails
 import com.tenmilelabs.chefai.domain.model.Allergen
 import com.tenmilelabs.chefai.domain.model.Ingredient
@@ -24,7 +25,7 @@ import com.tenmilelabs.chefai.domain.model.User
  * Maps Room database entities to domain models.
  */
 
-fun RecipeWithDetails.toDomain(): Recipe {
+fun RecipeWithDetails.toDomain(ingredients: List<RecipeIngredient> = emptyList()): Recipe {
     return Recipe(
         uuid = recipe.uuid,
         title = recipe.title,
@@ -36,7 +37,7 @@ fun RecipeWithDetails.toDomain(): Recipe {
         servings = recipe.servings,
         creator = creator.toDomain(),
         recipeExternalUrl = recipe.recipeExternalUrl,
-        ingredients = ingredients.map { it.toDomain() },
+        ingredients = ingredients,
         steps = steps.map { it.toDomain() },
         tags = tags.map { it.toDomain() },
         labels = labels.map { it.toDomain() },

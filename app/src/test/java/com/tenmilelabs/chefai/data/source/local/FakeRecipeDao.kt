@@ -3,12 +3,13 @@ package com.tenmilelabs.chefai.data.source.local
 import com.tenmilelabs.chefai.data.source.local.room.IngredientEntity
 import com.tenmilelabs.chefai.data.source.local.room.LabelEntity
 import com.tenmilelabs.chefai.data.source.local.room.RecipeEntity
-import com.tenmilelabs.chefai.data.source.local.room.RecipeIngredientCrossRef
+import com.tenmilelabs.chefai.data.source.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.data.source.local.room.RecipeLabelCrossRef
 import com.tenmilelabs.chefai.data.source.local.room.RecipeStepEntity
 import com.tenmilelabs.chefai.data.source.local.room.RecipeTagCrossRef
 import com.tenmilelabs.chefai.data.source.local.room.TagEntity
 import com.tenmilelabs.chefai.data.source.local.room.UserEntity
+import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeWithDetails
 import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeWithLabels
 import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeWithTags
@@ -31,7 +32,7 @@ class FakeRecipeDao : RecipeDao {
     private val labels = mutableMapOf<UUID, LabelEntity>()
     private val tags = mutableMapOf<UUID, TagEntity>()
     private val steps = mutableMapOf<UUID, RecipeStepEntity>()
-    private val recipeIngredients = mutableListOf<RecipeIngredientCrossRef>()
+    private val recipeIngredients = mutableListOf<RecipeIngredientEntity>()
     private val recipeLabels = mutableListOf<RecipeLabelCrossRef>()
     private val recipeTags = mutableListOf<RecipeTagCrossRef>()
 
@@ -45,7 +46,7 @@ class FakeRecipeDao : RecipeDao {
         labels: List<LabelEntity> = emptyList(),
         tags: List<TagEntity> = emptyList(),
         steps: List<RecipeStepEntity> = emptyList(),
-        recipeIngredients: List<RecipeIngredientCrossRef> = emptyList(),
+        recipeIngredients: List<RecipeIngredientEntity> = emptyList(),
         recipeLabels: List<RecipeLabelCrossRef> = emptyList(),
         recipeTags: List<RecipeTagCrossRef> = emptyList()
     ) {
@@ -84,7 +85,6 @@ class FakeRecipeDao : RecipeDao {
             recipe = recipe,
             creator = creator,
             steps = recipeSteps,
-            ingredients = recipeIngredientsList,
             tags = recipeTagsList,
             labels = recipeLabelsList
         )
@@ -92,6 +92,10 @@ class FakeRecipeDao : RecipeDao {
 
     override fun observeAllRecipesForUser(creatorId: UUID): Flow<List<RecipeEntity>> {
         return trigger.map { recipes.values.filter { it.creatorId == creatorId } }
+    }
+
+    override fun observeIngredientsForRecipe(recipeId: UUID): Flow<List<RecipeIngredient>> {
+        TODO("Not yet implemented);
     }
 
     override suspend fun getRecipeById(uuid: UUID): RecipeEntity? = recipes[uuid]

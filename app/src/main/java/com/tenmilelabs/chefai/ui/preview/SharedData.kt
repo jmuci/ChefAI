@@ -1,10 +1,11 @@
 package com.tenmilelabs.chefai.ui.preview
 
+import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.data.source.local.util.generateUuid7
 import com.tenmilelabs.chefai.domain.model.Allergen
-import com.tenmilelabs.chefai.domain.model.Ingredient
 import com.tenmilelabs.chefai.domain.model.Label
 import com.tenmilelabs.chefai.domain.model.RecipeStep
+import com.tenmilelabs.chefai.domain.model.SourceClassification
 import com.tenmilelabs.chefai.domain.model.Tag
 import com.tenmilelabs.chefai.domain.model.User
 
@@ -44,15 +45,28 @@ object SharedData {
 
     val multiAllergens = listOf(allergenGluten, allergenNuts, allergenPeanuts, allergenSoy, allergenWheat, allergenEggs, allergenDairy, allergenFish)
 
+    val srcClassPork = SourceClassification(generateUuid7(), "Animal", "Pork")
+    val srcClassBeef = SourceClassification(generateUuid7(), "Animal", "Beef")
+    val srcClassChicken = SourceClassification(generateUuid7(), "Animal", "Chicken")
+    val srcClassFish = SourceClassification(generateUuid7(), "Animal", "Fish")
+    val srscClassEgg = SourceClassification(generateUuid7(), "Animal", "Egg")
+    val srcClassShrimp = SourceClassification(generateUuid7(), "Animal", "Shrimp")
+    val scrClassGrain = SourceClassification(generateUuid7(), "Vegetable", "Grain")
+    val scrClassLegume = SourceClassification(generateUuid7(), "Vegetable", "Legume")
+    val srcClassSpice = SourceClassification(generateUuid7(), "Vegetable", "Spice")
+
+
+
+
     // Ingredients
-    val ingredientSpaghetti = Ingredient(generateUuid7(), "Spaghetti", allergen = allergenWheat, sourcePrimary = null)
-    val ingredientGuanciale = Ingredient(generateUuid7(), "Guanciale", allergen = null, sourcePrimary = null)
-    val ingredientEggs = Ingredient(generateUuid7(), "Eggs", allergen = allergenEggs, sourcePrimary = null)
-    val ingredientPecorino = Ingredient(generateUuid7(), "Pecorino Romano", allergen = allergenDairy, sourcePrimary = null)
-    val ingredientBlackPepper = Ingredient(generateUuid7(), "Black Pepper", allergen = null, sourcePrimary = null)
-    val ingredientChickenBreast = Ingredient(generateUuid7(), "Chicken Breast", allergen = null, sourcePrimary = null)
-    val ingredientGarlic = Ingredient(generateUuid7(), "Garlic", allergen = null, sourcePrimary = null)
-    val ingredientOliveOil = Ingredient(generateUuid7(), "Olive Oil", allergen = null, sourcePrimary = null)
+    val ingredientSpaghetti = RecipeIngredient(generateUuid7(), "Spaghetti", quantity = 500.0, unit= "gr", allergenName = allergenWheat.displayName, srcCategory = scrClassGrain.category, srcSubcategory = scrClassGrain.subcategory)
+    val ingredientGuanciale = RecipeIngredient(generateUuid7(), "Guanciale", quantity = 200.0, unit= "gr", allergenName = null, srcCategory = srcClassPork.category, srcSubcategory = srcClassPork.subcategory)
+    val ingredientEggs = RecipeIngredient(generateUuid7(), "Eggs", quantity = 2.0, unit= "units", allergenName = allergenEggs.displayName, srcCategory = srscClassEgg.category, srcSubcategory = srscClassEgg.subcategory)
+    val ingredientPecorino = RecipeIngredient(generateUuid7(), "Pecorino Romano", quantity = 250.0, unit= "gr", allergenName = allergenDairy.displayName, srcCategory = scrClassGrain.category, srcSubcategory = scrClassGrain.subcategory)
+    val ingredientBlackPepper = RecipeIngredient(generateUuid7(), "Black Pepper", quantity = 50.0, unit= "gr", allergenName = null, srcCategory = srcClassSpice.category, srcSubcategory = srcClassSpice.subcategory)
+    val ingredientChickenBreast = RecipeIngredient(generateUuid7(), "Chicken Breast", quantity = 500.0, unit= "gr", allergenName = null, srcCategory = scrClassGrain.category, srcSubcategory = scrClassGrain.subcategory)
+    val ingredientGarlic = RecipeIngredient(generateUuid7(), "Garlic", quantity = 500.0, unit= "gr", allergenName = allergenWheat.displayName, srcCategory = scrClassGrain.category, srcSubcategory = scrClassGrain.subcategory)
+    val ingredientOliveOil = RecipeIngredient(generateUuid7(), "Olive Oil", quantity = 500.0, unit= "gr", allergenName = allergenWheat.displayName, srcCategory = scrClassGrain.category, srcSubcategory = scrClassGrain.subcategory)
 
     val carbonaraIngredients = listOf(ingredientSpaghetti, ingredientGuanciale, ingredientEggs, ingredientPecorino, ingredientBlackPepper)
 

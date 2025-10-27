@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.domain.model
 
+import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeIngredient
 import java.util.UUID
 
 /**
@@ -17,7 +18,7 @@ data class Recipe(
     val servings: Int,
     val creator: User,
     val recipeExternalUrl: String?,
-    val ingredients: List<Ingredient>,
+    val ingredients: List<RecipeIngredient>,
     val steps: List<RecipeStep>,
     val tags: List<Tag>,
     val labels: List<Label>,

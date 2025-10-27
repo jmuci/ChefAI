@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -40,7 +41,7 @@ class DefaultRecipeRepository @Inject constructor(
     val testUserId = "F47AC10B58CC4372A5670E02B2C3D479".decodeHex().toUuid()
     override suspend fun getRecipes(): List<Recipe> {
         return withContext(dispatcher) {
-            localDatSource.observeRecipesWithDetails().first().map { it.toDomain() }
+            localDatSource.observeRecipesWithDetailsForUser(testUserId).first().map { it.toDomain() }
         }
     }
 
@@ -50,7 +51,7 @@ class DefaultRecipeRepository @Inject constructor(
                 recipes.toRecipePreviewDomain()
             }
         }.catch { e ->
-            logAndReThrow(e)
+            logAndReThrow(e, emptyList())
         }
     }
 
@@ -87,7 +88,20 @@ class DefaultRecipeRepository @Inject constructor(
     }
 
     override fun getRecipeStream(uuid: UUID): Flow<Recipe?> {
-        return localDatSource.observeRecipeWithDetails(uuid).map { it?.toDomain() }
+        val ingredientsFlow = localDatSource.observeIngredientsForRecipe(uuid)
+        val recipeFlow = localDatSource.observeRecipeWithDetails(uuid)
+        return combine(ingredientsFlow, recipeFlow) {
+            ingredients, recipesWithDetails ->
+            if (recipesWithDetails == null) {
+                return@combine null
+            }
+            recipesWithDetails.toDomain(ingredients)
+        }.catch { e ->
+            // TODO try to recover by potentially wiping the DB, recreating and re-syncing
+            logAndReThrow(e)
+        }
+
+            //.map { it?.toDomain() }
     }
 
     override suspend fun getRecipe(uuid: UUID): Recipe? {
@@ -110,13 +124,16 @@ class DefaultRecipeRepository @Inject constructor(
         localDatSource.deleteRecipe(recipeId)
     }
 
-    private suspend fun <T> FlowCollector<List<T>>.logAndReThrow(
-        e: Throwable
+    private suspend fun <T> FlowCollector<T>.logAndReThrow(
+        e: Throwable,
+        emptyObject: T? = null
     ): Nothing {
         if (e is IllegalStateException) {
             Timber.e(e, "Error observing recipes: ${e.message}")
             Timber.d("StackTrace: " + e.stackTrace)
-            emit(emptyList())
+            if (emptyObject != null) {
+                emit(emptyObject)
+            }
         }
         throw e
     }

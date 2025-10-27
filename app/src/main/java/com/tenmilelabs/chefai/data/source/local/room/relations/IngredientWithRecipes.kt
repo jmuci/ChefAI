@@ -5,7 +5,7 @@ import androidx.room.Junction
 import androidx.room.Relation
 import com.tenmilelabs.chefai.data.source.local.room.IngredientEntity
 import com.tenmilelabs.chefai.data.source.local.room.RecipeEntity
-import com.tenmilelabs.chefai.data.source.local.room.RecipeIngredientCrossRef
+import com.tenmilelabs.chefai.data.source.local.room.RecipeIngredientEntity
 
 data class IngredientWithRecipes(
     @Embedded val ingredient: IngredientEntity,
@@ -13,7 +13,7 @@ data class IngredientWithRecipes(
         parentColumn = "uuid",
         entityColumn = "uuid",
         associateBy = Junction(
-            value = RecipeIngredientCrossRef::class,
+            value = RecipeIngredientEntity::class,
             parentColumn = "ingredientId",
             entityColumn = "recipeId"
         )

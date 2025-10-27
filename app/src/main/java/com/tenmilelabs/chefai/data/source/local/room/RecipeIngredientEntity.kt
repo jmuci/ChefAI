@@ -29,7 +29,7 @@ import java.util.UUID
         Index(value = ["syncState", "updatedAt"])
     ]
 )
-data class RecipeIngredientCrossRef(
+data class RecipeIngredientEntity(
     val recipeId: UUID,
     val ingredientId: UUID,
     val quantity: Double,

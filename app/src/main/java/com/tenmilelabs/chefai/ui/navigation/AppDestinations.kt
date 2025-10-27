@@ -29,7 +29,7 @@ object AppDestinationArgs {
  * Destinations used in the [com.tenmilelabs.chefai.MainActivity].
  */
 enum class AppDestinations(
-    @StringRes val title: Int,
+    @param:StringRes val title: Int,
     val route: String,
 ) {
     HOME(R.string.app_dest_title_home, ScreenBaseRoutes.HOME),
