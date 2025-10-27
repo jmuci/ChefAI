@@ -4,7 +4,7 @@ import com.tenmilelabs.chefai.data.mapper.toDomain
 import com.tenmilelabs.chefai.data.source.local.room.IngredientEntity
 import com.tenmilelabs.chefai.data.source.local.room.LabelEntity
 import com.tenmilelabs.chefai.data.source.local.room.RecipeEntity
-import com.tenmilelabs.chefai.data.source.local.room.RecipeIngredientEntity
+import com.tenmilelabs.chefai.data.source.local.room.RecipeIngredientCrossRef
 import com.tenmilelabs.chefai.data.source.local.room.RecipeLabelCrossRef
 import com.tenmilelabs.chefai.data.source.local.room.RecipeStepEntity
 import com.tenmilelabs.chefai.data.source.local.room.RecipeTagCrossRef
@@ -143,28 +143,28 @@ val TEST_ROOM_RECIPES_LIST = listOf(recipeEntity1, recipeEntity2, recipeEntity3)
 
 //Cross - ref tables
 val testRecipeIngredients = listOf(
-    RecipeIngredientEntity(
+    RecipeIngredientCrossRef(
         recipeId = recipeId1,
         ingredientId = testIngredients[0].uuid,
         quantity = 200.0,
         unit = "grams",
         updatedAt = updatedTimeSt
     ),
-    RecipeIngredientEntity(
+    RecipeIngredientCrossRef(
         recipeId = recipeId1,
         ingredientId = testIngredients[1].uuid,
         quantity = 300.0,
         unit = "grams",
         updatedAt = updatedTimeSt
     ),
-    RecipeIngredientEntity(
+    RecipeIngredientCrossRef(
         recipeId = recipeId2,
         ingredientId = testIngredients[2].uuid,
         quantity = 200.0,
         unit = "grams",
         updatedAt = updatedTimeSt
     ),
-    RecipeIngredientEntity(
+    RecipeIngredientCrossRef(
         recipeId = recipeId3,
         ingredientId = testIngredients[0].uuid,
         quantity = 200.0,
