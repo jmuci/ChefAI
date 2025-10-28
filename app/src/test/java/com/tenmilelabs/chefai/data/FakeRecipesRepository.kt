@@ -26,6 +26,10 @@ class FakeRecipesRepository : RecipesRepository {
         recipesListFlow.tryEmit(recipes)
     }
 
+    fun setRecipePreviewsToEmit(recipePreviews: List<RecipePreview>) {
+        recipesPreviewListFlow.tryEmit(recipePreviews)
+    }
+
     fun setShouldReturnErrorForGetRecipes(value: Boolean, exception: Exception? = null) {
         shouldReturnErrorForGetRecipes = value
         this.exceptionForGetRecipes = exception ?: Exception("Test repository error for getRecipes")
