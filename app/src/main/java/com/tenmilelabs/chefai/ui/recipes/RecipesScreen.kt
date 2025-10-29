@@ -1,6 +1,8 @@
 package com.tenmilelabs.chefai.ui.recipes
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,7 +21,6 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
-import com.tenmilelabs.chefai.data.source.local.util.generateUuid7
 import com.tenmilelabs.chefai.domain.model.RecipePreview
 import com.tenmilelabs.chefai.ui.components.RecipeListCard
 import com.tenmilelabs.chefai.ui.preview.PreviewData
@@ -70,17 +71,28 @@ fun RecipesContent(
                 R.string.no_recipes_subtitle,
                 R.drawable.ic_chef_hat_black_24dp
             )
-        }
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = dimensionResource(id = R.dimen.padding_medium)),
-        ) {
-            LazyColumn {
-                items(recipes) { recipe ->
-                    RecipeListCard(
-                        recipe = recipe,
-                        navigateToDetail = { recipeCardOnClick(recipe.uuid) })
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = dimensionResource(id = R.dimen.padding_extra_small))
+            ) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        horizontal = dimensionResource(id = R.dimen.padding_extra_small),
+                        vertical = dimensionResource(id = R.dimen.padding_medium)
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(
+                        dimensionResource(id = R.dimen.padding_small)
+                    )
+                ) {
+                    items(items = recipes, key = { it.uuid }) { recipe ->
+                        RecipeListCard(
+                            recipe = recipe,
+                            navigateToDetail = { recipeCardOnClick(recipe.uuid) }
+                        )
+                    }
                 }
             }
         }
@@ -91,9 +103,13 @@ fun RecipesContent(
 @Preview
 @Composable
 fun RecipesListScreenPreview() {
+    // Create unique recipe previews for the list
     val recipes: List<RecipePreview> = buildList {
-        for (i in 1..60) {
-            add(PreviewData.recipePreview)
+        val baseList = PreviewData.recipePreviewList
+        for (i in 0 until 60) {
+            val baseRecipe = baseList[i % baseList.size]
+            // Create a copy with a unique UUID for each item
+            add(baseRecipe.copy(uuid = UUID.randomUUID()))
         }
     }
     ChefAITheme {
