@@ -29,6 +29,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.createGraph
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.ui.createrecipe.CreateRecipeScreen
 import com.tenmilelabs.chefai.ui.home.HomeScreen
 import com.tenmilelabs.chefai.ui.mealplans.MealPlansScreen
 import com.tenmilelabs.chefai.ui.recipeDetails.RecipeDetailsScreen
@@ -65,7 +66,12 @@ fun ChefAINavGraph(
             route = AppDestinations.RECIPE_DETAILS.route,
         ) {
             RecipeDetailsScreen(snackbarHostState = snackbarHostState)
-
+        }
+        composable(route = AppDestinations.CREATE_RECIPE.route) {
+            CreateRecipeScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onRecipeCreated = { navController.popBackStack() }
+            )
         }
     }
 
@@ -133,8 +139,7 @@ fun ChefAINavGraph(
                     },
                     onCreateRecipeClick = {
                         isFabMenuExpanded = false
-                        // TODO: Navigate to create recipe screen
-                        // navActions.navigateToCreateRecipe()
+                        navActions.navigateToCreateRecipe()
                     },
                     onImportRecipeClick = {
                         isFabMenuExpanded = false
