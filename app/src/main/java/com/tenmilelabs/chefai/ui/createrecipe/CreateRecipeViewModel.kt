@@ -1,7 +1,9 @@
 package com.tenmilelabs.chefai.ui.createrecipe
 
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.domain.model.Label
 import com.tenmilelabs.chefai.domain.model.Recipe
