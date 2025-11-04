@@ -7,6 +7,7 @@ import com.tenmilelabs.chefai.di.IoDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -21,16 +22,23 @@ class DefaultRecipeRepository @Inject constructor(
     private val localDatSource: RecipeDao,
     private val networkDataSource: RecipeNetworkDataSource,
     @IoDispatcher private val dispatcher: CoroutineDispatcher,
+    @ApplicationScope private val appScope: CoroutineScope,
 ) : RecipesRepository {
 
-    // Fire and forget
+    // TODO Cache in memory list of recipes (paginated?)
+    // TODO Decide when to read from local DB or network / cache
+    //  -> Implement Data Merging Strategy (based on some form of timeStamps Perhaps)
+    // TODO Use appScope to make sure coroutines don't get cancelled
+    //TODO Follow those docs : https://developer.android.com/topic/architecture/data-layer
+    // TODO Read https://developer.android.com/topic/architecture/data-layer/offline-first
+    // TODO obs internet connection state
     override suspend fun getRecipes(): List<Recipe> {
         return withContext(dispatcher) {
             localDatSource.getAllRecipes().toExternal()
         }
     }
 
-    override fun getRecipesStrem(): Flow<List<Recipe>> {
+    override fun getRecipesStream(): Flow<List<Recipe>> {
         return if (true) { // Network
             flow {
                 emit(getAllItemsFromNetwork())
@@ -49,7 +57,6 @@ class DefaultRecipeRepository @Inject constructor(
         Timber.d("Fetched ${recipes.size} recipes from the BE")
         recipes
     } catch(e: IOException)  {
-        // TODO(timber) Replace with Timber Logging
         // Handle error, e.g., emit an empty list or an error state
         Timber.e("Error fetching recipe items from network. Error: ${e.message}")
         throw e
