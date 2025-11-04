@@ -51,7 +51,7 @@ class FakeRecipesRepository : RecipesRepository {
         TODO("Not yet implemented")
     }
 
-    override fun getRecipesStrem(): Flow<List<Recipe>> {
+    override fun getRecipesStream(): Flow<List<Recipe>> {
         if (shouldReturnErrorForGetRecipes) {
             return flow { throw (exceptionForGetRecipes ?: Exception("Configured repository error")) }
         }

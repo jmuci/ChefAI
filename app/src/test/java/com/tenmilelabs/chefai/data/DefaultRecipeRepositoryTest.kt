@@ -34,7 +34,7 @@ class DefaultRecipeRepositoryTest {
         localDataSource = FakeRecipeDao(localRecipes.toMutableList())
         remoteDataSource = FakeApiService(networkRecipes.toMutableList())
         recipeRepository =
-            DefaultRecipeRepository(localDataSource, remoteDataSource, testDispatcher)
+            DefaultRecipeRepository(localDataSource, remoteDataSource, testDispatcher, testScope)
     }
 
     @Test
@@ -54,7 +54,7 @@ class DefaultRecipeRepositoryTest {
     @Test
     fun getRecipesFlow() = testScope.runTest {
         networkRecipes
-        assertThat(recipeRepository.getRecipesStrem().first().size).isEqualTo(3)
+        assertThat(recipeRepository.getRecipesStream().first().size).isEqualTo(3)
     }
 
     @Test
