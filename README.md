@@ -2,8 +2,7 @@
 
 [![Android Automatic Unit Tests Run](https://github.com/jmuci/ChefAI/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/jmuci/ChefAI/actions/workflows/unit_tests.yml)
 
-Chef AI is a Kotlin Android app that makes it easy to create weekly meal plans and export them to your fav grocery shop for delivery or pickup.
-The app will also support creating a menu based on a specific diet preferences.
+ChefAI is a Kotlin-first Android app that allows users to manage their own recipe collection. It also provides a library of recipes for users to browse and save. The app can generate weekly meal plans based on user preferences like low-carb, vegan, or Mediterranean diets, and allows for customization of the meal plan. Additionally, ChefAI can export the list of ingredients needed for a meal plan to a grocery store for purchase or provide a simple grocery list.
 
 ## Installation
 
@@ -11,9 +10,11 @@ Open with Android Studio.
 
 ## Usage
 
+This project is still under development.
+
 # Documentation
 
-## Chosen Librories
+## Chosen Libraries
 
 Dependency Injection:
 * [Hilt](https://developer.android.com/training/dependency-injection/hilt-android)
@@ -22,32 +23,29 @@ Data Base Layers:
 * [Room](https://developer.android.com/training/data-storage/room)
 
 Android UI:
+* [Jetpack Compose](https://developer.android.com/jetpack/compose)
 * [Navigation Compose](https://developer.android.com/jetpack/compose/navigation)
+* [Material 3](https://m3.material.io/)
+* [Lifecycle/ViewModel](https://developer.android.com/topic/libraries/architecture/lifecycle)
 
 Image Loading:
-
 * [Coil](https://github.com/coil-kt/coil)
 
 Networking: 
-* [Ktor](https://ktor.io/docs/welcome.html)
-* [OkHttp](https://github.com/square/okhttp)
-* [Gson](https://github.com/google/gson)
-
-Utils:
-* [Timber](https://github.com/JakeWharton/timber)
+* [Ktor](https://ktor.io/docs/welcome.html) with CIO engine, content negotiation, and logging
 * [Kotlinx Serialization](https://github.com/Kotlin/kotlinx.serialization)
-* [Kotlinx DateTime](https://github.com/Kotlin/kotlinx-datetime)
-* [Kotlinx UUID](https://github.com/Kotlin/kotlinx-uuid)
 
 Coroutines:
 * [Kotlinx Coroutines](https://github.com/Kotlin/kotlinx.coroutines)
 
+Utils:
+* [Timber](https://github.com/JakeWharton/timber)
+* [SLF4J](http://www.slf4j.org/) and [Logback](https://logback.qos.ch/) for Ktor logging
 
 ## Backend Test End Points
 
 You can use the enpoints hosted in this repo to test the backend:
 https://github.com/jmuci/ChATestAPI/tree/main?tab=readme-ov-file
-
 
 ## Contributing
 
