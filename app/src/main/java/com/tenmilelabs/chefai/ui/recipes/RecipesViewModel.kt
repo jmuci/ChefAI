@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
@@ -34,7 +33,7 @@ class RecipesViewModel @Inject constructor(
 
     private val _isLoading = MutableStateFlow(false)
     private val _userMessage: MutableStateFlow<Int?> = MutableStateFlow(null)
-     private val _recipesAsync = recipesRepository.getRecipesFlow()
+     private val _recipesAsync = recipesRepository.getRecipesStrem()
         .map { Async.Success(it) }
         .catch<Async<List<Recipe>>> { emit(Async.Error(R.string.loading_recipes_error)) }
 
