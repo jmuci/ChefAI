@@ -34,3 +34,7 @@ google-services.json
 
 ## Mac OSX files
 *.DS_Store
+
+# AI working folders
+/.ai/
+/.prompts_history/
