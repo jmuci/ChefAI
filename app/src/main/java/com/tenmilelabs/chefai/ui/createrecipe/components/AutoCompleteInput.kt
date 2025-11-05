@@ -1,4 +1,4 @@
-package com.tenmilelabs.chefai.ui.createrecipe
+package com.tenmilelabs.chefai.ui.createrecipe.components
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardActions
@@ -6,6 +6,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,7 +44,7 @@ public fun AutocompleteInput(
             placeholder = { Text(placeholder) },
             modifier = Modifier
                 .menuAnchor(
-                    type = androidx.compose.material3.MenuAnchorType.PrimaryNotEditable,
+                    type = MenuAnchorType.PrimaryNotEditable,
                     enabled = true
                 )
                 .fillMaxWidth(),

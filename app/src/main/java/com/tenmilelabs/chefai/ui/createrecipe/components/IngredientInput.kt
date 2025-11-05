@@ -1,4 +1,4 @@
-package com.tenmilelabs.chefai.ui.createrecipe
+package com.tenmilelabs.chefai.ui.createrecipe.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,6 +13,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -84,7 +85,7 @@ public fun IngredientInput(
                     placeholder = { Text(stringResource(R.string.placeholder_search)) },
                     modifier = Modifier
                         .menuAnchor(
-                            type = androidx.compose.material3.MenuAnchorType.PrimaryNotEditable,
+                            type = MenuAnchorType.PrimaryNotEditable,
                             enabled = true
                         )
                         .fillMaxWidth(),
