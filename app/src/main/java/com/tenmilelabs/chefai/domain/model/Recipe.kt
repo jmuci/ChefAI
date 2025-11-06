@@ -1,4 +1,4 @@
-package com.tenmilelabs.chefai.data
+package com.tenmilelabs.chefai.domain.model
 
 data class Recipe(
     val title: String,

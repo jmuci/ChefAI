@@ -2,9 +2,9 @@ package com.tenmilelabs.chefai.di
 
 import android.content.Context
 import androidx.room.Room
-import com.tenmilelabs.chefai.data.DefaultRecipeRepository
-import com.tenmilelabs.chefai.data.RecipesRepository
+import com.tenmilelabs.chefai.data.repository.DefaultRecipeRepository
 import com.tenmilelabs.chefai.data.source.local.ChefAIDataBase
+import com.tenmilelabs.chefai.domain.repository.RecipesRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides

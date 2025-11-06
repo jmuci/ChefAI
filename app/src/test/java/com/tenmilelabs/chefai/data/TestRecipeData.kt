@@ -1,5 +1,7 @@
 package com.tenmilelabs.chefai.data
 
+import com.tenmilelabs.chefai.domain.model.Recipe
+
 val recipe1 = Recipe(
     uuid = "1",
     title = "Title1",

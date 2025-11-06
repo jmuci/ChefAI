@@ -36,7 +36,7 @@ object NetworkModule {
     @Singleton
     fun provideHttpClient() = HttpClient(CIO) {
         expectSuccess = true
-       install(Logging) {
+        install(Logging) {
             logger = Logger.SIMPLE
             level = LogLevel.HEADERS
         }
