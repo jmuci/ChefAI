@@ -1,10 +1,15 @@
 package com.tenmilelabs.chefai.data
 
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.data.mapper.toRoomEntity
+import com.tenmilelabs.chefai.data.mapper.toNetwork
+import com.tenmilelabs.chefai.data.mapper.toRecipeEntity
+import com.tenmilelabs.chefai.data.repository.DefaultRecipeRepository
 import com.tenmilelabs.chefai.data.source.local.FakeRecipeDao
 import com.tenmilelabs.chefai.data.source.local.RecipeEntity
 import com.tenmilelabs.chefai.data.source.network.FakeApiService
 import com.tenmilelabs.chefai.data.source.network.NetworkRecipe
+import com.tenmilelabs.chefai.domain.model.Recipe
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
@@ -16,7 +21,7 @@ import org.junit.Test
 @ExperimentalCoroutinesApi
 class DefaultRecipeRepositoryTest {
 
-    private val localRecipes: List<RecipeEntity> = TEST_RECIPES_LIST.toLocal().sortedBy { it.uuid }
+    private val localRecipes: List<RecipeEntity> = TEST_RECIPES_LIST.toRoomEntity().sortedBy { it.uuid }
     private val networkRecipes: List<NetworkRecipe> = TEST_RECIPES_LIST.toNetwork().sortedBy { it.uuid }
 
     // Dependencies

@@ -15,7 +15,7 @@ Users can save recipes, browse a library, generate weekly meal plans, and get gr
 - Testability across all layers
 
 ## Tech Stack
-- UI: Jetpack Compose + Material3 + Navigation Compose
+- UI: Jetpack Compose + Material3 + Jetpack Navigation
 - DI: Hilt
 - Async: Kotlin Coroutines + Flow + StateFlow
 - Persistence: Room + TypeConverters

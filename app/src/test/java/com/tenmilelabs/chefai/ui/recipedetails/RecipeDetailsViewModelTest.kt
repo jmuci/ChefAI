@@ -5,7 +5,7 @@ import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.data.FakeRecipesRepository
-import com.tenmilelabs.chefai.data.Recipe
+import com.tenmilelabs.chefai.domain.model.Recipe
 import com.tenmilelabs.chefai.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.ui.recipeDetails.RecipeDetailsViewModel
 import com.tenmilelabs.chefai.util.MainCoroutineRule
