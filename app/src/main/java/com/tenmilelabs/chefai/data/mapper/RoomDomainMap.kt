@@ -90,6 +90,8 @@ fun IngredientEntity.toDomain(): Ingredient = Ingredient(
     allergen = null,
     sourcePrimary = null
 )
+@JvmName("toIngredientDomain")
+fun List<IngredientEntity>.toDomain() = map(IngredientEntity::toDomain)
 
 fun RecipeStepEntity.toDomain(): RecipeStep = RecipeStep(
     uuid = uuid,
@@ -102,10 +104,15 @@ fun TagEntity.toDomain(): Tag = Tag(
     displayName = displayName
 )
 
+@JvmName("toTagDomain")
+fun List<TagEntity>.toDomain() = map(TagEntity::toDomain)
 fun LabelEntity.toDomain(): Label = Label(
     uuid = uuid,
     displayName = displayName
 )
+
+@JvmName("toLabelDomain")
+fun List<LabelEntity>.toDomain() = map(LabelEntity::toDomain)
 
 fun AllergenEntity.toDomain(): Allergen = Allergen(
     uuid = uuid,
