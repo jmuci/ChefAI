@@ -7,6 +7,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.tenmilelabs.chefai.data.source.local.room.RecipeEntity
 import com.tenmilelabs.chefai.data.source.local.room.UserEntity
+import com.tenmilelabs.chefai.data.source.local.room.dao.ChefAIDataBase
 import junit.framework.TestCase.assertEquals
 import junit.framework.TestCase.assertNotNull
 import kotlinx.coroutines.ExperimentalCoroutinesApi

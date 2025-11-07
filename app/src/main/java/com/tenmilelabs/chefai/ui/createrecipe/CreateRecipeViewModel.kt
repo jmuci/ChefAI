@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.ui.createrecipe
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeIngredient
+import com.tenmilelabs.chefai.di.IoDispatcher
 import com.tenmilelabs.chefai.domain.model.Ingredient
 import com.tenmilelabs.chefai.domain.model.Label
 import com.tenmilelabs.chefai.domain.model.Recipe
@@ -14,6 +15,7 @@ import com.tenmilelabs.chefai.domain.repository.LabelsRepository
 import com.tenmilelabs.chefai.domain.repository.RecipesRepository
 import com.tenmilelabs.chefai.domain.repository.TagsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +23,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
 import javax.inject.Inject
 
@@ -80,7 +83,8 @@ class CreateRecipeViewModel @Inject constructor(
     private val recipesRepository: RecipesRepository,
     ingredientsRepository: IngredientsRepository,
     tagsRepository: TagsRepository,
-    labelsRepository: LabelsRepository
+    labelsRepository: LabelsRepository,
+    @param:IoDispatcher private val dispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CreateRecipeUiState())
@@ -89,7 +93,7 @@ class CreateRecipeViewModel @Inject constructor(
     private val allIngredients: StateFlow<List<Ingredient>> = ingredientsRepository.getAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val allTags: StateFlow<List<Tag>> = tagsRepository.getAll()
+    private val allTags: StateFlow<List<Tag>> = tagsRepository.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val allLabels: StateFlow<List<Label>> = labelsRepository.getAll()

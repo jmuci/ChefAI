@@ -3,7 +3,7 @@ package com.tenmilelabs.chefai.data.repository
 import com.tenmilelabs.chefai.data.mapper.toDomain
 import com.tenmilelabs.chefai.data.mapper.toRecipePreviewDomain
 import com.tenmilelabs.chefai.data.mapper.toRoomEntity
-import com.tenmilelabs.chefai.data.source.local.RecipeDao
+import com.tenmilelabs.chefai.data.source.local.room.dao.RecipeDao
 import com.tenmilelabs.chefai.data.source.local.util.decodeHex
 import com.tenmilelabs.chefai.data.source.local.util.toUuid
 import com.tenmilelabs.chefai.data.source.network.RecipeNetworkDataSource

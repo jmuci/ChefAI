@@ -6,7 +6,7 @@ import com.tenmilelabs.chefai.data.repository.DefaultRecipeRepository
 import com.tenmilelabs.chefai.data.repository.IngredientsRepositoryImpl
 import com.tenmilelabs.chefai.data.repository.LabelsRepositoryImpl
 import com.tenmilelabs.chefai.data.repository.TagsRepositoryImpl
-import com.tenmilelabs.chefai.data.source.local.ChefAIDataBase
+import com.tenmilelabs.chefai.data.source.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.domain.repository.IngredientsRepository
 import com.tenmilelabs.chefai.domain.repository.LabelsRepository
 import com.tenmilelabs.chefai.domain.repository.RecipesRepository

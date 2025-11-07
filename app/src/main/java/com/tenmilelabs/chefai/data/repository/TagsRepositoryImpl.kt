@@ -11,8 +11,11 @@ import javax.inject.Inject
 class TagsRepositoryImpl @Inject constructor(
     private val tagDao: TagDao
 ) : TagsRepository {
+    override suspend fun getAll(): List<Tag> {
+        return tagDao.getAllTags().toDomain()
+    }
 
-    override fun getAll(): Flow<List<Tag>> {
-        return tagDao.getAll().map { it.toDomain() }
+    override fun observeAll(): Flow<List<Tag>> {
+        return tagDao.observeAll().map { it.toDomain() }
     }
 }

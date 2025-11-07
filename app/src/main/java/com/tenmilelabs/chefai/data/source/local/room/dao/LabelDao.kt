@@ -2,11 +2,44 @@ package com.tenmilelabs.chefai.data.source.local.room.dao
 
 import androidx.room.Dao
 import androidx.room.Query
+import androidx.room.Transaction
+import androidx.room.Upsert
 import com.tenmilelabs.chefai.data.source.local.room.LabelEntity
+import com.tenmilelabs.chefai.data.source.local.room.relations.LabelWithRecipes
 import kotlinx.coroutines.flow.Flow
+import java.util.UUID
 
+/**
+ * Data Access Object for the labels table.
+ */
 @Dao
 interface LabelDao {
     @Query("SELECT * FROM labels")
-    fun getAll(): Flow<List<LabelEntity>>
+    suspend fun getAllLabels(): List<LabelEntity>
+
+    @Query("SELECT * FROM labels")
+    fun observeAll(): Flow<List<LabelEntity>>
+
+    @Query("SELECT * FROM labels WHERE uuid = :uuid")
+    suspend fun getLabelById(uuid: UUID): LabelEntity?
+
+    @Query("SELECT * FROM labels WHERE uuid = :uuid")
+    fun observeLabelById(uuid: UUID): Flow<LabelEntity?>
+
+    @Transaction
+    @Query("SELECT * FROM labels WHERE uuid = :uuid")
+    suspend fun getLabelWithRecipes(uuid: UUID): LabelWithRecipes?
+
+    @Transaction
+    @Query("SELECT * FROM labels")
+    fun observeLabelsWithRecipes(): Flow<List<LabelWithRecipes>>
+
+    @Query("DELETE FROM labels WHERE uuid = :uuid")
+    suspend fun deleteLabel(uuid: UUID)
+
+    @Query("DELETE FROM labels")
+    suspend fun deleteAllLabels()
+
+    @Upsert
+    suspend fun upsertLabel(label: LabelEntity)
 }
