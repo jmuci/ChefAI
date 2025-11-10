@@ -10,10 +10,8 @@ import com.tenmilelabs.chefai.domain.model.Recipe
 import com.tenmilelabs.chefai.domain.model.RecipeStep
 import com.tenmilelabs.chefai.domain.model.Tag
 import com.tenmilelabs.chefai.domain.model.User
-import com.tenmilelabs.chefai.domain.repository.IngredientsRepository
-import com.tenmilelabs.chefai.domain.repository.LabelsRepository
+import com.tenmilelabs.chefai.domain.repository.MetadataRepository
 import com.tenmilelabs.chefai.domain.repository.RecipesRepository
-import com.tenmilelabs.chefai.domain.repository.TagsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -81,25 +79,21 @@ data class CreateRecipeUiState(
 @HiltViewModel
 class CreateRecipeViewModel @Inject constructor(
     private val recipesRepository: RecipesRepository,
-    ingredientsRepository: IngredientsRepository,
-    tagsRepository: TagsRepository,
-    labelsRepository: LabelsRepository,
+    private val metadataRepository: MetadataRepository,
     @param:IoDispatcher private val dispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CreateRecipeUiState())
     val uiState: StateFlow<CreateRecipeUiState> = _uiState.asStateFlow()
 
-    private val allIngredients: StateFlow<List<Ingredient>> = ingredientsRepository.getAll()
+    private val allIngredients: StateFlow<List<Ingredient>> = metadataRepository.observeAllIngredients()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val allTags: StateFlow<List<Tag>> = tagsRepository.observeAll()
+    private val allTags: StateFlow<List<Tag>> = metadataRepository.observeAllTags()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val allLabels: StateFlow<List<Label>> = labelsRepository.getAll()
+    private val allLabels: StateFlow<List<Label>> = metadataRepository.observeAllLabels()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-
 
     fun onFieldChange(updatedRecipe: RecipeFields) {
         _uiState.update { it.copy(recipeFields = updatedRecipe) }
@@ -425,7 +419,9 @@ class CreateRecipeViewModel @Inject constructor(
                     updatedAt = System.currentTimeMillis()
                 )
 
-                recipesRepository.createRecipe(recipe)
+                withContext(dispatcher) {
+                    recipesRepository.createRecipe(recipe)
+                }
 
                 _uiState.update { it.copy(isSaving = false) }
                 onSuccess()
