@@ -36,6 +36,19 @@ Users can save recipes, browse a library, generate weekly meal plans, and get gr
 - View recipe details
 - Store images & metadata locally
 
+## 🔄 Sync and Data Layer Guidelines
+- Local persistence uses SQLite via Room with FTS5 enabled.
+- All entities use backend-generated UUIDv7 IDs (time-sortable).
+- Do not create auto-increment IDs or entity prefixes.
+- Sync is two-step:
+    1. POST /sync/push uploads local outbox entries.
+    2. GET /sync/pull?since=<timestamp> fetches backend deltas.
+- Client tracks lastSyncedAt and syncState per entity.
+- Always perform DB writes inside transactions and mark successful syncs as SYNCED.
+- Conflicts resolved by last-writer-wins based on updatedAt.
+- WorkManager runs sync on startup, connectivity, or local mutation events.
+
+
 ## Upcoming Features
 - Meal planner (AI-assisted)
 - Grocery list generation

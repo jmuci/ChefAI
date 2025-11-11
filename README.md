@@ -14,6 +14,29 @@ This project is still under development.
 
 # Documentation
 
+See the [docs folder](docs/)
+
+## Overall architecture
+![architecture diagram](docs/img/architecture.png)
+
+
+🏗️ Architecture Overview
+
+ChefAI follows a Clean Architecture with an offline-first design.
+
+UI Layer – Jetpack Compose screens with ViewModels that interact only with domain use cases.
+
+Domain Layer – Pure Kotlin business logic, entity models, and repository interfaces.
+
+Data Layer – Dual-source repositories combining Room (SQLite) for local caching and a Ktor network client for backend access.
+
+Sync – Background WorkManager handles two-step sync (push local outbox → pull backend deltas).
+
+IDs & Storage – All entities use backend-generated, time-sortable UUIDv7 IDs; Room provides full-text search and ACID transactions.
+
+Dependency Injection – Hilt/Koin modules wire DAOs, network clients, and repositories.
+
+This structure keeps UI reactive, data consistent across devices, and the codebase modular, testable, and ready to scale.
 ## Chosen Libraries
 
 Dependency Injection:

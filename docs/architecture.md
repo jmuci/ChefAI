@@ -19,6 +19,8 @@ Domain (Use Cases, Domain Entities, Repository Interfaces)
 
 ![Diagram](img/chefai-architecture-diagram.png "Data Flow Architecture")
 
+![Architecture Details](img/ChefAI-Architecure.png)
+
 ### UI Layer
 - Uses Jetpack Compose and `ViewModel` with `StateFlow` for state management.
 - Emits **UI events** upward and receives **state updates** downward.
