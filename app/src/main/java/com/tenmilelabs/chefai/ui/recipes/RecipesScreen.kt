@@ -18,6 +18,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.data.source.local.util.generateUuid7
 import com.tenmilelabs.chefai.domain.model.Label
 import com.tenmilelabs.chefai.domain.model.Recipe
 import com.tenmilelabs.chefai.domain.model.User
@@ -92,7 +93,7 @@ fun RecipesContent(
 @Composable
 fun RecipessListScreenPreview() {
     val previewUser = com.tenmilelabs.chefai.domain.model.User(
-        uuid = UUIDv7.generate(),
+        uuid = generateUuid7(),
         displayName = "ChefAI Preview",
         email = "preview@chefai.app",
         avatarUrl = null
@@ -101,7 +102,7 @@ fun RecipessListScreenPreview() {
         for (i in 1..60) {
             add(
                 Recipe(
-                    uuid = UUIDv7.generate(),
+                    uuid = generateUuid7(),
                     title = "Mediterranean Grilled Chicken",
                     description = "A light and flavorful grilled chicken recipe with classic Mediterranean herbs and a lemon-garlic marinade.",
                     imageUrl = "https://via.placeholder.com/150",
@@ -114,7 +115,7 @@ fun RecipessListScreenPreview() {
                     ingredients = emptyList(),
                     steps = emptyList(),
                     tags = emptyList(),
-                    labels = listOf(Label(UUIDv7.generate(), "Mediterranean")),
+                    labels = listOf(Label(generateUuid7(), "Mediterranean")),
                     updatedAt = System.currentTimeMillis()
                 )
             )

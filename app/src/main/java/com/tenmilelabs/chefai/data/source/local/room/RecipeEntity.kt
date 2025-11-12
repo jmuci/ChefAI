@@ -7,7 +7,6 @@ import androidx.room.PrimaryKey
 import com.tenmilelabs.chefai.data.source.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.data.source.local.util.SyncState
 import com.tenmilelabs.chefai.data.source.local.util.SyncableEntity
-import com.tenmilelabs.chefai.data.source.local.util.generateUuid7
 import java.util.UUID
 
 
@@ -27,7 +26,7 @@ import java.util.UUID
     ]
 )
 data class RecipeEntity(
-    @PrimaryKey override val uuid: UUID = generateUuid7(),
+    @PrimaryKey override val uuid: UUID,
     val title: String,
     val description: String,
     val imageUrl: String,

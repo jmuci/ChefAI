@@ -5,7 +5,6 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.tenmilelabs.chefai.data.source.local.util.SyncState
 import com.tenmilelabs.chefai.data.source.local.util.SyncableEntity
-import com.tenmilelabs.chefai.data.source.local.util.generateUuid7
 import java.util.UUID
 
 @Entity(
@@ -15,7 +14,7 @@ import java.util.UUID
     ]
 )
 data class SourceClassificationEntity(
-    @PrimaryKey override val uuid: UUID = generateUuid7(),
+    @PrimaryKey override val uuid: UUID,
     val category: String,      // e.g. "Animal", "Plant", "Fungal"
     val subcategory: String?,   // e.g. "Fish", "Meat", "Egg", "Legume"
 

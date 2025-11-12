@@ -6,7 +6,6 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.tenmilelabs.chefai.data.source.local.util.SyncState
 import com.tenmilelabs.chefai.data.source.local.util.SyncableEntity
-import com.tenmilelabs.chefai.data.source.local.util.generateUuid7
 import java.util.UUID
 
 @Entity(
@@ -25,7 +24,7 @@ import java.util.UUID
     ]
 )
 data class RecipeStepEntity(
-    @PrimaryKey override val uuid: UUID = generateUuid7(),
+    @PrimaryKey override val uuid: UUID,
     val recipeId: UUID,
     val orderIndex: Int,
     val instruction: String,
