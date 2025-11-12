@@ -41,4 +41,6 @@ abstract class ChefAIDataBase : RoomDatabase() {
     abstract fun sourceClassificationDao(): SourceClassificationDao
     abstract fun tagDao(): TagDao
     abstract fun userDao(): UserDao
+    abstract fun recipeTagCrossRefDao(): RecipeTagCrossRefDao
+    abstract fun recipeLabelCrossRefDao(): RecipeLabelCrossRefDao
 }

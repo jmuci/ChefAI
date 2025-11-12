@@ -1,7 +1,6 @@
 package com.tenmilelabs.chefai.data.source.local
 
 import androidx.room.Dao
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
@@ -17,11 +16,9 @@ import java.util.UUID
  */
 @Dao
 interface RecipeDao {
-    @Query("SELECT * FROM recipes")
-    suspend fun getAllRecipes(): List<RecipeEntity>
 
-    @Query("SELECT * FROM recipes")
-    fun observeAll(): Flow<List<RecipeEntity>>
+    @Query("SELECT * FROM recipes WHERE creatorId = :creatorId")
+    fun observeAllRecipesForUser(creatorId: UUID): Flow<List<RecipeEntity>>
 
     @Query("SELECT * FROM recipes WHERE uuid = :uuid")
     suspend fun getRecipeById(uuid: UUID): RecipeEntity?
@@ -40,6 +37,10 @@ interface RecipeDao {
     @Transaction
     @Query("SELECT * FROM recipes")
     fun observeRecipesWithDetails(): Flow<List<RecipeWithDetails>>
+
+    @Transaction
+    @Query("SELECT * FROM recipes WHERE creatorId = :creatorId")
+    fun observeRecipesWithDetailsForUser(creatorId: UUID): Flow<List<RecipeWithDetails>>
 
     @Transaction
     @Query("SELECT * FROM recipes WHERE uuid = :uuid")
