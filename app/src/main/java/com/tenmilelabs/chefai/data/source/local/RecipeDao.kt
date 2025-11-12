@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.data.source.local
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Upsert
+import com.tenmilelabs.chefai.data.source.local.room.RecipeEntity
 import kotlinx.coroutines.flow.Flow
 
 /**

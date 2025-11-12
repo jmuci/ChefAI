@@ -6,7 +6,7 @@ import com.tenmilelabs.chefai.data.mapper.toNetwork
 import com.tenmilelabs.chefai.data.mapper.toRecipeEntity
 import com.tenmilelabs.chefai.data.repository.DefaultRecipeRepository
 import com.tenmilelabs.chefai.data.source.local.FakeRecipeDao
-import com.tenmilelabs.chefai.data.source.local.RecipeEntity
+import com.tenmilelabs.chefai.data.source.local.room.RecipeEntity
 import com.tenmilelabs.chefai.data.source.network.FakeApiService
 import com.tenmilelabs.chefai.data.source.network.NetworkRecipe
 import com.tenmilelabs.chefai.domain.model.Recipe

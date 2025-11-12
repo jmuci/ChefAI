@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.data.source.local
 
+import com.tenmilelabs.chefai.data.source.local.room.RecipeEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flowOf

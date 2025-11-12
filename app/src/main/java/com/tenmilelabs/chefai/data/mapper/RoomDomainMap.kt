@@ -1,6 +1,6 @@
 package com.tenmilelabs.chefai.data.mapper
 
-import com.tenmilelabs.chefai.data.source.local.RecipeEntity
+import com.tenmilelabs.chefai.data.source.local.room.RecipeEntity
 import com.tenmilelabs.chefai.domain.model.Recipe
 
 /**
@@ -17,7 +17,7 @@ fun Recipe.toRecipeEntity(): RecipeEntity = RecipeEntity(
     label = label,
     description = description,
     prepTime = prepTime,
-    recipeUrl = recipeUrl,
+    recipeExternalUrl = recipeUrl,
     imageUrl = imageUrl,
     imageUrlThumbnail = thumbnailUrl,
     uuid = uuid,
@@ -30,7 +30,7 @@ fun RecipeEntity.toDomain() = Recipe(
     label = label,
     description = description,
     prepTime = prepTime,
-    recipeUrl = recipeUrl,
+    recipeUrl = recipeExternalUrl,
     imageUrl = imageUrl,
     thumbnailUrl = imageUrlThumbnail,
     uuid = uuid,
