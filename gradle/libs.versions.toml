@@ -29,6 +29,7 @@ truth = "1.4.5"
 turbine = "1.2.1"
 uiTextGoogleFonts = "1.9.4"
 timber = "5.0.1"
+uuidv7 = "1.1.0"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
@@ -75,6 +76,7 @@ google-truth = { group = "com.google.truth", name = "truth", version.ref = "trut
 slf4j-android = { module = "org.slf4j:slf4j-android", version.ref = "slf4jAndroid" }
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
+block-uuidv7 = { module = "xyz.block:uuidv7", version.ref = "uuidv7" }
 
 
 [plugins]

@@ -5,7 +5,9 @@ import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R // Assuming your UserMessage uses R.string
 import com.tenmilelabs.chefai.data.FakeRecipesRepository
-import com.tenmilelabs.chefai.domain.model.Recipe
+import com.tenmilelabs.chefai.testData.TEST_DOMAIN_RECIPES_LIST
+import com.tenmilelabs.chefai.testData.recipe1
+import com.tenmilelabs.chefai.testData.recipe2
 import com.tenmilelabs.chefai.util.MainCoroutineRule
 // Assuming UserMessage and RecipesUiState data classes exist
 // import com.tenmilelabs.chefai.ui.UserMessage
@@ -30,11 +32,6 @@ class RecipesViewModelTest {
 
     private lateinit var viewModel: RecipesViewModel
     private lateinit var recipesRepository: FakeRecipesRepository
-
-    private val testRecipe1 = Recipe(uuid = "1", title = "Recipe 1", description = "Desc 1", label = "Test Label", recipeUrl = "http://example.com/recipe", imageUrl = "http://example.com/image.jpg", thumbnailUrl = "http://example.com/thumb.jpg", prepTime = 30)
-    private val testRecipe2 = Recipe(uuid = "2", title = "Recipe 2", description = "Desc 2", label = "Test Label", recipeUrl = "http://example.com/recipe", imageUrl = "http://example.com/image.jpg", thumbnailUrl = "http://example.com/thumb.jpg", prepTime = 30)
-    private val testRecipes = listOf(testRecipe1, testRecipe2)
-
     @Before
     fun setup() {
         recipesRepository = FakeRecipesRepository()
@@ -59,12 +56,12 @@ class RecipesViewModelTest {
             assertThat(initialState.userMessage).isNull()
 
             // 2. Repository emits data
-            recipesRepository.setRecipesToEmit(testRecipes)
+            recipesRepository.setRecipesToEmit(TEST_DOMAIN_RECIPES_LIST)
 
             // 3. Expect success state with items
             val successState = awaitItem()
             assertThat(successState.isLoading).isFalse() // Or based on your VM's logic after load
-            assertThat(successState.items).isEqualTo(testRecipes)
+            assertThat(successState.items).isEqualTo(TEST_DOMAIN_RECIPES_LIST)
             assertThat(successState.userMessage).isEqualTo(R.string.loading_recipes_success) // Example message
 
             cancelAndConsumeRemainingEvents()

@@ -1,17 +1,26 @@
 package com.tenmilelabs.chefai.data
 
 import com.google.common.truth.Truth.assertThat
-import com.tenmilelabs.chefai.data.mapper.toRoomEntity
-import com.tenmilelabs.chefai.data.mapper.toNetwork
-import com.tenmilelabs.chefai.data.mapper.toRecipeEntity
 import com.tenmilelabs.chefai.data.repository.DefaultRecipeRepository
 import com.tenmilelabs.chefai.data.source.local.FakeRecipeDao
-import com.tenmilelabs.chefai.data.source.local.RecipeEntity
 import com.tenmilelabs.chefai.data.source.network.FakeApiService
-import com.tenmilelabs.chefai.data.source.network.NetworkRecipe
-import com.tenmilelabs.chefai.domain.model.Recipe
+import com.tenmilelabs.chefai.testData.recipe1
+import com.tenmilelabs.chefai.testData.recipe3
+import com.tenmilelabs.chefai.testData.recipeEntity1
+import com.tenmilelabs.chefai.testData.recipeEntity2
+import com.tenmilelabs.chefai.testData.recipeEntity3
+import com.tenmilelabs.chefai.testData.recipeId1
+import com.tenmilelabs.chefai.testData.testIngredients
+import com.tenmilelabs.chefai.testData.testLabels
+import com.tenmilelabs.chefai.testData.testRecipeIngredients
+import com.tenmilelabs.chefai.testData.testRecipeLabels
+import com.tenmilelabs.chefai.testData.testRecipeTags
+import com.tenmilelabs.chefai.testData.testSteps1
+import com.tenmilelabs.chefai.testData.testSteps2
+import com.tenmilelabs.chefai.testData.testSteps3
+import com.tenmilelabs.chefai.testData.testTags
+import com.tenmilelabs.chefai.testData.testUser
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -21,91 +30,108 @@ import org.junit.Test
 @ExperimentalCoroutinesApi
 class DefaultRecipeRepositoryTest {
 
-    private val localRecipes: List<RecipeEntity> = TEST_RECIPES_LIST.toRoomEntity().sortedBy { it.uuid }
-    private val networkRecipes: List<NetworkRecipe> = TEST_RECIPES_LIST.toNetwork().sortedBy { it.uuid }
+    // SUT
+    private lateinit var recipeRepository: DefaultRecipeRepository
 
     // Dependencies
     private lateinit var localDataSource: FakeRecipeDao
     private lateinit var remoteDataSource: FakeApiService
-    private var testDispatcher = UnconfinedTestDispatcher()
-    private var testScope = TestScope(testDispatcher)
+    private val testDispatcher = UnconfinedTestDispatcher()
+    private val testScope = TestScope(testDispatcher)
 
-    // Class under test
-    private lateinit var recipeRepository: DefaultRecipeRepository
-
-    @ExperimentalCoroutinesApi
     @Before
     fun createRepository() {
-        localDataSource = FakeRecipeDao(localRecipes.toMutableList())
-        remoteDataSource = FakeApiService(networkRecipes.toMutableList())
+        localDataSource = FakeRecipeDao()
+        remoteDataSource = FakeApiService()
         recipeRepository =
-            DefaultRecipeRepository(localDataSource, remoteDataSource, testDispatcher, testScope)
-    }
+            DefaultRecipeRepository(localDataSource, remoteDataSource, testDispatcher, testScope, )
 
-    @Test
-    fun getRecipes_emptyRepository() = testScope.runTest {
-        localDataSource.deleteAllRecipes()
-        assertThat(recipeRepository.getRecipes().size).isEqualTo(0)
-    }
-
-    @Test
-    fun getRecipes_localSourceHasTwoRecipes() {
-        testScope.runTest {
-            localRecipes
-            assertThat(recipeRepository.getRecipes().size).isEqualTo(3)
-        }
-    }
-
-    @Test
-    fun getRecipesFlow() = testScope.runTest {
-        networkRecipes
-        assertThat(recipeRepository.getRecipesStream().first().size).isEqualTo(3)
-    }
-
-    @Test
-    fun getRecipeStream() = testScope.runTest {
-        assertThat(recipeRepository.getRecipeStream("1").first()).isEqualTo(recipe1)
-    }
-
-    @Test
-    fun getRecipe() = testScope.runTest {
-        assertThat(recipeRepository.getRecipe("1")).isEqualTo(recipe1)
-    }
-
-    @Test
-    fun createRecipe_newRecipeSavedInLocalSource() = testScope.runTest {
-        val newRecipe = Recipe(
-            uuid = "uuid4",
-            title = "Title4",
-            description = "Description4",
-            imageUrl = "ImageUrl4",
-            thumbnailUrl = "ThumbnailUrl4",
-            prepTime = 10,
-            recipeUrl = "RecipeUrl4",
-            label = "Label4"
+        // Seed the fake DAO with our test data.
+        // This simulates a database with pre-existing data.
+        localDataSource.seed(
+            users = listOf(testUser),
+            recipes = listOf(recipeEntity1, recipeEntity2, recipeEntity3),
+            ingredients = testIngredients,
+            labels = testLabels,
+            tags = testTags,
+            steps = testSteps1 + testSteps2 + testSteps3,
+            recipeIngredients = testRecipeIngredients,
+            recipeLabels = testRecipeLabels,
+            recipeTags = testRecipeTags
         )
-        val newRecipeId = recipeRepository.createRecipe(newRecipe, "uuid4")
-        assertThat(newRecipe.toRecipeEntity()).isIn(localDataSource.recipes)
-        assertThat(localDataSource.recipes?.map { it.uuid }).contains(newRecipeId)
     }
 
     @Test
-    fun updateRecipe() = testScope.runTest {
-        val newRecipe = recipe4.copy(uuid = "2", title = "New Title")
-        recipeRepository.updateRecipe(newRecipe)
-        assertThat(localDataSource.recipes?.contains(newRecipe.toRecipeEntity()))
+    fun `getRecipes() returns all recipes from local source`() = runTest {
+        val recipes = recipeRepository.getRecipes()
+        assertThat(recipes).hasSize(3)
+        assertThat(recipes.map { it.uuid }).containsExactly(
+            recipeEntity1.uuid,
+            recipeEntity2.uuid,
+            recipeEntity3.uuid
+        )
     }
 
     @Test
-    fun deleteAllRecipes() = testScope.runTest {
-        recipeRepository.deleteAllRecipes()
-        assertThat(localDataSource.recipes?.size).isEqualTo(0)
+    fun `getRecipe() returns correct recipe with details`() = runTest {
+        val recipe = recipeRepository.getRecipe(recipeId1)
+        assertThat(recipe).isNotNull()
+        assertThat(recipe?.uuid).isEqualTo(recipeId1)
+        assertThat(recipe?.title).isEqualTo(recipe1.title)
+        assertThat(recipe?.ingredients).hasSize(2)
+        assertThat(recipe?.ingredients?.map { it.displayName }).containsExactly("Flour", "Milk")
+        assertThat(recipe?.steps).hasSize(3)
     }
 
     @Test
-    fun deleteRecipe() = testScope.runTest {
-        recipeRepository.deleteRecipe("1")
-        assertThat(localDataSource.recipes?.size).isEqualTo(2)
-        assertThat(localDataSource.recipes?.map { it.uuid }).doesNotContain("1")
+    fun `saveRecipe() creates a new recipe with all details`() = runTest {
+        recipeRepository.createRecipe(recipe3)
+
+        val savedRecipe = recipeRepository.getRecipe(recipe3.uuid)
+        assertThat(savedRecipe).isNotNull()
+        assertThat(savedRecipe?.title).isEqualTo(recipe3.title)
+        assertThat(savedRecipe?.ingredients).hasSize(1) // recipe3 has one ingredient in test data
+    }
+
+    @Test
+    fun `saveRecipe() updates an existing recipe`() = runTest {
+        val updatedRecipe = recipe1.copy(title = "The Best Pancakes")
+        recipeRepository.createRecipe(updatedRecipe)
+
+        val savedRecipe = recipeRepository.getRecipe(recipe1.uuid)
+        assertThat(savedRecipe?.title).isEqualTo("The Best Pancakes")
+    }
+
+    @Test
+    fun `deleteRecipe() removes a recipe and its associations`() = runTest {
+        // Given: A recipe with associations exists.
+        val recipeBeforeDelete = recipeRepository.getRecipe(recipeId1)
+        assertThat(recipeBeforeDelete).isNotNull()
+        assertThat(recipeBeforeDelete?.ingredients).isNotEmpty()
+        assertThat(recipeBeforeDelete?.steps).isNotEmpty()
+
+        // When: The recipe is deleted.
+        recipeRepository.deleteRecipe(recipeId1)
+
+        // Then: The recipe is no longer available.
+        val recipes = recipeRepository.getRecipes()
+        assertThat(recipes.find { it.uuid == recipeId1 }).isNull()
+        assertThat(recipes).hasSize(2)
+        assertThat(recipeRepository.getRecipe(recipeId1)).isNull()
+
+        // And When: A new recipe with the same ID but no associations is created.
+        val newRecipeWithSameId = recipe1.copy(
+            steps = emptyList(),
+            ingredients = emptyList(),
+            tags = emptyList(),
+            labels = emptyList()
+        )
+        recipeRepository.createRecipe(newRecipeWithSameId)
+
+        // Then: Fetching the recipe should not show the old, orphaned data.
+        val recreatedRecipe = recipeRepository.getRecipe(recipeId1)
+        assertThat(recreatedRecipe).isNotNull()
+        assertThat(recreatedRecipe?.steps).isEmpty()
+        assertThat(recreatedRecipe?.ingredients).isEmpty()
     }
 }

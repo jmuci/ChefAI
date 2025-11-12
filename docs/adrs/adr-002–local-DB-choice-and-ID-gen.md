@@ -38,9 +38,9 @@ We will:
     
 - **Globally unique:** Safe for distributed systems without coordination.
     
-- **Backend-controlled:** Prevents collisions across devices; backend remains the authoritative generator.
+- **Client-generated:** Because UUIDs have no collision risk and we want to support offline creation of entities, we generate them client-side.
     
-- **Offline readiness:** UUIDv7/ULID can also be locally generated if needed later.
+- **Library:** We use Block's UUID v7 generation library.
     
 - **No entity prefixes:** Prefixes (e.g., `rec_`, `usr_`) add no functional value and are omitted for simplicity; the schema ensures relational integrity.
     

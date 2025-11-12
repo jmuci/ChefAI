@@ -32,7 +32,7 @@ Data Layer – Dual-source repositories combining Room (SQLite) for local cachin
 
 Sync – Background WorkManager handles two-step sync (push local outbox → pull backend deltas).
 
-IDs & Storage – All entities use backend-generated, time-sortable UUIDv7 IDs; Room provides full-text search and ACID transactions.
+IDs & Storage – All entities use client-generated, time-sortable UUIDv7 IDs; Room provides full-text search and ACID transactions.
 
 Dependency Injection – Hilt/Koin modules wire DAOs, network clients, and repositories.
 

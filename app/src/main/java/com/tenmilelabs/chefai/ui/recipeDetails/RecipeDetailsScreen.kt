@@ -29,12 +29,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.domain.model.Label
 import com.tenmilelabs.chefai.domain.model.Recipe
+import com.tenmilelabs.chefai.domain.model.User
 import com.tenmilelabs.chefai.ui.components.RecipeTimeAndLabelRow
 import com.tenmilelabs.chefai.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.util.EmptyContent
 import com.tenmilelabs.chefai.util.LoadingContent
 import timber.log.Timber
+import java.util.UUID
 
 
 @Composable
@@ -93,7 +96,8 @@ fun RecipeDetailsContent(
                 .padding(vertical = dimensionResource(id = R.dimen.padding_small))
                 .height(200.dp)
         )
-        RecipeTimeAndLabelRow(recipe.prepTime, recipe.label)
+        //TODO support multiple labels
+        RecipeTimeAndLabelRow(recipe.prepTimeMinutes, recipe.labels.first().displayName)
         Text(
             text = stringResource(R.string.recipe_steps),
             style = MaterialTheme.typography.titleMedium
@@ -105,7 +109,7 @@ fun RecipeDetailsContent(
             buildAnnotatedString {
                 withLink(
                     LinkAnnotation.Url(
-                        recipe.recipeUrl,
+                        recipe.recipeExternalUrl ?: "", // TODO hide field if null URL
                         TextLinkStyles(style = SpanStyle(color = Color.Blue))
                     )
                 ) {
@@ -119,16 +123,30 @@ fun RecipeDetailsContent(
 @Preview(showBackground = true)
 @Composable
 fun RecipeDetailsFullScreenPreview() {
+    val previewUser = User(
+        uuid = UUID.randomUUID(),
+        displayName = "Preview User",
+        email = "user@preview.com",
+        avatarUrl = null
+    )
     ChefAITheme {
         RecipeDetailsContent(
             Recipe(
-                title = "Recipe Title",
-                label = "Recipe Label",
-                description = "Recipe Description.  This is how you do this. Follow exactly the following steps to achieve sucesss. \n No cutting corners.",
-                prepTime = 10,
-                recipeUrl = "https://www.google.com/",
-                imageUrl = "https://www.google.com",
-                thumbnailUrl = "https://www.google.com",
+                uuid = UUID.randomUUID(),
+                title = "Delicious Grilled Chicken",
+                description = "A very tasty and easy to make grilled chicken recipe. Perfect for a summer barbecue. Follow the steps carefully for the best results.",
+                imageUrl = "https://via.placeholder.com/200",
+                imageUrlThumbnail = "https://via.placeholder.com/200",
+                prepTimeMinutes = 15,
+                cookTimeMinutes = 20,
+                servings = 4,
+                creator = previewUser,
+                recipeExternalUrl = "https://example.com/grilled-chicken",
+                ingredients = emptyList(),
+                steps = emptyList(),
+                tags = emptyList(),
+                labels = listOf(Label(UUID.randomUUID(), "Grill")),
+                updatedAt = System.currentTimeMillis()
             )
         )
     }

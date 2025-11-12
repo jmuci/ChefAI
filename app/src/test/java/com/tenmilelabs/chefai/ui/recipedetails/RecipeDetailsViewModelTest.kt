@@ -5,7 +5,10 @@ import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.data.FakeRecipesRepository
-import com.tenmilelabs.chefai.domain.model.Recipe
+import com.tenmilelabs.chefai.testData.recipe1
+import com.tenmilelabs.chefai.testData.recipe2
+import com.tenmilelabs.chefai.testData.recipeId1
+import com.tenmilelabs.chefai.testData.recipeId2
 import com.tenmilelabs.chefai.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.ui.recipeDetails.RecipeDetailsViewModel
 import com.tenmilelabs.chefai.util.MainCoroutineRule
@@ -25,23 +28,11 @@ class RecipeDetailsViewModelTest {
     private lateinit var recipesRepository: FakeRecipesRepository
     private lateinit var savedStateHandle: SavedStateHandle
 
-    private val testRecipeUuid = "test-uuid-123"
-    private val testRecipe = Recipe(
-        uuid = testRecipeUuid,
-        title = "Test Recipe",
-        description = "A delicious test recipe.",
-        prepTime = 30,
-        label = "Test Label",
-        recipeUrl = "http://example.com/recipe",
-        imageUrl = "http://example.com/image.jpg",
-        thumbnailUrl = "http://example.com/thumb.jpg"
-    )
-
     @Before
     fun setup() {
         recipesRepository = FakeRecipesRepository()
         savedStateHandle = SavedStateHandle().apply {
-            set(AppDestinationArgs.RECIPE_ID_ARG, testRecipeUuid)
+            set(AppDestinationArgs.RECIPE_ID_ARG, recipeId1)
         }
         // ViewModel is re-initialized for each test to ensure clean state
     }
@@ -53,7 +44,7 @@ class RecipeDetailsViewModelTest {
     @Test
     fun `initial state is loading and recipeUuid is set`() = runTest {
         initializeViewModel()
-        assertThat(viewModel.recipeUuid).isEqualTo(testRecipeUuid)
+        assertThat(viewModel.recipeUuid).isEqualTo(recipeId1)
 
         viewModel.uiState.test {
             val initialState = awaitItem()
@@ -72,12 +63,12 @@ class RecipeDetailsViewModelTest {
             assertThat(awaitItem().isLoading).isTrue()
 
             // 2. Repository emits data
-            recipesRepository.emitRecipe(testRecipeUuid, testRecipe)
+            recipesRepository.emitRecipe(recipeId1, recipe1)
 
             // 3. Success state
             val successState = awaitItem()
             assertThat(successState.isLoading).isFalse() // Because _isLoading is false by default
-            assertThat(successState.recipe).isEqualTo(testRecipe)
+            assertThat(successState.recipe).isEqualTo(recipe1)
             assertThat(successState.userMessage).isEqualTo(R.string.loading_recipes_success)
 
             cancelAndConsumeRemainingEvents()
@@ -92,7 +83,7 @@ class RecipeDetailsViewModelTest {
             assertThat(awaitItem().isLoading).isTrue()
 
             // 2. Repository emits null (recipe not found)
-            recipesRepository.emitRecipe(testRecipeUuid, null)
+            recipesRepository.emitRecipe(recipeId1, null)
 
             // 3. Error state
             val errorState = awaitItem()
@@ -130,7 +121,7 @@ class RecipeDetailsViewModelTest {
             assertThat(awaitItem().isLoading).isTrue()
 
             // 2. Simulate an error to set a userMessage
-            recipesRepository.emitRecipe(testRecipeUuid, null)
+            recipesRepository.emitRecipe(recipeId1, null)
             val errorState = awaitItem()
             assertThat(errorState.userMessage).isEqualTo(R.string.loading_recipe_details_error)
             assertThat(errorState.recipe).isNull()
@@ -155,14 +146,14 @@ class RecipeDetailsViewModelTest {
             assertThat(awaitItem().isLoading).isTrue()
 
             // 2. Repository emits data. _isLoading is still its default (false)
-            recipesRepository.emitRecipe(testRecipeUuid, testRecipe)
+            recipesRepository.emitRecipe(recipeId1, recipe1)
 
             // 3. Success state
             val successState = awaitItem()
             // In the Async.Success branch, isLoading = isLoading (which is _isLoading.value)
             // Since _isLoading is private and defaults to false, this should be false.
             assertThat(successState.isLoading).isFalse()
-            assertThat(successState.recipe).isEqualTo(testRecipe)
+            assertThat(successState.recipe).isEqualTo(recipe1)
             assertThat(successState.userMessage).isEqualTo(R.string.loading_recipes_success)
 
             cancelAndConsumeRemainingEvents()
