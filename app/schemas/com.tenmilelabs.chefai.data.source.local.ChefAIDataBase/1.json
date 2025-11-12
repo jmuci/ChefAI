@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "702b958138a0dc75522a3ddfe5d9b5e0",
+    "identityHash": "ccbba1d58abb4f21caeb421192a9d3ea",
     "entities": [
       {
         "tableName": "allergens",
@@ -345,7 +345,7 @@
       },
       {
         "tableName": "recipe_ingredients",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`recipeId` BLOB NOT NULL, `ingredientId` BLOB NOT NULL, `quantity` REAL NOT NULL, `unit` TEXT, `notes` TEXT, `updatedAt` INTEGER NOT NULL, `deletedAt` INTEGER, `syncState` TEXT NOT NULL, PRIMARY KEY(`recipeId`, `ingredientId`), FOREIGN KEY(`recipeId`) REFERENCES `recipes`(`uuid`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`ingredientId`) REFERENCES `ingredients`(`uuid`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`recipeId` BLOB NOT NULL, `ingredientId` BLOB NOT NULL, `quantity` REAL NOT NULL, `unit` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, `deletedAt` INTEGER, `syncState` TEXT NOT NULL, PRIMARY KEY(`recipeId`, `ingredientId`), FOREIGN KEY(`recipeId`) REFERENCES `recipes`(`uuid`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`ingredientId`) REFERENCES `ingredients`(`uuid`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
         "fields": [
           {
             "fieldPath": "recipeId",
@@ -368,12 +368,8 @@
           {
             "fieldPath": "unit",
             "columnName": "unit",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "notes",
-            "columnName": "notes",
-            "affinity": "TEXT"
+            "affinity": "TEXT",
+            "notNull": true
           },
           {
             "fieldPath": "updatedAt",
@@ -893,7 +889,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '702b958138a0dc75522a3ddfe5d9b5e0')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'ccbba1d58abb4f21caeb421192a9d3ea')"
     ]
   }
 }
