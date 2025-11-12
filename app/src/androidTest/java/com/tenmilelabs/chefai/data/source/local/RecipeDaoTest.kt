@@ -111,7 +111,7 @@ class RecipeDaoTest {
         database.recipeDao().upsertRecipe(recipe2)
 
         // WHEN - get all recipes
-        val recipes = database.recipeDao().getAllRecipes()
+        val recipes = database.recipeDao().observeAllRecipesForUser(testUser.uuid).first()
 
         // THEN - the list contains both recipes
         assertEquals(2, recipes.size)
