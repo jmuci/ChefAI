@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import java.util.UUID
 import javax.inject.Inject
 
 /**
@@ -35,7 +36,7 @@ class RecipeDetailsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
-    val recipeUuid: String = savedStateHandle[AppDestinationArgs.RECIPE_ID_ARG]!!
+    val recipeUuid: UUID = savedStateHandle[AppDestinationArgs.RECIPE_ID_ARG]!!
 
     private val _isLoading = MutableStateFlow(false)
     private val _userMessage: MutableStateFlow<Int?> = MutableStateFlow(null)

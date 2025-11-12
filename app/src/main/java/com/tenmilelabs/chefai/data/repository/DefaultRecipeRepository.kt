@@ -1,7 +1,7 @@
 package com.tenmilelabs.chefai.data.repository
 
 import com.tenmilelabs.chefai.data.mapper.toDomain
-import com.tenmilelabs.chefai.data.mapper.toRecipeEntity
+import com.tenmilelabs.chefai.data.mapper.toRoomEntity
 import com.tenmilelabs.chefai.data.source.local.RecipeDao
 import com.tenmilelabs.chefai.data.source.network.RecipeNetworkDataSource
 import com.tenmilelabs.chefai.di.ApplicationScope
@@ -11,6 +11,7 @@ import com.tenmilelabs.chefai.domain.repository.RecipesRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -30,16 +31,9 @@ class DefaultRecipeRepository @Inject constructor(
     @ApplicationScope private val appScope: CoroutineScope,
 ) : RecipesRepository {
 
-    // TODO Cache in memory list of recipes (paginated?)
-    // TODO Decide when to read from local DB or network / cache
-    //  -> Implement Data Merging Strategy (based on some form of timeStamps Perhaps)
-    // TODO Use appScope to make sure coroutines don't get cancelled
-    //TODO Follow those docs : https://developer.android.com/topic/architecture/data-layer
-    // TODO Read https://developer.android.com/topic/architecture/data-layer/offline-first
-    // TODO obs internet connection state
     override suspend fun getRecipes(): List<Recipe> {
         return withContext(dispatcher) {
-            localDatSource.getAllRecipes().toDomain()
+            localDatSource.observeRecipesWithDetails().first().map { it.toDomain() }
         }
     }
 
@@ -49,7 +43,7 @@ class DefaultRecipeRepository @Inject constructor(
                 emit(getAllItemsFromNetwork())
             }
         } else {        // Local
-            return localDatSource.observeAll().map { recipes ->
+            return localDatSource.observeRecipesWithDetails().map { recipes ->
                 withContext(dispatcher) {
                     recipes.toDomain()
                 }
@@ -62,51 +56,37 @@ class DefaultRecipeRepository @Inject constructor(
         Timber.d("Fetched ${recipes.size} recipes from the BE")
         recipes
     } catch (e: CancellationException) {
-        Timber.e("Error fetching recipe items from network. Coroutine cancelled!")
+        Timber.w("Network request cancelled.")
         throw e
     } catch (e: UnresolvedAddressException) {
-        Timber.e("Failed to reach the Backend. Client offline or DNS issue.")
+        Timber.e(e, "DNS resolution failed. Device may be offline.")
         throw e
-    } catch(e: IOException)  {
-        // Handle error, e.g., emit an empty list or an error state
-        Timber.e("Error fetching recipe items from network. Error: ${e.message}")
+    } catch (e: IOException) {
+        Timber.e(e, "A network error occurred.")
         throw e
     }
 
-    override fun getRecipeStream(uuid: String): Flow<Recipe?> {
-        return localDatSource.observeRecipeById(uuid).map { it.toDomain() }
+    override fun getRecipeStream(uuid: UUID): Flow<Recipe?> {
+        return localDatSource.observeRecipeWithDetails(uuid).map { it?.toDomain() }
     }
 
-    override suspend fun getRecipe(uuid: String): Recipe? {
-        return localDatSource.getRecipeById(uuid)?.toDomain()
+    override suspend fun getRecipe(uuid: UUID): Recipe? {
+        return localDatSource.getRecipeWithDetails(uuid)?.toDomain()
     }
 
-    /**
-     * Creates a new [Recipe] in the local data source.
-     * The optional uuid parameter should only be used for testing
-     */
-    override suspend fun createRecipe(recipe: Recipe, uuid: String): String {
-        // ID creation might be a complex operation so it's executed using the supplied
-        // coroutine dispatcher
-        val recipeUuid = withContext(dispatcher) {
-            uuid.ifEmpty {
-                UUID.randomUUID().toString()
-            }
-        }
-
-        localDatSource.upsertRecipe(recipe.copy(uuid = recipeUuid).toRecipeEntity())
-        return recipeUuid
+    override suspend fun createRecipe(recipe: Recipe) {
+        localDatSource.upsertRecipe(recipe.toRoomEntity())
     }
 
     override suspend fun updateRecipe(recipe: Recipe) {
-        localDatSource.upsertRecipe(recipe.toRecipeEntity())
+        localDatSource.upsertRecipe(recipe.toRoomEntity())
     }
 
     override suspend fun deleteAllRecipes() {
         localDatSource.deleteAllRecipes()
     }
 
-    override suspend fun deleteRecipe(recipeId: String) {
+    override suspend fun deleteRecipe(recipeId: UUID) {
         localDatSource.deleteRecipe(recipeId)
     }
 }

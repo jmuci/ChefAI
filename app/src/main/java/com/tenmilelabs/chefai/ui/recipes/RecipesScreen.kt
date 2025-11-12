@@ -18,17 +18,21 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.domain.model.Label
 import com.tenmilelabs.chefai.domain.model.Recipe
+import com.tenmilelabs.chefai.domain.model.User
 import com.tenmilelabs.chefai.ui.components.RecipeCard
 import com.tenmilelabs.chefai.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.util.EmptyContent
 import com.tenmilelabs.chefai.util.LoadingContent
+import xyz.block.uuidv7.UUIDv7
+import java.util.UUID
 
 @Composable
 fun RecipesScreen(
     viewModel: RecipesViewModel = hiltViewModel(),
     snackbarHostState: SnackbarHostState,
-    onRecipeCardClick: (String) -> Unit = {},
+    onRecipeCardClick: (UUID) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     RecipesContent(
@@ -54,7 +58,7 @@ fun RecipesScreen(
 fun RecipesContent(
     loading: Boolean,
     recipes: List<Recipe>,
-    recipeCardOnClick: (String) -> Unit = {},
+    recipeCardOnClick: (UUID) -> Unit = {},
 ) {
     if (loading) {
         LoadingContent()
@@ -87,17 +91,31 @@ fun RecipesContent(
 @Preview
 @Composable
 fun RecipessListScreenPreview() {
+    val previewUser = com.tenmilelabs.chefai.domain.model.User(
+        uuid = UUIDv7.generate(),
+        displayName = "ChefAI Preview",
+        email = "preview@chefai.app",
+        avatarUrl = null
+    )
     val recipes: List<Recipe> = buildList {
         for (i in 1..60) {
             add(
                 Recipe(
-                    title = "Recipe Title $i",
-                    label = "Recipe Label $i",
-                    description = "Recipe Description $i.  This is how you do this. Follow exactly the following steps to achieve sucesss. \n No cutting corners.",
-                    prepTime = 10,
-                    recipeUrl = "https://www.google.com/$i",
-                    imageUrl = "https://www.google.com",
-                    thumbnailUrl = "https://www.google.com",
+                    uuid = UUIDv7.generate(),
+                    title = "Mediterranean Grilled Chicken",
+                    description = "A light and flavorful grilled chicken recipe with classic Mediterranean herbs and a lemon-garlic marinade.",
+                    imageUrl = "https://via.placeholder.com/150",
+                    imageUrlThumbnail = "https://via.placeholder.com/150",
+                    prepTimeMinutes = 15,
+                    cookTimeMinutes = 20,
+                    servings = 4,
+                    creator = previewUser,
+                    recipeExternalUrl = "https://example.com/recipe",
+                    ingredients = emptyList(),
+                    steps = emptyList(),
+                    tags = emptyList(),
+                    labels = listOf(Label(UUIDv7.generate(), "Mediterranean")),
+                    updatedAt = System.currentTimeMillis()
                 )
             )
         }
@@ -123,17 +141,31 @@ fun RecipesListScreenEmptyPreview() {
 @Preview
 @Composable
 fun RecipeCardPreview() {
+    val previewUser = User(
+        uuid = UUID.randomUUID(),
+        displayName = "Preview User",
+        email = "user@preview.com",
+        avatarUrl = null
+    )
     ChefAITheme {
         Surface {
             RecipeCard(
                 recipe = Recipe(
-                    title = "Recipe Title",
-                    label = "Recipe Label",
-                    description = "Recipe Description. This is how you do this. Follow exactly the following steps to achieve sucesss. \n No cutting corners.",
-                    prepTime = 10,
-                    recipeUrl = "https://www.google.com",
-                    imageUrl = "https://www.google.com",
-                    thumbnailUrl = "https://www.google.com",
+                    uuid = UUID.randomUUID(),
+                    title = "Delicious Grilled Chicken",
+                    description = "A very tasty and easy to make grilled chicken recipe. Perfect for a summer barbecue. Follow the steps carefully for the best results.",
+                    imageUrl = "https://via.placeholder.com/200",
+                    imageUrlThumbnail = "https://via.placeholder.com/200",
+                    prepTimeMinutes = 15,
+                    cookTimeMinutes = 20,
+                    servings = 4,
+                    creator = previewUser,
+                    recipeExternalUrl = "https://example.com/grilled-chicken",
+                    ingredients = emptyList(),
+                    steps = emptyList(),
+                    tags = emptyList(),
+                    labels = listOf(Label(UUID.randomUUID(), "Grill")),
+                    updatedAt = System.currentTimeMillis()
                 )
             )
         }

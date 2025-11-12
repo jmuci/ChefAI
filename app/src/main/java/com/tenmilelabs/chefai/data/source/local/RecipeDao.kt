@@ -31,6 +31,10 @@ interface RecipeDao {
 
     @Transaction
     @Query("SELECT * FROM recipes WHERE uuid = :uuid")
+    suspend fun getRecipeWithDetails(uuid: UUID): RecipeWithDetails?
+
+    @Transaction
+    @Query("SELECT * FROM recipes WHERE uuid = :uuid")
     fun observeRecipeWithDetails(uuid: UUID): Flow<RecipeWithDetails?>
 
     @Transaction

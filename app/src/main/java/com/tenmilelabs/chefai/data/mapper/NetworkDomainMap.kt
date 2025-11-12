@@ -3,39 +3,46 @@ package com.tenmilelabs.chefai.data.mapper
 import com.tenmilelabs.chefai.data.source.network.NetworkRecipe
 import com.tenmilelabs.chefai.data.source.network.NetworkRecipeList
 import com.tenmilelabs.chefai.domain.model.Recipe
+import com.tenmilelabs.chefai.domain.model.User
+import java.util.UUID
+
 /**
- * Data model mapping extension functions. There are three model types:
- *
- * - Recipe: Domain Entity model exposed to other layers in the architecture.
- * Obtained using `toDomain`.
- *
- * - NetworkRecipe: Internal model used to represent a recipe from the network. Obtained using
- * `toNetwork`.
- *
+ * Maps network DTOs to domain models.
  */
-fun Recipe.toNetworkRecipe() : NetworkRecipe = NetworkRecipe(
-    uuid = uuid,
-    title = title,
-    label = label,
-    description = description,
-    preparationTimeMinutes = prepTime,
-    recipeUrl = recipeUrl,
-    imageUrl = imageUrl,
-    imageUrlThumbnail = thumbnailUrl,
-)
 
-fun List<Recipe>.toNetwork() = map(Recipe::toNetworkRecipe)
+fun NetworkRecipe.toDomain(): Recipe {
+    return Recipe(
+        uuid = UUID.fromString(uuid),
+        title = title,
+        description = description,
+        imageUrl = imageUrl,
+        imageUrlThumbnail = imageUrlThumbnail,
+        prepTimeMinutes = preparationTimeMinutes,
+        cookTimeMinutes = 0, // Not available in network DTO
+        servings = 0, // Not available in network DTO
+        creator = User(UUID.randomUUID(), "", null, null), // Not available in network DTO
+        recipeExternalUrl = recipeUrl,
+        ingredients = emptyList(),
+        steps = emptyList(),
+        tags = emptyList(),
+        labels = emptyList(),
+        updatedAt = System.currentTimeMillis() // Or a default value
+    )
+}
 
-fun NetworkRecipe.toDomain() = Recipe(
-    uuid = uuid,
-    title = title,
-    label = label,
-    description = description,
-    prepTime = preparationTimeMinutes,
-    recipeUrl = recipeUrl,
-    imageUrl = imageUrl,
-    thumbnailUrl = imageUrlThumbnail,
-)
+fun List<NetworkRecipe>.toDomain(): List<Recipe> = map (NetworkRecipe::toDomain)
+fun NetworkRecipeList.toDomain() = this.recipes.toDomain()
+fun Recipe.toNetwork(): NetworkRecipe {
+    return NetworkRecipe(
+        uuid = uuid.toString(),
+        title = title,
+        label = "", // You might want to map this from recipe.labels
+        description = description,
+        preparationTimeMinutes = prepTimeMinutes,
+        recipeUrl = recipeExternalUrl ?: "",
+        imageUrl = imageUrl,
+        imageUrlThumbnail = imageUrlThumbnail
+    )
+}
 
-fun List<NetworkRecipe>.toDomain() = map(NetworkRecipe::toDomain)
-fun NetworkRecipeList.toDomain() = this.recipes.map(NetworkRecipe::toDomain)
+fun List<Recipe>.toNetwork(): List<NetworkRecipe> = map { it.toNetwork() }

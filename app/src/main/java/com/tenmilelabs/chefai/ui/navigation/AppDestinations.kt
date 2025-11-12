@@ -5,6 +5,7 @@ import androidx.navigation.NavHostController
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.ui.navigation.AppDestinationArgs.RECIPE_ID_ARG
 import com.tenmilelabs.chefai.ui.navigation.ScreenBaseRoutes.RECIPE_DETAILS
+import java.util.UUID
 
 /**
  * Screens used in [AppDestinations].
@@ -46,7 +47,7 @@ enum class AppDestinations(
  * Models the navigation actions in the app.
  */
 class NavigationActions(private val navController: NavHostController) {
-    fun navigateToRecipeDetail(recipeId: String) {
+    fun navigateToRecipeDetail(recipeId: UUID) {
         navController.navigate("$RECIPE_DETAILS/$recipeId")
     }
 
