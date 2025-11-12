@@ -5,7 +5,7 @@ package com.tenmilelabs.chefai.data.source.network
  * Allows injecting a predefined list of [NetworkRecipe] so tests are deterministic.
  */
 class FakeApiService(
-    private val fakeRecipes: List<NetworkRecipe> = emptyList()
+    var fakeRecipes: List<NetworkRecipe> = emptyList()
 ) : RecipeNetworkDataSource {
 
     override suspend fun getRecipes(): NetworkRecipeList {
