@@ -79,7 +79,7 @@ fun RecipeCard(recipe: Recipe,
                         .padding(horizontal = dimensionResource(id = R.dimen.padding_small))
                 )
                 //TODO (Display List of Labels)
-                RecipeTimeAndLabelRow(recipe.prepTimeMinutes, recipe.labels.first().displayName)
+                //RecipeTimeAndLabelRow(recipe.prepTimeMinutes, recipe.labels.first().displayName)
 
                 Text(
                     text = recipe.description,
