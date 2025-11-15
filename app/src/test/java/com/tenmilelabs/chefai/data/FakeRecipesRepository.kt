@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.data
 
 import com.tenmilelabs.chefai.domain.model.Recipe
+import com.tenmilelabs.chefai.domain.model.RecipePreview
 import com.tenmilelabs.chefai.domain.repository.RecipesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -11,6 +12,7 @@ class FakeRecipesRepository : RecipesRepository {
 
     // For general recipes list if needed by other ViewModels
     private val recipesListFlow = MutableSharedFlow<List<Recipe>>(replay = 1)
+    private val recipesPreviewListFlow = MutableSharedFlow<List<RecipePreview>>(replay = 1)
     private var recipesToEmitGeneral: List<Recipe> = emptyList()
     private var shouldReturnErrorForGetRecipes = false
     private var exceptionForGetRecipes: Exception? = null
@@ -52,6 +54,15 @@ class FakeRecipesRepository : RecipesRepository {
 
     override suspend fun getRecipes(): List<Recipe> {
         TODO("Not yet implemented")
+    }
+
+    override fun getRecipesPreviewStream(): Flow<List<RecipePreview>> {
+        if (shouldReturnErrorForGetRecipes) {
+            return flow {
+                throw (exceptionForGetRecipes ?: Exception("Configured repository error"))
+            }
+        }
+        return recipesPreviewListFlow
     }
 
     override fun getRecipesStream(): Flow<List<Recipe>> {

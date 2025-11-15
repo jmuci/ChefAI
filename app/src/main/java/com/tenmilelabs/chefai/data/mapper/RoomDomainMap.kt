@@ -14,6 +14,7 @@ import com.tenmilelabs.chefai.domain.model.Allergen
 import com.tenmilelabs.chefai.domain.model.Ingredient
 import com.tenmilelabs.chefai.domain.model.Label
 import com.tenmilelabs.chefai.domain.model.Recipe
+import com.tenmilelabs.chefai.domain.model.RecipePreview
 import com.tenmilelabs.chefai.domain.model.RecipeStep
 import com.tenmilelabs.chefai.domain.model.SourceClassification
 import com.tenmilelabs.chefai.domain.model.Tag
@@ -43,7 +44,23 @@ fun RecipeWithDetails.toDomain(): Recipe {
     )
 }
 
+@JvmName("toFullRecipeDomain")
 fun List<RecipeWithDetails>.toDomain() = map(RecipeWithDetails::toDomain)
+
+fun RecipeEntity.toDomain(): RecipePreview = RecipePreview(
+    uuid = uuid,
+    title = title,
+    description = description,
+    imageUrlThumbnail = imageUrlThumbnail,
+    prepTimeMinutes = prepTimeMinutes,
+    cookTimeMinutes = cookTimeMinutes,
+    servings = servings,
+    creatorId = creatorId,
+    tags = emptyList(),
+    labels = emptyList()
+)
+@JvmName("toRecipePreviewDomain")
+fun List<RecipeEntity>.toDomain() = map(RecipeEntity::toDomain)
 fun UserEntity.toDomain(): User = User(
     uuid = uuid,
     displayName = displayName,

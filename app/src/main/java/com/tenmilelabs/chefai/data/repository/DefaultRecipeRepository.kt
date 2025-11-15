@@ -7,10 +7,12 @@ import com.tenmilelabs.chefai.data.source.network.RecipeNetworkDataSource
 import com.tenmilelabs.chefai.di.ApplicationScope
 import com.tenmilelabs.chefai.di.IoDispatcher
 import com.tenmilelabs.chefai.domain.model.Recipe
+import com.tenmilelabs.chefai.domain.model.RecipePreview
 import com.tenmilelabs.chefai.domain.repository.RecipesRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -31,10 +33,21 @@ class DefaultRecipeRepository @Inject constructor(
     @IoDispatcher private val dispatcher: CoroutineDispatcher,
     @ApplicationScope private val appScope: CoroutineScope,
 ) : RecipesRepository {
-
+    //TODO implement authentication
+    val testUserId = UUID.fromString("F47AC10B58CC4372A5670E02B2C3D479")
     override suspend fun getRecipes(): List<Recipe> {
         return withContext(dispatcher) {
             localDatSource.observeRecipesWithDetails().first().map { it.toDomain() }
+        }
+    }
+
+    override fun getRecipesPreviewStream(): Flow<List<RecipePreview>> {
+        return localDatSource.observeAllRecipesForUser(testUserId).map { recipes ->
+            withContext(dispatcher) {
+                recipes.toDomain()
+            }
+        }.catch { e ->
+            logAndReThrow(e)
         }
     }
 
@@ -50,12 +63,7 @@ class DefaultRecipeRepository @Inject constructor(
                 }
             }.catch { e ->
                 // TODO try to recover by potentially wiping the DB, recreating and re-syncing
-                if (e is IllegalStateException) {
-                    Timber.e(e, "Error observing recipes: ${e.message}")
-                    Timber.d("StackTrace: " + e.stackTrace)
-                    emit(emptyList())
-                }
-                throw e
+                logAndReThrow(e)
             }
         }
     }
@@ -97,5 +105,16 @@ class DefaultRecipeRepository @Inject constructor(
 
     override suspend fun deleteRecipe(recipeId: UUID) {
         localDatSource.deleteRecipe(recipeId)
+    }
+
+    private suspend fun <T> FlowCollector<List<T>>.logAndReThrow(
+        e: Throwable
+    ): Nothing {
+        if (e is IllegalStateException) {
+            Timber.e(e, "Error observing recipes: ${e.message}")
+            Timber.d("StackTrace: " + e.stackTrace)
+            emit(emptyList())
+        }
+        throw e
     }
 }
