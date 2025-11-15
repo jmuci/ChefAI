@@ -3,6 +3,8 @@ package com.tenmilelabs.chefai.data.repository
 import com.tenmilelabs.chefai.data.mapper.toDomain
 import com.tenmilelabs.chefai.data.mapper.toRoomEntity
 import com.tenmilelabs.chefai.data.source.local.RecipeDao
+import com.tenmilelabs.chefai.data.source.local.util.decodeHex
+import com.tenmilelabs.chefai.data.source.local.util.toUuid
 import com.tenmilelabs.chefai.data.source.network.RecipeNetworkDataSource
 import com.tenmilelabs.chefai.di.ApplicationScope
 import com.tenmilelabs.chefai.di.IoDispatcher
@@ -30,11 +32,11 @@ import kotlin.coroutines.cancellation.CancellationException
 class DefaultRecipeRepository @Inject constructor(
     private val localDatSource: RecipeDao,
     private val networkDataSource: RecipeNetworkDataSource,
-    @IoDispatcher private val dispatcher: CoroutineDispatcher,
-    @ApplicationScope private val appScope: CoroutineScope,
+    @param:IoDispatcher private val dispatcher: CoroutineDispatcher,
+    @param:ApplicationScope private val appScope: CoroutineScope,
 ) : RecipesRepository {
     //TODO implement authentication
-    val testUserId = UUID.fromString("F47AC10B58CC4372A5670E02B2C3D479")
+    val testUserId = "F47AC10B58CC4372A5670E02B2C3D479".decodeHex().toUuid()
     override suspend fun getRecipes(): List<Recipe> {
         return withContext(dispatcher) {
             localDatSource.observeRecipesWithDetails().first().map { it.toDomain() }

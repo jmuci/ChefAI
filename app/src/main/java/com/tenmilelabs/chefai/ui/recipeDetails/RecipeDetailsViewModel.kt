@@ -36,7 +36,7 @@ class RecipeDetailsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
-    val recipeUuid: UUID = savedStateHandle[AppDestinationArgs.RECIPE_ID_ARG]!!
+    val recipeUuid: UUID = UUID.fromString(savedStateHandle[AppDestinationArgs.RECIPE_ID_ARG]!!)
 
     private val _isLoading = MutableStateFlow(false)
     private val _userMessage: MutableStateFlow<Int?> = MutableStateFlow(null)
