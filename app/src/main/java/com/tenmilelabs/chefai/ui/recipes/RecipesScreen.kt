@@ -91,12 +91,6 @@ fun RecipesContent(
 @Preview
 @Composable
 fun RecipesListScreenPreview() {
-    val previewUser = com.tenmilelabs.chefai.domain.model.User(
-        uuid = generateUuid7(),
-        displayName = "ChefAI Preview",
-        email = "preview@chefai.app",
-        avatarUrl = null
-    )
     val recipes: List<RecipePreview> = buildList {
         for (i in 1..60) {
             add(PreviewData.recipePreview)

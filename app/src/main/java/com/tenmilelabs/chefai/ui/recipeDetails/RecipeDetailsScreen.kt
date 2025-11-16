@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.ui.recipeDetails
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -101,8 +102,10 @@ fun RecipeDetailsContent(
                 .padding(vertical = dimensionResource(id = R.dimen.padding_small))
                 .height(200.dp)
         )
-        //TODO support multiple labels
+        Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_small)))
         RecipeTimeRow(recipe.prepTimeMinutes, recipe.cookTimeMinutes)
+        Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_small)))
+
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_extra_small)),
             verticalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_extra_small))
