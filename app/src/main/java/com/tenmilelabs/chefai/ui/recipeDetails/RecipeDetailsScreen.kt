@@ -1,6 +1,8 @@
 package com.tenmilelabs.chefai.ui.recipeDetails
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -32,6 +34,8 @@ import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.domain.model.Label
 import com.tenmilelabs.chefai.domain.model.Recipe
 import com.tenmilelabs.chefai.domain.model.User
+import com.tenmilelabs.chefai.ui.components.InfoChip
+import com.tenmilelabs.chefai.ui.components.InfoChipType
 import com.tenmilelabs.chefai.ui.components.RecipeTimeRow
 import com.tenmilelabs.chefai.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.util.EmptyContent
@@ -98,6 +102,17 @@ fun RecipeDetailsContent(
         )
         //TODO support multiple labels
         RecipeTimeRow(recipe.prepTimeMinutes, recipe.cookTimeMinutes)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_extra_small)),
+            verticalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_extra_small))
+        ) {
+            recipe.labels.forEach { label ->
+                InfoChip(text = label.displayName, type = InfoChipType.LABEL)
+            }
+            recipe.tags.forEach { tag ->
+                InfoChip(text = tag.displayName, type = InfoChipType.TAG)
+            }
+        }
         Text(
             text = stringResource(R.string.recipe_steps),
             style = MaterialTheme.typography.titleMedium

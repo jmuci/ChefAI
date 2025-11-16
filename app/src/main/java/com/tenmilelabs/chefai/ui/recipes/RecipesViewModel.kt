@@ -3,7 +3,6 @@ package com.tenmilelabs.chefai.ui.recipes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.R
-import com.tenmilelabs.chefai.domain.model.Recipe
 import com.tenmilelabs.chefai.domain.model.RecipePreview
 import com.tenmilelabs.chefai.domain.repository.RecipesRepository
 import com.tenmilelabs.chefai.util.Async
