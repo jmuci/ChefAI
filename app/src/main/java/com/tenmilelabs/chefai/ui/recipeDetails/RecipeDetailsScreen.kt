@@ -32,7 +32,7 @@ import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.domain.model.Label
 import com.tenmilelabs.chefai.domain.model.Recipe
 import com.tenmilelabs.chefai.domain.model.User
-import com.tenmilelabs.chefai.ui.components.RecipeTimeAndLabelRow
+import com.tenmilelabs.chefai.ui.components.RecipeTimeRow
 import com.tenmilelabs.chefai.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.util.EmptyContent
 import com.tenmilelabs.chefai.util.LoadingContent
@@ -97,7 +97,7 @@ fun RecipeDetailsContent(
                 .height(200.dp)
         )
         //TODO support multiple labels
-        RecipeTimeAndLabelRow(recipe.prepTimeMinutes, recipe.labels.first().displayName)
+        RecipeTimeRow(recipe.prepTimeMinutes, recipe.cookTimeMinutes)
         Text(
             text = stringResource(R.string.recipe_steps),
             style = MaterialTheme.typography.titleMedium

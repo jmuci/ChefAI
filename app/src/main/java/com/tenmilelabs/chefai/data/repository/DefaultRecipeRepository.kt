@@ -1,6 +1,8 @@
 package com.tenmilelabs.chefai.data.repository
 
 import com.tenmilelabs.chefai.data.mapper.toDomain
+import com.tenmilelabs.chefai.data.mapper.toPreviewDomain
+import com.tenmilelabs.chefai.data.mapper.toRecipePreviewDomain
 import com.tenmilelabs.chefai.data.mapper.toRoomEntity
 import com.tenmilelabs.chefai.data.source.local.RecipeDao
 import com.tenmilelabs.chefai.data.source.local.util.decodeHex
@@ -44,9 +46,9 @@ class DefaultRecipeRepository @Inject constructor(
     }
 
     override fun getRecipesPreviewStream(): Flow<List<RecipePreview>> {
-        return localDatSource.observeAllRecipesForUser(testUserId).map { recipes ->
+        return localDatSource.observeRecipesWithDetailsForUser(testUserId).map { recipes ->
             withContext(dispatcher) {
-                recipes.toDomain()
+                recipes.toRecipePreviewDomain()
             }
         }.catch { e ->
             logAndReThrow(e)
