@@ -8,13 +8,6 @@ import com.tenmilelabs.chefai.domain.model.User
 import java.util.UUID
 
 object PreviewData {
-    val user = User(
-        uuid = generateUuid7(),
-        displayName = "ChefAI Preview",
-        email = "preview@chefai.app",
-        avatarUrl = "https://i.pravatar.cc/150?u=a042581f4e29026704d"
-    )
-
     val recipePreview = RecipePreview(
         uuid = generateUuid7(),
         title = "Delicious Grilled Chicken",
@@ -23,7 +16,7 @@ object PreviewData {
         prepTimeMinutes = 15,
         cookTimeMinutes = 20,
         servings = 4,
-        creatorId = user.uuid,
+        creatorId = SharedData.user.uuid,
         tags = listOf(Tag(generateUuid7(), "Healthy"), Tag(generateUuid7(), "Quick")),
         labels = listOf(com.tenmilelabs.chefai.domain.model.Label(generateUuid7(), "Dinner")),
     )
@@ -36,7 +29,7 @@ object PreviewData {
         prepTimeMinutes = 10,
         cookTimeMinutes = 25,
         servings = 6,
-        creatorId = user.uuid,
+        creatorId = SharedData.user.uuid,
         tags = listOf(Tag(generateUuid7(), "Pasta"), Tag(generateUuid7(), "Comfort Food")),
         labels = listOf(Label(generateUuid7(), "Weeknight")),
     )
@@ -49,7 +42,7 @@ object PreviewData {
         prepTimeMinutes = 20,
         cookTimeMinutes = 180,
         servings = 8,
-        creatorId = user.uuid,
+        creatorId = SharedData.user.uuid,
         tags = listOf(Tag(generateUuid7(), "Slow Cook"), Tag(generateUuid7(), "Beef")),
         labels = listOf(Label(generateUuid7(), "Batch Cook")),
     )
@@ -62,7 +55,7 @@ object PreviewData {
         prepTimeMinutes = 15,
         cookTimeMinutes = 20,
         servings = 4,
-        creatorId = user.uuid,
+        creatorId = SharedData.user.uuid,
         tags = emptyList(),
         labels = listOf(Label(generateUuid7(), "Mediterranean")),
     )
