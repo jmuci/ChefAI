@@ -7,7 +7,7 @@ import com.tenmilelabs.chefai.data.source.local.room.AllergenEntity
 import com.tenmilelabs.chefai.data.source.local.room.IngredientEntity
 import com.tenmilelabs.chefai.data.source.local.room.LabelEntity
 import com.tenmilelabs.chefai.data.source.local.room.RecipeEntity
-import com.tenmilelabs.chefai.data.source.local.room.RecipeIngredientCrossRef
+import com.tenmilelabs.chefai.data.source.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.data.source.local.room.RecipeLabelCrossRef
 import com.tenmilelabs.chefai.data.source.local.room.RecipeStepEntity
 import com.tenmilelabs.chefai.data.source.local.room.RecipeTagCrossRef
@@ -22,7 +22,7 @@ import com.tenmilelabs.chefai.data.source.local.room.UuidConverters
         IngredientEntity::class,
         LabelEntity::class,
         RecipeEntity::class,
-        RecipeIngredientCrossRef::class,
+        RecipeIngredientEntity::class,
         RecipeLabelCrossRef::class,
         RecipeStepEntity::class,
         RecipeTagCrossRef::class,

@@ -137,3 +137,54 @@ INSERT INTO `recipe_tags` (`recipeId`, `tagId`, `updatedAt`, `deletedAt`, `syncS
 (X'44444444444444444444444444444444', X'A89E0F1AB2C34DFDA56A8B9C0D1E2F3A', 1672531200, null, 'SYNCED'),
 (X'44444444444444444444444444444444', X'D12B3C4DE5F64A1ED89D1E2F3A4B5C6D', 1672531200, null, 'SYNCED'),
 (X'55555555555555555555555555555555', X'B90F1A2BC3D44EFCB67B9C0D1E2F3A4B', 1672531200, null, 'SYNCED');
+
+
+-- Allergens
+INSERT INTO `allergens` (`uuid`, `displayName`, `updatedAt`, `deletedAt`, `syncState`) VALUES
+(X'1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A', 'Gluten', 1672531200, null, 'SYNCED'),
+(X'1B1B1B1B1B1B1B1B1B1B1B1B1B1B1B1B', 'Crustaceans', 1672531200, null, 'SYNCED'),
+(X'1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C', 'Eggs', 1672531200, null, 'SYNCED'),
+(X'1D1D1D1D1D1D1D1D1D1D1D1D1D1D1D1D', 'Fish', 1672531200, null, 'SYNCED'),
+(X'1E1E1E1E1E1E1E1E1E1E1E1E1E1E1E1E', 'Peanuts', 1672531200, null, 'SYNCED'),
+(X'1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F', 'Soybeans', 1672531200, null, 'SYNCED'),
+(X'2A2A2A2A2A2A2A2A2A2A2A2A2A2A2A2A', 'Milk', 1672531200, null, 'SYNCED'),
+(X'2B2B2B2B2B2B2B2B2B2B2B2B2B2B2B2B', 'Nuts', 1672531200, null, 'SYNCED');
+
+
+-- Source Classifications
+INSERT INTO `source_classifications` (`uuid`, `category`, `subcategory`, `updatedAt`, `deletedAt`, `syncState`) VALUES
+(X'3A3A3A3A3A3A3A3A3A3A3A3A3A3A3A3A', 'Produce', 'Fruit', 1672531200, null, 'SYNCED'),
+(X'3B3B3B3B3B3B3B3B3B3B3B3B3B3B3B3B', 'Produce', 'Vegetable', 1672531200, null, 'SYNCED'),
+(X'3C3C3C3C3C3C3C3C3C3C3C3C3C3C3C3C', 'Protein', 'Meat', 1672531200, null, 'SYNCED'),
+(X'3D3D3D3D3D3D3D3D3D3D3D3D3D3D3D3D', 'Protein', 'Poultry', 1672531200, null, 'SYNCED'),
+(X'3E3E3E3E3E3E3E3E3E3E3E3E3E3E3E3E', 'Protein', 'Seafood', 1672531200, null, 'SYNCED'),
+(X'3F3F3F3F3F3F3F3F3F3F3F3F3F3F3F3F', 'Dairy', null, 1672531200, null, 'SYNCED'),
+(X'4A4A4A4A4A4A4A4A4A4A4A4A4A4A4A4A', 'Pantry', 'Spices & Seasonings', 1672531200, null, 'SYNCED'),
+(X'4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B', 'Pantry', 'Oils & Fats', 1672531200, null, 'SYNCED'),
+(X'4C4C4C4C4C4C4C4C4C4C4C4C4C4C4C4C', 'Pantry', 'Grains, Pasta & Legumes', 1672531200, null, 'SYNCED');
+
+-- Update Ingredients with Allergens and Sources
+UPDATE `ingredients` SET `allergenId` = X'1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A' WHERE `displayName` = 'Spaghetti';
+UPDATE `ingredients` SET `sourcePrimaryId` = X'4C4C4C4C4C4C4C4C4C4C4C4C4C4C4C4C' WHERE `displayName` = 'Spaghetti';
+UPDATE `ingredients` SET `sourcePrimaryId` = X'3C3C3C3C3C3C3C3C3C3C3C3C3C3C3C3C' WHERE `displayName` = 'Guanciale';
+UPDATE `ingredients` SET `allergenId` = X'1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C' WHERE `displayName` = 'Eggs';
+UPDATE `ingredients` SET `sourcePrimaryId` = X'3D3D3D3D3D3D3D3D3D3D3D3D3D3D3D3D' WHERE `displayName` = 'Eggs';
+UPDATE `ingredients` SET `allergenId` = X'2A2A2A2A2A2A2A2A2A2A2A2A2A2A2A2A' WHERE `displayName` = 'Pecorino Romano Cheese';
+UPDATE `ingredients` SET `sourcePrimaryId` = X'3F3F3F3F3F3F3F3F3F3F3F3F3F3F3F3F' WHERE `displayName` = 'Pecorino Romano Cheese';
+UPDATE `ingredients` SET `sourcePrimaryId` = X'4A4A4A4A4A4A4A4A4A4A4A4A4A4A4A4A' WHERE `displayName` = 'Black Pepper';
+UPDATE `ingredients` SET `sourcePrimaryId` = X'3D3D3D3D3D3D3D3D3D3D3D3D3D3D3D3D' WHERE `displayName` = 'Chicken Breast';
+UPDATE `ingredients` SET `sourcePrimaryId` = X'3B3B3B3B3B3B3B3B3B3B3B3B3B3B3B3B' WHERE `displayName` = 'Broccoli';
+UPDATE `ingredients` SET `sourcePrimaryId` = X'3B3B3B3B3B3B3B3B3B3B3B3B3B3B3B3B' WHERE `displayName` = 'Garlic';
+UPDATE `ingredients` SET `sourcePrimaryId` = X'4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B' WHERE `displayName` = 'Olive Oil';
+UPDATE `ingredients` SET `allergenId` = X'1D1D1D1D1D1D1D1D1D1D1D1D1D1D1D1D' WHERE `displayName` = 'Salmon Fillet';
+UPDATE `ingredients` SET `sourcePrimaryId` = X'3E3E3E3E3E3E3E3E3E3E3E3E3E3E3E3E' WHERE `displayName` = 'Salmon Fillet';
+UPDATE `ingredients` SET `sourcePrimaryId` = X'3A3A3A3A3A3A3A3A3A3A3A3A3A3A3A3A' WHERE `displayName` = 'Lemon';
+UPDATE `ingredients` SET `sourcePrimaryId` = X'3B3B3B3B3B3B3B3B3B3B3B3B3B3B3B3B' WHERE `displayName` = 'Dill';
+UPDATE `ingredients` SET `sourcePrimaryId` = X'3C3C3C3C3C3C3C3C3C3C3C3C3C3C3C3C' WHERE `displayName` = 'Beef Mince';
+UPDATE `ingredients` SET `sourcePrimaryI d` = X'3B3B3B3B3B3B3B3B3B3B3B3B3B3B3B3B' WHERE `displayName` = 'Onion';
+UPDATE `ingredients` SET `sourcePrimaryId` = X'3B3B3B3B3B3B3B3B3B3B3B3B3B3B3B3B' WHERE `displayName` = 'Tomatoes';
+UPDATE `ingredients` SET `sourcePrimaryId` = X'4C4C4C4C4C4C4C4C4C4C4C4C4C4C4C4C' WHERE `displayName` = 'Kidney Beans';
+UPDATE `ingredients` SET `sourcePrimaryId` = X'4A4A4A4A4A4A4A4A4A4A4A4A4A4A4A4A' WHERE `displayName` = 'Chilli Powder';
+UPDATE `ingredients` SET `sourcePrimaryId` = X'3A3A3A3A3A3A3A3A3A3A3A3A3A3A3A3A' WHERE `displayName` = 'Avocado';
+UPDATE `ingredients` SET `sourcePrimaryId` = X'3B3B3B3B3B3B3B3B3B3B3B3B3B3B3B3B' WHERE `displayName` = 'Coriander';
+UPDATE `ingredients` SET `sourcePrimaryId` = X'3A3A3A3A3A3A3A3A3A3A3A3A3A3A3A3A' WHERE `displayName` = 'Lime';

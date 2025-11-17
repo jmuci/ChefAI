@@ -17,7 +17,6 @@ data class SourceClassificationEntity(
     @PrimaryKey override val uuid: UUID,
     val category: String,      // e.g. "Animal", "Plant", "Fungal"
     val subcategory: String?,   // e.g. "Fish", "Meat", "Egg", "Legume"
-
     override val updatedAt: Long,
     override val deletedAt: Long?,
     override val syncState: SyncState = SyncState.PENDING
