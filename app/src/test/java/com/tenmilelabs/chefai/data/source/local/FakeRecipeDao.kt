@@ -3,7 +3,7 @@ package com.tenmilelabs.chefai.data.source.local
 import com.tenmilelabs.chefai.data.source.local.room.IngredientEntity
 import com.tenmilelabs.chefai.data.source.local.room.LabelEntity
 import com.tenmilelabs.chefai.data.source.local.room.RecipeEntity
-import com.tenmilelabs.chefai.data.source.local.room.RecipeIngredientEntity
+import com.tenmilelabs.chefai.data.source.local.room.RecipeIngredientCrossRef
 import com.tenmilelabs.chefai.data.source.local.room.RecipeLabelCrossRef
 import com.tenmilelabs.chefai.data.source.local.room.RecipeStepEntity
 import com.tenmilelabs.chefai.data.source.local.room.RecipeTagCrossRef
@@ -31,7 +31,7 @@ class FakeRecipeDao : RecipeDao {
     private val labels = mutableMapOf<UUID, LabelEntity>()
     private val tags = mutableMapOf<UUID, TagEntity>()
     private val steps = mutableMapOf<UUID, RecipeStepEntity>()
-    private val recipeIngredients = mutableListOf<RecipeIngredientEntity>()
+    private val recipeIngredients = mutableListOf<RecipeIngredientCrossRef>()
     private val recipeLabels = mutableListOf<RecipeLabelCrossRef>()
     private val recipeTags = mutableListOf<RecipeTagCrossRef>()
 
@@ -45,7 +45,7 @@ class FakeRecipeDao : RecipeDao {
         labels: List<LabelEntity> = emptyList(),
         tags: List<TagEntity> = emptyList(),
         steps: List<RecipeStepEntity> = emptyList(),
-        recipeIngredients: List<RecipeIngredientEntity> = emptyList(),
+        recipeIngredients: List<RecipeIngredientCrossRef> = emptyList(),
         recipeLabels: List<RecipeLabelCrossRef> = emptyList(),
         recipeTags: List<RecipeTagCrossRef> = emptyList()
     ) {
