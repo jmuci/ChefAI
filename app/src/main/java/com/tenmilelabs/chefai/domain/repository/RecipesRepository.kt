@@ -6,7 +6,6 @@ import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
 interface RecipesRepository {
-    suspend fun getRecipes(): List<Recipe>
     fun getRecipesStream(): Flow<List<Recipe>>
 
     fun getRecipesPreviewStream(): Flow<List<RecipePreview>>
