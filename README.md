@@ -17,7 +17,7 @@ This project is still under development.
 See the [docs folder](docs/)
 
 ## Overall architecture
-![architecture diagram](docs/img/architecture.png)
+![architecture diagram](docs/img/ChefAI-Architecure.png)
 
 
 🏗️ Architecture Overview

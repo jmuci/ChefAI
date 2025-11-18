@@ -3,7 +3,7 @@ package com.tenmilelabs.chefai.ui.recipes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.R
-import com.tenmilelabs.chefai.domain.model.Recipe
+import com.tenmilelabs.chefai.domain.model.RecipePreview
 import com.tenmilelabs.chefai.domain.repository.RecipesRepository
 import com.tenmilelabs.chefai.util.Async
 import com.tenmilelabs.chefai.util.WhileUiSubscribed
@@ -22,7 +22,7 @@ import javax.inject.Inject
  * UiState for the task list screen.
  */
 data class RecipesUiState(
-    val items: List<Recipe> = emptyList(),
+    val items: List<RecipePreview> = emptyList(),
     val isLoading: Boolean = false,
     val userMessage: Int? = null,
 )
@@ -34,9 +34,9 @@ class RecipesViewModel @Inject constructor(
 
     private val _isLoading = MutableStateFlow(false)
     private val _userMessage: MutableStateFlow<Int?> = MutableStateFlow(null)
-    private val _recipesAsync = recipesRepository.getRecipesStream()
+    private val _recipesAsync = recipesRepository.getRecipesPreviewStream()
         .map { Async.Success(it) }
-        .catch<Async<List<Recipe>>> { e ->
+        .catch<Async<List<RecipePreview>>> { e ->
             if (e is CancellationException) throw e
             emit(Async.Error(R.string.loading_recipes_error))
         }

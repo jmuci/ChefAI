@@ -5,6 +5,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
 import com.tenmilelabs.chefai.data.source.local.room.RecipeEntity
+import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeWithDetails
 import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeWithLabels
 import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeWithTags
@@ -19,6 +20,23 @@ interface RecipeDao {
 
     @Query("SELECT * FROM recipes WHERE creatorId = :creatorId")
     fun observeAllRecipesForUser(creatorId: UUID): Flow<List<RecipeEntity>>
+
+    @Query("""
+        SELECT
+            ri.ingredientId AS ingredientId,
+            i.displayName AS ingredientDisplayName,
+            ri.quantity AS quantity,
+            ri.unit AS unit,
+            a.displayName AS allergenName,
+            s.category AS srcCategory,
+            s.subcategory AS srcSubcategory
+        FROM recipe_ingredients AS ri
+        INNER JOIN ingredients AS i ON ri.ingredientId = i.uuid
+        LEFT JOIN allergens AS a ON i.allergenId = a.uuid
+        LEFT JOIN source_classifications AS s ON i.sourcePrimaryId = s.uuid
+        WHERE ri.recipeId = :recipeId
+    """)
+    fun observeIngredientsForRecipe(recipeId: UUID): Flow<List<RecipeIngredient>>
 
     @Query("SELECT * FROM recipes WHERE uuid = :uuid")
     suspend fun getRecipeById(uuid: UUID): RecipeEntity?

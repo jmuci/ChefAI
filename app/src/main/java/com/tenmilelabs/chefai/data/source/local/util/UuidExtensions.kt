@@ -23,3 +23,11 @@ fun ByteArray.toUuid(): UUID {
     val low = buffer.long
     return UUID(high, low)
 }
+
+// Utility method used for testing and previews mainly.
+fun String.decodeHex(): ByteArray {
+    require(length % 2 == 0) { "Hex string must have an even length" }
+    return chunked(2)
+        .map { it.toInt(16).toByte() }
+        .toByteArray()
+}

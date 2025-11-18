@@ -1,43 +1,58 @@
 package com.tenmilelabs.chefai.ui.recipeDetails
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.LinkAnnotation
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLinkStyles
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.tenmilelabs.chefai.R
-import com.tenmilelabs.chefai.domain.model.Label
+import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.domain.model.Recipe
-import com.tenmilelabs.chefai.domain.model.User
-import com.tenmilelabs.chefai.ui.components.RecipeTimeAndLabelRow
+import com.tenmilelabs.chefai.domain.model.RecipeStep
+import com.tenmilelabs.chefai.ui.components.InfoChip
+import com.tenmilelabs.chefai.ui.components.InfoChipType
+import com.tenmilelabs.chefai.ui.components.RecipeTimeRow
+import com.tenmilelabs.chefai.ui.preview.RecipeData
 import com.tenmilelabs.chefai.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.util.EmptyContent
 import com.tenmilelabs.chefai.util.LoadingContent
+import com.tenmilelabs.chefai.util.MathUtils
+import kotlinx.coroutines.launch
 import timber.log.Timber
-import java.util.UUID
 
 
 @Composable
@@ -65,89 +80,144 @@ fun RecipeDetailsScreen(
     uiState.userMessage?.let { message ->
         val snackbarText = stringResource(message)
         LaunchedEffect(snackbarHostState, viewModel, message, snackbarText) {
-            snackbarHostState.showSnackbar(message = snackbarText,  duration = SnackbarDuration.Short)
+            snackbarHostState.showSnackbar(
+                message = snackbarText,
+                duration = SnackbarDuration.Short
+            )
             viewModel.snackbarMessageShown()
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun RecipeDetailsContent(
     recipe: Recipe,
 ) {
+    val tabTitles = listOf(stringResource(R.string.ingredients), stringResource(R.string.steps))
+    val pagerState = rememberPagerState { tabTitles.size }
+    val coroutineScope = rememberCoroutineScope()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(dimensionResource(id = R.dimen.padding_medium)),
     ) {
-        Text(
-            text = recipe.title,
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.onPrimaryContainer
-        )
-        AsyncImage(
-            model = recipe.imageUrl,
-            placeholder = painterResource(R.drawable.ic_img_placeholder),
-            error = painterResource(R.drawable.ic_img_error),
-            contentDescription = stringResource(R.string.recipe_image_content_description),
-            contentScale = ContentScale.Crop,
-            alignment = Alignment.Center,
-            modifier = Modifier
-                .padding(vertical = dimensionResource(id = R.dimen.padding_small))
-                .height(200.dp)
-        )
-        //TODO support multiple labels
-        RecipeTimeAndLabelRow(recipe.prepTimeMinutes, recipe.labels.first().displayName)
-        Text(
-            text = stringResource(R.string.recipe_steps),
-            style = MaterialTheme.typography.titleMedium
-        )
-        Text(
-            text = recipe.description,
-        )
-        Text(
-            buildAnnotatedString {
-                withLink(
-                    LinkAnnotation.Url(
-                        recipe.recipeExternalUrl ?: "", // TODO hide field if null URL
-                        TextLinkStyles(style = SpanStyle(color = Color.Blue))
-                    )
-                ) {
-                    append(stringResource(R.string.recipe_hyperlink))
+        Column(modifier = Modifier.padding(horizontal = dimensionResource(id = R.dimen.padding_medium))) {
+            Text(
+                text = recipe.title,
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.padding(top = dimensionResource(id = R.dimen.padding_medium))
+            )
+            AsyncImage(
+                model = recipe.imageUrl,
+                placeholder = painterResource(R.drawable.ic_img_placeholder),
+                error = painterResource(R.drawable.ic_img_error),
+                contentDescription = stringResource(R.string.recipe_image_content_description),
+                contentScale = ContentScale.Crop,
+                alignment = Alignment.Center,
+                modifier = Modifier
+                    .padding(vertical = dimensionResource(id = R.dimen.padding_small))
+                    .height(200.dp)
+                    .fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_small)))
+            RecipeTimeRow(recipe.prepTimeMinutes, recipe.cookTimeMinutes)
+            Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_small)))
+
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_extra_small)),
+                verticalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_extra_small))
+            ) {
+                recipe.labels.forEach { label ->
+                    InfoChip(text = label.displayName, type = InfoChipType.LABEL)
+                }
+                recipe.tags.forEach { tag ->
+                    InfoChip(text = tag.displayName, type = InfoChipType.TAG)
                 }
             }
-        )
+            Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_medium)))
+        }
+
+        TabRow(selectedTabIndex = pagerState.currentPage) {
+            tabTitles.forEachIndexed { index, title ->
+                Tab(
+                    selected = pagerState.currentPage == index,
+                    onClick = {
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(index)
+                        }
+                    },
+                    text = { Text(text = title) }
+                )
+            }
+        }
+
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
+            verticalAlignment = Alignment.Top
+        ) { page ->
+            when (page) {
+                0 -> IngredientsList(ingredients = recipe.ingredients)
+                1 -> StepsList(steps = recipe.steps)
+            }
+        }
+    }
+}
+
+@Composable
+fun IngredientsList(ingredients: List<RecipeIngredient>) {
+    LazyColumn(contentPadding = PaddingValues(all = dimensionResource(id = R.dimen.padding_medium))) {
+        items(ingredients) { ingredient ->
+            Row() {
+                Text(
+                    text = ingredient.ingredientDisplayName,
+                    modifier = Modifier
+                        .padding(vertical = dimensionResource(id = R.dimen.padding_small)),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = MathUtils.removeTrailingZeros(ingredient.quantity.toString()) + " " + ingredient.unit,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = dimensionResource(id = R.dimen.padding_small)),
+                    textAlign = TextAlign.End,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
+            HorizontalDivider()
+        }
+    }
+}
+
+@Composable
+fun StepsList(steps: List<RecipeStep>) {
+    LazyColumn(contentPadding = PaddingValues(all = dimensionResource(id = R.dimen.padding_medium))) {
+        items(steps.sortedBy { it.orderIndex }) { step ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = dimensionResource(id = R.dimen.padding_medium)),
+                verticalAlignment = Alignment.Top
+            ) {
+                Text(
+                    text = "${step.orderIndex}.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(end = dimensionResource(id = R.dimen.padding_small))
+                )
+                Text(text = step.instruction, style = MaterialTheme.typography.bodyLarge)
+            }
+            HorizontalDivider()
+        }
     }
 }
 
 @Preview(showBackground = true)
 @Composable
 fun RecipeDetailsFullScreenPreview() {
-    val previewUser = User(
-        uuid = UUID.randomUUID(),
-        displayName = "Preview User",
-        email = "user@preview.com",
-        avatarUrl = null
-    )
     ChefAITheme {
-        RecipeDetailsContent(
-            Recipe(
-                uuid = UUID.randomUUID(),
-                title = "Delicious Grilled Chicken",
-                description = "A very tasty and easy to make grilled chicken recipe. Perfect for a summer barbecue. Follow the steps carefully for the best results.",
-                imageUrl = "https://via.placeholder.com/200",
-                imageUrlThumbnail = "https://via.placeholder.com/200",
-                prepTimeMinutes = 15,
-                cookTimeMinutes = 20,
-                servings = 4,
-                creator = previewUser,
-                recipeExternalUrl = "https://example.com/grilled-chicken",
-                ingredients = emptyList(),
-                steps = emptyList(),
-                tags = emptyList(),
-                labels = listOf(Label(UUID.randomUUID(), "Grill")),
-                updatedAt = System.currentTimeMillis()
-            )
-        )
+        RecipeDetailsContent(RecipeData.recipe)
     }
 }

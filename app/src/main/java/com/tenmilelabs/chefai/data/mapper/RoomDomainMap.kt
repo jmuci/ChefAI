@@ -9,11 +9,13 @@ import com.tenmilelabs.chefai.data.source.local.room.SourceClassificationEntity
 import com.tenmilelabs.chefai.data.source.local.room.TagEntity
 import com.tenmilelabs.chefai.data.source.local.room.UserEntity
 import com.tenmilelabs.chefai.data.source.local.room.relations.IngredientWithDetails
+import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeWithDetails
 import com.tenmilelabs.chefai.domain.model.Allergen
 import com.tenmilelabs.chefai.domain.model.Ingredient
 import com.tenmilelabs.chefai.domain.model.Label
 import com.tenmilelabs.chefai.domain.model.Recipe
+import com.tenmilelabs.chefai.domain.model.RecipePreview
 import com.tenmilelabs.chefai.domain.model.RecipeStep
 import com.tenmilelabs.chefai.domain.model.SourceClassification
 import com.tenmilelabs.chefai.domain.model.Tag
@@ -23,7 +25,7 @@ import com.tenmilelabs.chefai.domain.model.User
  * Maps Room database entities to domain models.
  */
 
-fun RecipeWithDetails.toDomain(): Recipe {
+fun RecipeWithDetails.toDomain(ingredients: List<RecipeIngredient> = emptyList()): Recipe {
     return Recipe(
         uuid = recipe.uuid,
         title = recipe.title,
@@ -35,7 +37,7 @@ fun RecipeWithDetails.toDomain(): Recipe {
         servings = recipe.servings,
         creator = creator.toDomain(),
         recipeExternalUrl = recipe.recipeExternalUrl,
-        ingredients = ingredients.map { it.toDomain() },
+        ingredients = ingredients,
         steps = steps.map { it.toDomain() },
         tags = tags.map { it.toDomain() },
         labels = labels.map { it.toDomain() },
@@ -43,7 +45,27 @@ fun RecipeWithDetails.toDomain(): Recipe {
     )
 }
 
+@JvmName("toFullRecipeDomain")
 fun List<RecipeWithDetails>.toDomain() = map(RecipeWithDetails::toDomain)
+
+fun RecipeWithDetails.toPreviewDomain(): RecipePreview {
+    return RecipePreview(
+        uuid = recipe.uuid,
+        title = recipe.title,
+        description = recipe.description,
+        imageUrlThumbnail = recipe.imageUrlThumbnail,
+        prepTimeMinutes = recipe.prepTimeMinutes,
+        cookTimeMinutes = recipe.cookTimeMinutes,
+        servings = recipe.servings,
+        creatorId = creator.uuid,
+        tags = tags.map { it.toDomain() },
+        labels = labels.map { it.toDomain() },
+    )
+}
+
+@JvmName("toRecipePreviewDomain")
+fun List<RecipeWithDetails>.toRecipePreviewDomain() = map(RecipeWithDetails::toPreviewDomain)
+
 fun UserEntity.toDomain(): User = User(
     uuid = uuid,
     displayName = displayName,

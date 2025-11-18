@@ -6,9 +6,7 @@ import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.data.FakeRecipesRepository
 import com.tenmilelabs.chefai.testData.recipe1
-import com.tenmilelabs.chefai.testData.recipe2
 import com.tenmilelabs.chefai.testData.recipeId1
-import com.tenmilelabs.chefai.testData.recipeId2
 import com.tenmilelabs.chefai.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.ui.recipeDetails.RecipeDetailsViewModel
 import com.tenmilelabs.chefai.util.MainCoroutineRule
@@ -32,7 +30,7 @@ class RecipeDetailsViewModelTest {
     fun setup() {
         recipesRepository = FakeRecipesRepository()
         savedStateHandle = SavedStateHandle().apply {
-            set(AppDestinationArgs.RECIPE_ID_ARG, recipeId1)
+            set(AppDestinationArgs.RECIPE_ID_ARG, recipeId1.toString())
         }
         // ViewModel is re-initialized for each test to ensure clean state
     }
