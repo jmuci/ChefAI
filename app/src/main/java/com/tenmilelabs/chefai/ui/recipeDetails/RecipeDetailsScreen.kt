@@ -15,6 +15,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
@@ -137,6 +139,10 @@ fun RecipeDetailsContent(
                 }
             }
             Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_medium)))
+            if (!recipe.description.isEmpty()) {
+                RecipeDescription(recipe.description)
+                Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_medium)))
+            }
         }
 
         TabRow(selectedTabIndex = pagerState.currentPage) {
@@ -163,6 +169,23 @@ fun RecipeDetailsContent(
                 1 -> StepsList(steps = recipe.steps)
             }
         }
+    }
+}
+
+@Composable
+private fun RecipeDescription(description: String) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = dimensionResource(id = R.dimen.padding_medium)),
+        colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_medium))
+        )
     }
 }
 

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -46,9 +47,13 @@ fun RecipeListCard(
 ) {
     Card(
         modifier = Modifier
-            .padding(dimensionResource(id = R.dimen.padding_small))
-            .height(120.dp), // Fixed height for the card
-        colors = CardDefaults.cardColors(MaterialTheme.colorScheme.primaryContainer),
+            .padding(horizontal = dimensionResource(id = R.dimen.padding_small))
+            .height(dimensionResource(id = R.dimen.recipe_card_height))
+            .fillMaxWidth(),
+        colors = CardDefaults.cardColors(MaterialTheme.colorScheme.secondaryContainer),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = dimensionResource(id = R.dimen.padding_extra_small)
+        ),
         onClick = { navigateToDetail(recipe.uuid) }
     ) {
         Row(
@@ -79,12 +84,10 @@ fun RecipeListCard(
                     text = recipe.title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-
-                Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_small)))
 
                 RecipeTimeRow(
                     prepTime = recipe.prepTimeMinutes,
@@ -93,15 +96,26 @@ fun RecipeListCard(
 
                 Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_small)))
 
+                Text(
+                    text = recipe.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_extra_small)))
+
+                Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_small)))
+
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_extra_small)),
-                    verticalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_extra_small))
+                    verticalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_extra_small)),
+                    maxLines = 1
                 ) {
                     recipe.labels.take(3).forEach { label ->
                         InfoChip(text = label.displayName, type = InfoChipType.LABEL)
-                    }
-                    recipe.tags.take(3).forEach { tag ->
-                        InfoChip(text = tag.displayName, type = InfoChipType.TAG)
                     }
                 }
             }
