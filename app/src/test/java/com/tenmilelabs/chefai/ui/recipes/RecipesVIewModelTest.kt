@@ -68,8 +68,6 @@ class RecipesViewModelTest {
             assertThat(successState.isLoading).isFalse()
             assertThat(successState.items).isEqualTo(TEST_DOMAIN_RECIPE_PREVIEWS_LIST)
             assertThat(successState.items).hasSize(3)
-            assertThat(successState.userMessage).isEqualTo(R.string.loading_recipes_success)
-
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -86,7 +84,6 @@ class RecipesViewModelTest {
             val emptyState = awaitItem()
             assertThat(emptyState.isLoading).isFalse()
             assertThat(emptyState.items).isEmpty()
-            assertThat(emptyState.userMessage).isEqualTo(R.string.loading_recipes_success)
 
             cancelAndIgnoreRemainingEvents()
         }
@@ -114,13 +111,13 @@ class RecipesViewModelTest {
     fun `snackbarMessageShown does not affect state in current implementation`() = runTest {
         // Note: snackbarMessageShown() sets _userMessage but it's not actually used in combine
         // The userMessage in the state is hardcoded based on Success/Error states
-        recipesRepository.setRecipePreviewsToEmit(TEST_DOMAIN_RECIPE_PREVIEWS_LIST)
+        recipesRepository.setShouldReturnErrorForGetRecipes(true)
 
         initializeViewModel()
 
         viewModel.uiState.test {
-            val successState = awaitItem()
-            assertThat(successState.userMessage).isEqualTo(R.string.loading_recipes_success)
+            val errorState = awaitItem()
+            assertThat(errorState.userMessage).isEqualTo(R.string.loading_recipes_error)
 
             // Call snackbarMessageShown
             viewModel.snackbarMessageShown()
@@ -258,7 +255,6 @@ class RecipesViewModelTest {
 
         successViewModel.uiState.test {
             val successState = awaitItem()
-            assertThat(successState.userMessage).isEqualTo(R.string.loading_recipes_success)
             assertThat(successState.items).hasSize(3)
 
             cancelAndIgnoreRemainingEvents()
@@ -343,27 +339,6 @@ class RecipesViewModelTest {
 
             recipesRepository.setRecipePreviewsToEmit(TEST_DOMAIN_RECIPE_PREVIEWS_LIST)
             assertThat(awaitItem().items).hasSize(3)
-
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun `success state always includes success message`() = runTest {
-        recipesRepository.setRecipePreviewsToEmit(TEST_DOMAIN_RECIPE_PREVIEWS_LIST)
-
-        initializeViewModel()
-
-        viewModel.uiState.test {
-            val state = awaitItem()
-            assertThat(state.userMessage).isEqualTo(R.string.loading_recipes_success)
-            assertThat(state.items).isNotEmpty()
-
-            // Emit new data - should still have success message
-            recipesRepository.setRecipePreviewsToEmit(listOf(recipePreview1))
-
-            val updatedState = awaitItem()
-            assertThat(updatedState.userMessage).isEqualTo(R.string.loading_recipes_success)
 
             cancelAndIgnoreRemainingEvents()
         }
