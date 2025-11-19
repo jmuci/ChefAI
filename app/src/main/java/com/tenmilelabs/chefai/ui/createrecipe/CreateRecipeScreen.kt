@@ -31,6 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -67,10 +69,10 @@ import java.util.UUID
 fun CreateRecipeScreen(
     onNavigateBack: () -> Unit,
     onRecipeCreated: () -> Unit,
+    snackbarHostState: SnackbarHostState,
     viewModel: CreateRecipeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
 
     // Image picker launcher
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -79,13 +81,19 @@ fun CreateRecipeScreen(
         viewModel.onImageSelected(uri?.toString())
     }
 
-    // Show error snackbar
-    LaunchedEffect(uiState.saveError) {
-        uiState.saveError?.let { error ->
-            snackbarHostState.showSnackbar(error)
+    // Check for user messages to display on the screen
+    uiState.saveError?.let { message ->
+        val snackBarText = stringResource(R.string.snackbar_save_error)
+        LaunchedEffect(snackbarHostState, viewModel, message, snackBarText) {
+            snackbarHostState.showSnackbar(
+                message = snackBarText,
+                duration = SnackbarDuration.Short
+            )
             viewModel.clearError()
         }
     }
+    val focusManager = LocalFocusManager.current
+
     Column() {
         ActionBar(
             saveButtonOnCLick = {
@@ -96,6 +104,7 @@ fun CreateRecipeScreen(
                     email = "user@example.com",
                     avatarUrl = null
                 )
+                focusManager.clearFocus()
                 viewModel.saveRecipe(mockUser, onRecipeCreated)
             },
             saveButtonEnabled = uiState.isFormValid && !uiState.isSaving,
