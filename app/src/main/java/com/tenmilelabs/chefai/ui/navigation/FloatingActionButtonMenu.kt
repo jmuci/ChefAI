@@ -32,8 +32,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.tenmilelabs.chefai.R
 
 @Composable
 fun FloatingActionButtonMenu(
@@ -48,6 +50,11 @@ fun FloatingActionButtonMenu(
         targetValue = if (expanded) 45f else 0f,
         label = "FAB rotation"
     )
+    val fabContentDescription = if (expanded) {
+        stringResource(id = R.string.fab_close_menu_content_description)
+    } else {
+        stringResource(id = R.string.fab_open_menu_content_description)
+    }
 
     Box(modifier = modifier) {
         Column(
@@ -68,14 +75,14 @@ fun FloatingActionButtonMenu(
                     FabMenuItem(
                         onClick = onImportRecipeClick,
                         icon = Icons.Default.Download,
-                        label = "Import Recipe"
+                        label = stringResource(id = R.string.fab_import_recipe)
                     )
 
                     // Create Recipe option
                     FabMenuItem(
                         onClick = onCreateRecipeClick,
                         icon = Icons.Default.Create,
-                        label = "Create Recipe"
+                        label = stringResource(id = R.string.fab_create_recipe)
                     )
                 }
             }
@@ -90,7 +97,7 @@ fun FloatingActionButtonMenu(
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
-                    contentDescription = if (expanded) "Close menu" else "Open menu",
+                    contentDescription = fabContentDescription,
                     modifier = Modifier.rotate(rotation)
                 )
             }
