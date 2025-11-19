@@ -3,6 +3,7 @@
     <string name="app_dest_title_meal_plans">Meal Plans</string>
     <string name="app_dest_title_recipe_details">Recipe Details</string>
     <string name="app_dest_title_recipes">Recipes</string>
+    <string name="app_dest_title_create_recipe">Create Recipe</string>
     <string name="app_dest_title_settings">Settings</string>
     <string name="app_name">ChefAI</string>
     <string name="create_recipe_action_label">Recipe creation coming soon</string>

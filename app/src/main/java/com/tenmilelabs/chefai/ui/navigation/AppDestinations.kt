@@ -15,6 +15,7 @@ private object ScreenBaseRoutes {
     const val MEAL_PLANS = "meal_plans_screen"
     const val RECIPES = "recipes_screen"
     const val RECIPE_DETAILS = "recipe_details_screen"
+    const val CREATE_RECIPE = "create_recipe_screen"
     const val SETTINGS = "settings_screen"
 }
 
@@ -39,6 +40,7 @@ enum class AppDestinations(
         R.string.app_dest_title_recipe_details,
         "${ScreenBaseRoutes.RECIPE_DETAILS}/{$RECIPE_ID_ARG}"
     ),
+    CREATE_RECIPE(R.string.app_dest_title_create_recipe, ScreenBaseRoutes.CREATE_RECIPE),
     SETTINGS(R.string.app_dest_title_settings, ScreenBaseRoutes.SETTINGS),
 }
 
@@ -51,4 +53,7 @@ class NavigationActions(private val navController: NavHostController) {
         navController.navigate("$RECIPE_DETAILS/$recipeId")
     }
 
+    fun navigateToCreateRecipe() {
+        navController.navigate(ScreenBaseRoutes.CREATE_RECIPE)
+    }
 }
