@@ -1,6 +1,5 @@
 package com.tenmilelabs.chefai.ui.preview
 
-import com.tenmilelabs.chefai.domain.model.Label
 import com.tenmilelabs.chefai.domain.model.Recipe
 import java.util.UUID
 

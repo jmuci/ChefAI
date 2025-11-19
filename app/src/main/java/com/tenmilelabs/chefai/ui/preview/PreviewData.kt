@@ -4,8 +4,6 @@ import com.tenmilelabs.chefai.data.source.local.util.generateUuid7
 import com.tenmilelabs.chefai.domain.model.Label
 import com.tenmilelabs.chefai.domain.model.RecipePreview
 import com.tenmilelabs.chefai.domain.model.Tag
-import com.tenmilelabs.chefai.domain.model.User
-import java.util.UUID
 
 object PreviewData {
     val recipePreview = RecipePreview(

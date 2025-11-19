@@ -5,7 +5,12 @@
     <string name="app_dest_title_recipes">Recipes</string>
     <string name="app_dest_title_settings">Settings</string>
     <string name="app_name">ChefAI</string>
+    <string name="create_recipe_action_label">Recipe creation coming soon</string>
+    <string name="fab_create_recipe">Create recipe</string>
+    <string name="fab_open_menu_content_description">Open recipe actions</string>
+    <string name="fab_close_menu_content_description">Close recipe actions</string>
     <string name="home_screen_title">Home</string>
+    <string name="import_recipe_action_label">Recipe import coming soon</string>
     <string name="ingredients">Ingredients
 </string>
     <string name="loading_recipe_details_error">Failed to load recipe details</string>
@@ -23,6 +28,12 @@
     <string name="recipe_not_found_error_subtitle">Oops! This was not supposed to happen. Please navigate back and try again later.</string>
     <string name="recipe_steps">Recipe Instructions</string>
     <string name="recipes_screen_title">Recipes</string>
+    <string name="fab_import_recipe">Import recipe</string>
+    <string name="recipes_subtitle">Browse recipes and pick your next meal.</string>
+    <string name="recipes_title">Ready to cook?</string>
+    <string name="ingredient_quantity_format">%1$s %2$s</string>
+    <string name="servings_format">%1$d servings</string>
+    <string name="step_number_format">%1$d.</string>
     <string name="steps">Steps</string>
     <string name="title_home">Home</string>
     <string name="title_meal_plans">Meal Plans</string>
