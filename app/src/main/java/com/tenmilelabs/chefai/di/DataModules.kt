@@ -46,11 +46,23 @@ object DatabaseModules {
     fun provideRecipeDao(database: ChefAIDataBase) = database.recipeDao()
 
     @Provides
+    fun provideRecipeStepDao(database: ChefAIDataBase) = database.recipeStepDao()
+
+    @Provides
+    fun provideRecipeIngredientDao(database: ChefAIDataBase) = database.recipeIngredientDao()
+
+    @Provides
     fun provideIngredientDao(database: ChefAIDataBase) = database.ingredientDao()
 
     @Provides
     fun provideLabelDao(database: ChefAIDataBase) = database.labelDao()
 
     @Provides
+    fun provideRecipeLabelDao(database: ChefAIDataBase) = database.recipeLabelCrossRefDao()
+
+    @Provides
     fun provideTagDao(database: ChefAIDataBase) = database.tagDao()
+
+    @Provides
+    fun provideRecipeTagDao(database: ChefAIDataBase) = database.recipeTagCrossRefDao()
 }

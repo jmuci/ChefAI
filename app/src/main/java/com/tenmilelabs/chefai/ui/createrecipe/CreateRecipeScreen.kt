@@ -51,6 +51,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeIngredient
+import com.tenmilelabs.chefai.data.source.local.util.decodeHex
+import com.tenmilelabs.chefai.data.source.local.util.toUuid
 import com.tenmilelabs.chefai.domain.model.Label
 import com.tenmilelabs.chefai.domain.model.RecipeStep
 import com.tenmilelabs.chefai.domain.model.Tag
@@ -98,10 +100,12 @@ fun CreateRecipeScreen(
         ActionBar(
             saveButtonOnCLick = {
                 // TODO: Get current user from auth/user repository
+                // Using the test user that exists in the database to satisfy foreign key constraint
+                val testUserId = "F47AC10B58CC4372A5670E02B2C3D479".decodeHex().toUuid()
                 val mockUser = User(
-                    uuid = UUID.randomUUID(),
-                    displayName = "Current User",
-                    email = "user@example.com",
+                    uuid = testUserId,
+                    displayName = "Test User",
+                    email = "test.user@example.com",
                     avatarUrl = null
                 )
                 focusManager.clearFocus()

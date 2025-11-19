@@ -4,6 +4,7 @@ import com.tenmilelabs.chefai.data.source.local.room.AllergenEntity
 import com.tenmilelabs.chefai.data.source.local.room.IngredientEntity
 import com.tenmilelabs.chefai.data.source.local.room.LabelEntity
 import com.tenmilelabs.chefai.data.source.local.room.RecipeEntity
+import com.tenmilelabs.chefai.data.source.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.data.source.local.room.RecipeStepEntity
 import com.tenmilelabs.chefai.data.source.local.room.SourceClassificationEntity
 import com.tenmilelabs.chefai.data.source.local.room.TagEntity
@@ -20,6 +21,7 @@ import com.tenmilelabs.chefai.domain.model.RecipeStep
 import com.tenmilelabs.chefai.domain.model.SourceClassification
 import com.tenmilelabs.chefai.domain.model.Tag
 import com.tenmilelabs.chefai.domain.model.User
+import java.util.UUID
 
 /**
  * Maps Room database entities to domain models.
@@ -90,6 +92,7 @@ fun IngredientEntity.toDomain(): Ingredient = Ingredient(
     allergen = null,
     sourcePrimary = null
 )
+
 @JvmName("toIngredientDomain")
 fun List<IngredientEntity>.toDomain() = map(IngredientEntity::toDomain)
 
@@ -140,6 +143,7 @@ fun Recipe.toRoomEntity(): RecipeEntity = RecipeEntity(
     deletedAt = null, // or appropriate value
     syncState = com.tenmilelabs.chefai.data.source.local.util.SyncState.PENDING
 )
+
 fun List<Recipe>.toRoomEntity() = map(Recipe::toRoomEntity)
 
 fun Ingredient.toRoomEntity(): IngredientEntity = IngredientEntity(
@@ -151,3 +155,54 @@ fun Ingredient.toRoomEntity(): IngredientEntity = IngredientEntity(
     deletedAt = null,
     syncState = com.tenmilelabs.chefai.data.source.local.util.SyncState.PENDING
 )
+
+fun Tag.toRoomEntity(): TagEntity = TagEntity(
+    uuid = uuid,
+    displayName = displayName,
+    updatedAt = System.currentTimeMillis(),
+    deletedAt = null,
+    syncState = com.tenmilelabs.chefai.data.source.local.util.SyncState.PENDING
+)
+
+fun Label.toRoomEntity(): LabelEntity = LabelEntity(
+    uuid = uuid,
+    displayName = displayName,
+    updatedAt = System.currentTimeMillis(),
+    deletedAt = null,
+    syncState = com.tenmilelabs.chefai.data.source.local.util.SyncState.PENDING
+)
+
+fun RecipeStep.toRoomEntity(recipeId: UUID): RecipeStepEntity =
+    com.tenmilelabs.chefai.data.source.local.room.RecipeStepEntity(
+        uuid = uuid,
+        recipeId = recipeId,
+        orderIndex = orderIndex,
+        instruction = instruction,
+        updatedAt = System.currentTimeMillis(),
+        deletedAt = null,
+        syncState = com.tenmilelabs.chefai.data.source.local.util.SyncState.PENDING
+    )
+
+fun RecipeIngredient.toRoomEntity(): IngredientEntity = IngredientEntity(
+    uuid = ingredientId,
+    displayName = ingredientDisplayName,
+    allergenId = null, // Not available in RecipeIngredient
+    sourcePrimaryId = null, // Not available in RecipeIngredient
+    updatedAt = System.currentTimeMillis(),
+    deletedAt = null,
+    syncState = com.tenmilelabs.chefai.data.source.local.util.SyncState.PENDING
+)
+
+/**
+ * Converts a RecipeIngredient domain model to a RecipeIngredientEntity cross-reference.
+ * Used for persisting the many-to-many relationship between recipes and ingredients.
+ */
+fun RecipeIngredient.toCrossRef(recipeId: UUID): RecipeIngredientEntity =
+    RecipeIngredientEntity(
+        recipeId = recipeId,
+        ingredientId = ingredientId,
+        quantity = quantity,
+        unit = unit,
+        updatedAt = System.currentTimeMillis(),
+        syncState = com.tenmilelabs.chefai.data.source.local.util.SyncState.PENDING
+    )
