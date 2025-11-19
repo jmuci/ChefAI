@@ -53,8 +53,8 @@ class RecipesViewModel @Inject constructor(
                 is Async.Success -> {
                     RecipesUiState(
                         items = recipesAsync.data,
-                        isLoading = isLoading,
-                        userMessage = R.string.loading_recipes_success)
+                        isLoading = isLoading
+                    )
                 }
             }
         }
