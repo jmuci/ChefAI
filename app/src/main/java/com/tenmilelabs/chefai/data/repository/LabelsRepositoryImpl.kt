@@ -13,6 +13,6 @@ class LabelsRepositoryImpl @Inject constructor(
 ) : LabelsRepository {
 
     override fun getAll(): Flow<List<Label>> {
-        return labelDao.getAll().map { it.toDomain() }
+        return labelDao.observeAll().map { it.toDomain() }
     }
 }

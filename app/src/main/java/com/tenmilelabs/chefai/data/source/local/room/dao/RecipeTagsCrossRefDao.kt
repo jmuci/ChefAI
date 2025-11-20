@@ -1,4 +1,4 @@
-package com.tenmilelabs.chefai.data.source.local
+package com.tenmilelabs.chefai.data.source.local.room.dao
 
 import androidx.room.Dao
 import androidx.room.Upsert

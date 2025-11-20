@@ -4,5 +4,7 @@ import com.tenmilelabs.chefai.domain.model.Tag
 import kotlinx.coroutines.flow.Flow
 
 interface TagsRepository {
-    fun getAll(): Flow<List<Tag>>
+
+    suspend fun getAll(): List<Tag>
+    fun observeAll(): Flow<List<Tag>>
 }

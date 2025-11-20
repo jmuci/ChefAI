@@ -10,7 +10,7 @@ import javax.inject.Inject
 
 class FakeTagsRepository @Inject constructor() : TagsRepository {
 
-    override fun getAll(): Flow<List<Tag>> {
+    override fun observeAll(): Flow<List<Tag>> {
         return flowOf(testTags.toDomain())
     }
 }

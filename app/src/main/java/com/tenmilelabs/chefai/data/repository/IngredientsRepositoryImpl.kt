@@ -13,6 +13,6 @@ class IngredientsRepositoryImpl @Inject constructor(
 ) : IngredientsRepository {
 
     override fun getAll(): Flow<List<Ingredient>> {
-        return ingredientDao.getAll().map { it.toDomain() }
+        return ingredientDao.observeAll().map { it.toDomain() }
     }
 }
