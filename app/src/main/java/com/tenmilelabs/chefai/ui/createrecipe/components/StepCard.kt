@@ -1,4 +1,4 @@
-package com.tenmilelabs.chefai.ui.createrecipe
+package com.tenmilelabs.chefai.ui.createrecipe.components
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
