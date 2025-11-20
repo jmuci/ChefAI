@@ -1,20 +1,24 @@
 package com.tenmilelabs.chefai.ui.createrecipe
 
-import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeIngredient
+import com.tenmilelabs.chefai.domain.model.Ingredient
 import com.tenmilelabs.chefai.domain.model.Label
 import com.tenmilelabs.chefai.domain.model.Recipe
 import com.tenmilelabs.chefai.domain.model.RecipeStep
 import com.tenmilelabs.chefai.domain.model.Tag
 import com.tenmilelabs.chefai.domain.model.User
+import com.tenmilelabs.chefai.domain.repository.IngredientsRepository
+import com.tenmilelabs.chefai.domain.repository.LabelsRepository
 import com.tenmilelabs.chefai.domain.repository.RecipesRepository
+import com.tenmilelabs.chefai.domain.repository.TagsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -73,29 +77,30 @@ data class CreateRecipeUiState(
 
 @HiltViewModel
 class CreateRecipeViewModel @Inject constructor(
-    private val recipesRepository: RecipesRepository
+    private val recipesRepository: RecipesRepository,
+    ingredientsRepository: IngredientsRepository,
+    tagsRepository: TagsRepository,
+    labelsRepository: LabelsRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CreateRecipeUiState())
     val uiState: StateFlow<CreateRecipeUiState> = _uiState.asStateFlow()
 
-    // Mock data for autocomplete - in real app, this would come from repository
-    private val allTags = listOf(
-        "Quick", "Easy", "Healthy", "Vegetarian", "Vegan", "Gluten-Free",
-        "Dairy-Free", "Low-Carb", "High-Protein", "Spicy", "Sweet", "Savory"
-    )
+    private val allIngredients: StateFlow<List<Ingredient>> = ingredientsRepository.getAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val allLabels = listOf(
-        "Breakfast", "Lunch", "Dinner", "Snack", "Dessert", "Appetizer",
-        "Main Course", "Side Dish", "Soup", "Salad", "Beverage"
-    )
+    private val allTags: StateFlow<List<Tag>> = tagsRepository.getAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val allIngredients = listOf(
-        "Flour", "Sugar", "Salt", "Pepper", "Olive Oil", "Butter", "Eggs",
-        "Milk", "Cheese", "Chicken", "Beef", "Pork", "Fish", "Tomato",
-        "Onion", "Garlic", "Rice", "Pasta", "Bread", "Lettuce"
-    )
+    private val allLabels: StateFlow<List<Label>> = labelsRepository.getAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+
+
+    fun onFieldChange(updatedRecipe: RecipeFields) {
+        _uiState.update { it.copy(recipeFields = updatedRecipe) }
+        validateForm()
+    }
     // Title
     fun onTitleChange(title: String) {
         _uiState.update { it.copy( recipeFields = it.recipeFields.copy(title = title)) }
@@ -158,9 +163,9 @@ class CreateRecipeViewModel @Inject constructor(
                 ingredients = it.ingredients.copy(
                     input = input,
                     suggestions = if (input.isNotBlank()) {
-                        allIngredients.filter { ingredient ->
-                            ingredient.contains(input, ignoreCase = true)
-                        }.take(5)
+                        allIngredients.value.filter { ingredient ->
+                            ingredient.displayName.contains(input, ignoreCase = true)
+                        }.map { it.displayName }.take(5)
                     } else {
                         emptyList()
                     }
@@ -182,8 +187,11 @@ class CreateRecipeViewModel @Inject constructor(
     fun onIngredientSelected(ingredientName: String) {
         val state = _uiState.value.ingredients
         if (state.quantity.isNotBlank() && state.quantity.toDoubleOrNull() != null) {
+            val existingIngredient = allIngredients.value.find { it.displayName.equals(ingredientName, ignoreCase = true) }
+            val ingredientId = existingIngredient?.uuid ?: UUID.randomUUID()
+
             val ingredient = RecipeIngredient(
-                ingredientId = UUID.randomUUID(),
+                ingredientId = ingredientId,
                 ingredientDisplayName = ingredientName,
                 quantity = state.quantity.toDouble(),
                 unit = state.unit.ifBlank { "unit" },
@@ -291,10 +299,10 @@ class CreateRecipeViewModel @Inject constructor(
                 tags = it.tags.copy(
                     input = input,
                     suggestions = if (input.isNotBlank()) {
-                        allTags.filter { tag ->
-                            tag.contains(input, ignoreCase = true) &&
-                                    it.tags.selectedTags.none { selected -> selected.displayName == tag }
-                        }.take(5)
+                        val selectedTagNames = it.tags.selectedTags.map { it.displayName }.toSet()
+                        allTags.value.filter { tag ->
+                            tag.displayName.contains(input, ignoreCase = true) && tag.displayName !in selectedTagNames
+                        }.map { it.displayName }.take(5)
                     } else {
                         emptyList()
                     }
@@ -305,7 +313,8 @@ class CreateRecipeViewModel @Inject constructor(
 
     fun addTag(tagName: String = _uiState.value.tags.input.trim()) {
         if (tagName.isNotBlank() && _uiState.value.tags.selectedTags.none { it.displayName == tagName }) {
-            val newTag = Tag(
+            val existingTag = allTags.value.find { it.displayName.equals(tagName, ignoreCase = true) }
+            val newTag = existingTag ?: Tag(
                 uuid = UUID.randomUUID(),
                 displayName = tagName
             )
@@ -334,10 +343,10 @@ class CreateRecipeViewModel @Inject constructor(
                 labels = it.labels.copy(
                     input = input,
                     suggestions = if (input.isNotBlank()) {
-                        allLabels.filter { label ->
-                            label.contains(input, ignoreCase = true) &&
-                                    it.labels.selectedLabels.none { selected -> selected.displayName == label }
-                        }.take(5)
+                        val selectedLabelNames = it.labels.selectedLabels.map { it.displayName }.toSet()
+                        allLabels.value.filter { label ->
+                            label.displayName.contains(input, ignoreCase = true) && label.displayName !in selectedLabelNames
+                        }.map { it.displayName }.take(5)
                     } else {
                         emptyList()
                     }
@@ -348,7 +357,8 @@ class CreateRecipeViewModel @Inject constructor(
 
     fun addLabel(labelName: String = _uiState.value.labels.input.trim()) {
         if (labelName.isNotBlank() && _uiState.value.labels.selectedLabels.none { it.displayName == labelName }) {
-            val newLabel = Label(
+            val existingLabel = allLabels.value.find { it.displayName.equals(labelName, ignoreCase = true) }
+            val newLabel = existingLabel ?: Label(
                 uuid = UUID.randomUUID(),
                 displayName = labelName
             )
