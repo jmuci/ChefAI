@@ -2,15 +2,11 @@ package com.tenmilelabs.chefai.di
 
 import android.content.Context
 import androidx.room.Room
+import com.tenmilelabs.chefai.data.repository.DefaultMetadataRepository
 import com.tenmilelabs.chefai.data.repository.DefaultRecipeRepository
-import com.tenmilelabs.chefai.data.repository.IngredientsRepositoryImpl
-import com.tenmilelabs.chefai.data.repository.LabelsRepositoryImpl
-import com.tenmilelabs.chefai.data.repository.TagsRepositoryImpl
 import com.tenmilelabs.chefai.data.source.local.room.dao.ChefAIDataBase
-import com.tenmilelabs.chefai.domain.repository.IngredientsRepository
-import com.tenmilelabs.chefai.domain.repository.LabelsRepository
+import com.tenmilelabs.chefai.domain.repository.MetadataRepository
 import com.tenmilelabs.chefai.domain.repository.RecipesRepository
-import com.tenmilelabs.chefai.domain.repository.TagsRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -28,15 +24,7 @@ abstract class RepositoryModule {
 
     @Singleton
     @Binds
-    abstract fun bindIngredientsRepository(repository: IngredientsRepositoryImpl): IngredientsRepository
-
-    @Singleton
-    @Binds
-    abstract fun bindLabelsRepository(repository: LabelsRepositoryImpl): LabelsRepository
-
-    @Singleton
-    @Binds
-    abstract fun bindTagsRepository(repository: TagsRepositoryImpl): TagsRepository
+    abstract fun bindMetadataRepository(repository: DefaultMetadataRepository): MetadataRepository
 }
 
 
