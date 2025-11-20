@@ -70,7 +70,8 @@ fun ChefAINavGraph(
         composable(route = AppDestinations.CREATE_RECIPE.route) {
             CreateRecipeScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onRecipeCreated = { navController.popBackStack() }
+                onRecipeCreated = { navController.popBackStack() },
+                snackbarHostState= snackbarHostState
             )
         }
     }

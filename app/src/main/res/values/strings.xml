@@ -83,4 +83,5 @@
     <string name="title_home">Home</string>
     <string name="title_meal_plans">Meal Plans</string>
     <string name="title_recipes">Recipes</string>
+    <string name="snackbar_save_error">Failed to save recipe.</string>
 </resources>

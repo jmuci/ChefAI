@@ -297,7 +297,7 @@ class CreateRecipeViewModel @Inject constructor(
                     input = input,
                     suggestions = if (input.isNotBlank()) {
                         val selectedTagNames = it.tags.selectedTags.map { it.displayName }.toSet()
-                        Timber.d("Tag input changed to: $input.  Alltags.size: ${allTags.value.size} Alltags: ${allTags.value}")
+                        Timber.d("Tag input changed to: $input. Alltags.size: ${allTags.value.size} Alltags: ${allTags.value}")
                         allTags.value.filter { tag ->
                             tag.displayName.contains(input, ignoreCase = true) && tag.displayName !in selectedTagNames
                         }.map { it.displayName }.take(5)
