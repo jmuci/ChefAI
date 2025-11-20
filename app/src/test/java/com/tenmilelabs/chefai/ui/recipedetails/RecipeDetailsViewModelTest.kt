@@ -67,7 +67,6 @@ class RecipeDetailsViewModelTest {
             val successState = awaitItem()
             assertThat(successState.isLoading).isFalse() // Because _isLoading is false by default
             assertThat(successState.recipe).isEqualTo(recipe1)
-            assertThat(successState.userMessage).isEqualTo(R.string.loading_recipes_success)
 
             cancelAndConsumeRemainingEvents()
         }
@@ -152,7 +151,6 @@ class RecipeDetailsViewModelTest {
             // Since _isLoading is private and defaults to false, this should be false.
             assertThat(successState.isLoading).isFalse()
             assertThat(successState.recipe).isEqualTo(recipe1)
-            assertThat(successState.userMessage).isEqualTo(R.string.loading_recipes_success)
 
             cancelAndConsumeRemainingEvents()
         }

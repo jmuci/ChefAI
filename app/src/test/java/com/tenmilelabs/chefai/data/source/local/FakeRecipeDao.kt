@@ -11,6 +11,7 @@ import com.tenmilelabs.chefai.data.source.local.room.RecipeTagCrossRef
 import com.tenmilelabs.chefai.data.source.local.room.SourceClassificationEntity
 import com.tenmilelabs.chefai.data.source.local.room.TagEntity
 import com.tenmilelabs.chefai.data.source.local.room.UserEntity
+import com.tenmilelabs.chefai.data.source.local.room.dao.RecipeDao
 import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeWithDetails
 import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeWithLabels
@@ -22,7 +23,7 @@ import kotlinx.coroutines.flow.map
 import java.util.UUID
 
 /**
- * A fake implementation of [RecipeDao] for testing. It simulates a relational database
+ * A fake implementation of [com.tenmilelabs.chefai.data.source.local.room.dao.RecipeDao] for testing. It simulates a relational database
  * in memory, allowing for testing of repository logic that depends on transactions and relations.
  */
 class FakeRecipeDao : RecipeDao {

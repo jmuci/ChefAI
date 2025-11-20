@@ -2,8 +2,10 @@ package com.tenmilelabs.chefai.di
 
 import android.content.Context
 import androidx.room.Room
+import com.tenmilelabs.chefai.data.repository.DefaultMetadataRepository
 import com.tenmilelabs.chefai.data.repository.DefaultRecipeRepository
-import com.tenmilelabs.chefai.data.source.local.ChefAIDataBase
+import com.tenmilelabs.chefai.data.source.local.room.dao.ChefAIDataBase
+import com.tenmilelabs.chefai.domain.repository.MetadataRepository
 import com.tenmilelabs.chefai.domain.repository.RecipesRepository
 import dagger.Binds
 import dagger.Module
@@ -19,7 +21,12 @@ abstract class RepositoryModule {
     @Singleton
     @Binds
     abstract fun bindRecipeRepository(repository: DefaultRecipeRepository): RecipesRepository
+
+    @Singleton
+    @Binds
+    abstract fun bindMetadataRepository(repository: DefaultMetadataRepository): MetadataRepository
 }
+
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -37,4 +44,25 @@ object DatabaseModules {
 
     @Provides
     fun provideRecipeDao(database: ChefAIDataBase) = database.recipeDao()
+
+    @Provides
+    fun provideRecipeStepDao(database: ChefAIDataBase) = database.recipeStepDao()
+
+    @Provides
+    fun provideRecipeIngredientDao(database: ChefAIDataBase) = database.recipeIngredientDao()
+
+    @Provides
+    fun provideIngredientDao(database: ChefAIDataBase) = database.ingredientDao()
+
+    @Provides
+    fun provideLabelDao(database: ChefAIDataBase) = database.labelDao()
+
+    @Provides
+    fun provideRecipeLabelDao(database: ChefAIDataBase) = database.recipeLabelCrossRefDao()
+
+    @Provides
+    fun provideTagDao(database: ChefAIDataBase) = database.tagDao()
+
+    @Provides
+    fun provideRecipeTagDao(database: ChefAIDataBase) = database.recipeTagCrossRefDao()
 }
