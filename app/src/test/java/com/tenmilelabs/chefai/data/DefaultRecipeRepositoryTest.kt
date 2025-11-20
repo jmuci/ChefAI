@@ -2,7 +2,14 @@ package com.tenmilelabs.chefai.data
 
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.data.repository.DefaultRecipeRepository
+import com.tenmilelabs.chefai.data.source.local.FakeIngredientDao
+import com.tenmilelabs.chefai.data.source.local.FakeLabelDao
 import com.tenmilelabs.chefai.data.source.local.FakeRecipeDao
+import com.tenmilelabs.chefai.data.source.local.FakeRecipeIngredientDao
+import com.tenmilelabs.chefai.data.source.local.FakeRecipeLabelCrossRefDao
+import com.tenmilelabs.chefai.data.source.local.FakeRecipeStepDao
+import com.tenmilelabs.chefai.data.source.local.FakeRecipeTagCrossRefDao
+import com.tenmilelabs.chefai.data.source.local.FakeTagDao
 import com.tenmilelabs.chefai.data.source.network.FakeApiService
 import com.tenmilelabs.chefai.testData.recipe1
 import com.tenmilelabs.chefai.testData.recipe3
@@ -34,30 +41,57 @@ class DefaultRecipeRepositoryTest {
     private lateinit var recipeRepository: DefaultRecipeRepository
 
     // Dependencies
-    private lateinit var localDataSource: FakeRecipeDao
+    private lateinit var recipeDao: FakeRecipeDao
+    private lateinit var recipeStepDao: FakeRecipeStepDao
+    private lateinit var recipeIngredientDao: FakeRecipeIngredientDao
+    private lateinit var ingredientDao: FakeIngredientDao
+    private lateinit var tagDao: FakeTagDao
+    private lateinit var labelDao: FakeLabelDao
+    private lateinit var recipeTagDao: FakeRecipeTagCrossRefDao
+    private lateinit var recipeLabelDao: FakeRecipeLabelCrossRefDao
     private lateinit var remoteDataSource: FakeApiService
     private val testDispatcher = UnconfinedTestDispatcher()
 
     @Before
     fun createRepository() {
-        localDataSource = FakeRecipeDao()
+        recipeDao = FakeRecipeDao()
+        recipeStepDao = FakeRecipeStepDao()
+        recipeIngredientDao = FakeRecipeIngredientDao()
+        ingredientDao = FakeIngredientDao()
+        tagDao = FakeTagDao()
+        labelDao = FakeLabelDao()
+        recipeTagDao = FakeRecipeTagCrossRefDao()
+        recipeLabelDao = FakeRecipeLabelCrossRefDao()
         remoteDataSource = FakeApiService()
+
         recipeRepository =
-            DefaultRecipeRepository(localDataSource, remoteDataSource, testDispatcher)
+            DefaultRecipeRepository(
+                recipeDao,
+                recipeStepDao,
+                recipeIngredientDao,
+                ingredientDao,
+                tagDao,
+                labelDao,
+                recipeTagDao,
+                recipeLabelDao,
+                remoteDataSource, testDispatcher
+            )
 
         // Seed the fake DAO with our test data.
         // This simulates a database with pre-existing data.
-        localDataSource.seed(
-            users = listOf(testUser),
-            recipes = listOf(recipeEntity1, recipeEntity2, recipeEntity3),
-            ingredients = testIngredients,
-            labels = testLabels,
-            tags = testTags,
-            steps = testSteps1 + testSteps2 + testSteps3,
-            recipeIngredients = testRecipeIngredients,
-            recipeLabels = testRecipeLabels,
-            recipeTags = testRecipeTags
-        )
+        runTest {
+            recipeDao.seed(
+                users = listOf(testUser),
+                recipes = listOf(recipeEntity1, recipeEntity2, recipeEntity3),
+                ingredients = testIngredients,
+                labels = testLabels,
+                tags = testTags,
+                steps = testSteps1 + testSteps2 + testSteps3,
+                recipeIngredients = testRecipeIngredients,
+                recipeLabels = testRecipeLabels,
+                recipeTags = testRecipeTags
+            )
+        }
     }
 
     @Test
@@ -85,7 +119,7 @@ class DefaultRecipeRepositoryTest {
     @Test
     fun `getRecipesPreviewStream() returns empty list when no recipes exist`() = runTest {
         // Given: The database is cleared.
-        localDataSource.deleteAllRecipes()
+        recipeDao.deleteAllRecipes()
 
         // When: The preview stream is observed.
         val recipePreviews = recipeRepository.getRecipesPreviewStream().first()
@@ -101,7 +135,10 @@ class DefaultRecipeRepositoryTest {
         assertThat(recipe?.uuid).isEqualTo(recipeId1)
         assertThat(recipe?.title).isEqualTo(recipe1.title)
         assertThat(recipe?.ingredients).hasSize(2)
-        assertThat(recipe?.ingredients?.map { it.ingredientDisplayName }).containsExactly("Flour", "Milk")
+        assertThat(recipe?.ingredients?.map { it.ingredientDisplayName }).containsExactly(
+            "Flour",
+            "Milk"
+        )
         assertThat(recipe?.steps).hasSize(3)
     }
 
