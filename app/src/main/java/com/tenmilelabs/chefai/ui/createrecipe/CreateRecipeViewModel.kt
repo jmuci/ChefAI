@@ -18,10 +18,32 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
 
-/**
- * UiState for the Create Recipe screen
- */
-data class CreateRecipeUiState(
+data class IngredientsFields(
+    val input: String = "",
+    val quantity: String = "",
+    val unit: String = "",
+    val selectedIngredients: List<RecipeIngredient> = emptyList(),
+    val suggestions: List<String> = emptyList(),
+)
+
+data class StepsFields(
+    val input: String = "",
+    val steps: List<RecipeStep> = emptyList(),
+)
+
+data class TagsFields(
+    val input: String = "",
+    val selectedTags: List<Tag> = emptyList(),
+    val suggestions: List<String> = emptyList(),
+)
+
+data class LabelsFields(
+    val input: String = "",
+    val selectedLabels: List<Label> = emptyList(),
+    val suggestions: List<String> = emptyList(),
+)
+
+data class RecipeFields(
     val title: String = "",
     val description: String = "",
     val imageUrl: String = "",
@@ -30,28 +52,17 @@ data class CreateRecipeUiState(
     val cookTimeMinutes: String = "",
     val servings: String = "",
     val externalUrl: String = "",
+)
 
-    // Ingredients
-    val ingredientInput: String = "",
-    val ingredientQuantity: String = "",
-    val ingredientUnit: String = "",
-    val selectedIngredients: List<RecipeIngredient> = emptyList(),
-    val ingredientSuggestions: List<String> = emptyList(),
-
-    // Steps
-    val stepInput: String = "",
-    val steps: List<RecipeStep> = emptyList(),
-
-    // Tags
-    val tagInput: String = "",
-    val selectedTags: List<Tag> = emptyList(),
-    val tagSuggestions: List<String> = emptyList(),
-
-    // Labels
-    val labelInput: String = "",
-    val selectedLabels: List<Label> = emptyList(),
-    val labelSuggestions: List<String> = emptyList(),
-
+/**
+ * UiState for the Create Recipe screen
+ */
+data class CreateRecipeUiState(
+    val recipeFields: RecipeFields = RecipeFields(),
+    val ingredients: IngredientsFields = IngredientsFields(),
+    val steps: StepsFields = StepsFields(),
+    val tags: TagsFields = TagsFields(),
+    val labels: LabelsFields = LabelsFields(),
     // Validation & Status
     val isSaving: Boolean = false,
     val saveError: String? = null,
@@ -85,34 +96,34 @@ class CreateRecipeViewModel @Inject constructor(
 
     // Title
     fun onTitleChange(title: String) {
-        _uiState.update { it.copy(title = title) }
+        _uiState.update { it.copy( recipeFields = it.recipeFields.copy(title = title)) }
         validateForm()
     }
 
     // Description
     fun onDescriptionChange(description: String) {
-        _uiState.update { it.copy(description = description) }
+        _uiState.update { it.copy(recipeFields = it.recipeFields.copy(description = description)) }
         validateForm()
     }
 
     // Image URL
     fun onImageUrlChange(url: String) {
-        _uiState.update { it.copy(imageUrl = url) }
+        _uiState.update { it.copy(recipeFields = it.recipeFields.copy(imageUrl = url)) }
     }
 
     // Selected Image URI
     fun onImageSelected(uri: String?) {
-        _uiState.update { it.copy(selectedImageUri = uri) }
+        _uiState.update { it.copy(recipeFields = it.recipeFields.copy(selectedImageUri = uri)) }
     }
 
     fun clearSelectedImage() {
-        _uiState.update { it.copy(selectedImageUri = null) }
+        _uiState.update { it.copy(recipeFields = it.recipeFields.copy(selectedImageUri = null)) }
     }
 
     // Prep Time
     fun onPrepTimeChange(time: String) {
         if (time.isEmpty() || time.toIntOrNull() != null) {
-            _uiState.update { it.copy(prepTimeMinutes = time) }
+            _uiState.update { it.copy(recipeFields = it.recipeFields.copy(prepTimeMinutes = time)) }
             validateForm()
         }
     }
@@ -120,7 +131,7 @@ class CreateRecipeViewModel @Inject constructor(
     // Cook Time
     fun onCookTimeChange(time: String) {
         if (time.isEmpty() || time.toIntOrNull() != null) {
-            _uiState.update { it.copy(cookTimeMinutes = time) }
+            _uiState.update { it.copy(recipeFields = it.recipeFields.copy(cookTimeMinutes = time)) }
             validateForm()
         }
     }
@@ -128,50 +139,52 @@ class CreateRecipeViewModel @Inject constructor(
     // Servings
     fun onServingsChange(servings: String) {
         if (servings.isEmpty() || servings.toIntOrNull() != null) {
-            _uiState.update { it.copy(servings = servings) }
+            _uiState.update { it.copy(recipeFields = it.recipeFields.copy(servings = servings)) }
             validateForm()
         }
     }
 
     // External URL
     fun onExternalUrlChange(url: String) {
-        _uiState.update { it.copy(externalUrl = url) }
+        _uiState.update { it.copy(recipeFields = it.recipeFields.copy(externalUrl = url)) }
     }
 
     // Ingredient Input
     fun onIngredientInputChange(input: String) {
         _uiState.update {
             it.copy(
-                ingredientInput = input,
-                ingredientSuggestions = if (input.isNotBlank()) {
-                    allIngredients.filter { ingredient ->
-                        ingredient.contains(input, ignoreCase = true)
-                    }.take(5)
-                } else {
-                    emptyList()
-                }
+                ingredients = it.ingredients.copy(
+                    input = input,
+                    suggestions = if (input.isNotBlank()) {
+                        allIngredients.filter { ingredient ->
+                            ingredient.contains(input, ignoreCase = true)
+                        }.take(5)
+                    } else {
+                        emptyList()
+                    }
+                )
             )
         }
     }
 
     fun onIngredientQuantityChange(quantity: String) {
         if (quantity.isEmpty() || quantity.toDoubleOrNull() != null) {
-            _uiState.update { it.copy(ingredientQuantity = quantity) }
+            _uiState.update { it.copy(ingredients = it.ingredients.copy(quantity = quantity)) }
         }
     }
 
     fun onIngredientUnitChange(unit: String) {
-        _uiState.update { it.copy(ingredientUnit = unit) }
+        _uiState.update { it.copy(ingredients = it.ingredients.copy(unit = unit)) }
     }
 
     fun onIngredientSelected(ingredientName: String) {
-        val state = _uiState.value
-        if (state.ingredientQuantity.isNotBlank() && state.ingredientQuantity.toDoubleOrNull() != null) {
+        val state = _uiState.value.ingredients
+        if (state.quantity.isNotBlank() && state.quantity.toDoubleOrNull() != null) {
             val ingredient = RecipeIngredient(
                 ingredientId = UUID.randomUUID(),
                 ingredientDisplayName = ingredientName,
-                quantity = state.ingredientQuantity.toDouble(),
-                unit = state.ingredientUnit.ifBlank { "unit" },
+                quantity = state.quantity.toDouble(),
+                unit = state.unit.ifBlank { "unit" },
                 allergenName = null,
                 srcCategory = null,
                 srcSubcategory = null
@@ -179,11 +192,13 @@ class CreateRecipeViewModel @Inject constructor(
 
             _uiState.update {
                 it.copy(
-                    selectedIngredients = it.selectedIngredients + ingredient,
-                    ingredientInput = "",
-                    ingredientQuantity = "",
-                    ingredientUnit = "",
-                    ingredientSuggestions = emptyList()
+                    ingredients = it.ingredients.copy(
+                        selectedIngredients = it.ingredients.selectedIngredients + ingredient,
+                        input = "",
+                        quantity = "",
+                        unit = "",
+                        suggestions = emptyList()
+                    )
                 )
             }
             validateForm()
@@ -192,28 +207,30 @@ class CreateRecipeViewModel @Inject constructor(
 
     fun removeIngredient(ingredient: RecipeIngredient) {
         _uiState.update {
-            it.copy(selectedIngredients = it.selectedIngredients - ingredient)
+            it.copy(ingredients = it.ingredients.copy(selectedIngredients = it.ingredients.selectedIngredients - ingredient))
         }
         validateForm()
     }
 
     // Step Input
     fun onStepInputChange(input: String) {
-        _uiState.update { it.copy(stepInput = input) }
+        _uiState.update { it.copy(steps = it.steps.copy(input = input)) }
     }
 
     fun addStep() {
-        val stepText = _uiState.value.stepInput.trim()
+        val stepText = _uiState.value.steps.input.trim()
         if (stepText.isNotBlank()) {
             val newStep = RecipeStep(
                 uuid = UUID.randomUUID(),
-                orderIndex = _uiState.value.steps.size,
+                orderIndex = _uiState.value.steps.steps.size,
                 instruction = stepText
             )
             _uiState.update {
                 it.copy(
-                    steps = it.steps + newStep,
-                    stepInput = ""
+                    steps = it.steps.copy(
+                        steps = it.steps.steps + newStep,
+                        input = ""
+                    )
                 )
             }
             validateForm()
@@ -222,37 +239,45 @@ class CreateRecipeViewModel @Inject constructor(
 
     fun removeStep(step: RecipeStep) {
         _uiState.update { state ->
-            val updatedSteps = state.steps.filter { it != step }
+            val updatedSteps = state.steps.steps.filter { it != step }
                 .mapIndexed { index, s -> s.copy(orderIndex = index) }
-            state.copy(steps = updatedSteps)
+            state.copy(steps = state.steps.copy(steps = updatedSteps))
         }
         validateForm()
     }
 
     fun moveStepUp(step: RecipeStep) {
-        val currentIndex = _uiState.value.steps.indexOf(step)
+        val currentIndex = _uiState.value.steps.steps.indexOf(step)
         if (currentIndex > 0) {
-            val mutableSteps = _uiState.value.steps.toMutableList()
+            val mutableSteps = _uiState.value.steps.steps.toMutableList()
             mutableSteps.removeAt(currentIndex)
             mutableSteps.add(currentIndex - 1, step)
             _uiState.update {
-                it.copy(steps = mutableSteps.mapIndexed { index, s ->
-                    s.copy(orderIndex = index)
-                })
+                it.copy(
+                    steps = it.steps.copy(
+                        steps = mutableSteps.mapIndexed { index, s ->
+                            s.copy(orderIndex = index)
+                        }
+                    )
+                )
             }
         }
     }
 
     fun moveStepDown(step: RecipeStep) {
-        val currentIndex = _uiState.value.steps.indexOf(step)
-        if (currentIndex < _uiState.value.steps.size - 1) {
-            val mutableSteps = _uiState.value.steps.toMutableList()
+        val currentIndex = _uiState.value.steps.steps.indexOf(step)
+        if (currentIndex < _uiState.value.steps.steps.size - 1) {
+            val mutableSteps = _uiState.value.steps.steps.toMutableList()
             mutableSteps.removeAt(currentIndex)
             mutableSteps.add(currentIndex + 1, step)
             _uiState.update {
-                it.copy(steps = mutableSteps.mapIndexed { index, s ->
-                    s.copy(orderIndex = index)
-                })
+                it.copy(
+                    steps = it.steps.copy(
+                        steps = mutableSteps.mapIndexed { index, s ->
+                            s.copy(orderIndex = index)
+                        }
+                    )
+                )
             }
         }
     }
@@ -261,30 +286,34 @@ class CreateRecipeViewModel @Inject constructor(
     fun onTagInputChange(input: String) {
         _uiState.update {
             it.copy(
-                tagInput = input,
-                tagSuggestions = if (input.isNotBlank()) {
-                    allTags.filter { tag ->
-                        tag.contains(input, ignoreCase = true) &&
-                                it.selectedTags.none { selected -> selected.displayName == tag }
-                    }.take(5)
-                } else {
-                    emptyList()
-                }
+                tags = it.tags.copy(
+                    input = input,
+                    suggestions = if (input.isNotBlank()) {
+                        allTags.filter { tag ->
+                            tag.contains(input, ignoreCase = true) &&
+                                    it.tags.selectedTags.none { selected -> selected.displayName == tag }
+                        }.take(5)
+                    } else {
+                        emptyList()
+                    }
+                )
             )
         }
     }
 
-    fun addTag(tagName: String = _uiState.value.tagInput.trim()) {
-        if (tagName.isNotBlank() && _uiState.value.selectedTags.none { it.displayName == tagName }) {
+    fun addTag(tagName: String = _uiState.value.tags.input.trim()) {
+        if (tagName.isNotBlank() && _uiState.value.tags.selectedTags.none { it.displayName == tagName }) {
             val newTag = Tag(
                 uuid = UUID.randomUUID(),
                 displayName = tagName
             )
             _uiState.update {
                 it.copy(
-                    selectedTags = it.selectedTags + newTag,
-                    tagInput = "",
-                    tagSuggestions = emptyList()
+                    tags = it.tags.copy(
+                        selectedTags = it.tags.selectedTags + newTag,
+                        input = "",
+                        suggestions = emptyList()
+                    )
                 )
             }
         }
@@ -292,7 +321,7 @@ class CreateRecipeViewModel @Inject constructor(
 
     fun removeTag(tag: Tag) {
         _uiState.update {
-            it.copy(selectedTags = it.selectedTags - tag)
+            it.copy(tags = it.tags.copy(selectedTags = it.tags.selectedTags - tag))
         }
     }
 
@@ -300,30 +329,34 @@ class CreateRecipeViewModel @Inject constructor(
     fun onLabelInputChange(input: String) {
         _uiState.update {
             it.copy(
-                labelInput = input,
-                labelSuggestions = if (input.isNotBlank()) {
-                    allLabels.filter { label ->
-                        label.contains(input, ignoreCase = true) &&
-                                it.selectedLabels.none { selected -> selected.displayName == label }
-                    }.take(5)
-                } else {
-                    emptyList()
-                }
+                labels = it.labels.copy(
+                    input = input,
+                    suggestions = if (input.isNotBlank()) {
+                        allLabels.filter { label ->
+                            label.contains(input, ignoreCase = true) &&
+                                    it.labels.selectedLabels.none { selected -> selected.displayName == label }
+                        }.take(5)
+                    } else {
+                        emptyList()
+                    }
+                )
             )
         }
     }
 
-    fun addLabel(labelName: String = _uiState.value.labelInput.trim()) {
-        if (labelName.isNotBlank() && _uiState.value.selectedLabels.none { it.displayName == labelName }) {
+    fun addLabel(labelName: String = _uiState.value.labels.input.trim()) {
+        if (labelName.isNotBlank() && _uiState.value.labels.selectedLabels.none { it.displayName == labelName }) {
             val newLabel = Label(
                 uuid = UUID.randomUUID(),
                 displayName = labelName
             )
             _uiState.update {
                 it.copy(
-                    selectedLabels = it.selectedLabels + newLabel,
-                    labelInput = "",
-                    labelSuggestions = emptyList()
+                    labels = it.labels.copy(
+                        selectedLabels = it.labels.selectedLabels + newLabel,
+                        input = "",
+                        suggestions = emptyList()
+                    )
                 )
             }
         }
@@ -331,20 +364,20 @@ class CreateRecipeViewModel @Inject constructor(
 
     fun removeLabel(label: Label) {
         _uiState.update {
-            it.copy(selectedLabels = it.selectedLabels - label)
+            it.copy(labels = it.labels.copy(selectedLabels = it.labels.selectedLabels - label))
         }
     }
 
     // Form Validation
     private fun validateForm() {
         val state = _uiState.value
-        val isValid = state.title.isNotBlank() &&
-                state.description.isNotBlank() &&
-                state.prepTimeMinutes.isNotBlank() &&
-                state.cookTimeMinutes.isNotBlank() &&
-                state.servings.isNotBlank() &&
-                state.selectedIngredients.isNotEmpty() &&
-                state.steps.isNotEmpty()
+        val isValid = state.recipeFields.title.isNotBlank() &&
+                state.recipeFields.description.isNotBlank() &&
+                state.recipeFields.prepTimeMinutes.isNotBlank() &&
+                state.recipeFields.cookTimeMinutes.isNotBlank() &&
+                state.recipeFields.servings.isNotBlank() &&
+                state.ingredients.selectedIngredients.isNotEmpty() &&
+                state.steps.steps.isNotEmpty()
 
         _uiState.update { it.copy(isFormValid = isValid) }
     }
@@ -360,19 +393,19 @@ class CreateRecipeViewModel @Inject constructor(
                 val state = _uiState.value
                 val recipe = Recipe(
                     uuid = UUID.randomUUID(),
-                    title = state.title,
-                    description = state.description,
-                    imageUrl = state.imageUrl,
-                    imageUrlThumbnail = state.imageUrl,
-                    prepTimeMinutes = state.prepTimeMinutes.toInt(),
-                    cookTimeMinutes = state.cookTimeMinutes.toInt(),
-                    servings = state.servings.toInt(),
+                    title = state.recipeFields.title,
+                    description = state.recipeFields.description,
+                    imageUrl = state.recipeFields.imageUrl,
+                    imageUrlThumbnail = state.recipeFields.imageUrl,
+                    prepTimeMinutes = state.recipeFields.prepTimeMinutes.toInt(),
+                    cookTimeMinutes = state.recipeFields.cookTimeMinutes.toInt(),
+                    servings = state.recipeFields.servings.toInt(),
                     creator = currentUser,
-                    recipeExternalUrl = state.externalUrl.ifBlank { null },
-                    ingredients = state.selectedIngredients,
-                    steps = state.steps,
-                    tags = state.selectedTags,
-                    labels = state.selectedLabels,
+                    recipeExternalUrl = state.recipeFields.externalUrl.ifBlank { null },
+                    ingredients = state.ingredients.selectedIngredients,
+                    steps = state.steps.steps,
+                    tags = state.tags.selectedTags,
+                    labels = state.labels.selectedLabels,
                     updatedAt = System.currentTimeMillis()
                 )
 
