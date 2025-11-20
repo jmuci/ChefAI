@@ -1,9 +1,21 @@
 package com.tenmilelabs.chefai.data.repository
 
+import androidx.room.Transaction
+import com.tenmilelabs.chefai.data.mapper.toCrossRef
 import com.tenmilelabs.chefai.data.mapper.toDomain
 import com.tenmilelabs.chefai.data.mapper.toRecipePreviewDomain
 import com.tenmilelabs.chefai.data.mapper.toRoomEntity
+import com.tenmilelabs.chefai.data.source.local.room.RecipeLabelCrossRef
+import com.tenmilelabs.chefai.data.source.local.room.RecipeTagCrossRef
+import com.tenmilelabs.chefai.data.source.local.room.dao.ChefAIDataBase
+import com.tenmilelabs.chefai.data.source.local.room.dao.IngredientDao
+import com.tenmilelabs.chefai.data.source.local.room.dao.LabelDao
 import com.tenmilelabs.chefai.data.source.local.room.dao.RecipeDao
+import com.tenmilelabs.chefai.data.source.local.room.dao.RecipeIngredientDao
+import com.tenmilelabs.chefai.data.source.local.room.dao.RecipeLabelCrossRefDao
+import com.tenmilelabs.chefai.data.source.local.room.dao.RecipeStepDao
+import com.tenmilelabs.chefai.data.source.local.room.dao.RecipeTagCrossRefDao
+import com.tenmilelabs.chefai.data.source.local.room.dao.TagDao
 import com.tenmilelabs.chefai.data.source.local.util.decodeHex
 import com.tenmilelabs.chefai.data.source.local.util.toUuid
 import com.tenmilelabs.chefai.data.source.network.RecipeNetworkDataSource
@@ -29,14 +41,21 @@ import kotlin.coroutines.cancellation.CancellationException
 
 @Singleton
 class DefaultRecipeRepository @Inject constructor(
-    private val localDatSource: RecipeDao,
+    private val recipeDao: RecipeDao,
+    private val recipeStepDao: RecipeStepDao,
+    private val recipeIngredientDao: RecipeIngredientDao,
+    private val ingredientDao: IngredientDao,
+    private val tagDao: TagDao,
+    private val labelDao: LabelDao,
+    private val recipeTagDao: RecipeTagCrossRefDao,
+    private val recipeLabelDao: RecipeLabelCrossRefDao,
     private val networkDataSource: RecipeNetworkDataSource,
     @param:IoDispatcher private val dispatcher: CoroutineDispatcher) : RecipesRepository {
     //TODO implement authentication
     val testUserId = "F47AC10B58CC4372A5670E02B2C3D479".decodeHex().toUuid()
 
     override fun getRecipesPreviewStream(): Flow<List<RecipePreview>> {
-        return localDatSource.observeRecipesWithDetailsForUser(testUserId).map { recipes ->
+        return recipeDao.observeRecipesWithDetailsForUser(testUserId).map { recipes ->
             withContext(dispatcher) {
                 recipes.toRecipePreviewDomain()
             }
@@ -51,7 +70,7 @@ class DefaultRecipeRepository @Inject constructor(
                 emit(getAllItemsFromNetwork())
             }
         } else {        // Local
-            return localDatSource.observeRecipesWithDetails().map { recipes ->
+            return recipeDao.observeRecipesWithDetails().map { recipes ->
                 withContext(dispatcher) {
                     recipes.toDomain()
                 }
@@ -78,8 +97,8 @@ class DefaultRecipeRepository @Inject constructor(
     }
 
     override fun getRecipeStream(uuid: UUID): Flow<Recipe?> {
-        val ingredientsFlow = localDatSource.observeIngredientsForRecipe(uuid)
-        val recipeFlow = localDatSource.observeRecipeWithDetails(uuid)
+        val ingredientsFlow = recipeDao.observeIngredientsForRecipe(uuid)
+        val recipeFlow = recipeDao.observeRecipeWithDetails(uuid)
         return combine(ingredientsFlow, recipeFlow) {
             ingredients, recipesWithDetails ->
             if (recipesWithDetails == null) {
@@ -95,23 +114,79 @@ class DefaultRecipeRepository @Inject constructor(
     }
 
     override suspend fun getRecipe(uuid: UUID): Recipe? {
-        return localDatSource.getRecipeWithDetails(uuid)?.toDomain()
+        return recipeDao.getRecipeWithDetails(uuid)?.toDomain()
     }
 
+    @Transaction
     override suspend fun createRecipe(recipe: Recipe) {
-        localDatSource.upsertRecipe(recipe.toRoomEntity())
+        withContext(dispatcher) {
+            // Save the recipe entity
+            recipeDao.upsertRecipe(recipe.toRoomEntity())
+
+            // Save all tags (if they don't exist)
+            recipe.tags.forEach { tag ->
+                tagDao.upsertTag(tag.toRoomEntity())
+            }
+
+            // Save all labels (if they don't exist)
+            recipe.labels.forEach { label ->
+                labelDao.upsertLabel(label.toRoomEntity())
+            }
+
+            // Save all ingredients (if they don't exist)
+            recipe.ingredients.forEach { ingredient ->
+                ingredientDao.upsertIngredient(ingredient.toRoomEntity())
+            }
+
+            // Save recipe steps
+            recipe.steps.forEach { step ->
+                recipeStepDao.upsertStep(step.toRoomEntity(recipe.uuid))
+            }
+
+            // Upsert ingredient cross-references for the recipe
+            recipeIngredientDao.upsertAllForRecipe(
+                recipe.uuid,
+                recipe.ingredients.map { it.toCrossRef(recipe.uuid) }
+            )
+
+            // Save recipe-tag cross-references
+            recipe.tags.forEach { tag ->
+                recipeTagDao.upsertCrossRef(
+                    RecipeTagCrossRef(
+                        recipeId = recipe.uuid,
+                        tagId = tag.uuid,
+                        updatedAt = System.currentTimeMillis(),
+                        deletedAt = null,
+                        syncState = com.tenmilelabs.chefai.data.source.local.util.SyncState.PENDING
+                    )
+                )
+            }
+
+            // Save recipe-label cross-references
+            recipe.labels.forEach { label ->
+                recipeLabelDao.upsertCrossRef(
+                    RecipeLabelCrossRef(
+                        recipeId = recipe.uuid,
+                        labelId = label.uuid,
+                        updatedAt = System.currentTimeMillis(),
+                        deletedAt = null,
+                        syncState = com.tenmilelabs.chefai.data.source.local.util.SyncState.PENDING
+                    )
+                )
+            }
+        }
     }
 
     override suspend fun updateRecipe(recipe: Recipe) {
-        localDatSource.upsertRecipe(recipe.toRoomEntity())
+        recipeDao.upsertRecipe(recipe.toRoomEntity())
     }
 
     override suspend fun deleteAllRecipes() {
-        localDatSource.deleteAllRecipes()
+        recipeDao.deleteAllRecipes()
     }
 
     override suspend fun deleteRecipe(recipeId: UUID) {
-        localDatSource.deleteRecipe(recipeId)
+        recipeDao.deleteRecipe(recipeId)
     }
 
     private suspend fun <T> FlowCollector<T>.logAndReThrow(

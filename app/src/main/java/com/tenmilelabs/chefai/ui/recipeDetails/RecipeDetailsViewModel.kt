@@ -65,7 +65,6 @@ class RecipeDetailsViewModel @Inject constructor(
                 RecipesDetailsUiState(
                     recipe = recipeAsync.data,
                     isLoading = isLoading,
-                    userMessage = R.string.loading_recipes_success
                 )
             }
         }
