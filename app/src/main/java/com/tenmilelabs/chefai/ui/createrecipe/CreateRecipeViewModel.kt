@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.util.UUID
 import javax.inject.Inject
 
@@ -86,19 +87,17 @@ class CreateRecipeViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(CreateRecipeUiState())
     val uiState: StateFlow<CreateRecipeUiState> = _uiState.asStateFlow()
 
-    private val allIngredients: StateFlow<List<Ingredient>> = metadataRepository.observeAllIngredients()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    // Use Eagerly to start collecting immediately and keep the data available for autocomplete
+    private val allIngredients: StateFlow<List<Ingredient>> =
+        metadataRepository.observeAllIngredients()
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val allTags: StateFlow<List<Tag>> = metadataRepository.observeAllTags()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val allLabels: StateFlow<List<Label>> = metadataRepository.observeAllLabels()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    fun onFieldChange(updatedRecipe: RecipeFields) {
-        _uiState.update { it.copy(recipeFields = updatedRecipe) }
-        validateForm()
-    }
     // Title
     fun onTitleChange(title: String) {
         _uiState.update { it.copy( recipeFields = it.recipeFields.copy(title = title)) }
@@ -298,6 +297,7 @@ class CreateRecipeViewModel @Inject constructor(
                     input = input,
                     suggestions = if (input.isNotBlank()) {
                         val selectedTagNames = it.tags.selectedTags.map { it.displayName }.toSet()
+                        Timber.d("Tag input changed to: $input.  Alltags.size: ${allTags.value.size} Alltags: ${allTags.value}")
                         allTags.value.filter { tag ->
                             tag.displayName.contains(input, ignoreCase = true) && tag.displayName !in selectedTagNames
                         }.map { it.displayName }.take(5)
@@ -426,6 +426,7 @@ class CreateRecipeViewModel @Inject constructor(
                 _uiState.update { it.copy(isSaving = false) }
                 onSuccess()
             } catch (e: Exception) {
+                Timber.e("Failed to save recipe: ${e.message}")
                 _uiState.update {
                     it.copy(
                         isSaving = false,
