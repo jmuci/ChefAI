@@ -1,7 +1,9 @@
 package com.tenmilelabs.chefai.di
 
+import com.tenmilelabs.chefai.data.source.network.AuthInterceptor
 import com.tenmilelabs.chefai.data.source.network.ChefAIApiService
 import com.tenmilelabs.chefai.data.source.network.RecipeNetworkDataSource
+import com.tenmilelabs.chefai.auth.domain.SessionManager
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -34,12 +36,19 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideHttpClient() = HttpClient(CIO) {
+    fun provideHttpClient(sessionManager: SessionManager) = HttpClient(CIO) {
         expectSuccess = true
+
+        // Install authentication interceptor
+        install(AuthInterceptor) {
+            this.sessionManager = sessionManager
+        }
+
         install(Logging) {
             logger = Logger.SIMPLE
             level = LogLevel.HEADERS
         }
+
         install(ContentNegotiation) {
             json(Json {
                 prettyPrint = true

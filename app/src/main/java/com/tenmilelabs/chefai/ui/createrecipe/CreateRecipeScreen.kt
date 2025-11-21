@@ -37,7 +37,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
@@ -51,12 +50,9 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeIngredient
-import com.tenmilelabs.chefai.data.source.local.util.decodeHex
-import com.tenmilelabs.chefai.data.source.local.util.toUuid
 import com.tenmilelabs.chefai.domain.model.Label
 import com.tenmilelabs.chefai.domain.model.RecipeStep
 import com.tenmilelabs.chefai.domain.model.Tag
-import com.tenmilelabs.chefai.domain.model.User
 import com.tenmilelabs.chefai.ui.createrecipe.components.AutocompleteInput
 import com.tenmilelabs.chefai.ui.createrecipe.components.ImageUploadContent
 import com.tenmilelabs.chefai.ui.createrecipe.components.IngredientInput
@@ -64,7 +60,6 @@ import com.tenmilelabs.chefai.ui.createrecipe.components.StepCard
 import com.tenmilelabs.chefai.ui.preview.SharedData.carbonaraIngredients
 import com.tenmilelabs.chefai.ui.preview.SharedData.carbonaraSteps
 import com.tenmilelabs.chefai.ui.theme.ChefAITheme
-import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -99,17 +94,8 @@ fun CreateRecipeScreen(
     Column() {
         ActionBar(
             saveButtonOnCLick = {
-                // TODO: Get current user from auth/user repository
-                // Using the test user that exists in the database to satisfy foreign key constraint
-                val testUserId = "F47AC10B58CC4372A5670E02B2C3D479".decodeHex().toUuid()
-                val mockUser = User(
-                    uuid = testUserId,
-                    displayName = "Test User",
-                    email = "test.user@example.com",
-                    avatarUrl = null
-                )
                 focusManager.clearFocus()
-                viewModel.saveRecipe(mockUser, onRecipeCreated)
+                viewModel.saveRecipe(onRecipeCreated)
             },
             saveButtonEnabled = uiState.isFormValid && !uiState.isSaving,
             savingState = uiState.isSaving

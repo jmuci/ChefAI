@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.di.IoDispatcher
+import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.domain.model.Ingredient
 import com.tenmilelabs.chefai.domain.model.Label
 import com.tenmilelabs.chefai.domain.model.Recipe
@@ -81,6 +82,7 @@ data class CreateRecipeUiState(
 class CreateRecipeViewModel @Inject constructor(
     private val recipesRepository: RecipesRepository,
     private val metadataRepository: MetadataRepository,
+    private val sessionManager: SessionManager,
     @param:IoDispatcher private val dispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
@@ -393,13 +395,25 @@ class CreateRecipeViewModel @Inject constructor(
     }
 
     // Save Recipe
-    fun saveRecipe(currentUser: User, onSuccess: () -> Unit) {
+    fun saveRecipe(onSuccess: () -> Unit) {
         if (!_uiState.value.isFormValid) return
 
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, saveError = null) }
 
             try {
+                // Get current user from session
+                val currentUser = sessionManager.getCurrentUser()
+                if (currentUser == null) {
+                    _uiState.update {
+                        it.copy(
+                            isSaving = false,
+                            saveError = "User not authenticated"
+                        )
+                    }
+                    return@launch
+                }
+
                 val state = _uiState.value
                 val recipe = Recipe(
                     uuid = UUID.randomUUID(),

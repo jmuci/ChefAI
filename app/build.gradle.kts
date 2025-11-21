@@ -100,6 +100,9 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
     ksp(libs.hilt.android.compiler)
 
+    // Security Crypto for encrypted storage (EncryptedSharedPreferences)
+    implementation(libs.androidx.security.crypto)
+
     // Room Database
     implementation(libs.androidx.room.runtime)
     // If this project uses any Kotlin source, use Kotlin Symbol Processing (KSP)
