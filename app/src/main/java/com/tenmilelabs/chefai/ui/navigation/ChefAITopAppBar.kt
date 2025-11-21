@@ -18,6 +18,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.auth.ui.UserProfileMenu
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -25,6 +26,7 @@ import com.tenmilelabs.chefai.R
 fun ChefAITopAppBar(
     @StringRes titleResId: Int,
     onNavigationClick: (() -> Unit)? = null,
+    onLogout: () -> Unit = {}
 ) {
 
     return CenterAlignedTopAppBar(
@@ -52,6 +54,12 @@ fun ChefAITopAppBar(
                     )
                 }
             }
+        },
+        actions = {
+            // User profile menu on the right side
+            UserProfileMenu(
+                onLogout = onLogout
+            )
         },
         scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     )

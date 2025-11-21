@@ -1,4 +1,4 @@
-package com.tenmilelabs.chefai.data.source.local
+package com.tenmilelabs.chefai.auth.data.local
 
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID

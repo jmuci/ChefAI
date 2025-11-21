@@ -1,13 +1,12 @@
-package com.tenmilelabs.chefai.ui.auth
+package com.tenmilelabs.chefai.auth.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
-import com.tenmilelabs.chefai.domain.auth.SessionManager
-import com.tenmilelabs.chefai.domain.model.User
-import com.tenmilelabs.chefai.domain.model.UserSession
+import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 

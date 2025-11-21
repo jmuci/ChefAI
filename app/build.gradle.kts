@@ -100,9 +100,7 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
     ksp(libs.hilt.android.compiler)
 
-    // DataStore for secure preferences
-    implementation(libs.androidx.datastore.preferences)
-    // Security Crypto for encryption
+    // Security Crypto for encrypted storage (EncryptedSharedPreferences)
     implementation(libs.androidx.security.crypto)
 
     // Room Database
