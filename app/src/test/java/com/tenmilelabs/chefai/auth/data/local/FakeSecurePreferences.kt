@@ -1,6 +1,5 @@
-package com.tenmilelabs.chefai.data.source.local
+package com.tenmilelabs.chefai.auth.data.local
 
-import com.tenmilelabs.chefai.data.source.local.SecurePreferencesInterface
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map

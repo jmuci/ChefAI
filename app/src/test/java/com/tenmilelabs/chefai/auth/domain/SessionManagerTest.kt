@@ -1,7 +1,9 @@
-package com.tenmilelabs.chefai.domain.auth
+package com.tenmilelabs.chefai.auth.domain
 
+import com.google.common.truth.Truth
 import com.google.common.truth.Truth.assertThat
-import com.tenmilelabs.chefai.data.source.local.FakeSecurePreferences
+import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
+import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.domain.model.User
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -42,7 +44,7 @@ class SessionManagerTest {
         advanceUntilIdle()
 
         val initialState = sessionManager.userSession.value
-        assertThat(initialState).isInstanceOf(User.Authenticated::class.java)
+        Truth.assertThat(initialState).isInstanceOf(UserSession.Authenticated::class.java)
     }
 
     @Test
@@ -56,9 +58,9 @@ class SessionManagerTest {
 
         // Then: Mock user session is created
         val session = sessionManager.userSession.first()
-        assertThat(session).isInstanceOf(User.Authenticated::class.java)
+        Truth.assertThat(session).isInstanceOf(UserSession.Authenticated::class.java)
 
-        val authenticated = session as User.Authenticated
+        val authenticated = session as UserSession.Authenticated
         assertThat(authenticated.user.displayName).isEqualTo("Test User")
     }
 
@@ -73,8 +75,8 @@ class SessionManagerTest {
 
         // Then: Session is unauthenticated and storage is cleared
         val session = sessionManager.userSession.first()
-        assertThat(session).isEqualTo(User.Unauthenticated)
-        assertThat(fakeSecurePreferences.getUserUuid().first()).isNull()
+        Truth.assertThat(session).isEqualTo(UserSession.Unauthenticated)
+        Truth.assertThat(fakeSecurePreferences.getUserUuid().first()).isNull()
     }
 
     @Test
@@ -86,7 +88,7 @@ class SessionManagerTest {
         val user = sessionManager.getCurrentUser()
 
         // Then: Returns null
-        assertThat(user).isNull()
+        Truth.assertThat(user).isNull()
     }
 
     @Test
@@ -99,8 +101,8 @@ class SessionManagerTest {
         val user = sessionManager.getCurrentUser()
 
         // Then: Returns user
-        assertThat(user).isNotNull()
-        assertThat(user?.displayName).isEqualTo("Test User")
+        Truth.assertThat(user).isNotNull()
+        Truth.assertThat(user?.displayName).isEqualTo("Test User")
     }
 
     @Test
@@ -112,7 +114,7 @@ class SessionManagerTest {
         val token = sessionManager.getAccessToken()
 
         // Then: Returns null
-        assertThat(token).isNull()
+        Truth.assertThat(token).isNull()
     }
 
     @Test
@@ -125,8 +127,8 @@ class SessionManagerTest {
         val token = sessionManager.getAccessToken()
 
         // Then: Returns token
-        assertThat(token).isNotNull()
-        assertThat(token).startsWith("mock_access_token_")
+        Truth.assertThat(token).isNotNull()
+        Truth.assertThat(token).startsWith("mock_access_token_")
     }
 
     @Test
@@ -138,7 +140,7 @@ class SessionManagerTest {
         val isExpired = sessionManager.isTokenExpired()
 
         // Then: Returns true
-        assertThat(isExpired).isTrue()
+        Truth.assertThat(isExpired).isTrue()
     }
 
     @Test
@@ -151,6 +153,6 @@ class SessionManagerTest {
         val isExpired = sessionManager.isTokenExpired(bufferMillis = 5 * 60 * 1000)
 
         // Then: Returns false (mock token expires in 24 hours)
-        assertThat(isExpired).isFalse()
+        Truth.assertThat(isExpired).isFalse()
     }
 }

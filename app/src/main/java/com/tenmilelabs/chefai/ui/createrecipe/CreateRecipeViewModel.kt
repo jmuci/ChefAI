@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.di.IoDispatcher
-import com.tenmilelabs.chefai.domain.auth.SessionManager
+import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.domain.model.Ingredient
 import com.tenmilelabs.chefai.domain.model.Label
 import com.tenmilelabs.chefai.domain.model.Recipe
