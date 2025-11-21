@@ -1,4 +1,4 @@
-package com.tenmilelabs.chefai.domain.model
+package com.tenmilelabs.chefai.auth.domain.model
 
 /**
  * Represents authentication tokens for API access.

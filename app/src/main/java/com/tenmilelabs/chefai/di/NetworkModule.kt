@@ -3,7 +3,7 @@ package com.tenmilelabs.chefai.di
 import com.tenmilelabs.chefai.data.source.network.AuthInterceptor
 import com.tenmilelabs.chefai.data.source.network.ChefAIApiService
 import com.tenmilelabs.chefai.data.source.network.RecipeNetworkDataSource
-import com.tenmilelabs.chefai.domain.auth.SessionManager
+import com.tenmilelabs.chefai.auth.domain.SessionManager
 import dagger.Binds
 import dagger.Module
 import dagger.Provides

@@ -126,6 +126,10 @@ fun ChefAINavGraph(
                     { navController.popBackStack() }
                 } else {
                     null
+                },
+                onLogout = {
+                    // Handle logout - could navigate to login screen or show a message
+                    // For now, user stays on the same screen but is logged out
                 }
             )
         },

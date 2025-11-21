@@ -1,12 +1,12 @@
-package com.tenmilelabs.chefai.domain.auth
+package com.tenmilelabs.chefai.auth.domain
 
-import com.tenmilelabs.chefai.data.source.local.SecurePreferencesInterface
+import com.tenmilelabs.chefai.auth.data.local.SecurePreferencesInterface
 import com.tenmilelabs.chefai.data.source.local.util.decodeHex
 import com.tenmilelabs.chefai.data.source.local.util.toUuid
 import com.tenmilelabs.chefai.di.ApplicationScope
-import com.tenmilelabs.chefai.domain.model.AuthToken
+import com.tenmilelabs.chefai.auth.domain.model.AuthToken
 import com.tenmilelabs.chefai.domain.model.User
-import com.tenmilelabs.chefai.domain.model.UserSession
+import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -52,7 +52,7 @@ class SessionManager @Inject constructor(
      */
     suspend fun loadSession() {
         try {
-            Timber.d("Loading user session...")
+            Timber.Forest.d("Loading user session...")
             _userSession.value = UserSession.Loading
 
             val userUuid = securePreferences.getUserUuid().first()
@@ -71,7 +71,7 @@ class SessionManager @Inject constructor(
                 // Check if token is expired
                 val currentTime = System.currentTimeMillis()
                 if (currentTime >= tokenExpiry) {
-                    Timber.d("Access token expired, attempting refresh...")
+                    Timber.Forest.d("Access token expired, attempting refresh...")
                     // TODO: Implement token refresh when backend is ready
                     // For now, use mock user
                     setMockSession()
@@ -94,15 +94,15 @@ class SessionManager @Inject constructor(
                         user = user,
                         authToken = authToken
                     )
-                    Timber.d("Session loaded successfully for user: ${user.uuid}")
+                    Timber.Forest.d("Session loaded successfully for user: ${user.uuid}")
                 }
             } else {
                 // No stored session, use mock user for development
-                Timber.d("No stored session found, using mock user")
+                Timber.Forest.d("No stored session found, using mock user")
                 setMockSession()
             }
         } catch (e: Exception) {
-            Timber.e(e, "Failed to load session")
+            Timber.Forest.e(e, "Failed to load session")
             _userSession.value = UserSession.Unauthenticated
         }
     }
@@ -113,7 +113,7 @@ class SessionManager @Inject constructor(
      */
     suspend fun login(email: String, password: String): Result<Unit> {
         return try {
-            Timber.d("Login attempt for: $email")
+            Timber.Forest.d("Login attempt for: $email")
             _userSession.value = UserSession.Loading
 
             // TODO: Make API call to backend for authentication
@@ -138,10 +138,10 @@ class SessionManager @Inject constructor(
                 authToken = authToken
             )
 
-            Timber.d("Login successful for user: ${user.uuid}")
+            Timber.Forest.d("Login successful for user: ${user.uuid}")
             Result.success(Unit)
         } catch (e: Exception) {
-            Timber.e(e, "Login failed")
+            Timber.Forest.e(e, "Login failed")
             _userSession.value = UserSession.Unauthenticated
             Result.failure(e)
         }
@@ -152,7 +152,7 @@ class SessionManager @Inject constructor(
      */
     suspend fun logout() {
         try {
-            Timber.d("Logging out user...")
+            Timber.Forest.d("Logging out user...")
 
             // Clear secure storage
             securePreferences.clearAuthData()
@@ -160,9 +160,9 @@ class SessionManager @Inject constructor(
             // Clear session state
             _userSession.value = UserSession.Unauthenticated
 
-            Timber.d("Logout successful")
+            Timber.Forest.d("Logout successful")
         } catch (e: Exception) {
-            Timber.e(e, "Error during logout")
+            Timber.Forest.e(e, "Error during logout")
             // Still mark as unauthenticated even if clear fails
             _userSession.value = UserSession.Unauthenticated
         }
@@ -179,7 +179,7 @@ class SessionManager @Inject constructor(
                 return Result.failure(IllegalStateException("No active session to refresh"))
             }
 
-            Timber.d("Refreshing access token...")
+            Timber.Forest.d("Refreshing access token...")
 
             // TODO: Make API call to backend to refresh token
             // val response = authApi.refreshToken(currentSession.authToken.refreshToken)
@@ -200,10 +200,10 @@ class SessionManager @Inject constructor(
                 authToken = newAuthToken
             )
 
-            Timber.d("Token refreshed successfully")
+            Timber.Forest.d("Token refreshed successfully")
             Result.success(Unit)
         } catch (e: Exception) {
-            Timber.e(e, "Token refresh failed")
+            Timber.Forest.e(e, "Token refresh failed")
             Result.failure(e)
         }
     }
@@ -259,7 +259,7 @@ class SessionManager @Inject constructor(
             authToken = mockAuthToken
         )
 
-        Timber.d("Mock session initialized for user: ${mockUser.uuid}")
+        Timber.Forest.d("Mock session initialized for user: ${mockUser.uuid}")
     }
 
     /**

@@ -1,6 +1,6 @@
 package com.tenmilelabs.chefai.data.source.network
 
-import com.tenmilelabs.chefai.domain.auth.SessionManager
+import com.tenmilelabs.chefai.auth.domain.SessionManager
 import io.ktor.client.plugins.api.createClientPlugin
 import timber.log.Timber
 

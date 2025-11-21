@@ -1,4 +1,6 @@
-package com.tenmilelabs.chefai.domain.model
+package com.tenmilelabs.chefai.auth.domain.model
+
+import com.tenmilelabs.chefai.domain.model.User
 
 /**
  * Represents the current user's session state.

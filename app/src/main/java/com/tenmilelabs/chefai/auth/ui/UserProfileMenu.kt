@@ -1,4 +1,4 @@
-package com.tenmilelabs.chefai.ui.components
+package com.tenmilelabs.chefai.auth.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
@@ -20,10 +20,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.tenmilelabs.chefai.domain.auth.SessionManager
-import com.tenmilelabs.chefai.domain.model.User
-import com.tenmilelabs.chefai.domain.model.UserSession
-import com.tenmilelabs.chefai.ui.auth.rememberUserSession
+import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.ui.theme.ChefAITheme
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
