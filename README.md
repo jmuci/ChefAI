@@ -14,6 +14,8 @@ This project is still under development.
 
 # Documentation
 
+* [Authentication](docs/authentication.md)
+
 See the [docs folder](docs/)
 
 ## Overall architecture

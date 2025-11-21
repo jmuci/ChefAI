@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Room
 import com.tenmilelabs.chefai.data.repository.DefaultMetadataRepository
 import com.tenmilelabs.chefai.data.repository.DefaultRecipeRepository
+import com.tenmilelabs.chefai.data.source.local.SecurePreferences
+import com.tenmilelabs.chefai.data.source.local.SecurePreferencesInterface
 import com.tenmilelabs.chefai.data.source.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.domain.repository.MetadataRepository
 import com.tenmilelabs.chefai.domain.repository.RecipesRepository
@@ -25,6 +27,10 @@ abstract class RepositoryModule {
     @Singleton
     @Binds
     abstract fun bindMetadataRepository(repository: DefaultMetadataRepository): MetadataRepository
+
+    @Singleton
+    @Binds
+    abstract fun bindSecurePreferences(securePreferences: SecurePreferences): SecurePreferencesInterface
 }
 
 
