@@ -1,11 +1,11 @@
 package com.tenmilelabs.chefai.auth.domain
 
 import com.tenmilelabs.chefai.auth.data.local.SecurePreferencesInterface
-import com.tenmilelabs.chefai.data.source.local.util.decodeHex
-import com.tenmilelabs.chefai.data.source.local.util.toUuid
-import com.tenmilelabs.chefai.di.ApplicationScope
+import com.tenmilelabs.chefai.core.data.local.util.decodeHex
+import com.tenmilelabs.chefai.core.data.local.util.toUuid
+import com.tenmilelabs.chefai.core.di.ApplicationScope
 import com.tenmilelabs.chefai.auth.domain.model.AuthToken
-import com.tenmilelabs.chefai.domain.model.User
+import com.tenmilelabs.chefai.core.domain.model.User
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
