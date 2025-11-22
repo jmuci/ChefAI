@@ -1,0 +1,52 @@
+package com.tenmilelabs.chefai.core.data.local.room.dao
+
+import androidx.room.Database
+import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
+import com.tenmilelabs.chefai.core.data.local.room.AllergenEntity
+import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
+import com.tenmilelabs.chefai.core.data.local.room.LabelEntity
+import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
+import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
+import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
+import com.tenmilelabs.chefai.core.data.local.room.RecipeStepEntity
+import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
+import com.tenmilelabs.chefai.core.data.local.room.SourceClassificationEntity
+import com.tenmilelabs.chefai.core.data.local.room.TagEntity
+import com.tenmilelabs.chefai.core.data.local.room.UserEntity
+import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
+
+@Database(
+    entities = [
+        AllergenEntity::class,
+        IngredientEntity::class,
+        LabelEntity::class,
+        RecipeEntity::class,
+        RecipeIngredientEntity::class,
+        RecipeLabelCrossRef::class,
+        RecipeStepEntity::class,
+        RecipeTagCrossRef::class,
+        SourceClassificationEntity::class,
+        TagEntity::class,
+        UserEntity::class
+    ],
+    version = 1,
+    exportSchema = true
+)
+@TypeConverters(
+    UuidConverters::class,
+
+)
+abstract class ChefAIDataBase : RoomDatabase() {
+    abstract fun allergenDao(): AllergenDao
+    abstract fun ingredientDao(): IngredientDao
+    abstract fun labelDao(): LabelDao
+    abstract fun recipeDao(): RecipeDao
+    abstract fun recipeIngredientDao(): RecipeIngredientDao
+    abstract fun recipeStepDao(): RecipeStepDao
+    abstract fun sourceClassificationDao(): SourceClassificationDao
+    abstract fun tagDao(): TagDao
+    abstract fun userDao(): UserDao
+    abstract fun recipeTagCrossRefDao(): RecipeTagCrossRefDao
+    abstract fun recipeLabelCrossRefDao(): RecipeLabelCrossRefDao
+}
