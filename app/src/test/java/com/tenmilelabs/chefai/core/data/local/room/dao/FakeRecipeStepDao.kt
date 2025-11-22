@@ -1,7 +1,7 @@
-package com.tenmilelabs.chefai.data.source.local
+package com.tenmilelabs.chefai.core.data.local.room.dao
 
-import com.tenmilelabs.chefai.data.source.local.room.RecipeStepEntity
-import com.tenmilelabs.chefai.data.source.local.room.dao.RecipeStepDao
+import com.tenmilelabs.chefai.core.data.local.room.RecipeStepEntity
+import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeStepDao
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map

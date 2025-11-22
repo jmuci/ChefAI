@@ -1,4 +1,4 @@
-package com.tenmilelabs.chefai.util
+package com.tenmilelabs.chefai.core.util
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi

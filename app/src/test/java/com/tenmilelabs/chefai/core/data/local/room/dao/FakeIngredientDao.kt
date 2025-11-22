@@ -1,10 +1,10 @@
-package com.tenmilelabs.chefai.data.source.local
+package com.tenmilelabs.chefai.core.data.local.room.dao
 
-import com.tenmilelabs.chefai.data.source.local.room.IngredientEntity
-import com.tenmilelabs.chefai.data.source.local.room.dao.IngredientDao
-import com.tenmilelabs.chefai.data.source.local.room.relations.IngredientWithDetails
-import com.tenmilelabs.chefai.data.source.local.room.relations.IngredientWithRecipes
-import com.tenmilelabs.chefai.data.source.local.util.SyncState
+import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
+import com.tenmilelabs.chefai.core.data.local.room.dao.IngredientDao
+import com.tenmilelabs.chefai.core.data.local.room.relations.IngredientWithDetails
+import com.tenmilelabs.chefai.core.data.local.room.relations.IngredientWithRecipes
+import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
