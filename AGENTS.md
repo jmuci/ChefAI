@@ -37,6 +37,7 @@ Follow the project’s architecture and conventions. Propose **diff-based edits*
 - Use cases are single-responsibility, stateless, and invokable via operator `invoke`.
 - Repositories expose `Flow` for streams; queries accept plain Kotlin primitives/value objects.
 - Provide KDoc on public APIs.
+- When making major architectural changes, deciding on specific technologies or patterns, write an ADR document in the folder docs/adrs/ following the existing ADR format
 
 
 ## PR/Change Rules
