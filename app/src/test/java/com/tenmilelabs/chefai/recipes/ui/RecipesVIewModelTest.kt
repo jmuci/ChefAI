@@ -1,15 +1,15 @@
-package com.tenmilelabs.chefai.ui.recipes
+package com.tenmilelabs.chefai.recipes.ui
 
 
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
-import com.tenmilelabs.chefai.data.FakeRecipesRepository
-import com.tenmilelabs.chefai.testData.TEST_DOMAIN_RECIPE_PREVIEWS_LIST
-import com.tenmilelabs.chefai.testData.recipePreview1
-import com.tenmilelabs.chefai.testData.recipePreview2
-import com.tenmilelabs.chefai.testData.recipePreview3
-import com.tenmilelabs.chefai.util.MainCoroutineRule
+import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
+import com.tenmilelabs.chefai.core.testutil.TEST_DOMAIN_RECIPE_PREVIEWS_LIST
+import com.tenmilelabs.chefai.core.testutil.recipePreview1
+import com.tenmilelabs.chefai.core.testutil.recipePreview2
+import com.tenmilelabs.chefai.core.testutil.recipePreview3
+import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before

@@ -1,4 +1,7 @@
-package com.tenmilelabs.chefai.data.source.network
+package com.tenmilelabs.chefai.recipes.data.network
+
+import com.tenmilelabs.chefai.recipes.data.network.model.NetworkRecipe
+import com.tenmilelabs.chefai.recipes.data.network.model.NetworkRecipeList
 
 /**
  * Fake implementation of [RecipeNetworkDataSource] for testing purposes.

@@ -1,24 +1,24 @@
-package com.tenmilelabs.chefai.testData
+package com.tenmilelabs.chefai.core.testutil
 
-import com.tenmilelabs.chefai.data.mapper.toDomain
-import com.tenmilelabs.chefai.data.source.local.room.AllergenEntity
-import com.tenmilelabs.chefai.data.source.local.room.IngredientEntity
-import com.tenmilelabs.chefai.data.source.local.room.LabelEntity
-import com.tenmilelabs.chefai.data.source.local.room.RecipeEntity
-import com.tenmilelabs.chefai.data.source.local.room.RecipeIngredientEntity
-import com.tenmilelabs.chefai.data.source.local.room.RecipeLabelCrossRef
-import com.tenmilelabs.chefai.data.source.local.room.RecipeStepEntity
-import com.tenmilelabs.chefai.data.source.local.room.RecipeTagCrossRef
-import com.tenmilelabs.chefai.data.source.local.room.SourceClassificationEntity
-import com.tenmilelabs.chefai.data.source.local.room.TagEntity
-import com.tenmilelabs.chefai.data.source.local.room.UserEntity
-import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeIngredient
-import com.tenmilelabs.chefai.data.source.local.room.relations.RecipeWithDetails
-import com.tenmilelabs.chefai.data.source.local.util.decodeHex
-import com.tenmilelabs.chefai.data.source.local.util.toUuid
-import com.tenmilelabs.chefai.domain.model.Label
-import com.tenmilelabs.chefai.domain.model.RecipePreview
-import com.tenmilelabs.chefai.domain.model.Tag
+import com.tenmilelabs.chefai.recipes.data.mapper.toDomain
+import com.tenmilelabs.chefai.core.data.local.room.AllergenEntity
+import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
+import com.tenmilelabs.chefai.core.data.local.room.LabelEntity
+import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
+import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
+import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
+import com.tenmilelabs.chefai.core.data.local.room.RecipeStepEntity
+import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
+import com.tenmilelabs.chefai.core.data.local.room.SourceClassificationEntity
+import com.tenmilelabs.chefai.core.data.local.room.TagEntity
+import com.tenmilelabs.chefai.core.data.local.room.UserEntity
+import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
+import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeWithDetails
+import com.tenmilelabs.chefai.core.data.local.util.decodeHex
+import com.tenmilelabs.chefai.core.data.local.util.toUuid
+import com.tenmilelabs.chefai.core.domain.model.Label
+import com.tenmilelabs.chefai.core.domain.model.RecipePreview
+import com.tenmilelabs.chefai.core.domain.model.Tag
 import java.util.UUID
 
 private const val updatedTimeSt = 10_000_000L

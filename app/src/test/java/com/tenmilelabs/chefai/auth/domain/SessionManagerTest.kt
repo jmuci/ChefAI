@@ -4,7 +4,7 @@ import com.google.common.truth.Truth
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
-import com.tenmilelabs.chefai.domain.model.User
+import com.tenmilelabs.chefai.core.domain.model.User
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
