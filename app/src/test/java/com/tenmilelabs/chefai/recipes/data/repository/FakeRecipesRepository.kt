@@ -1,8 +1,8 @@
-package com.tenmilelabs.chefai.data
+package com.tenmilelabs.chefai.recipes.data.repository
 
-import com.tenmilelabs.chefai.domain.model.Recipe
-import com.tenmilelabs.chefai.domain.model.RecipePreview
-import com.tenmilelabs.chefai.domain.repository.RecipesRepository
+import com.tenmilelabs.chefai.core.domain.model.Recipe
+import com.tenmilelabs.chefai.core.domain.model.RecipePreview
+import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.flow
