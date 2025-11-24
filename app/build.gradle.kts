@@ -120,6 +120,7 @@ dependencies {
     // Coil Image Loader
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    testImplementation(libs.coil.test)
 
     // Networking Client
     implementation(libs.ktor.client.core)
@@ -144,6 +145,8 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.google.truth)
     testImplementation(libs.turbine)
+    testImplementation(libs.hilt.android.testing)
+    kspTest(libs.hilt.android.compiler)
 
 
     // Dependencies for Android tests ====
