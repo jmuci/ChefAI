@@ -21,6 +21,10 @@
     <string name="fab_create_recipe">Create recipe</string>
     <string name="fab_import_recipe">Import recipe</string>
     <string name="fab_open_menu_content_description">Open recipe actions</string>
+    <string name="home_recipe_suggestions_dietary_subtitle">Based on your seleceted dietary preferences</string>
+    <string name="home_recipe_suggestions_dietary_title">More low-carb alternatives</string>
+    <string name="home_recipe_suggestions_subtitle">Based on your taste profile</string>
+    <string name="home_recipe_suggestions_title">For You</string>
     <string name="home_screen_title">Home</string>
     <string name="image_selected">Image selected</string>
     <string name="image_url_set">Image URL set</string>
@@ -78,10 +82,10 @@
     <string name="section_recipe_photo">Recipe Photo</string>
     <string name="section_tags">Tags</string>
     <string name="servings_format">%1$d servings</string>
+    <string name="snackbar_save_error">Failed to save recipe.</string>
     <string name="step_number_format">%1$d.</string>
     <string name="steps">Steps</string>
     <string name="title_home">Home</string>
     <string name="title_meal_plans">Meal Plans</string>
     <string name="title_recipes">Recipes</string>
-    <string name="snackbar_save_error">Failed to save recipe.</string>
 </resources>
