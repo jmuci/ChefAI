@@ -6,11 +6,13 @@ import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.domain.model.Tag
 
 object PreviewData {
+    const val BASE_IMG_URL = "https://raw.githubusercontent.com/jmuci/ChATestAPI/refs/heads/main/statics/thumbnails/lowres/"
+        val pasta = "https://raw.githubusercontent.com/jmuci/ChATestAPI/refs/heads/main/statics/thumbnails/lowres/pasta-carbonara.jpeg"
     val recipePreview = RecipePreview(
         uuid = generateUuid7(),
         title = "Delicious Grilled Chicken",
         description = "A very tasty and easy to make grilled chicken recipe. Perfect for a summer barbecue. Follow the steps carefully for the best results.",
-        imageUrlThumbnail = "https://images.pexels.com/photos/106343/pexels-photo-106343.jpeg",
+        imageUrlThumbnail = BASE_IMG_URL + "lem-chicken.jpeg",
         prepTimeMinutes = 15,
         cookTimeMinutes = 20,
         servings = 4,
@@ -23,7 +25,8 @@ object PreviewData {
         uuid = generateUuid7(),
         title = "Spicy Tuscan Sausage & Kale Pasta with Sun-Dried Tomatoes and a Creamy Parmesan Sauce",
         description = "A hearty and comforting pasta dish that comes together in under 30 minutes. Perfect for a weeknight family dinner.",
-        imageUrlThumbnail = "https://www.istockphoto.com/photo/homemade-cavatelli-pasta-dinner-gm1355330441-429847611?utm_source=unsplash&utm_medium=affiliate&utm_campaign=srp_photos_bottom&utm_content=https%3A%2F%2Funsplash.com%2Fs%2Fphotos%2Fsausage-pasta-kale&utm_term=sausage+pasta+kale%3A%3Abottom-affiliates-3col%3Aexperiment",
+        //imageUrlThumbnail = BASE_IMG_URL +"pasta-carbonara.jpeg",
+        imageUrlThumbnail = pasta,
         prepTimeMinutes = 10,
         cookTimeMinutes = 25,
         servings = 6,
@@ -34,7 +37,7 @@ object PreviewData {
 
     val recipePreviewNoImage = RecipePreview(
         uuid = generateUuid7(),
-        title = "Classic Beef Stew",
+        title = "Brocoli Strogonoff",
         description = "A simple, traditional beef stew. This recipe is a placeholder and does not have an image, used for testing fallback UI.",
         imageUrlThumbnail = "", // No image
         prepTimeMinutes = 20,
@@ -49,7 +52,7 @@ object PreviewData {
         uuid = generateUuid7(),
         title = "Mediterranean Grilled Chicken",
         description = "A light and flavorful grilled chicken recipe with classic Mediterranean herbs and a lemon-garlic marinade.",
-        imageUrlThumbnail = "https://www.themediterraneandish.com/wp-content/uploads/2015/05/mediterranean-grilled-chicken-recipe-13.jpg",
+        imageUrlThumbnail = BASE_IMG_URL + "chicken-med.jpeg",
         prepTimeMinutes = 15,
         cookTimeMinutes = 20,
         servings = 4,
@@ -60,9 +63,9 @@ object PreviewData {
 
     val recipePreviewManyLabelsAndTags = RecipePreview(
         uuid = generateUuid7(),
-        title = "Mediterranean Grilled Chicken",
-        description = "A light and flavorful grilled chicken recipe with classic Mediterranean herbs and a lemon-garlic marinade.",
-        imageUrlThumbnail = "https://www.themediterraneandish.com/wp-content/uploads/2015/05/mediterranean-grilled-chicken-recipe-13.jpg",
+        title = "Classic Beef Stew",
+        description = "A simple, traditional beef stew that is perfect for a cold winter night.",
+        imageUrlThumbnail = "https://images.unsplash.com/photo-1608500218861-01091cdc501e?q=80&w=987&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
         prepTimeMinutes = 15,
         cookTimeMinutes = 20,
         servings = 4,
@@ -75,6 +78,7 @@ object PreviewData {
         uuid = generateUuid7(),
         title = "Classic Margherita Pizza",
         description = "Authentic Italian pizza with fresh mozzarella, basil, and tomato sauce on a crispy thin crust.",
+        imageUrlThumbnail = "https://images.unsplash.com/photo-1598023696416-0193a0bcd302?q=80&w=1536&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
         prepTimeMinutes = 20,
         cookTimeMinutes = 15,
         servings = 2,
@@ -88,6 +92,7 @@ object PreviewData {
         uuid = generateUuid7(),
         title = "Grilled Salmon Teriyaki",
         description = "Perfectly grilled salmon glazed with homemade teriyaki sauce, served with steamed vegetables.",
+        imageUrlThumbnail = "https://images.unsplash.com/photo-1735315050688-010b5b548054?q=80&w=1585&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
         prepTimeMinutes = 10,
         cookTimeMinutes = 15,
         servings = 4,
@@ -100,6 +105,7 @@ object PreviewData {
         uuid = generateUuid7(),
         title = "Chocolate Chip Cookies",
         description = "Soft and chewy homemade chocolate chip cookies that are perfect for any occasion.",
+        imageUrlThumbnail = "https://images.unsplash.com/photo-1499636136210-6f4ee915583e?q=80&w=1064&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
         prepTimeMinutes = 15,
         cookTimeMinutes = 12,
         servings = 24,
@@ -112,6 +118,7 @@ object PreviewData {
         uuid = generateUuid7(),
         title = "Thai Green Curry",
         description = "Aromatic and spicy Thai curry with coconut milk, vegetables, and your choice of protein.",
+        imageUrlThumbnail = "https://plus.unsplash.com/premium_photo-1713089366140-814130d69933?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
         prepTimeMinutes = 15,
         cookTimeMinutes = 25,
         servings = 4,
@@ -124,11 +131,11 @@ object PreviewData {
     val recipePreviewList = listOf(
         recipePreview,
         recipePreviewLongTitle,
-        recipePreviewNoImage,
+        //recipePreviewNoImage,
         recipePreviewNoTags,
-        recipePreview.copy(uuid = generateUuid7(), title = "Lemon Herb Roasted Chicken"),
+        recipePreviewManyLabelsAndTags,
+        recipePreview.copy(uuid = generateUuid7(), title = "Lemon Herb Roasted Chicken", imageUrlThumbnail = "https://media.istockphoto.com/id/1364436921/photo/lemon-butter-chicken-grilled-chicken-with-butter-lemon-and-garlic-lemon-chicken-dish.jpg?s=2048x2048&w=is&k=20&c=iKyK26uozMGiF48ITdaDOnxjhhkbh4JuDF3ZB2m4ow8="),
         recipePreviewLongTitle.copy(uuid = generateUuid7(), title = "Quick Shrimp Scampi"),
-        recipePreview.copy(uuid = generateUuid7(), title = "Vegetarian Chili"),
         recipePreview1,
         recipePreview2,
         recipePreview3,
