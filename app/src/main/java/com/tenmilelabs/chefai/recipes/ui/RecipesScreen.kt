@@ -23,6 +23,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.ui.components.RecipeListCard
+import com.tenmilelabs.chefai.core.ui.components.SectionHeaderWithSubtitle
 import com.tenmilelabs.chefai.core.ui.preview.PreviewData
 import com.tenmilelabs.chefai.core.ui.preview.RecipePreviewProvider
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
@@ -77,6 +78,8 @@ fun RecipesContent(
                     .fillMaxSize()
                     .padding(horizontal = dimensionResource(id = R.dimen.padding_extra_small))
             ) {
+                SectionHeaderWithSubtitle("Your Recipes", "All your favorite recipes in one place!")
+
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(

@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.core.ui.navigation
 
 import android.content.res.Configuration.UI_MODE_NIGHT_YES
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -10,11 +11,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
@@ -29,10 +33,12 @@ enum class TopLevelDestination(
 ) {
     HOME(
         icon = R.drawable.ic_home_black_24dp,
-        appDestination = AppDestinations.HOME),
+        appDestination = AppDestinations.HOME
+    ),
     RECIPES(
         icon = R.drawable.ic_recipe_library_24dp,
-        appDestination = AppDestinations.RECIPES),
+        appDestination = AppDestinations.RECIPES
+    ),
     MEAL_PLANS(
         icon = R.drawable.ic_chef_hat_black_24dp,
         appDestination = AppDestinations.MEAL_PLANS
@@ -58,7 +64,11 @@ fun BottomNavigationBar(
                     navController.navigate(item.appDestination.route)
                 },
                 icon = {
-                    Icon(imageVector = ImageVector.vectorResource(id = item.icon), contentDescription = stringResource(item.appDestination.title))
+                    Icon(
+                        imageVector = ImageVector.vectorResource(id = item.icon),
+                        contentDescription = stringResource(item.appDestination.title),
+                        modifier = Modifier.size(dimensionResource(R.dimen.nav_bar_icon_size))
+                    )
                 },
                 label = {
                     Text(
