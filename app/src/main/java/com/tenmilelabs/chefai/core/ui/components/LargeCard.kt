@@ -63,6 +63,7 @@ fun LargeCard(
     height: Int = 250,
     onClick: (UUID) -> Unit = {}
 ) {
+    timber.log.Timber.d("LargeCard composing for recipe: ${recipe.title}, imageUrl: ${recipe.imageUrlThumbnail}")
     Card(
         modifier = modifier
             .width(width.dp)
@@ -77,11 +78,17 @@ fun LargeCard(
             modifier = Modifier.fillMaxSize()
         ) {
             // Background Image
+            val imageRequest = ImageRequest.Builder(LocalContext.current)
+                .data(recipe.imageUrlThumbnail)
+                .crossfade(true)
+                .listener(
+                    onError = { _, result -> timber.log.Timber.e("Image loading ERROR: ${recipe.imageUrlThumbnail}, error: ${result.throwable}") },
+                    onCancel = { timber.log.Timber.d("Image loading CANCELLED: ${recipe.imageUrlThumbnail}") }
+                )
+                .build()
+
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(recipe.imageUrlThumbnail)
-                    .crossfade(true)
-                    .build(),
+                model = imageRequest,
                 placeholder = painterResource(R.drawable.ic_img_placeholder),
                 error = painterResource(R.drawable.ic_img_error),
                 contentDescription = stringResource(R.string.recipe_image_content_description),
