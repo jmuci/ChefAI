@@ -80,7 +80,7 @@ fun RecipeCarouselSection(
         text = title,
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = dimensionResource(id = R.dimen.padding_extra_small))
     )
 
     Text(
