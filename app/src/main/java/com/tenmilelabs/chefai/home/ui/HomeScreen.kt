@@ -36,7 +36,7 @@ fun HomeScreen(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(vertical = 16.dp)
+        contentPadding = PaddingValues(vertical = dimensionResource(id = R.dimen.padding_extra_small))
     ) {
         // Recipe Suggestions Section
         item {
@@ -80,7 +80,10 @@ fun RecipeCarouselSection(
         text = title,
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = dimensionResource(id = R.dimen.padding_extra_small))
+        modifier = Modifier.padding(
+            horizontal = dimensionResource(id = R.dimen.padding_medium),
+            vertical = dimensionResource(id = R.dimen.padding_small)
+        )
     )
 
     Text(
@@ -88,7 +91,10 @@ fun RecipeCarouselSection(
         style = MaterialTheme.typography.titleMedium,
         color = MaterialTheme.colorScheme.secondary,
         fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = dimensionResource(id = R.dimen.padding_extra_small))
+        modifier = Modifier.padding(
+            horizontal = 16.dp,
+            vertical = dimensionResource(id = R.dimen.padding_extra_extra_small)
+        )
     )
 
     // Horizontal scrolling carousel

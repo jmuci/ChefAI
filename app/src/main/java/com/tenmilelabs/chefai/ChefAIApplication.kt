@@ -4,14 +4,13 @@ import android.app.Application
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
-import dagger.hilt.android.HiltAndroidApp
-import dagger.hilt.android.EntryPointAccessors
-import timber.log.Timber
-import timber.log.Timber.DebugTree
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.android.HiltAndroidApp
 import dagger.hilt.components.SingletonComponent
-import jakarta.inject.Inject
+import timber.log.Timber
+import timber.log.Timber.DebugTree
 
 /**
  * Custom Application class for ChefAI.

@@ -22,7 +22,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class SecurePreferences @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) : SecurePreferencesInterface {
     companion object {
         private const val SECURE_PREFS_FILE_NAME = "chefai_secure_prefs"

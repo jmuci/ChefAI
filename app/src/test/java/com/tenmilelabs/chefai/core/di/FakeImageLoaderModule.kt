@@ -1,12 +1,12 @@
 package com.tenmilelabs.chefai.core.di
 
-import android.content.Context
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.annotation.ExperimentalCoilApi
 import coil3.test.FakeImageLoaderEngine
 import dagger.Module
 import dagger.Provides
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dagger.hilt.testing.TestInstallIn
 import javax.inject.Singleton
@@ -32,7 +32,7 @@ object FakeImageLoaderModule {
     @OptIn(ExperimentalCoilApi::class)
     @Provides
     @Singleton
-    fun provideFakeImageLoader(context: PlatformContext): ImageLoader {
+    fun provideFakeImageLoader(@ApplicationContext context: PlatformContext): ImageLoader {
         return ImageLoader.Builder(context)
             .components {
                 // FakeImageLoaderEngine returns synthetic images instantly

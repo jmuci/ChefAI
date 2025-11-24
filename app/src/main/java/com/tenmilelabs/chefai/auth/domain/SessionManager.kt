@@ -25,7 +25,7 @@ import javax.inject.Singleton
 @Singleton
 class SessionManager @Inject constructor(
     private val securePreferences: SecurePreferencesInterface,
-    @ApplicationScope private val applicationScope: CoroutineScope
+    @param:ApplicationScope private val applicationScope: CoroutineScope
 ) {
     private val _userSession = MutableStateFlow<UserSession>(UserSession.Loading)
     val userSession: StateFlow<UserSession> = _userSession.asStateFlow()
