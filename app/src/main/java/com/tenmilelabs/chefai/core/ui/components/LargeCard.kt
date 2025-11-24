@@ -60,7 +60,7 @@ fun LargeCard(
     recipe: RecipePreview,
     modifier: Modifier = Modifier,
     width: Int = 300,
-    height: Int = 250,
+    height: Int = 220,
     onClick: (UUID) -> Unit = {}
 ) {
     timber.log.Timber.d("LargeCard composing for recipe: ${recipe.title}, imageUrl: ${recipe.imageUrlThumbnail}")
@@ -212,7 +212,7 @@ private fun LargeCardPreview() {
     ChefAITheme {
         Surface {
             LargeCard(
-                recipe = PreviewData.recipePreview,
+                recipe = PreviewData.grilledChickenRecipe,
                 modifier = Modifier.padding(16.dp)
             )
         }
@@ -225,7 +225,7 @@ private fun LargeCardDarkPreview() {
     ChefAITheme(darkTheme = true) {
         Surface {
             LargeCard(
-                recipe = PreviewData.recipePreview,
+                recipe = PreviewData.grilledChickenRecipe,
                 modifier = Modifier.padding(16.dp)
             )
         }
