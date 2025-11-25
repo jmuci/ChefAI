@@ -51,7 +51,7 @@ object PreviewData {
     val beefStewNoPhoto = RecipePreview(
         uuid = generateUuid7(),
         title = "Brocoli Strogonoff",
-        description = "A simple, traditional beef stew. This recipe is a placeholder and does not have an image, used for testing fallback UI.",
+        description = " does not have an image",
         imageUrlThumbnail = "", // No image
         prepTimeMinutes = 20,
         cookTimeMinutes = 180,
