@@ -7,6 +7,7 @@ import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeRepository
 import com.tenmilelabs.chefai.auth.data.local.SecurePreferences
 import com.tenmilelabs.chefai.auth.data.local.SecurePreferencesInterface
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
+import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_1_2
 import com.tenmilelabs.chefai.core.domain.repository.MetadataRepository
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.Binds
@@ -45,7 +46,10 @@ object DatabaseModules {
             context,
             ChefAIDataBase::class.java,
             "ChefAI.db"
-        ).createFromAsset("database/ChefAI.db").build()
+        )
+            .createFromAsset("database/ChefAI.db")
+            .addMigrations(MIGRATION_1_2) // Add migration for email/avatarUrl NOT NULL
+            .build()
     }
 
     @Provides
