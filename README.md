@@ -18,6 +18,12 @@ This project is still under development.
 
 See the [docs folder](docs/)
 
+## UI Preview
+
+Below are a couple of the app screens to get an idea of how it looks. 
+
+![home screen](docs/img/screenshots/Home.png)
+![MyCollection Screen](docs/img/screenshots/MyCollection.png)
 ## Overall architecture
 ![architecture diagram](docs/img/ChefAI-Architecure.png)
 
