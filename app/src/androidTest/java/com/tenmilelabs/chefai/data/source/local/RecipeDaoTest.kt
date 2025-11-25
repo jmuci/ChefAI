@@ -29,7 +29,7 @@ class RecipeDaoTest {
         uuid = UUID.randomUUID(),
         displayName = "Test User",
         email = "test@test.com",
-        avatarUrl = null,
+        avatarUrl = "",
         updatedAt = System.currentTimeMillis(),
         deletedAt = null
     )

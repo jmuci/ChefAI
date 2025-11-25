@@ -27,7 +27,7 @@ val testUser = UserEntity(
     uuid = "F47AC10B58CC4372A5670E02B2C3D479".decodeHex().toUuid(),
     displayName = "Test User",
     email = "test@test.com",
-    avatarUrl = null,
+    avatarUrl = "",
     updatedAt = updatedTimeSt,
     deletedAt = null
 )
