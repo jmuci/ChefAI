@@ -20,7 +20,7 @@ fun NetworkRecipe.toDomain(): Recipe {
         prepTimeMinutes = preparationTimeMinutes,
         cookTimeMinutes = 0, // Not available in network DTO
         servings = 0, // Not available in network DTO
-        creator = User(UUID.randomUUID(), "", null, null), // Not available in network DTO
+        creator = User(UUID.randomUUID(), "", "", ""), // Not available in network DTO
         recipeExternalUrl = recipeUrl,
         ingredients = emptyList(),
         steps = emptyList(),
