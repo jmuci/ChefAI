@@ -11,14 +11,17 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -29,6 +32,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -52,7 +56,9 @@ import java.util.UUID
  * @param modifier Modifier for customizing the card appearance and behavior
  * @param width The width of the card (default 300dp for carousel use)
  * @param height The height of the card (default 250dp)
+ * @param isInCollection Whether the recipe is already saved to collection (default false)
  * @param onClick Callback when the card is clicked, receives the recipe UUID
+ * @param onSaveToCollection Callback when the save to collection button is clicked, receives the recipe UUID
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -61,7 +67,9 @@ fun LargeCard(
     modifier: Modifier = Modifier,
     width: Int = 300,
     height: Int = 220,
-    onClick: (UUID) -> Unit = {}
+    isInCollection: Boolean = false,
+    onClick: (UUID) -> Unit = {},
+    onSaveToCollection: (UUID) -> Unit = {}
 ) {
     timber.log.Timber.d("LargeCard composing for recipe: ${recipe.title}, imageUrl: ${recipe.imageUrlThumbnail}")
     Card(
@@ -110,6 +118,29 @@ fun LargeCard(
                         )
                     )
             )
+
+            // Save to Collection button (top end)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(dimensionResource(R.dimen.padding_small) ),
+                contentAlignment = Alignment.TopEnd
+            ) {
+                IconButton(
+                    onClick = { onSaveToCollection(recipe.uuid) },
+                    modifier = Modifier
+                        .background(
+                            color = Color.Black.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(50)
+                        )
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.BookmarkBorder,
+                        contentDescription = stringResource(R.string.save_to_collection_content_description),
+                        tint = Color.White
+                    )
+                }
+            }
 
             // Content overlay
             Column(
@@ -214,6 +245,19 @@ private fun LargeCardPreview() {
             LargeCard(
                 recipe = PreviewData.grilledChickenRecipe,
                 modifier = Modifier.padding(16.dp)
+            )
+        }
+    }
+}
+@Preview
+@Composable
+private fun LargeCardInCollectionPreview() {
+    ChefAITheme {
+        Surface {
+            LargeCard(
+                recipe = PreviewData.grilledChickenRecipe,
+                modifier = Modifier.padding(16.dp),
+                isInCollection = true
             )
         }
     }

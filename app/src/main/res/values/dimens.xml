@@ -10,4 +10,5 @@
     <dimen name="row_height_medium">50dp</dimen>
     <dimen name="section_header_height">60dp</dimen>
     <dimen name="nav_bar_icon_size">30dp</dimen>
+    <dimen name="icon_size_large">30dp</dimen>
 </resources>
