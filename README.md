@@ -24,7 +24,7 @@ Below are a couple of the app screens to get an idea of how it looks.
 
 | Home Screen | MyCollection Screen |
 |------------|----------------------|
-| <img src="img/screenshots/Home.png" alt="Home Screen" height="600"> | <img src="img/screenshots/MyCollection.png" alt="MyCollection Screen" height="600"> |
+| <img src="docs/img/screenshots/Home.png" alt="Home Screen" height="600"> | <img src="docs/img/screenshots/MyCollection.png" alt="MyCollection Screen" height="600"> |
 
 
 ## Overall architecture
