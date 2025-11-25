@@ -1,11 +1,13 @@
 package com.tenmilelabs.chefai.core.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -21,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.modifier.modifierLocalConsumer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
@@ -98,7 +101,7 @@ fun RecipeListCard(
 
                 Text(
                     text = recipe.description,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -106,18 +109,23 @@ fun RecipeListCard(
                 )
 
                 Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_extra_small)))
-
-                Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_small)))
-
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_extra_small)),
-                    verticalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_extra_small)),
-                    maxLines = 1
-                ) {
-                    recipe.labels.take(3).forEach { label ->
-                        InfoChip(text = label.displayName, type = InfoChipType.LABEL)
+                Box(modifier = Modifier.fillMaxSize()) {
+                    FlowRow(
+                        modifier = Modifier.align(Alignment.BottomStart),
+                        horizontalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_extra_small)),
+                        verticalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_extra_small)),
+                        maxLines = 1
+                    ) {
+                        recipe.labels.take(3).forEach { label ->
+                            InfoChip(text = label.displayName, type = InfoChipType.LABEL)
+                        }
+                        recipe.tags.take(3).forEach { label ->
+                            InfoChip(text = label.displayName, type = InfoChipType.TAG)
+                        }
                     }
                 }
+
+
             }
         }
     }
