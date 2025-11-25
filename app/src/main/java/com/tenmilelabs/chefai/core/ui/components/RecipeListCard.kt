@@ -109,7 +109,12 @@ fun RecipeListCard(
                 )
 
                 Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_extra_small)))
-                Box(modifier = Modifier.fillMaxSize()) {
+                // Box takes remaining space in the Column, chips align to bottom
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
                     FlowRow(
                         modifier = Modifier.align(Alignment.BottomStart),
                         horizontalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_extra_small)),
