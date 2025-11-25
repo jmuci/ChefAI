@@ -16,8 +16,8 @@ import java.util.UUID
 data class UserEntity(
     @PrimaryKey override val uuid: UUID,
     val displayName: String,
-    val email: String?,
-    val avatarUrl: String?,
+    val email: String,
+    val avatarUrl: String,
 
     override val updatedAt: Long,
     override val deletedAt: Long?,

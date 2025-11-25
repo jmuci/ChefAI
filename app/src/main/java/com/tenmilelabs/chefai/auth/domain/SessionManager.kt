@@ -36,7 +36,7 @@ class SessionManager @Inject constructor(
         uuid = "F47AC10B58CC4372A5670E02B2C3D479".decodeHex().toUuid(),
         displayName = "Test User",
         email = "test@chefai.com",
-        avatarUrl = null
+        avatarUrl = "https://lh3.googleusercontent.com/a/ACg8ocJkiHEp4Du1l-Y4-raRQ6opmwP2Dihq9JIi47wJUn1Aki3d_8Z6=s288-c-no"
     )
 
     init {
@@ -85,8 +85,8 @@ class SessionManager @Inject constructor(
                         User(
                             uuid = userUuid,
                             displayName = "User",
-                            email = null,
-                            avatarUrl = null
+                            email = "",
+                            avatarUrl = ""
                         )
                     }
 

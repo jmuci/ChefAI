@@ -3,7 +3,7 @@
 
 -- Test User
 INSERT INTO `users` (`uuid`, `displayName`, `email`, `avatarUrl`, `updatedAt`, `deletedAt`, `syncState`) VALUES
-('f47ac10b-58cc-4372-a567-0e02b2c3d479', 'Test User', 'test.user@example.com', null, 1672531200, null, 'SYNCED');
+('f47ac10b-58cc-4372-a567-0e02b2c3d479', 'Test User', 'test.user@example.com', 'https://lh3.googleusercontent.com/a/ACg8ocJkiHEp4Du1l-Y4-raRQ6opmwP2Dihq9JIi47wJUn1Aki3d_8Z6=s288-c-no', 1672531200, null, 'SYNCED');
 
 -- Ingredients
 INSERT INTO `ingredients` (`uuid`, `displayName`, `allergenId`, `sourcePrimaryId`, `updatedAt`, `deletedAt`, `syncState`) VALUES
