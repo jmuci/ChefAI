@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.auth.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountCircle
@@ -16,12 +17,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
+import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
+import com.tenmilelabs.chefai.core.ui.preview.RecipeData.recipe
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
@@ -63,10 +73,30 @@ fun UserProfileMenu(
 
     Box(modifier = modifier) {
         IconButton(onClick = { expanded = true }) {
-            Icon(
-                imageVector = Icons.Default.AccountCircle,
-                contentDescription = "User profile"
-            )
+            if (userSession is UserSession.Authenticated && (userSession as UserSession.Authenticated).user.avatarUrl.isNotEmpty()) {
+                val user = (userSession as UserSession.Authenticated).user
+                val imageRequest = ImageRequest.Builder(LocalContext.current)
+                    .data(user.avatarUrl)
+                    .crossfade(true)
+                    .listener(
+                        onError = { _, result -> timber.log.Timber.e("Image loading ERROR: ${recipe.imageUrlThumbnail}, error: ${result.throwable}") },
+                        onCancel = { timber.log.Timber.d("Image loading CANCELLED: ${recipe.imageUrlThumbnail}") }
+                    )
+                    .build()
+                AsyncImage(
+                    model = imageRequest,
+                    placeholder = painterResource(R.drawable.ic_img_placeholder),
+                    error = painterResource(R.drawable.ic_img_error),
+                    contentDescription = stringResource(R.string.user_profile_avatar_description),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.AccountCircle,
+                    contentDescription = "User profile"
+                )
+            }
         }
 
         DropdownMenu(
