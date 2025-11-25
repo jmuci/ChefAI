@@ -22,8 +22,8 @@ See the [docs folder](docs/)
 
 Below are a couple of the app screens to get an idea of how it looks. 
 
-![home screen](docs/img/screenshots/Home.png)
-![MyCollection Screen](docs/img/screenshots/MyCollection.png)
+![home screen](docs/img/screenshots/Home.png =350x)
+![MyCollection Screen](docs/img/screenshots/MyCollection.png =350x)
 ## Overall architecture
 ![architecture diagram](docs/img/ChefAI-Architecure.png)
 
