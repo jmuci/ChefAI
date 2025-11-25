@@ -92,4 +92,5 @@
     <string name="home_recipe_suggestions_desserts_subtitle">Because we know you have sweet tooth...</string>
     <string name="home_recipe_suggestions_world_cuisine_title">Around the world: Italy</string>
     <string name="home_recipe_suggestions_world_cuisine_subtitle">Travel to italy through it\'s cuisine this week.</string>
+    <string name="user_profile_avatar_description">User avatar description</string>
 </resources>
