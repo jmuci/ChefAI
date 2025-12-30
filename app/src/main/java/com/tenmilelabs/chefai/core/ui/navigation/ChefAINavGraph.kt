@@ -6,12 +6,10 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -19,7 +17,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
@@ -45,7 +42,6 @@ fun ChefAINavGraph(
     }
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
-    val userMessages = remember { mutableListOf<Int>() } //TODO list or single message?
 
     val graph = navController.createGraph(startDestination = AppDestinations.HOME.route) {
         composable(route = AppDestinations.HOME.route) {
@@ -160,18 +156,6 @@ fun ChefAINavGraph(
             graph = graph,
             modifier = Modifier.padding(innerPadding)
         )
-    }
-
-    // Check for user messages to display on the screen
-    userMessages.map { message ->
-        val snackbarText = stringResource(message)
-        LaunchedEffect(snackbarHostState, message, snackbarText) {
-            snackbarHostState.showSnackbar(
-                message = snackbarText,
-                duration = SnackbarDuration.Short
-            )
-            userMessages.remove(message) // Remove it from the list after displaying it
-        }
     }
 
 }
