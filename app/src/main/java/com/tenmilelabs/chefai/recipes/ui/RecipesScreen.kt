@@ -14,8 +14,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.dimensionResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -38,22 +38,27 @@ fun RecipesScreen(
     onRecipeCardClick: (UUID) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
     RecipesContent(
         loading = uiState.isLoading,
         recipes = uiState.items,
         recipeCardOnClick = onRecipeCardClick,
     )
 
-    // Check for user messages to display on the screen
-    uiState.userMessage?.let { message ->
-        val snackBarText = stringResource(message)
-        LaunchedEffect(snackbarHostState, viewModel, message, snackBarText) {
-            snackbarHostState.showSnackbar(
-                message = snackBarText,
-                duration = SnackbarDuration.Short
-            )
-            viewModel.snackbarMessageShown()
+    // Collect and handle UI events
+    LaunchedEffect(viewModel) {
+        viewModel.uiEvents.collect { event ->
+            when (event) {
+                is RecipesUiEvent.ShowSnackbar -> {
+                    snackbarHostState.showSnackbar(
+                        message = context.getString(event.message),
+                        duration = SnackbarDuration.Short
+                    )
+                }
+            }
         }
+
     }
 }
 
