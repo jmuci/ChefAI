@@ -9,17 +9,21 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.ui.components.LargeCard
 import com.tenmilelabs.chefai.core.ui.components.SectionHeaderWithSubtitle
-import com.tenmilelabs.chefai.core.ui.preview.PreviewData
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import java.util.UUID
 
@@ -29,8 +33,27 @@ import java.util.UUID
  */
 @Composable
 fun HomeScreen(
+    viewModel: HomeViewModel = hiltViewModel(),
+    snackbarHostState: SnackbarHostState,
     onRecipeClick: (UUID) -> Unit = {}
 ) {
+    val uiState = viewModel.uiState
+    val context = LocalContext.current
+
+    // Collect and handle UI events
+    LaunchedEffect(viewModel) {
+        viewModel.uiEvents.collect { event ->
+            when (event) {
+                is HomeUiEvent.ShowSnackbar -> {
+                    snackbarHostState.showSnackbar(
+                        message = context.getString(event.message),
+                        duration = SnackbarDuration.Short
+                    )
+                }
+            }
+        }
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = dimensionResource(id = R.dimen.padding_extra_small))
@@ -40,7 +63,7 @@ fun HomeScreen(
             RecipeCarouselSection(
                 title = stringResource(R.string.home_recipe_suggestions_title),
                 subtitle = stringResource(R.string.home_recipe_suggestions_subtitle),
-                recipes = getForYouSampleRecipes(), // Using static test data
+                recipes = uiState.forYouRecipes,
                 onRecipeClick = onRecipeClick
             )
         }
@@ -50,7 +73,7 @@ fun HomeScreen(
             RecipeCarouselSection(
                 title = stringResource(R.string.home_recipe_suggestions_dietary_title),
                 subtitle = stringResource(R.string.home_recipe_suggestions_dietary_subtitle),
-                recipes = getLowCarbSampleRecipes(), // Using static test data
+                recipes = uiState.lowCarbRecipes,
                 onRecipeClick = onRecipeClick
             )
         }
@@ -59,7 +82,7 @@ fun HomeScreen(
             RecipeCarouselSection(
                 title = stringResource(R.string.home_recipe_suggestions_world_cuisine_title),
                 subtitle = stringResource(R.string.home_recipe_suggestions_world_cuisine_subtitle),
-                recipes = getItalianSampleRecipes().shuffled(), // Using static test data
+                recipes = uiState.italianRecipes.shuffled(),
                 onRecipeClick = onRecipeClick
             )
         }
@@ -68,7 +91,7 @@ fun HomeScreen(
             RecipeCarouselSection(
                 title = stringResource(R.string.home_recipe_suggestions_dessets_title),
                 subtitle = stringResource(R.string.home_recipe_suggestions_desserts_subtitle),
-                recipes = getDessertsSampleRecipes(), // Using static test data
+                recipes = uiState.dessertRecipes,
                 onRecipeClick = onRecipeClick
             )
         }
@@ -109,28 +132,14 @@ fun RecipeCarouselSection(
     Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_extra_small)))
 }
 
-
-private fun getForYouSampleRecipes(): List<RecipePreview> {
-    return PreviewData.forYouPreview
-}
-
-private fun getLowCarbSampleRecipes(): List<RecipePreview> {
-    return PreviewData.lowCarbsPreviewList
-}
-
-private fun getItalianSampleRecipes(): List<RecipePreview> {
-    return PreviewData.italianPreviewList
-}
-
-private fun getDessertsSampleRecipes(): List<RecipePreview> {
-    return PreviewData.dessertsPreviewList
-}
-
 @Preview(showBackground = true)
 @Composable
 private fun HomeScreenPreview() {
     ChefAITheme {
-        HomeScreen()
+        // Preview with placeholder snackbar state
+        HomeScreen(
+            snackbarHostState = SnackbarHostState()
+        )
     }
 }
 
@@ -138,6 +147,9 @@ private fun HomeScreenPreview() {
 @Composable
 private fun HomeScreenDarkPreview() {
     ChefAITheme(darkTheme = true) {
-        HomeScreen()
+        // Preview with placeholder snackbar state
+        HomeScreen(
+            snackbarHostState = SnackbarHostState()
+        )
     }
 }

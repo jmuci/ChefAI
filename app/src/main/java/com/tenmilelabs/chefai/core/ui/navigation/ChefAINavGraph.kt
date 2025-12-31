@@ -45,7 +45,7 @@ fun ChefAINavGraph(
 
     val graph = navController.createGraph(startDestination = AppDestinations.HOME.route) {
         composable(route = AppDestinations.HOME.route) {
-            HomeScreen()
+            HomeScreen(snackbarHostState = snackbarHostState)
         }
         composable(route = AppDestinations.RECIPES.route) {
             RecipesScreen(
