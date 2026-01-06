@@ -172,4 +172,22 @@ class SecurePreferences @Inject constructor(
             throw e
         }
     }
+
+    /**
+     * Updates only the refresh token (used during token rotation).
+     * Data is encrypted before being written to disk.
+     */
+    override suspend fun updateRefreshToken(refreshToken: String) {
+        try {
+            encryptedPrefs.edit()
+                .putString(KEY_REFRESH_TOKEN, refreshToken)
+                .apply()
+
+            notifyChange()
+            Timber.d("Refresh token updated successfully (encrypted)")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to update refresh token")
+            throw e
+        }
+    }
 }
