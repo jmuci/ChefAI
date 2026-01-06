@@ -1,0 +1,227 @@
+package com.tenmilelabs.chefai.auth.ui
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.auth.domain.model.UserSession
+import com.tenmilelabs.chefai.core.domain.model.User
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+/**
+ * UiState for the registration screen.
+ */
+data class RegisterUiState(
+    val isLoading: Boolean = false,
+    val username: String = "",
+    val email: String = "",
+    val password: String = "",
+    val confirmPassword: String = "",
+    val isPasswordVisible: Boolean = false,
+    val isConfirmPasswordVisible: Boolean = false,
+    val usernameError: String? = null,
+    val emailError: String? = null,
+    val passwordError: String? = null,
+    val confirmPasswordError: String? = null
+)
+
+/**
+ * One-time events for the registration screen.
+ */
+sealed interface RegisterUiEvent {
+    data class ShowSnackbar(val message: Int) : RegisterUiEvent
+    data object NavigateToHome : RegisterUiEvent
+    data object NavigateToLogin : RegisterUiEvent
+}
+
+/**
+ * ViewModel for the registration screen.
+ */
+@HiltViewModel
+class RegisterViewModel @Inject constructor(
+    private val sessionManager: SessionManager
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(RegisterUiState())
+    val uiState: StateFlow<RegisterUiState> = _uiState.asStateFlow()
+
+    private val _uiEvent = Channel<RegisterUiEvent>()
+    val uiEvents = _uiEvent.receiveAsFlow()
+
+    fun onUsernameChange(username: String) {
+        _uiState.value = _uiState.value.copy(
+            username = username,
+            usernameError = null
+        )
+    }
+
+    fun onEmailChange(email: String) {
+        _uiState.value = _uiState.value.copy(
+            email = email,
+            emailError = null
+        )
+    }
+
+    fun onPasswordChange(password: String) {
+        _uiState.value = _uiState.value.copy(
+            password = password,
+            passwordError = null,
+            confirmPasswordError = if (_uiState.value.confirmPassword.isNotBlank() && 
+                _uiState.value.confirmPassword != password) "Passwords do not match" else null
+        )
+    }
+
+    fun onConfirmPasswordChange(confirmPassword: String) {
+        _uiState.value = _uiState.value.copy(
+            confirmPassword = confirmPassword,
+            confirmPasswordError = if (_uiState.value.password.isNotBlank() && 
+                confirmPassword != _uiState.value.password) "Passwords do not match" else null
+        )
+    }
+
+    fun onPasswordVisibilityToggle() {
+        _uiState.value = _uiState.value.copy(
+            isPasswordVisible = !_uiState.value.isPasswordVisible
+        )
+    }
+
+    fun onConfirmPasswordVisibilityToggle() {
+        _uiState.value = _uiState.value.copy(
+            isConfirmPasswordVisible = !_uiState.value.isConfirmPasswordVisible
+        )
+    }
+
+    fun onRegisterClick() {
+        if (!validateInputs()) {
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+
+            val result = sessionManager.register(
+                username = _uiState.value.username.trim(),
+                email = _uiState.value.email.trim(),
+                password = _uiState.value.password
+            )
+
+            _uiState.value = _uiState.value.copy(isLoading = false)
+
+            result.fold(
+                onSuccess = { user ->
+                    _uiEvent.send(RegisterUiEvent.NavigateToHome)
+                },
+                onFailure = { exception ->
+                    val errorMessage = getErrorMessage(exception)
+                    setErrorField(errorMessage)
+                }
+            )
+        }
+    }
+
+    fun onLoginClick() {
+        viewModelScope.launch {
+            _uiEvent.send(RegisterUiEvent.NavigateToLogin)
+        }
+    }
+
+    private fun validateInputs(): Boolean {
+        val username = _uiState.value.username.trim()
+        val email = _uiState.value.email.trim()
+        val password = _uiState.value.password
+        val confirmPassword = _uiState.value.confirmPassword
+
+        var isValid = true
+        var usernameError: String? = null
+        var emailError: String? = null
+        var passwordError: String? = null
+        var confirmPasswordError: String? = null
+
+        // Validate username
+        if (username.isBlank()) {
+            usernameError = "Username is required"
+            isValid = false
+        } else if (username.length < 3) {
+            usernameError = "Username must be at least 3 characters"
+            isValid = false
+        }
+
+        // Validate email
+        if (email.isBlank()) {
+            emailError = "Email is required"
+            isValid = false
+        } else if (!isValidEmail(email)) {
+            emailError = "Invalid email format"
+            isValid = false
+        }
+
+        // Validate password
+        if (password.isBlank()) {
+            passwordError = "Password is required"
+            isValid = false
+        } else if (password.length < 8) {
+            passwordError = "Password must be at least 8 characters"
+            isValid = false
+        } else if (!containsLettersAndNumbers(password)) {
+            passwordError = "Password must contain both letters and numbers"
+            isValid = false
+        }
+
+        // Validate confirm password
+        if (confirmPassword.isBlank()) {
+            confirmPasswordError = "Please confirm your password"
+            isValid = false
+        } else if (confirmPassword != password) {
+            confirmPasswordError = "Passwords do not match"
+            isValid = false
+        }
+
+        _uiState.value = _uiState.value.copy(
+            usernameError = usernameError,
+            emailError = emailError,
+            passwordError = passwordError,
+            confirmPasswordError = confirmPasswordError
+        )
+
+        return isValid
+    }
+
+    private fun setErrorField(errorMessage: String) {
+        val currentUrl = _uiState.value.email.lowercase()
+        _uiState.value = _uiState.value.copy(
+            usernameError = if (errorMessage.contains("username")) errorMessage else null,
+            emailError = if (errorMessage.contains("email")) errorMessage else null,
+            passwordError = if (errorMessage.contains("password")) errorMessage else null
+        )
+    }
+
+    private fun isValidEmail(email: String): Boolean {
+        val emailRegex = Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
+        return emailRegex.matches(email)
+    }
+
+    private fun containsLettersAndNumbers(password: String): Boolean {
+        val hasLetter = password.any { it.isLetter() }
+        val hasNumber = password.any { it.isDigit() }
+        return hasLetter && hasNumber
+    }
+
+    private fun getErrorMessage(exception: Throwable): String {
+        return when (exception) {
+            is com.tenmilelabs.chefai.auth.data.network.AuthHttpException -> {
+                when (exception.statusCode) {
+                    400 -> "Invalid input data"
+                    409 -> "Email already registered"
+                    else -> exception.message
+                }
+            }
+            else -> "Registration failed. Please try again."
+        }
+    }
+}
