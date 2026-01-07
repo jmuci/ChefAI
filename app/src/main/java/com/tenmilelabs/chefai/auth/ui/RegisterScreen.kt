@@ -35,6 +35,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusManager
@@ -64,14 +65,16 @@ fun RegisterScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
 
     // Handle UI events
+    @Suppress("CompositionLocalAccess")
     LaunchedEffect(viewModel, snackbarHostState) {
         viewModel.uiEvents.collect { event ->
             when (event) {
                 is RegisterUiEvent.ShowSnackbar -> {
                     snackbarHostState?.showSnackbar(
-                        message = event.message,
+                        message = context.getString(event.message),
                         duration = androidx.compose.material3.SnackbarDuration.Short
                     )
                 }

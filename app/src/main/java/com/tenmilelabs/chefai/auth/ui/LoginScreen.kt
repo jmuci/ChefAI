@@ -36,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
@@ -55,20 +56,21 @@ import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 @Composable
 fun LoginScreen(
     viewModel: LoginViewModel = hiltViewModel(),
-    snackbarHostState: SnackbarHostState,
+    snackbarHostState: SnackbarHostState? = null,
     onNavigateToHome: () -> Unit = {},
     onNavigateToRegister: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
 
     // Handle UI events
     LaunchedEffect(viewModel, snackbarHostState) {
         viewModel.uiEvents.collect { event ->
             when (event) {
                 is LoginUiEvent.ShowSnackbar -> {
-                    snackbarHostState.showSnackbar(
-                        message = event.message,
+                    snackbarHostState?.showSnackbar(
+                        message = context.getString(event.message),
                         duration = SnackbarDuration.Short
                     )
                 }

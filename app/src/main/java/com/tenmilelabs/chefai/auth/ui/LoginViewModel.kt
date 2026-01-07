@@ -30,7 +30,7 @@ data class LoginUiState(
  * One-time events for the login screen.
  */
 sealed interface LoginUiEvent {
-    data class ShowSnackbar(val message: String) : LoginUiEvent
+    data class ShowSnackbar(val message: Int) : LoginUiEvent
     data object NavigateToHome : LoginUiEvent
     data object NavigateToRegister : LoginUiEvent
 }

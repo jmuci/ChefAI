@@ -33,7 +33,7 @@ data class RegisterUiState(
  * One-time events for the registration screen.
  */
 sealed interface RegisterUiEvent {
-    data class ShowSnackbar(val message: String) : RegisterUiEvent
+    data class ShowSnackbar(val message: Int) : RegisterUiEvent
     data object NavigateToHome : RegisterUiEvent
     data object NavigateToLogin : RegisterUiEvent
 }
