@@ -51,6 +51,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
@@ -132,7 +133,13 @@ fun RegisterScreenContent(
 
             // Logo
             Image(
-                painter = painterResource(R.drawable.ic_chef_hat_black_24dp),
+                painter = painterResource(
+                    if (isSystemInDarkTheme()) {
+                        R.drawable.ic_chef_hat_white_24dp
+                    } else {
+                        R.drawable.ic_chef_hat_black_24dp
+                    }
+                ),
                 contentDescription = "ChefAI Logo",
                 modifier = Modifier.size(100.dp)
             )
