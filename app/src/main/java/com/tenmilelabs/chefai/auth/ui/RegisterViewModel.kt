@@ -2,6 +2,8 @@ package com.tenmilelabs.chefai.auth.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.auth.data.network.AuthHttpException
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -10,6 +12,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
+import java.io.IOException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import javax.inject.Inject
 
 /**
@@ -116,10 +123,78 @@ class RegisterViewModel @Inject constructor(
                     _uiEvent.emit(RegisterUiEvent.NavigateToHome)
                 },
                 onFailure = { exception ->
-                    val errorMessage = getErrorMessage(exception)
-                    setErrorField(errorMessage)
+                    Timber.e(exception, "Registration failed")
+                    handleRegistrationError(exception)
                 }
             )
+        }
+    }
+
+    private suspend fun handleRegistrationError(exception: Throwable) {
+        when (exception) {
+            // Network connectivity errors - show snackbar
+            is UnknownHostException -> {
+                _uiEvent.emit(
+                    RegisterUiEvent.ShowSnackbar(
+                        R.string.error_network_unavailable
+                    )
+                )
+            }
+            is ConnectException -> {
+                _uiEvent.emit(
+                    RegisterUiEvent.ShowSnackbar(
+                        R.string.error_network_unavailable
+                    )
+                )
+            }
+            is SocketTimeoutException -> {
+                _uiEvent.emit(
+                    RegisterUiEvent.ShowSnackbar(
+                        R.string.error_connection_timeout
+                    )
+                )
+            }
+            is IOException -> {
+                _uiEvent.emit(
+                    RegisterUiEvent.ShowSnackbar(
+                        R.string.error_network_error
+                    )
+                )
+            }
+            // HTTP errors
+            is AuthHttpException -> {
+                when (exception.statusCode) {
+                    400, 409 -> {
+                        // Bad Request, Conflict - show as field errors
+                        val errorMessage = getHttpErrorMessage(exception.statusCode)
+                        setErrorField(errorMessage)
+                    }
+                    500, 502, 503 -> {
+                        // Server errors - show as snackbar
+                        _uiEvent.emit(
+                            RegisterUiEvent.ShowSnackbar(
+                                R.string.error_server_error
+                            )
+                        )
+                    }
+                    else -> {
+                        // Other HTTP errors
+                        _uiEvent.emit(
+                            RegisterUiEvent.ShowSnackbar(
+                                R.string.error_registration_failed
+                            )
+                        )
+                    }
+                }
+            }
+            // Other unknown errors
+            else -> {
+                _uiEvent.emit(
+                    RegisterUiEvent.ShowSnackbar(
+                        R.string.error_registration_failed
+                    )
+                )
+            }
         }
     }
 
@@ -210,15 +285,10 @@ class RegisterViewModel @Inject constructor(
         return hasLetter && hasNumber
     }
 
-    private fun getErrorMessage(exception: Throwable): String {
-        return when (exception) {
-            is com.tenmilelabs.chefai.auth.data.network.AuthHttpException -> {
-                when (exception.statusCode) {
-                    400 -> "Invalid input data"
-                    409 -> "Email already registered"
-                    else -> exception.message
-                }
-            }
+    private fun getHttpErrorMessage(statusCode: Int): String {
+        return when (statusCode) {
+            400 -> "Invalid input data"
+            409 -> "Email already registered"
             else -> "Registration failed. Please try again."
         }
     }

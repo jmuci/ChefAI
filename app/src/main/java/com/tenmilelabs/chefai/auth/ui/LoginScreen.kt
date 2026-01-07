@@ -50,7 +50,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
@@ -259,7 +258,7 @@ private fun EmailTextField(
         },
         isError = error != null,
         supportingText = if (error != null) {
-            { Text(text = error ?: "", color = MaterialTheme.colorScheme.error) }
+            { Text(text = error, color = MaterialTheme.colorScheme.error) }
         } else null,
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Email,
@@ -305,7 +304,7 @@ private fun PasswordTextField(
         visualTransformation = if (isVisible) VisualTransformation.None else PasswordVisualTransformation(),
         isError = error != null,
         supportingText = if (error != null) {
-            { Text(text = error ?: "", color = MaterialTheme.colorScheme.error) }
+            { Text(text = error, color = MaterialTheme.colorScheme.error) }
         } else null,
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Password,

@@ -2,6 +2,8 @@ package com.tenmilelabs.chefai.auth.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.auth.data.network.AuthHttpException
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -11,6 +13,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
+import java.io.IOException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import javax.inject.Inject
 
 /**
@@ -104,13 +111,81 @@ class LoginViewModel @Inject constructor(
                     _uiEvent.emit(LoginUiEvent.NavigateToHome)
                 },
                 onFailure = { exception ->
-                    val errorMessage = getErrorMessage(exception)
-                    _uiState.value = _uiState.value.copy(
-                        emailError = if (errorMessage.contains("email")) errorMessage else null,
-                        passwordError = if (errorMessage.contains("password")) errorMessage else null
-                    )
+                    Timber.e(exception, "Login failed")
+                    handleLoginError(exception)
                 }
             )
+        }
+    }
+
+    private suspend fun handleLoginError(exception: Throwable) {
+        when (exception) {
+            // Network connectivity errors - show snackbar
+            is UnknownHostException -> {
+                _uiEvent.emit(
+                    LoginUiEvent.ShowSnackbar(
+                        R.string.error_network_unavailable
+                    )
+                )
+            }
+            is ConnectException -> {
+                _uiEvent.emit(
+                    LoginUiEvent.ShowSnackbar(
+                        R.string.error_network_unavailable
+                    )
+                )
+            }
+            is SocketTimeoutException -> {
+                _uiEvent.emit(
+                    LoginUiEvent.ShowSnackbar(
+                        R.string.error_connection_timeout
+                    )
+                )
+            }
+            is IOException -> {
+                _uiEvent.emit(
+                    LoginUiEvent.ShowSnackbar(
+                        R.string.error_network_error
+                    )
+                )
+            }
+            // HTTP errors - might need field-specific or general error
+            is AuthHttpException -> {
+                when (exception.statusCode) {
+                    400, 401, 404 -> {
+                        // Bad Request, Unauthorized, Not Found - show as field errors
+                        val errorMessage = getHttpErrorMessage(exception.statusCode)
+                        _uiState.value = _uiState.value.copy(
+                            emailError = if (errorMessage.contains("email")) errorMessage else null,
+                            passwordError = if (errorMessage.contains("password")) errorMessage else null
+                        )
+                    }
+                    500, 502, 503 -> {
+                        // Server errors - show as snackbar
+                        _uiEvent.emit(
+                            LoginUiEvent.ShowSnackbar(
+                                R.string.error_server_error
+                            )
+                        )
+                    }
+                    else -> {
+                        // Other HTTP errors
+                        _uiEvent.emit(
+                            LoginUiEvent.ShowSnackbar(
+                                R.string.error_login_failed
+                            )
+                        )
+                    }
+                }
+            }
+            // Other unknown errors
+            else -> {
+                _uiEvent.emit(
+                    LoginUiEvent.ShowSnackbar(
+                        R.string.error_login_failed
+                    )
+                )
+            }
         }
     }
 
@@ -154,16 +229,11 @@ class LoginViewModel @Inject constructor(
         return emailRegex.matches(email)
     }
 
-    private fun getErrorMessage(exception: Throwable): String {
-        return when (exception) {
-            is com.tenmilelabs.chefai.auth.data.network.AuthHttpException -> {
-                when (exception.statusCode) {
-                    400 -> "Invalid credentials"
-                    401 -> "Invalid email or password"
-                    404 -> "User not found"
-                    else -> exception.message
-                }
-            }
+    private fun getHttpErrorMessage(statusCode: Int): String {
+        return when (statusCode) {
+            400 -> "Invalid input format"
+            401 -> "Invalid email or password"
+            404 -> "User not found. Please check your email."
             else -> "Login failed. Please try again."
         }
     }

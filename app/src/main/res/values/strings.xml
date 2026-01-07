@@ -110,5 +110,11 @@
     <string name="register_button">Create Account</string>
     <string name="already_have_account">Already have an account?</string>
     <string name="login">Log In</string>
+    <string name="error_network_unavailable">No internet connection. Please check your network settings.</string>
+    <string name="error_connection_timeout">Connection timeout. Please try again.</string>
+    <string name="error_network_error">Network error. Please check your connection.</string>
+    <string name="error_server_error">Server error. Please try again later.</string>
+    <string name="error_login_failed">Login failed. Please try again.</string>
+    <string name="error_registration_failed">Registration failed. Please try again.</string>
 
 </resources>
