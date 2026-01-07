@@ -28,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -56,6 +57,7 @@ import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 @Composable
 fun RegisterScreen(
     viewModel: RegisterViewModel = hiltViewModel(),
+    snackbarHostState: SnackbarHostState? = null,
     onNavigateToHome: () -> Unit = {},
     onNavigateToLogin: () -> Unit = {}
 ) {
@@ -64,11 +66,14 @@ fun RegisterScreen(
     val scrollState = rememberScrollState()
 
     // Handle UI events
-    LaunchedEffect(viewModel) {
+    LaunchedEffect(viewModel, snackbarHostState) {
         viewModel.uiEvents.collect { event ->
             when (event) {
                 is RegisterUiEvent.ShowSnackbar -> {
-                    // TODO: Show snackbar - need snackbarHostState parameter
+                    snackbarHostState?.showSnackbar(
+                        message = event.message,
+                        duration = androidx.compose.material3.SnackbarDuration.Short
+                    )
                 }
                 RegisterUiEvent.NavigateToHome -> {
                     onNavigateToHome()
@@ -80,6 +85,35 @@ fun RegisterScreen(
         }
     }
 
+    RegisterScreenContent(
+        uiState = uiState,
+        focusManager = focusManager,
+        scrollState = scrollState,
+        onUsernameChange = viewModel::onUsernameChange,
+        onEmailChange = viewModel::onEmailChange,
+        onPasswordChange = viewModel::onPasswordChange,
+        onConfirmPasswordChange = viewModel::onConfirmPasswordChange,
+        onPasswordVisibilityToggle = viewModel::onPasswordVisibilityToggle,
+        onConfirmPasswordVisibilityToggle = viewModel::onConfirmPasswordVisibilityToggle,
+        onRegisterClick = viewModel::onRegisterClick,
+        onLoginClick = viewModel::onLoginClick
+    )
+}
+
+@Composable
+fun RegisterScreenContent(
+    uiState: RegisterUiState,
+    focusManager: FocusManager,
+    scrollState: androidx.compose.foundation.ScrollState,
+    onUsernameChange: (String) -> Unit = {},
+    onEmailChange: (String) -> Unit = {},
+    onPasswordChange: (String) -> Unit = {},
+    onConfirmPasswordChange: (String) -> Unit = {},
+    onPasswordVisibilityToggle: () -> Unit = {},
+    onConfirmPasswordVisibilityToggle: () -> Unit = {},
+    onRegisterClick: () -> Unit = {},
+    onLoginClick: () -> Unit = {}
+) {
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -123,7 +157,7 @@ fun RegisterScreen(
             // Username Field
             UsernameTextField(
                 username = uiState.username,
-                onUsernameChange = viewModel::onUsernameChange,
+                onUsernameChange = onUsernameChange,
                 error = uiState.usernameError,
                 onNext = { focusManager.clearFocus() },
                 modifier = Modifier.fillMaxWidth()
@@ -134,7 +168,7 @@ fun RegisterScreen(
             // Email Field
             EmailTextField(
                 email = uiState.email,
-                onEmailChange = viewModel::onEmailChange,
+                onEmailChange = onEmailChange,
                 error = uiState.emailError,
                 onNext = { focusManager.clearFocus() },
                 modifier = Modifier.fillMaxWidth()
@@ -145,9 +179,9 @@ fun RegisterScreen(
             // Password Field
             PasswordTextField(
                 password = uiState.password,
-                onPasswordChange = viewModel::onPasswordChange,
+                onPasswordChange = onPasswordChange,
                 isVisible = uiState.isPasswordVisible,
-                onVisibilityToggle = viewModel::onPasswordVisibilityToggle,
+                onVisibilityToggle = onPasswordVisibilityToggle,
                 error = uiState.passwordError,
                 onNext = { focusManager.clearFocus() },
                 modifier = Modifier.fillMaxWidth()
@@ -158,11 +192,11 @@ fun RegisterScreen(
             // Confirm Password Field
             ConfirmPasswordTextField(
                 password = uiState.confirmPassword,
-                onPasswordChange = viewModel::onConfirmPasswordChange,
+                onPasswordChange = onConfirmPasswordChange,
                 isVisible = uiState.isConfirmPasswordVisible,
-                onVisibilityToggle = viewModel::onConfirmPasswordVisibilityToggle,
+                onVisibilityToggle = onConfirmPasswordVisibilityToggle,
                 error = uiState.confirmPasswordError,
-                onDone = { viewModel.onRegisterClick() },
+                onDone = onRegisterClick,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -170,7 +204,7 @@ fun RegisterScreen(
 
             // Register Button
             Button(
-                onClick = viewModel::onRegisterClick,
+                onClick = onRegisterClick,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
@@ -208,7 +242,7 @@ fun RegisterScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 
-                TextButton(onClick = viewModel::onLoginClick) {
+                TextButton(onClick = onLoginClick) {
                     Text(
                         stringResource(R.string.login),
                         style = MaterialTheme.typography.bodyMedium,
@@ -243,7 +277,7 @@ private fun UsernameTextField(
         },
         isError = error != null,
         supportingText = if (error != null) {
-            { Text(text = error ?: "", color = MaterialTheme.colorScheme.error) }
+            { Text(text = error, color = MaterialTheme.colorScheme.error) }
         } else null,
         keyboardOptions = KeyboardOptions(
             imeAction = ImeAction.Next
@@ -277,7 +311,7 @@ private fun EmailTextField(
         },
         isError = error != null,
         supportingText = if (error != null) {
-            { Text(text = error ?: "", color = MaterialTheme.colorScheme.error) }
+            { Text(text = error, color = MaterialTheme.colorScheme.error) }
         } else null,
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Email,
@@ -322,7 +356,7 @@ private fun PasswordTextField(
         visualTransformation = if (isVisible) VisualTransformation.None else PasswordVisualTransformation(),
         isError = error != null,
         supportingText = if (error != null) {
-            { Text(text = error ?: "", color = MaterialTheme.colorScheme.error) }
+            { Text(text = error, color = MaterialTheme.colorScheme.error) }
         } else null,
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Password,
@@ -367,7 +401,7 @@ private fun ConfirmPasswordTextField(
         visualTransformation = if (isVisible) VisualTransformation.None else PasswordVisualTransformation(),
         isError = error != null,
         supportingText = if (error != null) {
-            { Text(text = error ?: "", color = MaterialTheme.colorScheme.error) }
+            { Text(text = error, color = MaterialTheme.colorScheme.error) }
         } else null,
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Password,
@@ -384,7 +418,16 @@ private fun ConfirmPasswordTextField(
 @Composable
 private fun RegisterScreenPreview() {
     ChefAITheme {
-        RegisterScreen()
+        RegisterScreenContent(
+            uiState = RegisterUiState(
+                username = "alice",
+                email = "alice@example.com",
+                password = "Password123!",
+                confirmPassword = "Password123!"
+            ),
+            focusManager = LocalFocusManager.current,
+            scrollState = rememberScrollState()
+        )
     }
 }
 
@@ -392,6 +435,15 @@ private fun RegisterScreenPreview() {
 @Composable
 private fun RegisterScreenDarkPreview() {
     ChefAITheme(darkTheme = true) {
-        RegisterScreen()
+        RegisterScreenContent(
+            uiState = RegisterUiState(
+                username = "alice",
+                email = "alice@example.com",
+                password = "Password123!",
+                confirmPassword = "Password123!"
+            ),
+            focusManager = LocalFocusManager.current,
+            scrollState = rememberScrollState()
+        )
     }
 }

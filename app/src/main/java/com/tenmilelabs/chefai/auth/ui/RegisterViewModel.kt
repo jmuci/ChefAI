@@ -3,13 +3,11 @@ package com.tenmilelabs.chefai.auth.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.auth.domain.SessionManager
-import com.tenmilelabs.chefai.auth.domain.model.UserSession
-import com.tenmilelabs.chefai.core.domain.model.User
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -35,7 +33,7 @@ data class RegisterUiState(
  * One-time events for the registration screen.
  */
 sealed interface RegisterUiEvent {
-    data class ShowSnackbar(val message: Int) : RegisterUiEvent
+    data class ShowSnackbar(val message: String) : RegisterUiEvent
     data object NavigateToHome : RegisterUiEvent
     data object NavigateToLogin : RegisterUiEvent
 }
@@ -51,8 +49,8 @@ class RegisterViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(RegisterUiState())
     val uiState: StateFlow<RegisterUiState> = _uiState.asStateFlow()
 
-    private val _uiEvent = Channel<RegisterUiEvent>()
-    val uiEvents = _uiEvent.receiveAsFlow()
+    private val _uiEvent = MutableSharedFlow<RegisterUiEvent>()
+    val uiEvents = _uiEvent.asSharedFlow()
 
     fun onUsernameChange(username: String) {
         _uiState.value = _uiState.value.copy(
@@ -115,7 +113,7 @@ class RegisterViewModel @Inject constructor(
 
             result.fold(
                 onSuccess = { user ->
-                    _uiEvent.send(RegisterUiEvent.NavigateToHome)
+                    _uiEvent.emit(RegisterUiEvent.NavigateToHome)
                 },
                 onFailure = { exception ->
                     val errorMessage = getErrorMessage(exception)
@@ -127,7 +125,7 @@ class RegisterViewModel @Inject constructor(
 
     fun onLoginClick() {
         viewModelScope.launch {
-            _uiEvent.send(RegisterUiEvent.NavigateToLogin)
+            _uiEvent.emit(RegisterUiEvent.NavigateToLogin)
         }
     }
 

@@ -10,8 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
@@ -25,18 +25,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusManager
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
@@ -56,19 +55,22 @@ import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 @Composable
 fun LoginScreen(
     viewModel: LoginViewModel = hiltViewModel(),
+    snackbarHostState: SnackbarHostState,
     onNavigateToHome: () -> Unit = {},
     onNavigateToRegister: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
     val focusManager = LocalFocusManager.current
 
     // Handle UI events
-    LaunchedEffect(viewModel) {
+    LaunchedEffect(viewModel, snackbarHostState) {
         viewModel.uiEvents.collect { event ->
             when (event) {
                 is LoginUiEvent.ShowSnackbar -> {
-                    // TODO: Show snackbar - need snackbarHostState parameter
+                    snackbarHostState.showSnackbar(
+                        message = event.message,
+                        duration = SnackbarDuration.Short
+                    )
                 }
                 LoginUiEvent.NavigateToHome -> {
                     onNavigateToHome()
@@ -80,6 +82,29 @@ fun LoginScreen(
         }
     }
 
+    LoginScreenContent(
+        uiState = uiState,
+        focusManager = focusManager,
+        onEmailChange = viewModel::onEmailChange,
+        onPasswordChange = viewModel::onPasswordChange,
+        onRememberMeChange = viewModel::onRememberMeChange,
+        onPasswordVisibilityToggle = viewModel::onPasswordVisibilityToggle,
+        onLoginClick = viewModel::onLoginClick,
+        onCreateAccountClick = viewModel::onCreateAccountClick
+    )
+}
+
+@Composable
+fun LoginScreenContent(
+    uiState: LoginUiState,
+    focusManager: FocusManager,
+    onEmailChange: (String) -> Unit = {},
+    onPasswordChange: (String) -> Unit = {},
+    onRememberMeChange: (Boolean) -> Unit = {},
+    onPasswordVisibilityToggle: () -> Unit = {},
+    onLoginClick: () -> Unit = {},
+    onCreateAccountClick: () -> Unit = {}
+) {
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -121,7 +146,7 @@ fun LoginScreen(
             // Email Field
             EmailTextField(
                 email = uiState.email,
-                onEmailChange = viewModel::onEmailChange,
+                onEmailChange = onEmailChange,
                 error = uiState.emailError,
                 onNext = { focusManager.clearFocus() },
                 modifier = Modifier.fillMaxWidth()
@@ -132,12 +157,12 @@ fun LoginScreen(
             // Password Field
             PasswordTextField(
                 password = uiState.password,
-                onPasswordChange = viewModel::onPasswordChange,
+                onPasswordChange = onPasswordChange,
                 isVisible = uiState.isPasswordVisible,
-                onVisibilityToggle = viewModel::onPasswordVisibilityToggle,
+                onVisibilityToggle = onPasswordVisibilityToggle,
                 error = uiState.passwordError,
                 modifier = Modifier.fillMaxWidth(),
-                onDone = { viewModel.onLoginClick() }
+                onDone = onLoginClick
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -145,14 +170,14 @@ fun LoginScreen(
             // Remember Me Checkbox
             RememberMeCheckbox(
                 isChecked = uiState.rememberMe,
-                onCheckedChange = viewModel::onRememberMeChange
+                onCheckedChange = onRememberMeChange
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
             // Login Button
             Button(
-                onClick = viewModel::onLoginClick,
+                onClick = onLoginClick,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
@@ -190,7 +215,7 @@ fun LoginScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                TextButton(onClick = viewModel::onCreateAccountClick) {
+                TextButton(onClick = onCreateAccountClick) {
                     Text(
                         stringResource(R.string.create_account),
                         style = MaterialTheme.typography.bodyMedium,
@@ -313,7 +338,13 @@ private fun RememberMeCheckbox(
 @Composable
 private fun LoginScreenPreview() {
     ChefAITheme {
-        LoginScreen()
+        LoginScreenContent(
+            uiState = LoginUiState(
+                email = "alice@example.com",
+                password = "Password123!"
+            ),
+            focusManager = LocalFocusManager.current
+        )
     }
 }
 
@@ -321,6 +352,12 @@ private fun LoginScreenPreview() {
 @Composable
 private fun LoginScreenDarkPreview() {
     ChefAITheme(darkTheme = true) {
-        LoginScreen()
+        LoginScreenContent(
+            uiState = LoginUiState(
+                email = "alice@example.com",
+                password = "Password123!"
+            ),
+            focusManager = LocalFocusManager.current
+        )
     }
 }

@@ -1,25 +1,20 @@
 package com.tenmilelabs.chefai.core.ui.navigation
 
-import android.content.res.Configuration.UI_MODE_NIGHT_NO
-import android.content.res.Configuration.UI_MODE_NIGHT_YES
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavHostController
@@ -28,14 +23,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.createGraph
 import com.tenmilelabs.chefai.R
-import com.tenmilelabs.chefai.recipes.ui.create.CreateRecipeScreen
-import com.tenmilelabs.chefai.home.ui.HomeScreen
-import com.tenmilelabs.chefai.mealplans.ui.MealPlansScreen
-import com.tenmilelabs.chefai.recipes.ui.details.RecipeDetailsScreen
-import com.tenmilelabs.chefai.recipes.ui.RecipesScreen
+import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.ui.LoginScreen
 import com.tenmilelabs.chefai.auth.ui.RegisterScreen
-import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.home.ui.HomeScreen
+import com.tenmilelabs.chefai.mealplans.ui.MealPlansScreen
+import com.tenmilelabs.chefai.recipes.ui.RecipesScreen
+import com.tenmilelabs.chefai.recipes.ui.create.CreateRecipeScreen
+import com.tenmilelabs.chefai.recipes.ui.details.RecipeDetailsScreen
 import timber.log.Timber
 
 @Composable
@@ -87,12 +82,14 @@ fun ChefAINavGraph(
         }
         composable(route = AppDestinations.LOGIN.route) {
             LoginScreen(
+                snackbarHostState = snackbarHostState,
                 onNavigateToHome = { navActions.navigateToHome() },
                 onNavigateToRegister = { navActions.navigateToRegister() }
             )
         }
         composable(route = AppDestinations.REGISTER.route) {
             RegisterScreen(
+                snackbarHostState = snackbarHostState,
                 onNavigateToHome = { navActions.navigateToHome() },
                 onNavigateToLogin = { navActions.navigateToLogin() }
             )

@@ -4,12 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
-import com.tenmilelabs.chefai.core.domain.model.User
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -31,7 +30,7 @@ data class LoginUiState(
  * One-time events for the login screen.
  */
 sealed interface LoginUiEvent {
-    data class ShowSnackbar(val message: Int) : LoginUiEvent
+    data class ShowSnackbar(val message: String) : LoginUiEvent
     data object NavigateToHome : LoginUiEvent
     data object NavigateToRegister : LoginUiEvent
 }
@@ -47,15 +46,15 @@ class LoginViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
-    private val _uiEvent = Channel<LoginUiEvent>() // TODO replace with MutableSharedFlow
-    val uiEvents = _uiEvent.receiveAsFlow()
+    private val _uiEvent = MutableSharedFlow<LoginUiEvent>()
+    val uiEvents = _uiEvent.asSharedFlow()
 
     init {
         // Check current session state
         if (sessionManager.userSession.value is UserSession.Authenticated) {
             // User is already logged in, navigate to home
             viewModelScope.launch {
-                _uiEvent.send(LoginUiEvent.NavigateToHome)
+                _uiEvent.emit(LoginUiEvent.NavigateToHome)
             }
         }
     }
@@ -102,7 +101,7 @@ class LoginViewModel @Inject constructor(
 
             result.fold(
                 onSuccess = { user ->
-                    _uiEvent.send(LoginUiEvent.NavigateToHome)
+                    _uiEvent.emit(LoginUiEvent.NavigateToHome)
                 },
                 onFailure = { exception ->
                     val errorMessage = getErrorMessage(exception)
@@ -117,7 +116,7 @@ class LoginViewModel @Inject constructor(
 
     fun onCreateAccountClick() {
         viewModelScope.launch {
-            _uiEvent.send(LoginUiEvent.NavigateToRegister)
+            _uiEvent.emit(LoginUiEvent.NavigateToRegister)
         }
     }
 
