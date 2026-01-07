@@ -2,15 +2,14 @@ package com.tenmilelabs.chefai.recipes.ui.create
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.core.di.IoDispatcher
-import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.core.domain.model.Ingredient
 import com.tenmilelabs.chefai.core.domain.model.Label
 import com.tenmilelabs.chefai.core.domain.model.Recipe
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
-import com.tenmilelabs.chefai.core.domain.model.User
 import com.tenmilelabs.chefai.core.domain.repository.MetadataRepository
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel

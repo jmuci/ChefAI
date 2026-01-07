@@ -2,13 +2,13 @@ package com.tenmilelabs.chefai.core.di
 
 import android.content.Context
 import androidx.room.Room
-import com.tenmilelabs.chefai.core.data.repository.DefaultMetadataRepository
-import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeRepository
 import com.tenmilelabs.chefai.auth.data.local.SecurePreferences
 import com.tenmilelabs.chefai.auth.data.local.SecurePreferencesInterface
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_1_2
+import com.tenmilelabs.chefai.core.data.repository.DefaultMetadataRepository
 import com.tenmilelabs.chefai.core.domain.repository.MetadataRepository
+import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeRepository
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.Binds
 import dagger.Module

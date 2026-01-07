@@ -1,6 +1,10 @@
 package com.tenmilelabs.chefai.auth.data.network
 
-import com.tenmilelabs.chefai.auth.data.network.dto.*
+import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
+import com.tenmilelabs.chefai.auth.data.network.dto.LoginRequest
+import com.tenmilelabs.chefai.auth.data.network.dto.RefreshTokenRequest
+import com.tenmilelabs.chefai.auth.data.network.dto.RegisterRequest
+import com.tenmilelabs.chefai.auth.data.network.dto.TokenRefreshResponse
 
 /**
  * Network data source for authentication operations.

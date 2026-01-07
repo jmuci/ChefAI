@@ -1,6 +1,11 @@
 package com.tenmilelabs.chefai.auth.data.network
 
-import com.tenmilelabs.chefai.auth.data.network.dto.*
+import com.tenmilelabs.chefai.auth.data.network.dto.ApiErrorResponse
+import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
+import com.tenmilelabs.chefai.auth.data.network.dto.LoginRequest
+import com.tenmilelabs.chefai.auth.data.network.dto.RefreshTokenRequest
+import com.tenmilelabs.chefai.auth.data.network.dto.RegisterRequest
+import com.tenmilelabs.chefai.auth.data.network.dto.TokenRefreshResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.expectSuccess

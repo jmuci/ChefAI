@@ -1,7 +1,6 @@
 package com.tenmilelabs.chefai.auth.data.network.dto
 
 import kotlinx.serialization.Serializable
-import java.util.UUID
 
 /**
  * Response body for successful authentication (login or register).

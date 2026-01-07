@@ -1,9 +1,9 @@
 package com.tenmilelabs.chefai.recipes.data.mapper
 
-import com.tenmilelabs.chefai.recipes.data.network.model.NetworkRecipe
-import com.tenmilelabs.chefai.recipes.data.network.model.NetworkRecipeList
 import com.tenmilelabs.chefai.core.domain.model.Recipe
 import com.tenmilelabs.chefai.core.domain.model.User
+import com.tenmilelabs.chefai.recipes.data.network.model.NetworkRecipe
+import com.tenmilelabs.chefai.recipes.data.network.model.NetworkRecipeList
 import java.util.UUID
 
 /**
