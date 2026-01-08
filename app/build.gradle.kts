@@ -59,6 +59,10 @@ room {
     schemaDirectory("$projectDir/schemas")
 }
 
+hilt {
+    enableAggregatingTask = true
+}
+
 dependencies {
 
     implementation(libs.androidx.core.ktx)
@@ -144,8 +148,15 @@ dependencies {
     testImplementation(libs.androidx.archcore.testing)
     testImplementation(libs.kotlinx.coroutines.android)
     testImplementation(libs.kotlinx.coroutines.test)
+    
+    // Testing
     testImplementation(libs.google.truth)
     testImplementation(libs.turbine)
+    testImplementation("io.mockk:mockk:1.13.5")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.9.3")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.9.3")
     testImplementation(libs.hilt.android.testing)
     kspTest(libs.hilt.android.compiler)
 
@@ -153,11 +164,16 @@ dependencies {
     // Dependencies for Android tests ====
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(libs.kotlinx.coroutines.android)
-    androidTestImplementation(libs.kotlinx.coroutines.test)
-
-    //Compose
+    androidTestImplementation(platform(libs.kotlinx.coroutines.test))
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test.ext:junit-ktx:1.1.5")
+    androidTestImplementation("io.mockk:mockk-android:1.13.5")
+    androidTestImplementation("com.google.dagger:hilt-android-testing:2.44")
+    androidTestImplementation("junit:junit:4.13.2")
+    
+    // Compose UI testing
     androidTestImplementation(libs.androidx.ui.test.junit4)
-    debugImplementation(libs.androidx.ui.test.manifest)
-    testImplementation(kotlin("test"))
+    
+    // KSP for Hilt in android tests
+    kspAndroidTest("com.google.dagger:hilt-compiler:2.44")
 }
