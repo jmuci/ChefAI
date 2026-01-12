@@ -50,7 +50,6 @@ class DefaultRecipeRepositoryTest {
     private lateinit var recipeTagDao: FakeRecipeTagCrossRefDao
     private lateinit var recipeLabelDao: FakeRecipeLabelCrossRefDao
     private lateinit var remoteDataSource: FakeApiService
-    private val testDispatcher = UnconfinedTestDispatcher()
 
     @Before
     fun createRepository() {
@@ -74,7 +73,7 @@ class DefaultRecipeRepositoryTest {
                 labelDao,
                 recipeTagDao,
                 recipeLabelDao,
-                remoteDataSource, testDispatcher
+                remoteDataSource
             )
 
         // Seed the fake DAO with our test data.

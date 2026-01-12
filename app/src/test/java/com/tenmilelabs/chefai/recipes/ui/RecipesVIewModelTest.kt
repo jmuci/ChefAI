@@ -32,24 +32,16 @@ class RecipesViewModelTest {
     @Before
     fun setup() {
         recipesRepository = FakeRecipesRepository()
-    }
-
-    private fun initializeViewModel() {
-        // ViewModel starts collecting on init
         viewModel = RecipesViewModel(recipesRepository)
     }
 
     @Test
     fun `initial state is loading when no data emitted yet`() = runTest {
-        // Don't emit any data initially
-        initializeViewModel()
-
         viewModel.uiState.test {
             // Expect initial state from stateIn (loading=true, empty items)
             val initialState = awaitItem()
             assertThat(initialState.isLoading).isTrue()
             assertThat(initialState.items).isEmpty()
-            assertThat(initialState.userMessage).isNull()
 
             cancelAndIgnoreRemainingEvents()
         }
@@ -57,13 +49,10 @@ class RecipesViewModelTest {
 
     @Test
     fun `uiState reflects emitted recipes with success message`() = runTest {
-        // Emit data before initializing ViewModel (since MutableSharedFlow has replay=1)
+        // Emit data (since ViewModel is already initialized, new data triggers updates)
         recipesRepository.setRecipePreviewsToEmit(TEST_DOMAIN_RECIPE_PREVIEWS_LIST)
 
-        initializeViewModel()
-
         viewModel.uiState.test {
-            // Since repository already has data with replay=1, first emission should be success state
             val successState = awaitItem()
             assertThat(successState.isLoading).isFalse()
             assertThat(successState.items).isEqualTo(TEST_DOMAIN_RECIPE_PREVIEWS_LIST)
@@ -74,10 +63,8 @@ class RecipesViewModelTest {
 
     @Test
     fun `uiState reflects empty list when repository emits empty data`() = runTest {
-        // Emit empty list before initializing ViewModel
+        // Emit empty list
         recipesRepository.setRecipePreviewsToEmit(emptyList())
-
-        initializeViewModel()
 
         viewModel.uiState.test {
             // Success state with empty items
@@ -90,40 +77,51 @@ class RecipesViewModelTest {
     }
 
     @Test
-    fun `uiState shows error message when repository throws error`() = runTest {
-        // Configure repository to throw error
-        recipesRepository.setShouldReturnErrorForGetRecipes(true)
+    fun `uiState shows error and emits ShowSnackbar event when repository throws error`() = runTest {
+        // Need to create a new ViewModel for this test with error configuration
+        val errorRepository = FakeRecipesRepository()
+        errorRepository.setShouldReturnErrorForGetRecipes(true)
+        val testViewModel = RecipesViewModel(errorRepository)
 
-        initializeViewModel()
-
-        viewModel.uiState.test {
-            // Expect error state with error message
+        // Collect and verify UI state
+        testViewModel.uiState.test {
             val errorState = awaitItem()
             assertThat(errorState.isLoading).isFalse()
             assertThat(errorState.items).isEmpty()
-            assertThat(errorState.userMessage).isEqualTo(R.string.loading_recipes_error)
+            cancelAndIgnoreRemainingEvents()
+        }
 
+        // Verify that a ShowSnackbar event is emitted (with replay=1, it should be available)
+        testViewModel.uiEvents.test {
+            val event = awaitItem()
+            assertThat(event).isInstanceOf(RecipesUiEvent.ShowSnackbar::class.java)
+            assertThat((event as RecipesUiEvent.ShowSnackbar).message)
+                .isEqualTo(R.string.loading_recipes_error)
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun `snackbarMessageShown does not affect state in current implementation`() = runTest {
-        // Note: snackbarMessageShown() sets _userMessage but it's not actually used in combine
-        // The userMessage in the state is hardcoded based on Success/Error states
-        recipesRepository.setShouldReturnErrorForGetRecipes(true)
+    fun `uiEvents emits ShowSnackbar only once per error`() = runTest {
+        // Need a new ViewModel for error scenario
+        val errorRepository = FakeRecipesRepository()
+        errorRepository.setShouldReturnErrorForGetRecipes(true)
+        val testViewModel = RecipesViewModel(errorRepository)
 
-        initializeViewModel()
-
-        viewModel.uiState.test {
+        // Trigger uiState collection to ensure the flow starts
+        testViewModel.uiState.test {
             val errorState = awaitItem()
-            assertThat(errorState.userMessage).isEqualTo(R.string.loading_recipes_error)
+            assertThat(errorState.isLoading).isFalse()
+            cancelAndIgnoreRemainingEvents()
+        }
 
-            // Call snackbarMessageShown
-            viewModel.snackbarMessageShown()
+        // Now collect events
+        testViewModel.uiEvents.test {
+            // Wait for first ShowSnackbar event
+            val firstEvent = awaitItem()
+            assertThat(firstEvent).isInstanceOf(RecipesUiEvent.ShowSnackbar::class.java)
 
-            // The message should not change since _userMessage is not actually used in the combine
-            // This test documents the current behavior
+            // No more events should be emitted without additional errors
             expectNoEvents()
 
             cancelAndIgnoreRemainingEvents()
@@ -134,8 +132,6 @@ class RecipesViewModelTest {
     fun `uiState updates when repository emits new data after initialization`() = runTest {
         // Start with empty data
         recipesRepository.setRecipePreviewsToEmit(emptyList())
-
-        initializeViewModel()
 
         viewModel.uiState.test {
             // First state - empty
@@ -174,8 +170,6 @@ class RecipesViewModelTest {
     fun `uiState contains correct recipe data`() = runTest {
         recipesRepository.setRecipePreviewsToEmit(listOf(recipePreview1, recipePreview2))
 
-        initializeViewModel()
-
         viewModel.uiState.test {
             val state = awaitItem()
             assertThat(state.items).hasSize(2)
@@ -197,18 +191,25 @@ class RecipesViewModelTest {
 
     @Test
     fun `error state maintains empty items list`() = runTest {
-        recipesRepository.setShouldReturnErrorForGetRecipes(true)
+        // Need a new ViewModel for error scenario
+        val errorRepository = FakeRecipesRepository()
+        errorRepository.setShouldReturnErrorForGetRecipes(true)
+        val testViewModel = RecipesViewModel(errorRepository)
 
-        initializeViewModel()
-
-        viewModel.uiState.test {
+        testViewModel.uiState.test {
             val errorState = awaitItem()
 
             // Verify error state structure
             assertThat(errorState.isLoading).isFalse()
             assertThat(errorState.items).isEmpty()
-            assertThat(errorState.userMessage).isNotNull()
-            assertThat(errorState.userMessage).isEqualTo(R.string.loading_recipes_error)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        // Verify corresponding event is emitted
+        testViewModel.uiEvents.test {
+            val event = awaitItem()
+            assertThat(event).isInstanceOf(RecipesUiEvent.ShowSnackbar::class.java)
 
             cancelAndIgnoreRemainingEvents()
         }
@@ -217,8 +218,6 @@ class RecipesViewModelTest {
     @Test
     fun `isLoading is false after successful data load`() = runTest {
         recipesRepository.setRecipePreviewsToEmit(TEST_DOMAIN_RECIPE_PREVIEWS_LIST)
-
-        initializeViewModel()
 
         viewModel.uiState.test {
             // First emission should be success with isLoading=false
@@ -242,8 +241,15 @@ class RecipesViewModelTest {
 
         errorViewModel.uiState.test {
             val errorState = awaitItem()
-            assertThat(errorState.userMessage).isEqualTo(R.string.loading_recipes_error)
             assertThat(errorState.items).isEmpty()
+            assertThat(errorState.isLoading).isFalse()
+
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        errorViewModel.uiEvents.test {
+            val event = awaitItem()
+            assertThat(event).isInstanceOf(RecipesUiEvent.ShowSnackbar::class.java)
 
             cancelAndIgnoreRemainingEvents()
         }
@@ -259,13 +265,16 @@ class RecipesViewModelTest {
 
             cancelAndIgnoreRemainingEvents()
         }
+
+        // No events should be emitted in success case
+        successViewModel.uiEvents.test {
+            expectNoEvents()
+        }
     }
 
     @Test
     fun `uiState handles single recipe emission`() = runTest {
         recipesRepository.setRecipePreviewsToEmit(listOf(recipePreview1))
-
-        initializeViewModel()
 
         viewModel.uiState.test {
             val state = awaitItem()
@@ -285,8 +294,6 @@ class RecipesViewModelTest {
         val orderedPreviews = listOf(recipePreview3, recipePreview1, recipePreview2)
         recipesRepository.setRecipePreviewsToEmit(orderedPreviews)
 
-        initializeViewModel()
-
         viewModel.uiState.test {
             val state = awaitItem()
             assertThat(state.items).hasSize(3)
@@ -300,14 +307,11 @@ class RecipesViewModelTest {
 
     @Test
     fun `initial loading state is shown when data not yet emitted`() = runTest {
-        // Don't pre-emit any data
-        initializeViewModel()
-
+        // Don't emit any data
         viewModel.uiState.test {
             val initialState = awaitItem()
             assertThat(initialState.isLoading).isTrue()
             assertThat(initialState.items).isEmpty()
-            assertThat(initialState.userMessage).isNull()
 
             // Now emit data
             recipesRepository.setRecipePreviewsToEmit(TEST_DOMAIN_RECIPE_PREVIEWS_LIST)
@@ -318,13 +322,16 @@ class RecipesViewModelTest {
 
             cancelAndIgnoreRemainingEvents()
         }
+
+        // No events should be emitted in success case
+        viewModel.uiEvents.test {
+            expectNoEvents()
+        }
     }
 
     @Test
     fun `uiState handles multiple rapid updates`() = runTest {
         recipesRepository.setRecipePreviewsToEmit(emptyList())
-
-        initializeViewModel()
 
         viewModel.uiState.test {
             // First state - empty
@@ -347,8 +354,6 @@ class RecipesViewModelTest {
     @Test
     fun `recipe preview contains all required fields`() = runTest {
         recipesRepository.setRecipePreviewsToEmit(listOf(recipePreview1))
-
-        initializeViewModel()
 
         viewModel.uiState.test {
             val state = awaitItem()

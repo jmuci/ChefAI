@@ -1,6 +1,6 @@
 [versions]
-activityCompose = "1.12.1"
-agp = "8.13.1"
+activityCompose = "1.11.0"
+agp = "8.13.2"
 androidxArchCore = "2.2.0"
 androidxHiltNavigationCompose = "1.3.0"
 androidxSecurityCrypto = "1.1.0"

@@ -2,14 +2,18 @@ package com.tenmilelabs.chefai.recipes.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import com.tenmilelabs.chefai.core.util.Async
 import com.tenmilelabs.chefai.core.util.WhileUiSubscribed
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -19,13 +23,19 @@ import javax.inject.Inject
 
 
 /**
- * UiState for the task list screen.
+ * UiState for the recipes screen.
  */
 data class RecipesUiState(
     val items: List<RecipePreview> = emptyList(),
-    val isLoading: Boolean = false,
-    val userMessage: Int? = null,
+    val isLoading: Boolean = false
 )
+
+/**
+ * One-time events for the recipes screen.
+ */
+sealed interface RecipesUiEvent {
+    data class ShowSnackbar(val message: Int) : RecipesUiEvent
+}
 
 @HiltViewModel
 class RecipesViewModel @Inject constructor(
@@ -33,7 +43,9 @@ class RecipesViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _isLoading = MutableStateFlow(false)
-    private val _userMessage: MutableStateFlow<Int?> = MutableStateFlow(null)
+    private val _uiEvent = MutableSharedFlow<RecipesUiEvent>(replay = 1)
+    val uiEvents: SharedFlow<RecipesUiEvent> = _uiEvent.asSharedFlow()
+    
     private val _recipesAsync = recipesRepository.getRecipesPreviewStream()
         .map { Async.Success(it) }
         .catch<Async<List<RecipePreview>>> { e ->
@@ -41,14 +53,18 @@ class RecipesViewModel @Inject constructor(
             emit(Async.Error(R.string.loading_recipes_error))
         }
 
-    val uiState: StateFlow<RecipesUiState> = combine(_isLoading, _recipesAsync, _userMessage)
-        { isLoading, recipesAsync, userMessage ->
+    val uiState: StateFlow<RecipesUiState> = combine(_isLoading, _recipesAsync)
+        { isLoading, recipesAsync ->
             when (recipesAsync) {
                 Async.Loading -> {
                     RecipesUiState(isLoading = true)
                 }
                 is Async.Error -> {
-                    RecipesUiState(userMessage = recipesAsync.errorMessage)
+                    // Emit error event asynchronously
+                    viewModelScope.launch {
+                        _uiEvent.emit(RecipesUiEvent.ShowSnackbar(recipesAsync.errorMessage))
+                    }
+                    RecipesUiState(isLoading = false)
                 }
                 is Async.Success -> {
                     RecipesUiState(
@@ -63,9 +79,5 @@ class RecipesViewModel @Inject constructor(
             started = WhileUiSubscribed,
             initialValue = RecipesUiState(isLoading = true)
         )
-
-    fun snackbarMessageShown() {
-        _userMessage.value = null
-    }
 
 }
