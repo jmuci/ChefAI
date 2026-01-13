@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.auth.ui
 
+import android.R.attr.enabled
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -115,6 +117,7 @@ fun LoginScreenContent(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .testTag("LoginScreen")
                 .padding(dimensionResource(id = R.dimen.padding_large)),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
@@ -189,6 +192,7 @@ fun LoginScreenContent(
                 onClick = onLoginClick,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .testTag("LoginButton")
                     .height(56.dp),
                 enabled = !uiState.isLoading,
                 colors = ButtonDefaults.buttonColors(
@@ -224,7 +228,8 @@ fun LoginScreenContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                TextButton(onClick = onCreateAccountClick) {
+                TextButton(onClick = onCreateAccountClick,
+                    modifier = Modifier.testTag("CreateAccountButton"),) {
                     Text(
                         stringResource(R.string.create_account),
                         style = MaterialTheme.typography.bodyMedium,
