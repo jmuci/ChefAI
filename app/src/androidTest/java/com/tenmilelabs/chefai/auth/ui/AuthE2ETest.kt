@@ -12,7 +12,6 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.platform.app.InstrumentationRegistry
 import com.tenmilelabs.chefai.MainActivity
 import com.tenmilelabs.chefai.R.string
-import com.tenmilelabs.chefai.auth.data.network.AuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
 import dagger.hilt.android.testing.HiltAndroidRule
@@ -42,20 +41,15 @@ class AuthE2ETest {
 
     @get:Rule(order = 1)
     val composeTestRule = createAndroidComposeRule<MainActivity>()
-
     @Inject
-    lateinit var authNetworkDataSource: AuthNetworkDataSource
-
-    private lateinit var fakeAuthDataSource: FakeAuthNetworkDataSource
+    lateinit var fakeAuthDataSource: FakeAuthNetworkDataSource
 
     private lateinit var context: Context
 
     @Before
     fun setup() {
         hiltRule.inject()
-
         // Get reference to the fake data source
-        fakeAuthDataSource = authNetworkDataSource as FakeAuthNetworkDataSource
         fakeAuthDataSource.reset()
         context = InstrumentationRegistry
             .getInstrumentation()

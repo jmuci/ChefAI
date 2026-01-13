@@ -34,9 +34,14 @@ abstract class TestAuthModule {
          */
         @Provides
         @Singleton
-        fun provideAuthNetworkDataSource(): AuthNetworkDataSource {
+        fun provideFakeAuthNetworkDataSource(): FakeAuthNetworkDataSource {
             return FakeAuthNetworkDataSource()
         }
+
+        @Provides
+        fun bindAuthNetworkDataSource(
+            fake: FakeAuthNetworkDataSource
+        ): AuthNetworkDataSource = fake
     }
 
     /**
