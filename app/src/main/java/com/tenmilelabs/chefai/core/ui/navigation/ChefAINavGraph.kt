@@ -1,9 +1,6 @@
 package com.tenmilelabs.chefai.core.ui.navigation
 
-import android.content.res.Configuration.UI_MODE_NIGHT_NO
-import android.content.res.Configuration.UI_MODE_NIGHT_YES
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -17,7 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavHostController
@@ -26,16 +23,20 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.createGraph
 import com.tenmilelabs.chefai.R
-import com.tenmilelabs.chefai.recipes.ui.create.CreateRecipeScreen
+import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.auth.ui.LoginScreen
+import com.tenmilelabs.chefai.auth.ui.RegisterScreen
 import com.tenmilelabs.chefai.home.ui.HomeScreen
 import com.tenmilelabs.chefai.mealplans.ui.MealPlansScreen
-import com.tenmilelabs.chefai.recipes.ui.details.RecipeDetailsScreen
 import com.tenmilelabs.chefai.recipes.ui.RecipesScreen
+import com.tenmilelabs.chefai.recipes.ui.create.CreateRecipeScreen
+import com.tenmilelabs.chefai.recipes.ui.details.RecipeDetailsScreen
 import timber.log.Timber
 
 @Composable
 fun ChefAINavGraph(
     modifier: Modifier,
+    sessionManager: SessionManager,
     navController: NavHostController = rememberNavController(),
     navActions: NavigationActions = remember(navController) {
         NavigationActions(navController)
@@ -43,7 +44,16 @@ fun ChefAINavGraph(
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val graph = navController.createGraph(startDestination = AppDestinations.HOME.route) {
+    // Collect session state to determine start destination
+    val userSession by sessionManager.userSession.collectAsStateWithLifecycle()
+
+    // Determine start destination based on authentication state
+    val startDestination = when (userSession) {
+        is com.tenmilelabs.chefai.auth.domain.model.UserSession.Authenticated -> AppDestinations.HOME.route
+        else -> AppDestinations.LOGIN.route
+    }
+
+    val graph = navController.createGraph(startDestination = startDestination) {
         composable(route = AppDestinations.HOME.route) {
             HomeScreen(snackbarHostState = snackbarHostState)
         }
@@ -70,11 +80,25 @@ fun ChefAINavGraph(
                 snackbarHostState= snackbarHostState
             )
         }
+        composable(route = AppDestinations.LOGIN.route) {
+            LoginScreen(
+                snackbarHostState = snackbarHostState,
+                onNavigateToHome = { navActions.navigateToHome() },
+                onNavigateToRegister = { navActions.navigateToRegister() }
+            )
+        }
+        composable(route = AppDestinations.REGISTER.route) {
+            RegisterScreen(
+                snackbarHostState = snackbarHostState,
+                onNavigateToHome = { navActions.navigateToHome() },
+                onNavigateToLogin = { navActions.navigateToLogin() }
+            )
+        }
     }
 
     var titleRes by rememberSaveable { mutableIntStateOf(R.string.app_name) }
     var isTopLevelDestination by rememberSaveable { mutableStateOf(false) }
-    var currentRoute by rememberSaveable { mutableStateOf(AppDestinations.HOME.route) }
+    var currentRoute by rememberSaveable { mutableStateOf(startDestination) }
 
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     var isFabMenuExpanded by rememberSaveable { mutableStateOf(false) }
@@ -116,20 +140,28 @@ fun ChefAINavGraph(
         modifier,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            ChefAITopAppBar(
-                titleRes,
-                onNavigationClick = if (!isTopLevelDestination) {
-                    { navController.popBackStack() }
-                } else {
-                    null
-                },
-                onLogout = {
-                    // Handle logout - could navigate to login screen or show a message
-                    // For now, user stays on the same screen but is logged out
-                }
-            )
+            // Don't show top bar on login or register screens
+            if (currentRoute != AppDestinations.LOGIN.route && currentRoute != AppDestinations.REGISTER.route) {
+                ChefAITopAppBar(
+                    titleRes,
+                    onNavigationClick = if (!isTopLevelDestination) {
+                        { navController.popBackStack() }
+                    } else {
+                        null
+                    },
+                    onLogout = {
+                        // Navigate to login screen and clear back stack
+                        navActions.navigateToLogin()
+                    }
+                )
+            }
         },
-        bottomBar = { BottomNavigationBar(navController) },
+        bottomBar = {
+            // Don't show bottom bar on login or register screens
+            if (currentRoute != AppDestinations.LOGIN.route && currentRoute != AppDestinations.REGISTER.route) {
+                BottomNavigationBar(navController)
+            }
+        },
         floatingActionButton = {
             // Only show FAB on Recipes screen
             if (currentRoute == AppDestinations.RECIPES.route) {
@@ -162,17 +194,5 @@ fun ChefAINavGraph(
 
 
 
-@Preview(
-    uiMode = UI_MODE_NIGHT_YES,
-    name = "DefaultPreviewDark",
-    showBackground = true
-)
-@Preview(
-    uiMode = UI_MODE_NIGHT_NO,
-    name = "DefaultPreviewLight",
-    showBackground = true
-)
-@Composable
-fun ChefAINavGraphPreview() {
-    ChefAINavGraph(Modifier.fillMaxSize())
-}
+// Preview not available - ChefAINavGraph requires SessionManager injection from Hilt
+// which can't be easily mocked in Composable previews

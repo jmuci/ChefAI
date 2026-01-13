@@ -53,13 +53,13 @@ import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.core.domain.model.Label
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
+import com.tenmilelabs.chefai.core.ui.preview.SharedData.carbonaraIngredients
+import com.tenmilelabs.chefai.core.ui.preview.SharedData.carbonaraSteps
+import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.recipes.ui.create.components.AutocompleteInput
 import com.tenmilelabs.chefai.recipes.ui.create.components.ImageUploadContent
 import com.tenmilelabs.chefai.recipes.ui.create.components.IngredientInput
 import com.tenmilelabs.chefai.recipes.ui.create.components.StepCard
-import com.tenmilelabs.chefai.core.ui.preview.SharedData.carbonaraIngredients
-import com.tenmilelabs.chefai.core.ui.preview.SharedData.carbonaraSteps
-import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

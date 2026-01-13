@@ -1,0 +1,35 @@
+{
+  "ignore": [
+    "build/**",
+    "**/build/**",
+    ".gradle/**",
+    "**/generated/**",
+    "app/build/**",
+    "**/gen/**",
+    "**/*.apk",
+    "**/*.aab",
+    "**/*.dex",
+    "**/.idea/**",
+    "**/.cxx/**",
+    "**/schema/**"
+  ],
+  "rules": [
+    "ChefAI is an offline-first recipe management app (Kotlin + Compose + Hilt + Room + Ktor)",
+    "Follow MVVM + Clean Architecture with data/domain/ui layers",
+    "Use StateFlow for state, never LiveData",
+    "Prefer fakes over mocks in tests",
+    {
+      "filePathMatches": "**/*Test.kt",
+      "rules": [
+        "Use lowercase test names with backticks and spaces",
+        "Use Google Truth for assertions",
+        "Use Turbine for Flow testing"
+      ],
+      "rulesPaths": "./AGENTS.md"
+    },
+    {
+      "filePathMatches": ["**/*.kt", "**/*.kts"],
+      "rulesPaths": "./AGENTS.md"
+    }
+  ]
+}

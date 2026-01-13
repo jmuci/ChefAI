@@ -1,8 +1,8 @@
 package com.tenmilelabs.chefai.auth.util
 
 import com.tenmilelabs.chefai.auth.domain.SessionManager
-import com.tenmilelabs.chefai.core.domain.model.User
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
+import com.tenmilelabs.chefai.core.domain.model.User
 import kotlinx.coroutines.flow.map
 
 /**

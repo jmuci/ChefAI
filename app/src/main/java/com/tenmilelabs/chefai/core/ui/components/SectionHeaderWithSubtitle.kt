@@ -15,7 +15,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
-import com.tenmilelabs.chefai.home.ui.HomeScreen
 
 @Composable
 fun SectionHeaderWithSubtitle(title: String, subtitle: String) {

@@ -1,6 +1,5 @@
 package com.tenmilelabs.chefai.core.data.repository
 
-import com.tenmilelabs.chefai.recipes.data.mapper.toDomain
 import com.tenmilelabs.chefai.core.data.local.room.dao.IngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.LabelDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.TagDao
@@ -8,6 +7,7 @@ import com.tenmilelabs.chefai.core.domain.model.Ingredient
 import com.tenmilelabs.chefai.core.domain.model.Label
 import com.tenmilelabs.chefai.core.domain.model.Tag
 import com.tenmilelabs.chefai.core.domain.repository.MetadataRepository
+import com.tenmilelabs.chefai.recipes.data.mapper.toDomain
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject

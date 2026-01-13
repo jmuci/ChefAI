@@ -17,6 +17,8 @@ private object ScreenBaseRoutes {
     const val RECIPE_DETAILS = "recipe_details_screen"
     const val CREATE_RECIPE = "create_recipe_screen"
     const val SETTINGS = "settings_screen"
+    const val LOGIN = "login_screen"
+    const val REGISTER = "register_screen"
 }
 
 /**
@@ -42,6 +44,8 @@ enum class AppDestinations(
     ),
     CREATE_RECIPE(R.string.app_dest_title_create_recipe, ScreenBaseRoutes.CREATE_RECIPE),
     SETTINGS(R.string.app_dest_title_settings, ScreenBaseRoutes.SETTINGS),
+    LOGIN(R.string.app_dest_title_login, ScreenBaseRoutes.LOGIN),
+    REGISTER(R.string.app_dest_title_register, ScreenBaseRoutes.REGISTER),
 }
 
 
@@ -55,5 +59,23 @@ class NavigationActions(private val navController: NavHostController) {
 
     fun navigateToCreateRecipe() {
         navController.navigate(ScreenBaseRoutes.CREATE_RECIPE)
+    }
+
+    fun navigateToLogin() {
+        navController.navigate(ScreenBaseRoutes.LOGIN) {
+            popUpTo(navController.graph.id) {
+                inclusive = true
+            }
+        }
+    }
+
+    fun navigateToRegister() {
+        navController.navigate(ScreenBaseRoutes.REGISTER)
+    }
+
+    fun navigateToHome() {
+        navController.navigate(ScreenBaseRoutes.HOME) {
+            popUpTo(ScreenBaseRoutes.LOGIN) { inclusive = true }
+        }
     }
 }

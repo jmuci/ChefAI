@@ -66,4 +66,10 @@ class FakeSecurePreferences : SecurePreferencesInterface {
             put(KEY_TOKEN_EXPIRY, tokenExpiry)
         }
     }
+
+    override suspend fun updateRefreshToken(refreshToken: String) {
+        storage.value = storage.value.toMutableMap().apply {
+            put(KEY_REFRESH_TOKEN, refreshToken)
+        }
+    }
 }

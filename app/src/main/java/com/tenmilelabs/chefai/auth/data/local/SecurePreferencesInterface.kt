@@ -21,4 +21,5 @@ interface SecurePreferencesInterface {
     fun getTokenExpiry(): Flow<Long?>
     suspend fun clearAuthData()
     suspend fun updateAccessToken(accessToken: String, tokenExpiry: Long)
+    suspend fun updateRefreshToken(refreshToken: String)
 }

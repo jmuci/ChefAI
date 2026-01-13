@@ -59,6 +59,10 @@ room {
     schemaDirectory("$projectDir/schemas")
 }
 
+hilt {
+    enableAggregatingTask = true
+}
+
 dependencies {
 
     implementation(libs.androidx.core.ktx)
@@ -69,7 +73,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     // Jetpack Compose ===
-    val composeBom = platform("androidx.compose:compose-bom:2025.05.00")
+    val composeBom = platform("androidx.compose:compose-bom:${libs.versions.androidxComposeBom.get()}")
     implementation(composeBom)
     androidTestImplementation(composeBom)
     // Material Design 3
@@ -142,8 +146,9 @@ dependencies {
     // Dependencies for local unit tests ====
     testImplementation(libs.junit)
     testImplementation(libs.androidx.archcore.testing)
-    testImplementation(libs.kotlinx.coroutines.android)
     testImplementation(libs.kotlinx.coroutines.test)
+    
+    // Testing
     testImplementation(libs.google.truth)
     testImplementation(libs.turbine)
     testImplementation(libs.hilt.android.testing)
@@ -153,11 +158,7 @@ dependencies {
     // Dependencies for Android tests ====
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(libs.kotlinx.coroutines.android)
-    androidTestImplementation(libs.kotlinx.coroutines.test)
-
-    //Compose
+    
+    // Compose UI testing
     androidTestImplementation(libs.androidx.ui.test.junit4)
-    debugImplementation(libs.androidx.ui.test.manifest)
-    testImplementation(kotlin("test"))
 }

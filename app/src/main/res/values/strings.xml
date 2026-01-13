@@ -1,9 +1,11 @@
 <resources>
     <string name="app_dest_title_create_recipe">Create Recipe</string>
     <string name="app_dest_title_home">Home</string>
+    <string name="app_dest_title_login">Login</string>
     <string name="app_dest_title_meal_plans">Meal Plans</string>
     <string name="app_dest_title_recipe_details">Recipe Details</string>
     <string name="app_dest_title_recipes">Recipes</string>
+    <string name="app_dest_title_register">Register</string>
     <string name="app_dest_title_settings">Settings</string>
     <string name="app_name">ChefAI</string>
     <string name="button_select_photo">Select Photo from Gallery</string>
@@ -94,4 +96,25 @@
     <string name="home_recipe_suggestions_world_cuisine_title">Around the world: Italy</string>
     <string name="home_recipe_suggestions_world_cuisine_subtitle">Travel to italy through it\'s cuisine this week.</string>
     <string name="user_profile_avatar_description">User avatar description</string>
+    <string name="welcome_back">Welcome Back</string>
+    <string name="login_subtitle">Enter your credentials to continue</string>
+    <string name="login_button">Log In</string>
+    <string name="dont_have_account">Don\'t have an account?</string>
+    <string name="create_account">Create Account</string>
+    <string name="label_email">Email</string>
+    <string name="label_password">Password</string>
+    <string name="label_confirm_password">Confirm Password</string>
+    <string name="label_username">Username</string>
+    <string name="remember_me">Remember me</string>
+    <string name="create_account_subtitle">Join ChefAI and start your culinary journey</string>
+    <string name="register_button">Create Account</string>
+    <string name="already_have_account">Already have an account?</string>
+    <string name="login">Log In</string>
+    <string name="error_network_unavailable">No internet connection. Please check your network settings.</string>
+    <string name="error_connection_timeout">Connection timeout. Please try again.</string>
+    <string name="error_network_error">Network error. Please check your connection.</string>
+    <string name="error_server_error">Server error. Please try again later.</string>
+    <string name="error_login_failed">Login failed. Please try again.</string>
+    <string name="error_registration_failed">Registration failed. Please try again.</string>
+
 </resources>
