@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.auth.ui
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -49,7 +50,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme

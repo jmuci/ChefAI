@@ -14,7 +14,6 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
-import javax.inject.Provider
 
 /**
  * Unit tests for LoginViewModel.

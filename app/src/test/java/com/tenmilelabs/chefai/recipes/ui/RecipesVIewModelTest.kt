@@ -4,12 +4,12 @@ package com.tenmilelabs.chefai.recipes.ui
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
-import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
 import com.tenmilelabs.chefai.core.testutil.TEST_DOMAIN_RECIPE_PREVIEWS_LIST
 import com.tenmilelabs.chefai.core.testutil.recipePreview1
 import com.tenmilelabs.chefai.core.testutil.recipePreview2
 import com.tenmilelabs.chefai.core.testutil.recipePreview3
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
+import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before

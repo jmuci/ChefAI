@@ -1,7 +1,6 @@
 package com.tenmilelabs.chefai.core.data.local.room.dao
 
 import com.tenmilelabs.chefai.core.data.local.room.TagEntity
-import com.tenmilelabs.chefai.core.data.local.room.dao.TagDao
 import com.tenmilelabs.chefai.core.data.local.room.relations.TagWithRecipes
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import kotlinx.coroutines.flow.Flow

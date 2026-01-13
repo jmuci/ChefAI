@@ -11,7 +11,6 @@ import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.SourceClassificationEntity
 import com.tenmilelabs.chefai.core.data.local.room.TagEntity
 import com.tenmilelabs.chefai.core.data.local.room.UserEntity
-import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeWithDetails
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeWithLabels

@@ -1,7 +1,6 @@
 package com.tenmilelabs.chefai.core.data.local.room.dao
 
 import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
-import com.tenmilelabs.chefai.core.data.local.room.dao.IngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.relations.IngredientWithDetails
 import com.tenmilelabs.chefai.core.data.local.room.relations.IngredientWithRecipes
 import com.tenmilelabs.chefai.core.data.local.util.SyncState

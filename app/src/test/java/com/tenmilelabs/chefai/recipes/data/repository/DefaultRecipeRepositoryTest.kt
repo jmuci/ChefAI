@@ -1,7 +1,6 @@
 package com.tenmilelabs.chefai.recipes.data.repository
 
 import com.google.common.truth.Truth.assertThat
-import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeRepository
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeLabelDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
@@ -10,7 +9,6 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDa
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeTagDao
-import com.tenmilelabs.chefai.recipes.data.network.FakeApiService
 import com.tenmilelabs.chefai.core.testutil.recipe1
 import com.tenmilelabs.chefai.core.testutil.recipe3
 import com.tenmilelabs.chefai.core.testutil.recipeEntity1
@@ -27,9 +25,9 @@ import com.tenmilelabs.chefai.core.testutil.testSteps2
 import com.tenmilelabs.chefai.core.testutil.testSteps3
 import com.tenmilelabs.chefai.core.testutil.testTags
 import com.tenmilelabs.chefai.core.testutil.testUser
+import com.tenmilelabs.chefai.recipes.data.network.FakeApiService
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
