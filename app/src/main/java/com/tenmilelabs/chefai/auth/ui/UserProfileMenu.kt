@@ -64,8 +64,8 @@ class UserProfileViewModel @Inject constructor(
  */
 @Composable
 fun UserProfileMenu(
-    onLogout: () -> Unit = {},
     modifier: Modifier = Modifier,
+    onLogout: () -> Unit = {},
     viewModel: UserProfileViewModel = hiltViewModel()
 ) {
     val userSession by rememberUserSession()

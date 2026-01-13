@@ -1,6 +1,5 @@
 package com.tenmilelabs.chefai.auth.ui
 
-import android.R.attr.enabled
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
