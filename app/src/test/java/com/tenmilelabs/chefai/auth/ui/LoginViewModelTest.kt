@@ -4,7 +4,6 @@ import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
-import com.tenmilelabs.chefai.auth.data.network.AuthHttpException
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
@@ -15,9 +14,6 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
-import java.net.ConnectException
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
 import javax.inject.Provider
 
 /**
@@ -41,7 +37,7 @@ class LoginViewModelTest {
 
         sessionManager = SessionManager(
             securePreferences = fakeSecurePreferences,
-            authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
+            authNetworkDataSource = { fakeAuthNetworkDataSource },
             applicationScope = testScope
         )
 
