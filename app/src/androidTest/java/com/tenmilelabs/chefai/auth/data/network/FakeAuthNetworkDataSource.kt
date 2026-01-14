@@ -12,6 +12,8 @@ import java.util.UUID
  * Provides mock responses for authentication operations.
  * 
  * This version allows pre-seeding users for testing existing user flows.
+ * TODO This fakes duplicate the ones in the unit tests package.
+ * Put all fakes in a test utilities module in the future to remove redundancy.
  */
 class FakeAuthNetworkDataSource : AuthNetworkDataSource {
 
