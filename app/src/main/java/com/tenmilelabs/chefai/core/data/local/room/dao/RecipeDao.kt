@@ -21,7 +21,8 @@ interface RecipeDao {
     @Query("SELECT * FROM recipes WHERE creatorId = :creatorId")
     fun observeAllRecipesForUser(creatorId: UUID): Flow<List<RecipeEntity>>
 
-    @Query("""
+    @Query(
+        """
         SELECT
             ri.ingredientId AS ingredientId,
             i.displayName AS ingredientDisplayName,
@@ -35,7 +36,8 @@ interface RecipeDao {
         LEFT JOIN allergens AS a ON i.allergenId = a.uuid
         LEFT JOIN source_classifications AS s ON i.sourcePrimaryId = s.uuid
         WHERE ri.recipeId = :recipeId
-    """)
+    """
+    )
     fun observeIngredientsForRecipe(recipeId: UUID): Flow<List<RecipeIngredient>>
 
     @Query("SELECT * FROM recipes WHERE uuid = :uuid")
@@ -90,5 +92,43 @@ interface RecipeDao {
 
     @Query("SELECT * FROM recipes WHERE syncState = 'PENDING'")
     suspend fun getDirty(): List<RecipeEntity>
+
+    /**
+     * Get paginated recipes that are either:
+     * 1. Public (visible to everyone)
+     * 2. Created by the specified user (regardless of privacy)
+     *
+     * Sort order:
+     * 1. User's recipes (public + private) sorted by updatedAt DESC
+     * 2. Other users' public recipes sorted by updatedAt DESC
+     *
+     * This creates a "My Recipes" + "Explore" experience.
+     *
+     * @param userId The user ID to check for creator ownership
+     * @param limit Maximum number of results to return
+     * @param offset Number of results to skip (for pagination)
+     *  @return List of recipes with their details
+     */
+    @Transaction
+    @Query(
+        """
+        SELECT r.* 
+        FROM recipes r
+        WHERE r.deletedAt IS NULL
+            AND (
+                r.privacy = 'PUBLIC'
+                OR r.creatorId = :userId
+            )
+        ORDER BY 
+            CASE WHEN r.creatorId = :userId THEN 0 ELSE 1 END,
+            r.updatedAt DESC
+        LIMIT :limit OFFSET :offset
+    """
+    )
+    suspend fun getRecipesWithDetailsForUserPaginated(
+        userId: UUID,
+        limit: Int,
+        offset: Int
+    ): List<RecipeWithDetails>
 
 }

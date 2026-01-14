@@ -142,6 +142,10 @@ dependencies {
 
     implementation(libs.timber)
 
+    // Paging
+    implementation(libs.androidx.paging.runtime)
+    // Compose integration
+    implementation(libs.androidx.paging.compose)
 
     // Dependencies for local unit tests ====
     testImplementation(libs.junit)
@@ -153,6 +157,8 @@ dependencies {
     testImplementation(libs.turbine)
     testImplementation(libs.hilt.android.testing)
     kspTest(libs.hilt.android.compiler)
+    // JVM-friendly paging for unit tests
+    testImplementation(libs.androidx.paging.common)
 
 
     // Dependencies for Android tests ====
