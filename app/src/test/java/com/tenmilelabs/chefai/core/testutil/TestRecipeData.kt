@@ -1,6 +1,5 @@
 package com.tenmilelabs.chefai.core.testutil
 
-import com.tenmilelabs.chefai.recipes.data.mapper.toDomain
 import com.tenmilelabs.chefai.core.data.local.room.AllergenEntity
 import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.LabelEntity
@@ -19,6 +18,7 @@ import com.tenmilelabs.chefai.core.data.local.util.toUuid
 import com.tenmilelabs.chefai.core.domain.model.Label
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.domain.model.Tag
+import com.tenmilelabs.chefai.recipes.data.mapper.toDomain
 import java.util.UUID
 
 private const val updatedTimeSt = 10_000_000L

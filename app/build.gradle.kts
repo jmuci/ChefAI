@@ -18,7 +18,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "com.tenmilelabs.chefai.HiltTestRunner"
     }
 
     buildTypes {
@@ -161,4 +161,9 @@ dependencies {
     
     // Compose UI testing
     androidTestImplementation(libs.androidx.ui.test.junit4)
+    debugImplementation(libs.androidx.ui.test.manifest)
+    
+    // Hilt testing for androidTest
+    androidTestImplementation(libs.hilt.android.testing)
+    kspAndroidTest(libs.hilt.android.compiler)
 }

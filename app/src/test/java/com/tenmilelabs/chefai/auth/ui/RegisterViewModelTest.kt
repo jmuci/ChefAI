@@ -2,7 +2,6 @@ package com.tenmilelabs.chefai.auth.ui
 
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
-import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.domain.SessionManager
@@ -13,7 +12,6 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
-import javax.inject.Provider
 
 /**
  * Unit tests for RegisterViewModel.
@@ -36,7 +34,7 @@ class RegisterViewModelTest {
 
         sessionManager = SessionManager(
             securePreferences = fakeSecurePreferences,
-            authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
+            authNetworkDataSource = { fakeAuthNetworkDataSource },
             applicationScope = testScope
         )
 

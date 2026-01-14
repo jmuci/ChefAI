@@ -4,12 +4,11 @@ import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
-import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
 import com.tenmilelabs.chefai.core.testutil.recipe1
 import com.tenmilelabs.chefai.core.testutil.recipeId1
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
-import com.tenmilelabs.chefai.recipes.ui.details.RecipeDetailsViewModel
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
+import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before

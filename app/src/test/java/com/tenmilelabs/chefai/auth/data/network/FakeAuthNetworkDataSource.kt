@@ -5,6 +5,8 @@ import com.tenmilelabs.chefai.auth.data.network.dto.LoginRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RefreshTokenRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RegisterRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.TokenRefreshResponse
+import kotlinx.coroutines.delay
+import java.util.UUID
 
 /**
  * Fake implementation of AuthNetworkDataSource for testing.
@@ -36,7 +38,7 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
 
     override suspend fun register(request: RegisterRequest): AuthResponse {
         if (networkDelayMs > 0) {
-            kotlinx.coroutines.delay(networkDelayMs)
+            delay(networkDelayMs)
         }
 
         if (shouldThrowError) {
@@ -51,7 +53,7 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
 
     override suspend fun login(request: LoginRequest): AuthResponse {
         if (networkDelayMs > 0) {
-            kotlinx.coroutines.delay(networkDelayMs)
+            delay(networkDelayMs)
         }
 
         if (shouldThrowError) {
@@ -66,7 +68,7 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
 
     override suspend fun refreshToken(request: RefreshTokenRequest): TokenRefreshResponse {
         if (networkDelayMs > 0) {
-            kotlinx.coroutines.delay(networkDelayMs)
+            delay(networkDelayMs)
         }
 
         if (shouldThrowError) {
@@ -83,7 +85,7 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
         return AuthResponse(
             token = "fake_access_token_${System.currentTimeMillis()}",
             refreshToken = "fake_refresh_token_${System.currentTimeMillis()}",
-            userId = java.util.UUID.randomUUID().toString(),
+            userId = UUID.randomUUID().toString(),
             username = username,
             email = email,
             expiresIn = 3600 // 1 hour in seconds
@@ -97,7 +99,7 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
         return TokenRefreshResponse(
             accessToken = "fake_new_access_token_${System.currentTimeMillis()}",
             refreshToken = "fake_new_refresh_token_${System.currentTimeMillis()}",
-            userId = java.util.UUID.randomUUID().toString(),
+            userId = UUID.randomUUID().toString(),
             expiresIn = 3600 // 1 hour in seconds
         )
     }

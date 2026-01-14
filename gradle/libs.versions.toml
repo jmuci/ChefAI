@@ -55,6 +55,7 @@ androidx-security-crypto = { module = "androidx.security:security-crypto", versi
 androidx-ui = { module = "androidx.compose.ui:ui" }
 androidx-ui-graphics = { module = "androidx.compose.ui:ui-graphics" }
 androidx-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
+androidx-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
 androidx-ui-text-google-fonts = { module = "androidx.compose.ui:ui-text-google-fonts", version.ref = "uiTextGoogleFonts" }
 androidx-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
 androidx-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }

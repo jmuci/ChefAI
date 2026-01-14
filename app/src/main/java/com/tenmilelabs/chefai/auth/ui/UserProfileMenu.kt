@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -63,15 +64,15 @@ class UserProfileViewModel @Inject constructor(
  */
 @Composable
 fun UserProfileMenu(
-    onLogout: () -> Unit = {},
     modifier: Modifier = Modifier,
+    onLogout: () -> Unit = {},
     viewModel: UserProfileViewModel = hiltViewModel()
 ) {
     val userSession by rememberUserSession()
     val coroutineScope = rememberCoroutineScope()
     var expanded by remember { mutableStateOf(false) }
 
-    Box(modifier = modifier) {
+    Box(modifier = modifier.testTag("UserProfileMenu")) {
         IconButton(onClick = { expanded = true }) {
             if (userSession is UserSession.Authenticated && (userSession as UserSession.Authenticated).user.avatarUrl.isNotEmpty()) {
                 val user = (userSession as UserSession.Authenticated).user
@@ -131,7 +132,8 @@ fun UserProfileMenu(
                                 imageVector = Icons.AutoMirrored.Filled.Logout,
                                 contentDescription = null
                             )
-                        }
+                        },
+                        modifier = Modifier.testTag("LogoutMenuItem")
                     )
                 }
 
