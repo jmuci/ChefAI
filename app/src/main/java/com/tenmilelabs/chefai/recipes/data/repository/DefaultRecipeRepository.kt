@@ -1,5 +1,8 @@
 package com.tenmilelabs.chefai.recipes.data.repository
 
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
 import androidx.room.Transaction
 import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
@@ -15,6 +18,7 @@ import com.tenmilelabs.chefai.core.data.local.util.decodeHex
 import com.tenmilelabs.chefai.core.data.local.util.toUuid
 import com.tenmilelabs.chefai.core.domain.model.Recipe
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
+import com.tenmilelabs.chefai.recipes.data.RecipesPagingSource
 import com.tenmilelabs.chefai.recipes.data.mapper.toCrossRef
 import com.tenmilelabs.chefai.recipes.data.mapper.toDomain
 import com.tenmilelabs.chefai.recipes.data.mapper.toRecipePreviewDomain
@@ -106,6 +110,27 @@ class DefaultRecipeRepository @Inject constructor(
 
     override suspend fun getRecipe(uuid: UUID): Recipe? {
         return recipeDao.getRecipeWithDetails(uuid)?.toDomain()
+    }
+
+    override fun getRecipesPreviewPager(
+        userId: UUID,
+        pageSize: Int
+    ): Flow<PagingData<RecipePreview>> {
+        return Pager(
+            config = PagingConfig(
+                pageSize = pageSize,
+                enablePlaceholders = false,
+                initialLoadSize = pageSize * 2, // Load 2 pages initially for smoother experience
+                prefetchDistance = pageSize / 2, // Start loading next page when halfway through current
+                maxSize = pageSize * 5 // Keep max 5 pages in memory
+            ),
+            pagingSourceFactory = {
+                RecipesPagingSource(
+                    recipeDao = recipeDao,
+                    userId = userId
+                )
+            }
+        ).flow
     }
 
     @Transaction

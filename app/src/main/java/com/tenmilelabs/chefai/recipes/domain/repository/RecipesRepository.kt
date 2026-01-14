@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.recipes.domain.repository
 
+import androidx.paging.PagingData
 import com.tenmilelabs.chefai.core.domain.model.Recipe
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import kotlinx.coroutines.flow.Flow
@@ -20,4 +21,7 @@ interface RecipesRepository {
     suspend fun deleteAllRecipes()
 
     suspend fun deleteRecipe(recipeId: UUID)
+
+    fun getRecipesPreviewPager(userId: UUID, pageSize: Int = 20): Flow<PagingData<RecipePreview>>
+
 }

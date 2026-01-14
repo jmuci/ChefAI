@@ -22,7 +22,9 @@ import java.util.UUID
     ],
     indices = [
         Index("creatorId"),
-        Index(value = ["syncState", "updatedAt"])
+        Index(value = ["syncState", "updatedAt"]),
+        // Index(value = ["privacy", "deletedAt", "updatedAt"]), TODO Add those on the next DB update
+        // Index(value = ["creatorId", "deletedAt", "updatedAt"])
     ]
 )
 data class RecipeEntity(
@@ -40,4 +42,4 @@ data class RecipeEntity(
     override val updatedAt: Long,
     override val deletedAt: Long?,
     override val syncState: SyncState = SyncState.PENDING,
-): SyncableEntity
+) : SyncableEntity
