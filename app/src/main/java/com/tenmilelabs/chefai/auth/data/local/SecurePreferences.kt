@@ -1,85 +1,108 @@
 package com.tenmilelabs.chefai.auth.data.local
 
 import android.content.Context
-import android.content.SharedPreferences
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
+import android.util.Base64
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import timber.log.Timber
+import java.security.KeyStore
 import java.util.UUID
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
 import javax.inject.Inject
 import javax.inject.Singleton
 
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(
+    name = "chefai_secure_prefs"
+)
+
 /**
- * Manages secure storage of authentication data using EncryptedSharedPreferences.
- * Uses Android's Security Crypto library to encrypt sensitive data at rest with AES256-GCM.
+ * Manages secure storage of authentication data using Jetpack DataStore
+ * with AES-256/GCM encryption backed by the Android Keystore.
  *
- * This implementation ensures that all authentication tokens and user IDs are actually
- * encrypted on disk, unlike the DataStore approach which stores data in plain text.
+ * Each value is individually encrypted with a fresh IV before storage.
+ * The encryption key is hardware-backed when available via Android Keystore.
  */
 @Singleton
 class SecurePreferences @Inject constructor(
     @param:ApplicationContext private val context: Context
 ) : SecurePreferencesInterface {
+
     companion object {
-        private const val SECURE_PREFS_FILE_NAME = "chefai_secure_prefs"
+        private const val KEY_ALIAS = "chefai_master_key"
+        private const val GCM_IV_LENGTH = 12
+        private const val GCM_TAG_LENGTH_BITS = 128
 
-        // Preference keys
-        private const val KEY_USER_UUID = "user_uuid"
-        private const val KEY_DISPLAY_NAME = "display_name"
-        private const val KEY_EMAIL = "email"
-        private const val KEY_AVATAR_URL = "avatar_url"
-        private const val KEY_ACCESS_TOKEN = "access_token"
-        private const val KEY_REFRESH_TOKEN = "refresh_token"
-        private const val KEY_TOKEN_EXPIRY = "token_expiry"
+        private val KEY_USER_UUID = stringPreferencesKey("user_uuid")
+        private val KEY_DISPLAY_NAME = stringPreferencesKey("display_name")
+        private val KEY_EMAIL = stringPreferencesKey("email")
+        private val KEY_AVATAR_URL = stringPreferencesKey("avatar_url")
+        private val KEY_ACCESS_TOKEN = stringPreferencesKey("access_token")
+        private val KEY_REFRESH_TOKEN = stringPreferencesKey("refresh_token")
+        private val KEY_TOKEN_EXPIRY = stringPreferencesKey("token_expiry")
     }
 
-    // Create MasterKey for encryption (hardware-backed when available)
-    private val masterKey = MasterKey.Builder(context)
-        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-        .build()
+    private val dataStore: DataStore<Preferences> = context.dataStore
 
-    // Create EncryptedSharedPreferences - this actually encrypts data at rest
-    // Keys are encrypted with AES256-SIV, values with AES256-GCM
-    private val encryptedPrefs: SharedPreferences = EncryptedSharedPreferences.create(
-        context,
-        SECURE_PREFS_FILE_NAME,
-        masterKey,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
+    private val secretKey: SecretKey by lazy { getOrCreateKey() }
 
-    // Flow-based state for reactive observation
-    private val prefsFlow = MutableStateFlow(getCurrentPrefsMap())
+    private fun getOrCreateKey(): SecretKey {
+        val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        if (!keyStore.containsAlias(KEY_ALIAS)) {
+            KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore").apply {
+                init(
+                    KeyGenParameterSpec.Builder(
+                        KEY_ALIAS,
+                        KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+                    )
+                        .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                        .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                        .setKeySize(256)
+                        .build()
+                )
+                generateKey()
+            }
+        }
+        return (keyStore.getEntry(KEY_ALIAS, null) as KeyStore.SecretKeyEntry).secretKey
+    }
 
     /**
-     * Gets current preferences as a map for flow emission.
+     * Encrypts [plaintext] using AES-256/GCM. The 12-byte random IV is
+     * prepended to the ciphertext and the whole blob is Base64-encoded.
      */
-    private fun getCurrentPrefsMap(): Map<String, Any?> {
-        return mapOf(
-            KEY_USER_UUID to encryptedPrefs.getString(KEY_USER_UUID, null),
-            KEY_DISPLAY_NAME to encryptedPrefs.getString(KEY_DISPLAY_NAME, null),
-            KEY_EMAIL to encryptedPrefs.getString(KEY_EMAIL, null),
-            KEY_AVATAR_URL to encryptedPrefs.getString(KEY_AVATAR_URL, null),
-            KEY_ACCESS_TOKEN to encryptedPrefs.getString(KEY_ACCESS_TOKEN, null),
-            KEY_REFRESH_TOKEN to encryptedPrefs.getString(KEY_REFRESH_TOKEN, null),
-            KEY_TOKEN_EXPIRY to encryptedPrefs.getLong(KEY_TOKEN_EXPIRY, -1L).takeIf { it != -1L }
-        )
+    private fun encrypt(plaintext: String): String {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey)
+        val iv = cipher.iv
+        val ciphertext = cipher.doFinal(plaintext.toByteArray(Charsets.UTF_8))
+        return Base64.encodeToString(iv + ciphertext, Base64.NO_WRAP)
     }
 
     /**
-     * Updates the flow with current preferences.
+     * Decrypts a Base64-encoded blob that was produced by [encrypt].
      */
-    private fun notifyChange() {
-        prefsFlow.value = getCurrentPrefsMap()
+    private fun decrypt(encoded: String): String {
+        val decoded = Base64.decode(encoded, Base64.NO_WRAP)
+        val iv = decoded.copyOfRange(0, GCM_IV_LENGTH)
+        val ciphertext = decoded.copyOfRange(GCM_IV_LENGTH, decoded.size)
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv))
+        return String(cipher.doFinal(ciphertext), Charsets.UTF_8)
     }
 
     /**
-     * Stores user authentication data securely (encrypted at rest).
-     * Data is encrypted using AES256-GCM before being written to disk.
+     * Stores user authentication data securely. Each field is individually
+     * encrypted with AES-256/GCM before being written to DataStore.
      */
     override suspend fun saveAuthData(
         userUuid: UUID,
@@ -91,17 +114,15 @@ class SecurePreferences @Inject constructor(
         tokenExpiry: Long
     ) {
         try {
-            encryptedPrefs.edit()
-                .putString(KEY_USER_UUID, userUuid.toString())
-                .putString(KEY_DISPLAY_NAME, displayName)
-                .putString(KEY_EMAIL, email)
-                .putString(KEY_AVATAR_URL, avatarUrl)
-                .putString(KEY_ACCESS_TOKEN, accessToken)
-                .putString(KEY_REFRESH_TOKEN, refreshToken)
-                .putLong(KEY_TOKEN_EXPIRY, tokenExpiry)
-                .apply()
-
-            notifyChange()
+            dataStore.edit { prefs ->
+                prefs[KEY_USER_UUID] = encrypt(userUuid.toString())
+                prefs[KEY_DISPLAY_NAME] = encrypt(displayName)
+                prefs[KEY_EMAIL] = encrypt(email)
+                prefs[KEY_AVATAR_URL] = encrypt(avatarUrl)
+                prefs[KEY_ACCESS_TOKEN] = encrypt(accessToken)
+                prefs[KEY_REFRESH_TOKEN] = encrypt(refreshToken)
+                prefs[KEY_TOKEN_EXPIRY] = encrypt(tokenExpiry.toString())
+            }
             Timber.d("Auth data saved securely (AES256-GCM encrypted) for user: $userUuid")
         } catch (e: Exception) {
             Timber.e(e, "Failed to save auth data")
@@ -109,68 +130,47 @@ class SecurePreferences @Inject constructor(
         }
     }
 
-    /**
-     * Retrieves the stored user UUID as a Flow.
-     * Data is decrypted on read.
-     */
-    override fun getUserUuid(): Flow<UUID?> = prefsFlow.map { prefs ->
-        (prefs[KEY_USER_UUID] as? String)?.let { uuidString ->
+    override fun getUserUuid(): Flow<UUID?> = dataStore.data.map { prefs ->
+        prefs[KEY_USER_UUID]?.let { encrypted ->
             try {
-                UUID.fromString(uuidString)
-            } catch (e: IllegalArgumentException) {
-                Timber.e(e, "Invalid UUID format in preferences")
+                UUID.fromString(decrypt(encrypted))
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to read user UUID from preferences")
                 null
             }
         }
     }
 
-    override fun getDisplayName(): Flow<String?> = prefsFlow.map { prefs ->
-        prefs[KEY_DISPLAY_NAME] as? String
+    override fun getDisplayName(): Flow<String?> = dataStore.data.map { prefs ->
+        prefs[KEY_DISPLAY_NAME]?.let { runCatching { decrypt(it) }.getOrNull() }
     }
 
-    override fun getUserEmail(): Flow<String?> = prefsFlow.map { prefs ->
-        prefs[KEY_EMAIL] as? String
+    override fun getUserEmail(): Flow<String?> = dataStore.data.map { prefs ->
+        prefs[KEY_EMAIL]?.let { runCatching { decrypt(it) }.getOrNull() }
     }
 
-    override fun getUserAvatarUrl(): Flow<String?> = prefsFlow.map { prefs ->
-        prefs[KEY_AVATAR_URL] as? String
+    override fun getUserAvatarUrl(): Flow<String?> = dataStore.data.map { prefs ->
+        prefs[KEY_AVATAR_URL]?.let { runCatching { decrypt(it) }.getOrNull() }
     }
 
-    /**
-     * Retrieves the stored access token as a Flow.
-     * Data is decrypted on read.
-     */
-    override fun getAccessToken(): Flow<String?> = prefsFlow.map { prefs ->
-        prefs[KEY_ACCESS_TOKEN] as? String
+    override fun getAccessToken(): Flow<String?> = dataStore.data.map { prefs ->
+        prefs[KEY_ACCESS_TOKEN]?.let { runCatching { decrypt(it) }.getOrNull() }
     }
 
-    /**
-     * Retrieves the stored refresh token as a Flow.
-     * Data is decrypted on read.
-     */
-    override fun getRefreshToken(): Flow<String?> = prefsFlow.map { prefs ->
-        prefs[KEY_REFRESH_TOKEN] as? String
+    override fun getRefreshToken(): Flow<String?> = dataStore.data.map { prefs ->
+        prefs[KEY_REFRESH_TOKEN]?.let { runCatching { decrypt(it) }.getOrNull() }
+    }
+
+    override fun getTokenExpiry(): Flow<Long?> = dataStore.data.map { prefs ->
+        prefs[KEY_TOKEN_EXPIRY]?.let { runCatching { decrypt(it).toLong() }.getOrNull() }
     }
 
     /**
-     * Retrieves the token expiry timestamp as a Flow.
-     * Data is decrypted on read.
-     */
-    override fun getTokenExpiry(): Flow<Long?> = prefsFlow.map { prefs ->
-        prefs[KEY_TOKEN_EXPIRY] as? Long
-    }
-
-    /**
-     * Clears all stored authentication data (secure erasure).
-     * The encrypted file is cleared, ensuring no sensitive data remains.
+     * Clears all stored authentication data.
      */
     override suspend fun clearAuthData() {
         try {
-            encryptedPrefs.edit()
-                .clear()
-                .apply()
-
-            notifyChange()
+            dataStore.edit { it.clear() }
             Timber.d("Auth data cleared successfully (securely erased)")
         } catch (e: Exception) {
             Timber.e(e, "Failed to clear auth data")
@@ -180,16 +180,13 @@ class SecurePreferences @Inject constructor(
 
     /**
      * Updates only the access token and expiry (used during token refresh).
-     * Data is encrypted before being written to disk.
      */
     override suspend fun updateAccessToken(accessToken: String, tokenExpiry: Long) {
         try {
-            encryptedPrefs.edit()
-                .putString(KEY_ACCESS_TOKEN, accessToken)
-                .putLong(KEY_TOKEN_EXPIRY, tokenExpiry)
-                .apply()
-
-            notifyChange()
+            dataStore.edit { prefs ->
+                prefs[KEY_ACCESS_TOKEN] = encrypt(accessToken)
+                prefs[KEY_TOKEN_EXPIRY] = encrypt(tokenExpiry.toString())
+            }
             Timber.d("Access token updated successfully (encrypted)")
         } catch (e: Exception) {
             Timber.e(e, "Failed to update access token")
@@ -199,15 +196,12 @@ class SecurePreferences @Inject constructor(
 
     /**
      * Updates only the refresh token (used during token rotation).
-     * Data is encrypted before being written to disk.
      */
     override suspend fun updateRefreshToken(refreshToken: String) {
         try {
-            encryptedPrefs.edit()
-                .putString(KEY_REFRESH_TOKEN, refreshToken)
-                .apply()
-
-            notifyChange()
+            dataStore.edit { prefs ->
+                prefs[KEY_REFRESH_TOKEN] = encrypt(refreshToken)
+            }
             Timber.d("Refresh token updated successfully (encrypted)")
         } catch (e: Exception) {
             Timber.e(e, "Failed to update refresh token")
