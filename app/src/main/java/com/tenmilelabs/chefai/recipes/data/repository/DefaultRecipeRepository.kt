@@ -11,8 +11,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeLabelCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.TagDao
-import com.tenmilelabs.chefai.core.data.local.util.decodeHex
-import com.tenmilelabs.chefai.core.data.local.util.toUuid
+import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.core.domain.model.Recipe
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.recipes.data.mapper.toCrossRef
@@ -26,6 +25,7 @@ import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.io.IOException
 import timber.log.Timber
@@ -45,12 +45,14 @@ class DefaultRecipeRepository @Inject constructor(
     private val labelDao: LabelDao,
     private val recipeTagDao: RecipeTagCrossRefDao,
     private val recipeLabelDao: RecipeLabelCrossRefDao,
-    private val networkDataSource: RecipeNetworkDataSource) : RecipesRepository {
-    //TODO implement authentication
-    val testUserId = "F47AC10B58CC4372A5670E02B2C3D479".decodeHex().toUuid()
+    private val networkDataSource: RecipeNetworkDataSource,
+    private val sessionManager: SessionManager) : RecipesRepository {
 
     override fun getRecipesPreviewStream(): Flow<List<RecipePreview>> {
-        return recipeDao.observeRecipesWithDetailsForUser(testUserId).map { recipes ->
+        val userId = sessionManager.getCurrentUser()?.uuid
+            ?: return flowOf(emptyList())
+        // TODO pass the userId to only show recipes from the user when filtering.
+        return recipeDao.observeRecipesWithDetails().map { recipes ->
             recipes.toRecipePreviewDomain()
         }.catch { e ->
             logAndReThrow(e, emptyList())

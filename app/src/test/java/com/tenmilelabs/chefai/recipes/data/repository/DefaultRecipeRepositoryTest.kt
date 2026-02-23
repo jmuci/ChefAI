@@ -1,6 +1,9 @@
 package com.tenmilelabs.chefai.recipes.data.repository
 
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
+import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
+import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeLabelDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
@@ -28,6 +31,9 @@ import com.tenmilelabs.chefai.core.testutil.testUser
 import com.tenmilelabs.chefai.recipes.data.network.FakeApiService
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
@@ -48,9 +54,38 @@ class DefaultRecipeRepositoryTest {
     private lateinit var recipeTagDao: FakeRecipeTagCrossRefDao
     private lateinit var recipeLabelDao: FakeRecipeLabelCrossRefDao
     private lateinit var remoteDataSource: FakeApiService
+    private lateinit var sessionManager: SessionManager
+    private val testDispatcher = StandardTestDispatcher()
+    private lateinit var testScope: TestScope
 
     @Before
     fun createRepository() {
+        testScope = TestScope(testDispatcher)
+        val fakeSecurePreferences = FakeSecurePreferences()
+        val fakeAuthNetworkDataSource = FakeAuthNetworkDataSource()
+
+        // Pre-seed secure preferences so the session loads as the test user.
+        // Use runBlocking to avoid test-scheduler timing issues in @Before.
+        runBlocking {
+            fakeSecurePreferences.saveAuthData(
+                userUuid = testUser.uuid,
+                displayName = testUser.displayName,
+                email = testUser.email,
+                avatarUrl = testUser.avatarUrl,
+                accessToken = "test_token",
+                refreshToken = "test_refresh",
+                tokenExpiry = System.currentTimeMillis() + 3_600_000L
+            )
+        }
+
+        sessionManager = SessionManager(
+            securePreferences = fakeSecurePreferences,
+            authNetworkDataSource = { fakeAuthNetworkDataSource },
+            applicationScope = testScope
+        )
+        // Advance until the SessionManager init coroutine (loadSession) completes.
+        testDispatcher.scheduler.advanceUntilIdle()
+
         recipeDao = FakeRecipeDao()
         recipeStepDao = FakeRecipeStepDao()
         recipeIngredientDao = FakeRecipeIngredientDao()
@@ -71,12 +106,13 @@ class DefaultRecipeRepositoryTest {
                 labelDao,
                 recipeTagDao,
                 recipeLabelDao,
-                remoteDataSource
+                remoteDataSource,
+                sessionManager
             )
 
         // Seed the fake DAO with our test data.
         // This simulates a database with pre-existing data.
-        runTest {
+        runBlocking {
             recipeDao.seed(
                 users = listOf(testUser),
                 recipes = listOf(recipeEntity1, recipeEntity2, recipeEntity3),
