@@ -31,10 +31,20 @@ Users can save recipes, browse a library, generate weekly meal plans, and get gr
 - Future: `/ai/` module for meal planner & LLM integration
 
 ## Current Key Features
-- User-managed personal recipe collection
-- Browse library recipes
-- View recipe details
+- User-managed personal recipe collection (create, edit, delete)
+- Browse library recipes with pagination (Paging 3)
+- View recipe details with tabs (overview, ingredients, instructions)
 - Store images & metadata locally
+- User authentication (login, register, token refresh) via Ktor → backend
+- Secure token storage (EncryptedSharedPreferences)
+- Feature-based package structure (auth/, recipes/, home/, mealplans/, core/)
+
+## Current Gaps (Feb 2026)
+- Anonymous-first usage NOT implemented (login required)
+- Sync NOT implemented (no Outbox, no SyncWorker, no WorkManager)
+- RecipesViewModel and DefaultRecipeRepository use hardcoded test user UUID
+- HomeScreen uses static placeholder data (no repository)
+- MealPlans is stub only
 
 ## 🔄 Sync and Data Layer Guidelines
 - Local persistence uses SQLite via Room with FTS5 enabled.

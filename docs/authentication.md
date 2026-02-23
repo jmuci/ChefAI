@@ -32,7 +32,7 @@ The core singleton class that manages user authentication state.
 // Load saved session from secure storage
 suspend fun loadSession()
 
-// Login with credentials (TODO: implement when backend ready)
+// Login with credentials 
 suspend fun login(email: String, password: String): Result<Unit>
 
 // Logout and clear session
@@ -251,20 +251,26 @@ fun provideHttpClient(sessionManager: SessionManager) = HttpClient(CIO) {
 }
 ```
 
-## Current Development Setup
+## Current Development Setup (Feb 2026)
 
-**Mock User:**
+**Auth API calls are implemented.** `SessionManager.login()`, `register()`, and `refreshToken()` all
+make real Ktor HTTP calls to the backend at `http://10.0.2.2:8080` (emulator localhost).
 
-- UUID: `F47AC10B58CC4372A5670E02B2C3D479`
-- Display Name: "Test User"
-- Email: "test@chefai.com"
+**Remaining gaps:**
 
-The app currently uses a mock user and mock tokens for development. When the backend authentication
-endpoints are ready:
+- `loadSession()` reconstructs a `User` with placeholder `displayName = "User"` — user details
+  should be fetched from backend or stored locally during login.
+- `RecipesViewModel` and `DefaultRecipeRepository` still use a hardcoded test user UUID
+  (`F47AC10B58CC4372A5670E02B2C3D479`) instead of getting the actual user from `SessionManager`.
+- Anonymous-first flow is **not implemented** — the app requires login; there is no anonymous
+  session, no local-only user, and no anonymous → authenticated upgrade path yet.
 
-1. Update `SessionManager.login()` to make actual API call
-2. Update `SessionManager.refreshToken()` to call backend refresh endpoint
-3. Update `SessionManager.loadSession()` to validate tokens with backend if needed
+**What still needs work:**
+
+1. Wire `SessionManager` into `RecipesViewModel` and `DefaultRecipeRepository` to use the real user.
+2. Implement anonymous-first: allow app usage without login, create local-only session.
+3. Implement anonymous → authenticated upgrade (merge local data into authenticated account).
+4. Store user profile details locally during login so `loadSession()` can fully restore them.
 
 ## API Requests
 
@@ -332,10 +338,14 @@ if (sessionManager.isTokenExpired()) {
 4. **Memory Safety**: Tokens stored in secure preferences, not in plain memory
 5. **Automatic Cleanup**: Logout clears all stored authentication data
 
-## Future Enhancements (When Backend Ready)
+## Future Enhancements
 
-- [ ] Implement actual login API call
-- [ ] Implement token refresh API call
+- [x] Implement actual login API call
+- [x] Implement token refresh API call
+- [ ] Anonymous-first session (use app without login)
+- [ ] Anonymous → authenticated upgrade flow
+- [ ] Store user profile locally during login
+- [ ] Wire real user ID into repositories (replace hardcoded test UUID)
 - [ ] Add biometric authentication option
 - [ ] Implement "Remember Me" functionality
 - [ ] Add session timeout handling
