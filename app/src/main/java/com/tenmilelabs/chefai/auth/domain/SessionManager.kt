@@ -76,12 +76,15 @@ class SessionManager @Inject constructor(
                         _userSession.value = UserSession.Unauthenticated
                     }
                 } else {
-                    // Token is still valid, create user session
+                    // Token is still valid, restore user from storage
+                    val displayName = securePreferences.getDisplayName().first() ?: ""
+                    val email = securePreferences.getUserEmail().first() ?: ""
+                    val avatarUrl = securePreferences.getUserAvatarUrl().first() ?: ""
                     val user = User(
                         uuid = userUuid,
-                        displayName = "User", // TODO: Fetch user details from backend
-                        email = "",
-                        avatarUrl = ""
+                        displayName = displayName,
+                        email = email,
+                        avatarUrl = avatarUrl
                     )
 
                     _userSession.value = UserSession.Authenticated(
@@ -120,6 +123,9 @@ class SessionManager @Inject constructor(
             // Save to secure storage
             securePreferences.saveAuthData(
                 userUuid = user.uuid,
+                displayName = user.displayName,
+                email = user.email,
+                avatarUrl = user.avatarUrl,
                 accessToken = authToken.accessToken,
                 refreshToken = authToken.refreshToken,
                 tokenExpiry = authToken.expiresAt
@@ -158,6 +164,9 @@ class SessionManager @Inject constructor(
             // Save to secure storage
             securePreferences.saveAuthData(
                 userUuid = user.uuid,
+                displayName = user.displayName,
+                email = user.email,
+                avatarUrl = user.avatarUrl,
                 accessToken = authToken.accessToken,
                 refreshToken = authToken.refreshToken,
                 tokenExpiry = authToken.expiresAt
