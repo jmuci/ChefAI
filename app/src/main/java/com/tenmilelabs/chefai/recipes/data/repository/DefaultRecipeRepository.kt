@@ -49,9 +49,8 @@ class DefaultRecipeRepository @Inject constructor(
     private val sessionManager: SessionManager) : RecipesRepository {
 
     override fun getRecipesPreviewStream(): Flow<List<RecipePreview>> {
-        val userId = sessionManager.getCurrentUser()?.uuid
-            ?: return flowOf(emptyList())
         // TODO pass the userId to only show recipes from the user when filtering.
+        // val userId = sessionManager.getCurrentUser()?.uuid
         return recipeDao.observeRecipesWithDetails().map { recipes ->
             recipes.toRecipePreviewDomain()
         }.catch { e ->
