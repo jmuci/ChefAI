@@ -1,6 +1,6 @@
 # ChefAI Architecture Overview
 
-_Last updated: November 2025_
+_Last updated: February 2026_
 
 ChefAI follows a **Hybrid Architecture** based on Google’s Modern Android Architecture, selectively enhanced with **Clean Architecture principles**.  
 The goal is to balance **developer velocity** (for a solo engineer) with **clarity, testability, and scalability** for future growth or collaboration.
@@ -35,13 +35,31 @@ Domain (Use Cases, Domain Entities, Repository Interfaces)
 - Free of Android or I/O dependencies.
 
 ### Data Layer
-- Contains repository implementations, data sources (Room, Retrofit/Ktor), DTOs, and mappers.
+- Contains repository implementations, data sources (Room, Ktor), DTOs, and mappers.
 - Owns the **single source of truth** for persisted or cached data.
 - Responsible for coordinating between network, local storage, and mapping to/from domain.
+- **Pagination:** Recipes use AndroidX Paging 3 with a custom `RecipesPagingSource` backed by Room.
 
 Current DB Schema as of 11/11/2025
 
 ![Database Schema Details](img/chefAI-datamodel.png)
+
+### Current Implementation Status (Feb 2026)
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Room database (11 entities) | Done | Version 2, migration support |
+| DAOs with CRUD + pagination | Done | `RecipeDao` includes paginated query |
+| Repositories (Recipe, Metadata) | Done | Local-only, hardcoded test user |
+| Ktor HTTP client + auth interceptor | Done | CIO engine, JSON, logging |
+| Auth (SessionManager, SecurePrefs) | Done | Login/register/refresh against backend API |
+| Paging 3 integration | Done | PagingSource → Repository → ViewModel → UI |
+| SyncableEntity interface | Done | All entities have syncState, updatedAt, deletedAt |
+| Anonymous-first usage | Not started | App requires login; no anonymous session yet |
+| Sync (push/pull, WorkManager) | Not started | No Outbox, no SyncWorker, no sync_metadata table |
+| Offline conflict resolution | Not started | SyncState.CONFLICT defined but unused |
+| HomeScreen repository integration | Not started | Uses static placeholder data |
+| Meal Plans | Stub only | Empty screen + ViewModel |
 
 ---
 
@@ -78,7 +96,7 @@ Mappers convert between these layers under `data/mapper/` and `ui/mappers/`.
 
 - Domain defines interfaces; Data implements them.
 - No Android or storage dependencies are allowed in the Domain layer.
-- ViewModels and UseCases are constructed via dependency injection (Hilt/Koin in future).
+- ViewModels and UseCases are constructed via dependency injection (Hilt).
 
 ---
 
@@ -95,4 +113,9 @@ Mappers convert between these layers under `data/mapper/` and `ui/mappers/`.
 ## 📄 Related Documents
 
 - [`/AGENTS.md`](../AGENTS.md) — formal rules for AI/code generation.
-- [`/docs/decisions/adr-0001-hybrid-architecture-choice.md`](decisions/adr-0001-hybrid-architecture-choice.md) — rationale for choosing this hybrid architecture.
+- [`/docs/adrs/adr-001-hybrid-architecture-choice.md`](adrs/adr-001-hybrid-architecture-choice.md) — rationale for choosing this hybrid architecture.
+- [`/docs/adrs/adr-002–local-DB-choice-and-ID-gen.md`](adrs/adr-002–local-DB-choice-and-ID-gen.md) — SQLite/Room + UUIDv7.
+- [`/docs/adrs/adr-003–two-step-BE-sync.md`](adrs/adr-003–two-step-BE-sync.md) — Two-step sync model.
+- [`/docs/adrs/adr-004-data-layer.md`](adrs/adr-004-data-layer.md) — Data layer composition.
+- [`/docs/adrs/adr-0005-feature-based-package-structure.md`](adrs/adr-0005-feature-based-package-structure.md) — Feature-based packaging.
+- [`/docs/authentication.md`](authentication.md) — Auth system documentation.
