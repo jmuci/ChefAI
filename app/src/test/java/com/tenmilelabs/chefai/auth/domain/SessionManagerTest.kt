@@ -211,7 +211,7 @@ class SessionManagerTest {
     fun `load session restores session from storage`() = testScope.runTest {
         // Given: User is logged in and session is saved
         sessionManager.login("restored@example.com", "password123")
-        val originalSession= sessionManager.userSession.value as UserSession.Authenticated
+        val originalSession = sessionManager.userSession.value as UserSession.Authenticated
 
         // When: Creating new SessionManager that loads from storage
         val newSessionManager = SessionManager(
@@ -226,5 +226,54 @@ class SessionManagerTest {
         assertThat(restoredSession).isInstanceOf(UserSession.Authenticated::class.java)
         val authenticated = restoredSession as UserSession.Authenticated
         assertThat(authenticated.user.uuid).isEqualTo(originalSession.user.uuid)
+    }
+
+    @Test
+    fun `load session restores user details from storage`() = testScope.runTest {
+        // Given: User registers so full profile is saved to storage
+        val username = "Jane"
+        val email = "jane@example.com"
+        sessionManager.register(username, email, "password123")
+        val originalSession = sessionManager.userSession.value as UserSession.Authenticated
+
+        // When: A new SessionManager instance loads the persisted session
+        val newSessionManager = SessionManager(
+            securePreferences = fakeSecurePreferences,
+            authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
+            applicationScope = testScope
+        )
+        advanceUntilIdle()
+
+        // Then: displayName and email are restored from storage instead of fallback placeholders
+        val restoredSession = newSessionManager.userSession.value
+        assertThat(restoredSession).isInstanceOf(UserSession.Authenticated::class.java)
+        val authenticated = restoredSession as UserSession.Authenticated
+        assertThat(authenticated.user.uuid).isEqualTo(originalSession.user.uuid)
+        assertThat(authenticated.user.displayName).isEqualTo(originalSession.user.displayName)
+        assertThat(authenticated.user.email).isEqualTo(originalSession.user.email)
+    }
+
+    @Test
+    fun `login persists user display name and email`() = testScope.runTest {
+        // Given / When: User logs in
+        val email = "alice@example.com"
+        sessionManager.login(email, "password123")
+
+        // Then: displayName derived from email prefix is stored and accessible
+        val session = sessionManager.userSession.value as UserSession.Authenticated
+        assertThat(session.user.email).isEqualTo(email)
+        // FakeAuthNetworkDataSource derives username from email prefix
+        assertThat(session.user.displayName).isEqualTo(email.substringBefore("@"))
+
+        // And: details survive a new SessionManager loading from the same storage
+        val newSessionManager = SessionManager(
+            securePreferences = fakeSecurePreferences,
+            authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
+            applicationScope = testScope
+        )
+        advanceUntilIdle()
+        val restoredSession = newSessionManager.userSession.value as UserSession.Authenticated
+        assertThat(restoredSession.user.displayName).isEqualTo(session.user.displayName)
+        assertThat(restoredSession.user.email).isEqualTo(session.user.email)
     }
 }

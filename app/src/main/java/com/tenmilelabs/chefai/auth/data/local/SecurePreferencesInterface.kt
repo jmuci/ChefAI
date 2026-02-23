@@ -10,12 +10,18 @@ import java.util.UUID
 interface SecurePreferencesInterface {
     suspend fun saveAuthData(
         userUuid: UUID,
+        displayName: String,
+        email: String,
+        avatarUrl: String,
         accessToken: String,
         refreshToken: String,
         tokenExpiry: Long
     )
 
     fun getUserUuid(): Flow<UUID?>
+    fun getDisplayName(): Flow<String?>
+    fun getUserEmail(): Flow<String?>
+    fun getUserAvatarUrl(): Flow<String?>
     fun getAccessToken(): Flow<String?>
     fun getRefreshToken(): Flow<String?>
     fun getTokenExpiry(): Flow<Long?>

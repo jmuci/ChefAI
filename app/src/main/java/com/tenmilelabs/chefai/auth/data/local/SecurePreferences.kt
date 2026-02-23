@@ -29,6 +29,9 @@ class SecurePreferences @Inject constructor(
 
         // Preference keys
         private const val KEY_USER_UUID = "user_uuid"
+        private const val KEY_DISPLAY_NAME = "display_name"
+        private const val KEY_EMAIL = "email"
+        private const val KEY_AVATAR_URL = "avatar_url"
         private const val KEY_ACCESS_TOKEN = "access_token"
         private const val KEY_REFRESH_TOKEN = "refresh_token"
         private const val KEY_TOKEN_EXPIRY = "token_expiry"
@@ -58,6 +61,9 @@ class SecurePreferences @Inject constructor(
     private fun getCurrentPrefsMap(): Map<String, Any?> {
         return mapOf(
             KEY_USER_UUID to encryptedPrefs.getString(KEY_USER_UUID, null),
+            KEY_DISPLAY_NAME to encryptedPrefs.getString(KEY_DISPLAY_NAME, null),
+            KEY_EMAIL to encryptedPrefs.getString(KEY_EMAIL, null),
+            KEY_AVATAR_URL to encryptedPrefs.getString(KEY_AVATAR_URL, null),
             KEY_ACCESS_TOKEN to encryptedPrefs.getString(KEY_ACCESS_TOKEN, null),
             KEY_REFRESH_TOKEN to encryptedPrefs.getString(KEY_REFRESH_TOKEN, null),
             KEY_TOKEN_EXPIRY to encryptedPrefs.getLong(KEY_TOKEN_EXPIRY, -1L).takeIf { it != -1L }
@@ -77,6 +83,9 @@ class SecurePreferences @Inject constructor(
      */
     override suspend fun saveAuthData(
         userUuid: UUID,
+        displayName: String,
+        email: String,
+        avatarUrl: String,
         accessToken: String,
         refreshToken: String,
         tokenExpiry: Long
@@ -84,6 +93,9 @@ class SecurePreferences @Inject constructor(
         try {
             encryptedPrefs.edit()
                 .putString(KEY_USER_UUID, userUuid.toString())
+                .putString(KEY_DISPLAY_NAME, displayName)
+                .putString(KEY_EMAIL, email)
+                .putString(KEY_AVATAR_URL, avatarUrl)
                 .putString(KEY_ACCESS_TOKEN, accessToken)
                 .putString(KEY_REFRESH_TOKEN, refreshToken)
                 .putLong(KEY_TOKEN_EXPIRY, tokenExpiry)
@@ -110,6 +122,18 @@ class SecurePreferences @Inject constructor(
                 null
             }
         }
+    }
+
+    override fun getDisplayName(): Flow<String?> = prefsFlow.map { prefs ->
+        prefs[KEY_DISPLAY_NAME] as? String
+    }
+
+    override fun getUserEmail(): Flow<String?> = prefsFlow.map { prefs ->
+        prefs[KEY_EMAIL] as? String
+    }
+
+    override fun getUserAvatarUrl(): Flow<String?> = prefsFlow.map { prefs ->
+        prefs[KEY_AVATAR_URL] as? String
     }
 
     /**
