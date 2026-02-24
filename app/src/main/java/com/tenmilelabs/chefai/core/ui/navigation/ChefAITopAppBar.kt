@@ -26,6 +26,7 @@ import com.tenmilelabs.chefai.auth.ui.UserProfileMenu
 fun ChefAITopAppBar(
     @StringRes titleResId: Int,
     onNavigationClick: (() -> Unit)? = null,
+    onLogin: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
 
@@ -58,6 +59,7 @@ fun ChefAITopAppBar(
         actions = {
             // User profile menu on the right side
             UserProfileMenu(
+                onLogin = onLogin,
                 onLogout = onLogout
             )
         },
@@ -68,5 +70,5 @@ fun ChefAITopAppBar(
 @Preview
 @Composable
 fun ChefAITopBarPreview() {
-    ChefAITopAppBar(R.string.app_name)
+    ChefAITopAppBar(R.string.app_name,)
 }
