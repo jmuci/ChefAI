@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Room
 import com.tenmilelabs.chefai.auth.data.local.SecurePreferences
 import com.tenmilelabs.chefai.auth.data.local.SecurePreferencesInterface
+import com.tenmilelabs.chefai.core.data.local.room.RoomTransactionRunner
+import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_1_2
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_2_3
@@ -82,4 +84,9 @@ object DatabaseModules {
 
     @Provides
     fun provideSyncMetadataDao(database: ChefAIDataBase) = database.syncMetadataDao()
+
+    @Provides
+    @Singleton
+    fun provideTransactionRunner(database: ChefAIDataBase): TransactionRunner =
+        RoomTransactionRunner(database)
 }
