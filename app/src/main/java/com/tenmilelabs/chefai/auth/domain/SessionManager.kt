@@ -159,7 +159,13 @@ class SessionManager @Inject constructor(
             )
             
             val authToken = response.toAuthToken()
-            val user = response.toUser()
+            val responseUser = response.toUser()
+            // Use the username from the registration form if the backend doesn't return it
+            val user = if (responseUser.displayName.isBlank()) {
+                responseUser.copy(displayName = username)
+            } else {
+                responseUser
+            }
 
             // Save to secure storage
             securePreferences.saveAuthData(

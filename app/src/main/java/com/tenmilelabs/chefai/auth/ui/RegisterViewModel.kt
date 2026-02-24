@@ -41,6 +41,7 @@ data class RegisterUiState(
  */
 sealed interface RegisterUiEvent {
     data class ShowSnackbar(val message: Int) : RegisterUiEvent
+    data class ShowSnackbarText(val message: String) : RegisterUiEvent
     data object NavigateToHome : RegisterUiEvent
     data object NavigateToLogin : RegisterUiEvent
 }
@@ -165,9 +166,14 @@ class RegisterViewModel @Inject constructor(
             is AuthHttpException -> {
                 when (exception.statusCode) {
                     400, 409 -> {
-                        // Bad Request, Conflict - show as field errors
-                        val errorMessage = getHttpErrorMessage(exception.statusCode)
-                        setErrorField(errorMessage)
+                        // Bad Request, Conflict - use actual backend message
+                        val errorMessage = exception.message
+                        val fieldMatched = setErrorField(errorMessage)
+                        if (!fieldMatched) {
+                            _uiEvent.emit(
+                                RegisterUiEvent.ShowSnackbarText(errorMessage)
+                            )
+                        }
                     }
                     500, 502, 503 -> {
                         // Server errors - show as snackbar
@@ -223,6 +229,9 @@ class RegisterViewModel @Inject constructor(
         } else if (username.length < 3) {
             usernameError = "Username must be at least 3 characters"
             isValid = false
+        } else if (!isValidUsername(username)) {
+            usernameError = "Username can only contain letters, numbers, dots, hyphens, and underscores"
+            isValid = false
         }
 
         // Validate email
@@ -265,13 +274,23 @@ class RegisterViewModel @Inject constructor(
         return isValid
     }
 
-    private fun setErrorField(errorMessage: String) {
-        val currentUrl = _uiState.value.email.lowercase()
+    private fun setErrorField(errorMessage: String): Boolean {
+        val lowerMessage = errorMessage.lowercase()
+        val usernameError = if (lowerMessage.contains("username")) errorMessage else null
+        val emailError = if (lowerMessage.contains("email")) errorMessage else null
+        val passwordError = if (lowerMessage.contains("password")) errorMessage else null
+        val matched = usernameError != null || emailError != null || passwordError != null
         _uiState.value = _uiState.value.copy(
-            usernameError = if (errorMessage.contains("username")) errorMessage else null,
-            emailError = if (errorMessage.contains("email")) errorMessage else null,
-            passwordError = if (errorMessage.contains("password")) errorMessage else null
+            usernameError = usernameError,
+            emailError = emailError,
+            passwordError = passwordError
         )
+        return matched
+    }
+
+    private fun isValidUsername(username: String): Boolean {
+        val usernameRegex = Regex("^[a-zA-Z0-9._-]+$")
+        return usernameRegex.matches(username)
     }
 
     private fun isValidEmail(email: String): Boolean {
@@ -285,11 +304,4 @@ class RegisterViewModel @Inject constructor(
         return hasLetter && hasNumber
     }
 
-    private fun getHttpErrorMessage(statusCode: Int): String {
-        return when (statusCode) {
-            400 -> "Invalid input data"
-            409 -> "Email already registered"
-            else -> "Registration failed. Please try again."
-        }
-    }
 }

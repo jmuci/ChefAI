@@ -80,6 +80,12 @@ fun RegisterScreen(
                         duration = androidx.compose.material3.SnackbarDuration.Short
                     )
                 }
+                is RegisterUiEvent.ShowSnackbarText -> {
+                    snackbarHostState?.showSnackbar(
+                        message = event.message,
+                        duration = androidx.compose.material3.SnackbarDuration.Short
+                    )
+                }
                 RegisterUiEvent.NavigateToHome -> {
                     onNavigateToHome()
                 }

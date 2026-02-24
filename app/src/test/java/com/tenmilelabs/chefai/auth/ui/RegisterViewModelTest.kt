@@ -3,14 +3,17 @@ package com.tenmilelabs.chefai.auth.ui
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
+import com.tenmilelabs.chefai.auth.data.network.AuthHttpException
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
 /**
@@ -18,6 +21,9 @@ import org.junit.Test
  */
 @ExperimentalCoroutinesApi
 class RegisterViewModelTest {
+
+    @get:Rule
+    val mainCoroutineRule = MainCoroutineRule()
 
     private lateinit var viewModel: RegisterViewModel
     private lateinit var sessionManager: SessionManager
@@ -415,5 +421,106 @@ class RegisterViewModelTest {
             val event = awaitItem()
             assertThat(event).isEqualTo(RegisterUiEvent.NavigateToLogin)
         }
+    }
+
+    @Test
+    fun `on register click with username containing spaces shows error`() = testScope.runTest {
+        // Given: Username with spaces
+        viewModel.onUsernameChange("test user")
+        viewModel.onEmailChange("test@example.com")
+        viewModel.onPasswordChange("password123")
+        viewModel.onConfirmPasswordChange("password123")
+
+        // When: Clicking register
+        viewModel.onRegisterClick()
+        advanceUntilIdle()
+
+        // Then: Username error is shown
+        val state = viewModel.uiState.value
+        assertThat(state.usernameError).isEqualTo("Username can only contain letters, numbers, dots, hyphens, and underscores")
+    }
+
+    @Test
+    fun `on register click with username containing special characters shows error`() = testScope.runTest {
+        // Given: Username with special characters
+        viewModel.onUsernameChange("user@name!")
+        viewModel.onEmailChange("test@example.com")
+        viewModel.onPasswordChange("password123")
+        viewModel.onConfirmPasswordChange("password123")
+
+        // When: Clicking register
+        viewModel.onRegisterClick()
+        advanceUntilIdle()
+
+        // Then: Username error is shown
+        val state = viewModel.uiState.value
+        assertThat(state.usernameError).isEqualTo("Username can only contain letters, numbers, dots, hyphens, and underscores")
+    }
+
+    @Test
+    fun `on register click with valid username characters succeeds`() = testScope.runTest {
+        // Given: Username with valid characters (letters, numbers, dots, hyphens, underscores)
+        viewModel.onUsernameChange("test.user-name_123")
+        viewModel.onEmailChange("test@example.com")
+        viewModel.onPasswordChange("password123")
+        viewModel.onConfirmPasswordChange("password123")
+
+        // When: Clicking register
+        viewModel.uiEvents.test {
+            viewModel.onRegisterClick()
+            advanceUntilIdle()
+
+            // Then: Registration succeeds (navigate to home)
+            val event = awaitItem()
+            assertThat(event).isInstanceOf(RegisterUiEvent.NavigateToHome::class.java)
+        }
+    }
+
+    @Test
+    fun `on register click with http 400 validation error shows snackbar with backend message`() = testScope.runTest {
+        // Given: Backend returns HTTP 400 with validation message that doesn't match a field
+        fakeAuthNetworkDataSource.shouldThrowError = true
+        fakeAuthNetworkDataSource.errorToThrow = AuthHttpException(
+            message = "Invalid input data",
+            statusCode = 400
+        )
+        viewModel.onUsernameChange("testuser")
+        viewModel.onEmailChange("test@example.com")
+        viewModel.onPasswordChange("password123")
+        viewModel.onConfirmPasswordChange("password123")
+
+        // When: Clicking register
+        viewModel.uiEvents.test {
+            viewModel.onRegisterClick()
+            advanceUntilIdle()
+
+            // Then: Snackbar with backend message is shown
+            val event = awaitItem()
+            assertThat(event).isInstanceOf(RegisterUiEvent.ShowSnackbarText::class.java)
+            assertThat((event as RegisterUiEvent.ShowSnackbarText).message)
+                .isEqualTo("Invalid input data")
+        }
+    }
+
+    @Test
+    fun `on register click with http 400 username error shows field error`() = testScope.runTest {
+        // Given: Backend returns HTTP 400 with username-specific message
+        fakeAuthNetworkDataSource.shouldThrowError = true
+        fakeAuthNetworkDataSource.errorToThrow = AuthHttpException(
+            message = "Username already taken",
+            statusCode = 400
+        )
+        viewModel.onUsernameChange("testuser")
+        viewModel.onEmailChange("test@example.com")
+        viewModel.onPasswordChange("password123")
+        viewModel.onConfirmPasswordChange("password123")
+
+        // When: Clicking register
+        viewModel.onRegisterClick()
+        advanceUntilIdle()
+
+        // Then: Username field error is set
+        val state = viewModel.uiState.value
+        assertThat(state.usernameError).isEqualTo("Username already taken")
     }
 }
