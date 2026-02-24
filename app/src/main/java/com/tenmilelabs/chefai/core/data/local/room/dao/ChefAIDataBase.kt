@@ -14,6 +14,7 @@ import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.RecipeStepEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.SourceClassificationEntity
+import com.tenmilelabs.chefai.core.data.local.room.SyncMetadataEntity
 import com.tenmilelabs.chefai.core.data.local.room.TagEntity
 import com.tenmilelabs.chefai.core.data.local.room.UserEntity
 import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
@@ -29,10 +30,11 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         RecipeStepEntity::class,
         RecipeTagCrossRef::class,
         SourceClassificationEntity::class,
+        SyncMetadataEntity::class,
         TagEntity::class,
         UserEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 @TypeConverters(
@@ -51,6 +53,20 @@ abstract class ChefAIDataBase : RoomDatabase() {
     abstract fun userDao(): UserDao
     abstract fun recipeTagCrossRefDao(): RecipeTagCrossRefDao
     abstract fun recipeLabelCrossRefDao(): RecipeLabelCrossRefDao
+    abstract fun syncMetadataDao(): SyncMetadataDao
+}
+
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS sync_metadata (
+                entityType TEXT NOT NULL PRIMARY KEY,
+                lastSyncedAt INTEGER NOT NULL DEFAULT 0
+            )
+        """.trimIndent()
+        )
+    }
 }
 
 // TODO - merge migrations into new DB asset before rolling out to production
