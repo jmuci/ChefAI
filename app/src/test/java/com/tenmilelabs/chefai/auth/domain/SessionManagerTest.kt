@@ -6,6 +6,7 @@ import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
+import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -348,6 +349,39 @@ class SessionManagerTest {
         val restoredSession = newSessionManager.userSession.value as UserSession.Authenticated
         assertThat(restoredSession.user.displayName).isEqualTo(session.user.displayName)
         assertThat(restoredSession.user.email).isEqualTo(session.user.email)
+    }
+
+    @Test
+    fun `logout restores same anonymous UUID for data continuity`() = testScope.runTest {
+        // Given: Anonymous session established before login
+        sessionManager.loadSession()
+        val firstSession = sessionManager.userSession.first() as UserSession.Anonymous
+        val firstLocalUserId = firstSession.localUserId
+
+        // When: User logs in and then logs out
+        sessionManager.login("test@example.com", "password123")
+        sessionManager.logout()
+
+        // Then: Post-logout anonymous session reuses the same localUserId.
+        // Pocket Chef is a single-user personal device app — reusing the UUID gives
+        // data continuity (local recipes stay visible after logout) and simpler semantics.
+        val newSession = sessionManager.userSession.first() as UserSession.Anonymous
+        assertThat(newSession.localUserId).isEqualTo(firstLocalUserId)
+    }
+
+    @Test
+    fun `anonymous session creates UserEntity with PENDING syncState`() = testScope.runTest {
+        // Given: No stored data
+        fakeSecurePreferences.clearAuthData()
+
+        // When: Loading session (enters anonymous mode)
+        sessionManager.loadSession()
+
+        // Then: The anonymous UserEntity has PENDING syncState
+        val session = sessionManager.userSession.first() as UserSession.Anonymous
+        val userEntity = fakeUserDao.getUserById(session.localUserId)
+        assertThat(userEntity).isNotNull()
+        assertThat(userEntity!!.syncState).isEqualTo(SyncState.PENDING)
     }
 
     @Test

@@ -14,6 +14,7 @@ import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.RecipeStepEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.SourceClassificationEntity
+import com.tenmilelabs.chefai.core.data.local.room.SyncMetadataEntity
 import com.tenmilelabs.chefai.core.data.local.room.TagEntity
 import com.tenmilelabs.chefai.core.data.local.room.UserEntity
 import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
@@ -29,10 +30,11 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         RecipeStepEntity::class,
         RecipeTagCrossRef::class,
         SourceClassificationEntity::class,
+        SyncMetadataEntity::class,
         TagEntity::class,
         UserEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 @TypeConverters(
@@ -51,16 +53,30 @@ abstract class ChefAIDataBase : RoomDatabase() {
     abstract fun userDao(): UserDao
     abstract fun recipeTagCrossRefDao(): RecipeTagCrossRefDao
     abstract fun recipeLabelCrossRefDao(): RecipeLabelCrossRefDao
+    abstract fun syncMetadataDao(): SyncMetadataDao
+}
+
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS sync_metadata (
+                entityType TEXT NOT NULL PRIMARY KEY,
+                lastSyncedAt INTEGER NOT NULL DEFAULT 0
+            )
+        """.trimIndent()
+        )
+    }
 }
 
 // TODO - merge migrations into new DB asset before rolling out to production
 val MIGRATION_1_2 = object : Migration(1, 2) {
-    override fun migrate(database: SupportSQLiteDatabase) {
+    override fun migrate(db: SupportSQLiteDatabase) {
         // Make email and avatarUrl NOT NULL in users table
         // SQLite doesn't support ALTER COLUMN, so we recreate the table
 
         // Step 1: Create new table with NOT NULL constraints
-        database.execSQL(
+        db.execSQL(
             """
             CREATE TABLE users_new (
                 uuid BLOB NOT NULL PRIMARY KEY,
@@ -75,7 +91,7 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
         )
 
         // Step 2: Copy data (only rows with non-null email and avatarUrl)
-        database.execSQL(
+        db.execSQL(
             """
             INSERT INTO users_new (uuid, displayName, email, avatarUrl, updatedAt, deletedAt, syncState)
             SELECT uuid, displayName, email, avatarUrl, updatedAt, deletedAt, syncState
@@ -85,12 +101,12 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
         )
 
         // Step 3: Drop old table
-        database.execSQL("DROP TABLE users")
+        db.execSQL("DROP TABLE users")
 
         // Step 4: Rename new table
-        database.execSQL("ALTER TABLE users_new RENAME TO users")
+        db.execSQL("ALTER TABLE users_new RENAME TO users")
 
         // Step 5: Recreate index
-        database.execSQL("CREATE INDEX index_users_syncState_updatedAt ON users(syncState, updatedAt)")
+        db.execSQL("CREATE INDEX index_users_syncState_updatedAt ON users(syncState, updatedAt)")
     }
 }

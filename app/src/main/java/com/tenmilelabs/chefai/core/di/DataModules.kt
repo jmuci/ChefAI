@@ -6,6 +6,7 @@ import com.tenmilelabs.chefai.auth.data.local.SecurePreferences
 import com.tenmilelabs.chefai.auth.data.local.SecurePreferencesInterface
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_1_2
+import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_2_3
 import com.tenmilelabs.chefai.core.data.repository.DefaultMetadataRepository
 import com.tenmilelabs.chefai.core.domain.repository.MetadataRepository
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeRepository
@@ -48,7 +49,7 @@ object DatabaseModules {
             "ChefAI.db"
         )
             .createFromAsset("database/ChefAI.db")
-            .addMigrations(MIGRATION_1_2) // Add migration for email/avatarUrl NOT NULL
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .build()
     }
 
@@ -78,4 +79,7 @@ object DatabaseModules {
 
     @Provides
     fun provideUserDao(database: ChefAIDataBase) = database.userDao()
+
+    @Provides
+    fun provideSyncMetadataDao(database: ChefAIDataBase) = database.syncMetadataDao()
 }

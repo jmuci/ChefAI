@@ -14,6 +14,9 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeTagDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import java.util.UUID
+import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
+import com.tenmilelabs.chefai.core.data.local.room.UserEntity
+import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.testutil.recipe1
 import com.tenmilelabs.chefai.core.testutil.recipe3
 import com.tenmilelabs.chefai.core.testutil.recipeEntity1
@@ -230,5 +233,70 @@ class DefaultRecipeRepositoryTest {
         assertThat(recreatedRecipe).isNotNull()
         assertThat(recreatedRecipe?.steps).isEmpty()
         assertThat(recreatedRecipe?.ingredients).isEmpty()
+    }
+
+    @Test
+    fun `getRecipesPreviewStream returns recipes created by anonymous user`() = runTest {
+        // Given: A recipe created with an anonymous user's creatorId
+        val anonymousUserId = UUID.randomUUID()
+        val anonymousUser = UserEntity(
+            uuid = anonymousUserId,
+            displayName = "Guest",
+            email = "",
+            avatarUrl = "",
+            updatedAt = System.currentTimeMillis(),
+            deletedAt = null,
+            syncState = SyncState.PENDING
+        )
+        val anonymousRecipe = RecipeEntity(
+            uuid = UUID.randomUUID(),
+            title = "Anonymous Recipe",
+            description = "Created offline",
+            imageUrl = "",
+            imageUrlThumbnail = "",
+            prepTimeMinutes = 5,
+            cookTimeMinutes = 10,
+            servings = 2,
+            creatorId = anonymousUserId,
+            recipeExternalUrl = null,
+            updatedAt = System.currentTimeMillis(),
+            deletedAt = null,
+            syncState = SyncState.PENDING
+        )
+
+        recipeDao.seed(
+            users = listOf(anonymousUser),
+            recipes = listOf(anonymousRecipe),
+            ingredients = emptyList(),
+            labels = emptyList(),
+            tags = emptyList(),
+            steps = emptyList(),
+            recipeIngredients = emptyList(),
+            recipeLabels = emptyList(),
+            recipeTags = emptyList()
+        )
+
+        // When: Loading all recipes (no user filtering)
+        val previews = recipeRepository.getRecipesPreviewStream().first()
+
+        // Then: The anonymous user's recipe is included
+        val anonymousPreview = previews.find { it.title == "Anonymous Recipe" }
+        assertThat(anonymousPreview).isNotNull()
+        assertThat(anonymousPreview?.creatorId).isEqualTo(anonymousUserId)
+    }
+
+    @Test
+    fun `createRecipe persists recipe with PENDING syncState`() = runTest {
+        // Given: A new recipe to save
+        val newRecipe = recipe1.copy(uuid = UUID.randomUUID(), title = "New Test Recipe")
+
+        // When: Saving the recipe
+        recipeRepository.createRecipe(newRecipe)
+
+        // Then: The recipe is persisted with PENDING syncState
+        val savedEntity = recipeDao.getRecipeById(newRecipe.uuid)
+        assertThat(savedEntity).isNotNull()
+        assertThat(savedEntity?.syncState).isEqualTo(SyncState.PENDING)
+        assertThat(savedEntity?.title).isEqualTo("New Test Recipe")
     }
 }
