@@ -9,6 +9,7 @@ import com.tenmilelabs.chefai.auth.data.network.dto.RefreshTokenRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RegisterRequest
 import com.tenmilelabs.chefai.auth.domain.model.AuthToken
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
+import com.tenmilelabs.chefai.auth.domain.usecase.AccountUpgradeUseCase
 import com.tenmilelabs.chefai.core.data.local.room.UserEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.UserDao
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
@@ -37,6 +38,7 @@ class SessionManager @Inject constructor(
     private val securePreferences: SecurePreferencesInterface,
     private val authNetworkDataSource: Provider<AuthNetworkDataSource>,
     private val userDao: UserDao,
+    private val accountUpgradeUseCaseProvider: Provider<AccountUpgradeUseCase>,
     @param:ApplicationScope private val applicationScope: CoroutineScope
 ) : TokenProvider {
 
@@ -168,10 +170,17 @@ class SessionManager @Inject constructor(
 
     /**
      * Logs in a user with credentials using the backend API.
+     * If the user was in an anonymous session with local recipes, those recipes are
+     * reassigned to the authenticated user via [AccountUpgradeUseCase].
      */
     suspend fun login(email: String, password: String): Result<User> {
         return try {
             Timber.d("Login attempt for: $email")
+
+            // Capture the current anonymous userId BEFORE changing session state
+            val previousSession = _userSession.value
+            val anonymousUserId = (previousSession as? UserSession.Anonymous)?.localUserId
+
             _userSession.value = UserSession.Loading
 
             // Make API call to backend for authentication
@@ -181,6 +190,17 @@ class SessionManager @Inject constructor(
 
             val authToken = response.toAuthToken()
             val user = response.toUser()
+
+            // Run the anonymous → authenticated data upgrade if we had anonymous data
+            if (anonymousUserId != null) {
+                try {
+                    val upgraded = accountUpgradeUseCaseProvider.get()
+                        .execute(anonymousUserId, user)
+                    Timber.d("Upgraded $upgraded anonymous recipes to authenticated user")
+                } catch (e: Exception) {
+                    Timber.e(e, "Account upgrade failed, but login succeeded. Recipes may not be transferred.")
+                }
+            }
 
             // Save to secure storage
             securePreferences.saveAuthData(
@@ -209,10 +229,17 @@ class SessionManager @Inject constructor(
 
     /**
      * Registers a new user with the backend API.
+     * If the user was in an anonymous session with local recipes, those recipes are
+     * reassigned to the authenticated user via [AccountUpgradeUseCase].
      */
     suspend fun register(username: String, email: String, password: String): Result<User> {
         return try {
             Timber.d("Register attempt for: $email")
+
+            // Capture the current anonymous userId BEFORE changing session state
+            val previousSession = _userSession.value
+            val anonymousUserId = (previousSession as? UserSession.Anonymous)?.localUserId
+
             _userSession.value = UserSession.Loading
 
             // Make API call to backend for registration
@@ -227,6 +254,17 @@ class SessionManager @Inject constructor(
                 responseUser.copy(displayName = username)
             } else {
                 responseUser
+            }
+
+            // Run the anonymous → authenticated data upgrade if we had anonymous data
+            if (anonymousUserId != null) {
+                try {
+                    val upgraded = accountUpgradeUseCaseProvider.get()
+                        .execute(anonymousUserId, user)
+                    Timber.d("Upgraded $upgraded anonymous recipes to authenticated user")
+                } catch (e: Exception) {
+                    Timber.e(e, "Account upgrade failed, but registration succeeded.")
+                }
             }
 
             // Save to secure storage
@@ -256,29 +294,18 @@ class SessionManager @Inject constructor(
 
     /**
      * Logs out the current user and returns to an anonymous session.
-     * The existing localUserId is preserved so that local recipes created before
-     * login remain visible after logout (data continuity on a personal device).
-     * Only auth tokens and profile data are cleared — the localUserId is not.
+     * Reuses the existing anonymous localUserId from SecurePreferences so that
+     * data continuity is maintained on the device (RFC-001 Section 7.3).
      */
     suspend fun logout() {
         try {
             val currentUser = getCurrentUser()
             Timber.d("Logging out user: ${currentUser?.uuid}")
 
-            // Preserve the localUserId before clearing auth data so that the same
-            // anonymous session (and its local recipes) are restored after logout.
-            val savedLocalUserId = securePreferences.getLocalUserId().first()
-
-            // Clear auth tokens and profile data from secure storage
+            // Clear auth data (preserves localUserId)
             securePreferences.clearAuthData()
 
-            // Re-save the localUserId so enterAnonymousSession() restores the same UUID
-            // rather than generating a new one.
-            if (savedLocalUserId != null) {
-                securePreferences.saveLocalUserId(savedLocalUserId)
-            }
-
-            // Return to the same anonymous session for data continuity
+            // Return to anonymous state, reusing existing localUserId
             enterAnonymousSession()
 
             Timber.d("Logout successful, now in anonymous mode")
