@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.core.data.local.room.dao
 
 import com.tenmilelabs.chefai.core.data.local.room.RecipeStepEntity
+import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -43,5 +44,15 @@ class FakeRecipeStepDao : RecipeStepDao {
             currentSteps.add(step)
         }
         stepsFlow.value = currentSteps
+    }
+
+    override suspend fun markPendingForRecipes(recipeIds: List<UUID>, updatedAt: Long) {
+        stepsFlow.value = stepsFlow.value.map { step ->
+            if (step.recipeId in recipeIds) {
+                step.copy(syncState = SyncState.PENDING, updatedAt = updatedAt)
+            } else {
+                step
+            }
+        }
     }
 }
