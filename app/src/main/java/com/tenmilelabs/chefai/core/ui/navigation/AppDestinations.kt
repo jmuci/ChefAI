@@ -75,7 +75,7 @@ class NavigationActions(private val navController: NavHostController) {
 
     fun navigateToHome() {
         navController.navigate(ScreenBaseRoutes.HOME) {
-            popUpTo(ScreenBaseRoutes.LOGIN) { inclusive = true }
+            popUpTo(navController.graph.id) { inclusive = true }
         }
     }
 }
