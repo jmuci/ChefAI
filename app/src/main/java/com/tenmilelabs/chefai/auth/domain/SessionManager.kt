@@ -254,17 +254,29 @@ class SessionManager @Inject constructor(
 
     /**
      * Logs out the current user and returns to an anonymous session.
-     * Generates a new anonymous UUID (previous data stays on server).
+     * The existing localUserId is preserved so that local recipes created before
+     * login remain visible after logout (data continuity on a personal device).
+     * Only auth tokens and profile data are cleared — the localUserId is not.
      */
     suspend fun logout() {
         try {
             val currentUser = getCurrentUser()
             Timber.d("Logging out user: ${currentUser?.uuid}")
 
-            // Clear auth data from secure storage
+            // Preserve the localUserId before clearing auth data so that the same
+            // anonymous session (and its local recipes) are restored after logout.
+            val savedLocalUserId = securePreferences.getLocalUserId().first()
+
+            // Clear auth tokens and profile data from secure storage
             securePreferences.clearAuthData()
 
-            // Return to anonymous state with a new UUID
+            // Re-save the localUserId so enterAnonymousSession() restores the same UUID
+            // rather than generating a new one.
+            if (savedLocalUserId != null) {
+                securePreferences.saveLocalUserId(savedLocalUserId)
+            }
+
+            // Return to the same anonymous session for data continuity
             enterAnonymousSession()
 
             Timber.d("Logout successful, now in anonymous mode")

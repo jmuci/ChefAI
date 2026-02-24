@@ -352,8 +352,8 @@ class SessionManagerTest {
     }
 
     @Test
-    fun `logout generates new anonymous UUID different from previous`() = testScope.runTest {
-        // Given: Anonymous session
+    fun `logout restores same anonymous UUID for data continuity`() = testScope.runTest {
+        // Given: Anonymous session established before login
         sessionManager.loadSession()
         val firstSession = sessionManager.userSession.first() as UserSession.Anonymous
         val firstLocalUserId = firstSession.localUserId
@@ -362,9 +362,11 @@ class SessionManagerTest {
         sessionManager.login("test@example.com", "password123")
         sessionManager.logout()
 
-        // Then: New anonymous session has a different UUID
+        // Then: Post-logout anonymous session reuses the same localUserId.
+        // Pocket Chef is a single-user personal device app — reusing the UUID gives
+        // data continuity (local recipes stay visible after logout) and simpler semantics.
         val newSession = sessionManager.userSession.first() as UserSession.Anonymous
-        assertThat(newSession.localUserId).isNotEqualTo(firstLocalUserId)
+        assertThat(newSession.localUserId).isEqualTo(firstLocalUserId)
     }
 
     @Test
