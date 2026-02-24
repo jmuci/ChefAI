@@ -50,6 +50,7 @@ class SecurePreferences @Inject constructor(
         private val KEY_ACCESS_TOKEN = stringPreferencesKey("access_token")
         private val KEY_REFRESH_TOKEN = stringPreferencesKey("refresh_token")
         private val KEY_TOKEN_EXPIRY = stringPreferencesKey("token_expiry")
+        private val KEY_LOCAL_USER_ID = stringPreferencesKey("local_user_id")
     }
 
     private val dataStore: DataStore<Preferences> = context.dataStore
@@ -205,6 +206,41 @@ class SecurePreferences @Inject constructor(
             Timber.d("Refresh token updated successfully (encrypted)")
         } catch (e: Exception) {
             Timber.e(e, "Failed to update refresh token")
+            throw e
+        }
+    }
+
+    override suspend fun saveLocalUserId(uuid: UUID) {
+        try {
+            dataStore.edit { prefs ->
+                prefs[KEY_LOCAL_USER_ID] = encrypt(uuid.toString())
+            }
+            Timber.d("Local user ID saved securely")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to save local user ID")
+            throw e
+        }
+    }
+
+    override fun getLocalUserId(): Flow<UUID?> = dataStore.data.map { prefs ->
+        prefs[KEY_LOCAL_USER_ID]?.let { encrypted ->
+            try {
+                UUID.fromString(decrypt(encrypted))
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to read local user ID from preferences")
+                null
+            }
+        }
+    }
+
+    override suspend fun clearLocalUserId() {
+        try {
+            dataStore.edit { prefs ->
+                prefs.remove(KEY_LOCAL_USER_ID)
+            }
+            Timber.d("Local user ID cleared")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to clear local user ID")
             throw e
         }
     }

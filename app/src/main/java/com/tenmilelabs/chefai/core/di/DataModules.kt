@@ -75,4 +75,7 @@ object DatabaseModules {
 
     @Provides
     fun provideRecipeTagDao(database: ChefAIDataBase) = database.recipeTagCrossRefDao()
+
+    @Provides
+    fun provideUserDao(database: ChefAIDataBase) = database.userDao()
 }

@@ -6,6 +6,8 @@ import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
 import com.tenmilelabs.chefai.auth.data.network.AuthHttpException
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
+import java.util.UUID
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -41,8 +43,11 @@ class RegisterViewModelTest {
         sessionManager = SessionManager(
             securePreferences = fakeSecurePreferences,
             authNetworkDataSource = { fakeAuthNetworkDataSource },
+            userDao = FakeUserDao(),
             applicationScope = testScope
-        )
+        ).apply {
+            uuidGenerator = { UUID.randomUUID() }
+        }
 
         viewModel = RegisterViewModel(sessionManager)
     }

@@ -65,6 +65,7 @@ class UserProfileViewModel @Inject constructor(
 @Composable
 fun UserProfileMenu(
     modifier: Modifier = Modifier,
+    onLogin: () -> Unit = {},
     onLogout: () -> Unit = {},
     viewModel: UserProfileViewModel = hiltViewModel()
 ) {
@@ -137,10 +138,18 @@ fun UserProfileMenu(
                     )
                 }
 
-                is UserSession.Unauthenticated -> {
+                is UserSession.Anonymous -> {
                     DropdownMenuItem(
-                        text = { Text("Not logged in") },
-                        onClick = { expanded = false }
+                        text = { Text("Guest") },
+                        onClick = { },
+                        enabled = false
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Log in / Register") },
+                        onClick = {
+                            onLogin()
+                            expanded = false
+                        },
                     )
                 }
 

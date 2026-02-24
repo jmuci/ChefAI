@@ -7,6 +7,8 @@ import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
+import java.util.UUID
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -37,8 +39,11 @@ class LoginViewModelTest {
         sessionManager = SessionManager(
             securePreferences = fakeSecurePreferences,
             authNetworkDataSource = { fakeAuthNetworkDataSource },
+            userDao = FakeUserDao(),
             applicationScope = testScope
-        )
+        ).apply {
+            uuidGenerator = { UUID.randomUUID() }
+        }
 
         viewModel = LoginViewModel(sessionManager)
     }

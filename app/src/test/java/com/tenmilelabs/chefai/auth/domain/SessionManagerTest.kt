@@ -5,7 +5,7 @@ import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
-import java.util.UUID
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -14,10 +14,11 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
+import java.util.UUID
 import javax.inject.Provider
 
 /**
- * Unit tests for SessionManager.
+ * Unit tests for SessionManager with anonymous-first session model.
  */
 @ExperimentalCoroutinesApi
 class SessionManagerTest {
@@ -25,6 +26,7 @@ class SessionManagerTest {
     private lateinit var sessionManager: SessionManager
     private lateinit var fakeSecurePreferences: FakeSecurePreferences
     private lateinit var fakeAuthNetworkDataSource: FakeAuthNetworkDataSource
+    private lateinit var fakeUserDao: FakeUserDao
     private lateinit var testScope: TestScope
     private val testDispatcher = StandardTestDispatcher()
 
@@ -33,33 +35,68 @@ class SessionManagerTest {
         testScope = TestScope(testDispatcher)
         fakeSecurePreferences = FakeSecurePreferences()
         fakeAuthNetworkDataSource = FakeAuthNetworkDataSource()
+        fakeUserDao = FakeUserDao()
 
         // Create SessionManager with test scope
         sessionManager = SessionManager(
             securePreferences = fakeSecurePreferences,
             authNetworkDataSource = { fakeAuthNetworkDataSource },
+            userDao = fakeUserDao,
             applicationScope = testScope
-        )
+        ).apply {
+            uuidGenerator = { UUID.randomUUID() }
+        }
     }
 
     @Test
-    fun `initial state is unauthenticated when no stored data`() = testScope.runTest {
+    fun `initial state is anonymous when no stored data`() = testScope.runTest {
         // SessionManager automatically loads session in init block
-        // Advance time to let the init coroutine complete
         val initialState = sessionManager.userSession.value
-        assertThat(initialState).isEqualTo(UserSession.Unauthenticated)
+        assertThat(initialState).isInstanceOf(UserSession.Anonymous::class.java)
     }
 
     @Test
-    fun `load session returns unauthenticated when no stored data`() = testScope.runTest {
+    fun `load session returns anonymous when no stored data`() = testScope.runTest {
         // Given: No stored auth data
         fakeSecurePreferences.clearAuthData()
 
         // When: Loading session
         sessionManager.loadSession()
-        // Then: Session is unauthenticated
+
+        // Then: Session is anonymous
         val session = sessionManager.userSession.first()
-        assertThat(session).isEqualTo(UserSession.Unauthenticated)
+        assertThat(session).isInstanceOf(UserSession.Anonymous::class.java)
+    }
+
+    @Test
+    fun `anonymous session creates UserEntity in Room`() = testScope.runTest {
+        // Given: No stored data
+        fakeSecurePreferences.clearAuthData()
+
+        // When: Loading session (enters anonymous mode)
+        sessionManager.loadSession()
+
+        // Then: An anonymous UserEntity exists in Room
+        val session = sessionManager.userSession.first() as UserSession.Anonymous
+        val userEntity = fakeUserDao.getUserById(session.localUserId)
+        assertThat(userEntity).isNotNull()
+        assertThat(userEntity!!.displayName).isEqualTo("Guest")
+        assertThat(userEntity.email).isEmpty()
+    }
+
+    @Test
+    fun `anonymous session reuses existing localUserId`() = testScope.runTest {
+        // Given: A localUserId already stored in preferences
+        sessionManager.loadSession()
+        val firstSession = sessionManager.userSession.first() as UserSession.Anonymous
+        val firstLocalUserId = firstSession.localUserId
+
+        // When: Loading session again (simulating app restart)
+        sessionManager.loadSession()
+
+        // Then: Same localUserId is reused
+        val secondSession = sessionManager.userSession.first() as UserSession.Anonymous
+        assertThat(secondSession.localUserId).isEqualTo(firstLocalUserId)
     }
 
     @Test
@@ -81,17 +118,17 @@ class SessionManagerTest {
     }
 
     @Test
-    fun `login with network error returns failure`() = testScope.runTest {
+    fun `login with network error returns failure and falls back to anonymous`() = testScope.runTest {
         // Given: Network error is simulated
         fakeAuthNetworkDataSource.shouldThrowError = true
 
         // When: Logging in
         val result = sessionManager.login("test@example.com", "password123")
-        // Then: Login fails and session is unauthenticated
+        // Then: Login fails and session falls back to anonymous
         assertThat(result.isFailure).isTrue()
 
         val session = sessionManager.userSession.first()
-        assertThat(session).isEqualTo(UserSession.Unauthenticated)
+        assertThat(session).isInstanceOf(UserSession.Anonymous::class.java)
     }
 
     @Test
@@ -115,40 +152,69 @@ class SessionManagerTest {
     }
 
     @Test
-    fun `register with network error returns failure`() = testScope.runTest {
+    fun `register with network error returns failure and falls back to anonymous`() = testScope.runTest {
         // Given: Network error is simulated
         fakeAuthNetworkDataSource.shouldThrowError = true
 
         // When: Registering
         val result = sessionManager.register("testuser", "test@example.com", "password123")
-        // Then: Registration fails and session is unauthenticated
+        // Then: Registration fails and session falls back to anonymous
         assertThat(result.isFailure).isTrue()
 
         val session = sessionManager.userSession.first()
-        assertThat(session).isEqualTo(UserSession.Unauthenticated)
+        assertThat(session).isInstanceOf(UserSession.Anonymous::class.java)
     }
 
     @Test
-    fun `logout clears session and secure storage`() = testScope.runTest {
+    fun `logout returns to anonymous session`() = testScope.runTest {
         // Given: User is logged in
         sessionManager.login("test@example.com", "password123")
         // When: User logs out
         sessionManager.logout()
 
-        // Then: Session is unauthenticated and storage is cleared
+        // Then: Session is anonymous and auth storage is cleared
         val session = sessionManager.userSession.first()
-        assertThat(session).isEqualTo(UserSession.Unauthenticated)
+        assertThat(session).isInstanceOf(UserSession.Anonymous::class.java)
         assertThat(fakeSecurePreferences.getUserUuid().first()).isNull()
     }
 
     @Test
-    fun `get current user returns null when unauthenticated`() = testScope.runTest {
-        // Given: User is not logged in (already unauthenticated from setup)
+    fun `getCurrentUserId returns localUserId when anonymous`() = testScope.runTest {
+        // Given: Anonymous session
+        sessionManager.loadSession()
+
+        // When: Getting current user ID
+        val userId = sessionManager.getCurrentUserId()
+
+        // Then: Returns the anonymous localUserId
+        assertThat(userId).isNotNull()
+        val session = sessionManager.userSession.first() as UserSession.Anonymous
+        assertThat(userId).isEqualTo(session.localUserId)
+    }
+
+    @Test
+    fun `getCurrentUserId returns user uuid when authenticated`() = testScope.runTest {
+        // Given: Authenticated session
+        sessionManager.login("test@example.com", "password123")
+
+        // When: Getting current user ID
+        val userId = sessionManager.getCurrentUserId()
+
+        // Then: Returns the authenticated user's UUID
+        assertThat(userId).isNotNull()
+        val session = sessionManager.userSession.first() as UserSession.Authenticated
+        assertThat(userId).isEqualTo(session.user.uuid)
+    }
+
+    @Test
+    fun `get current user returns null when anonymous`() = testScope.runTest {
+        // Given: Anonymous session
+        sessionManager.loadSession()
 
         // When: Getting current user
         val user = sessionManager.getCurrentUser()
 
-        // Then: Returns null
+        // Then: Returns null (anonymous has no full User profile)
         assertThat(user).isNull()
     }
 
@@ -165,8 +231,9 @@ class SessionManagerTest {
     }
 
     @Test
-    fun `get access token returns null when unauthenticated`() = testScope.runTest {
-        // Given: User is not logged in
+    fun `get access token returns null when anonymous`() = testScope.runTest {
+        // Given: Anonymous session
+        sessionManager.loadSession()
 
         // When: Getting access token
         val token = sessionManager.getAccessToken()
@@ -188,13 +255,14 @@ class SessionManagerTest {
     }
 
     @Test
-    fun `is token expired returns true when unauthenticated`() = testScope.runTest {
-        // Given: User is not logged in
+    fun `is token expired returns true when anonymous`() = testScope.runTest {
+        // Given: Anonymous session
+        sessionManager.loadSession()
 
         // When: Checking if token is expired
         val isExpired = sessionManager.isTokenExpired()
 
-        // Then: Returns true
+        // Then: Returns true (no token)
         assertThat(isExpired).isTrue()
     }
 
@@ -219,8 +287,9 @@ class SessionManagerTest {
         val newSessionManager = SessionManager(
             securePreferences = fakeSecurePreferences,
             authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
+            userDao = fakeUserDao,
             applicationScope = testScope
-        )
+        ).apply { uuidGenerator = { UUID.randomUUID() } }
         advanceUntilIdle()
 
         // Then: Session is restored from storage
@@ -242,8 +311,9 @@ class SessionManagerTest {
         val newSessionManager = SessionManager(
             securePreferences = fakeSecurePreferences,
             authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
+            userDao = fakeUserDao,
             applicationScope = testScope
-        )
+        ).apply { uuidGenerator = { UUID.randomUUID() } }
         advanceUntilIdle()
 
         // Then: displayName and email are restored from storage instead of fallback placeholders
@@ -271,8 +341,9 @@ class SessionManagerTest {
         val newSessionManager = SessionManager(
             securePreferences = fakeSecurePreferences,
             authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
+            userDao = fakeUserDao,
             applicationScope = testScope
-        )
+        ).apply { uuidGenerator = { UUID.randomUUID() } }
         advanceUntilIdle()
         val restoredSession = newSessionManager.userSession.value as UserSession.Authenticated
         assertThat(restoredSession.user.displayName).isEqualTo(session.user.displayName)

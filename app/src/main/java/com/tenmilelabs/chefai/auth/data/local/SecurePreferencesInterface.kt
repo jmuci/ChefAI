@@ -28,4 +28,13 @@ interface SecurePreferencesInterface {
     suspend fun clearAuthData()
     suspend fun updateAccessToken(accessToken: String, tokenExpiry: Long)
     suspend fun updateRefreshToken(refreshToken: String)
+
+    /** Stores the anonymous local user ID (persists across app restarts). */
+    suspend fun saveLocalUserId(uuid: UUID)
+
+    /** Reads the anonymous local user ID, or null if none has been stored. */
+    fun getLocalUserId(): Flow<UUID?>
+
+    /** Clears the anonymous local user ID (e.g., after account upgrade). */
+    suspend fun clearLocalUserId()
 }

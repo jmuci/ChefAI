@@ -14,7 +14,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavHostController
@@ -23,7 +22,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.createGraph
 import com.tenmilelabs.chefai.R
-import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.ui.LoginScreen
 import com.tenmilelabs.chefai.auth.ui.RegisterScreen
 import com.tenmilelabs.chefai.home.ui.HomeScreen
@@ -36,7 +34,6 @@ import timber.log.Timber
 @Composable
 fun ChefAINavGraph(
     modifier: Modifier,
-    sessionManager: SessionManager,
     navController: NavHostController = rememberNavController(),
     navActions: NavigationActions = remember(navController) {
         NavigationActions(navController)
@@ -44,14 +41,9 @@ fun ChefAINavGraph(
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Collect session state to determine start destination
-    val userSession by sessionManager.userSession.collectAsStateWithLifecycle()
-
-    // Determine start destination based on authentication state
-    val startDestination = when (userSession) {
-        is com.tenmilelabs.chefai.auth.domain.model.UserSession.Authenticated -> AppDestinations.HOME.route
-        else -> AppDestinations.LOGIN.route
-    }
+    // Home is always the start destination (anonymous-first model).
+    // Login/Register are available via profile menu or settings.
+    val startDestination = AppDestinations.HOME.route
 
     val graph = navController.createGraph(startDestination = startDestination) {
         composable(route = AppDestinations.HOME.route) {
@@ -150,7 +142,10 @@ fun ChefAINavGraph(
                         null
                     },
                     onLogout = {
-                        // Navigate to login screen and clear back stack
+                        // User returns to anonymous mode; stay on Home
+                        navActions.navigateToHome()
+                    },
+                    onLogin = {
                         navActions.navigateToLogin()
                     }
                 )
