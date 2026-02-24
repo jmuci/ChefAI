@@ -167,12 +167,23 @@ class SecurePreferences @Inject constructor(
     }
 
     /**
-     * Clears all stored authentication data.
+     * Clears all stored authentication data while preserving the anonymous localUserId.
+     * The localUserId is intentionally kept so that logout → re-anonymous reuses the same UUID
+     * (RFC-001 Section 7.3: "Restore the existing localUserId from SecurePreferences").
      */
     override suspend fun clearAuthData() {
         try {
-            dataStore.edit { it.clear() }
-            Timber.d("Auth data cleared successfully (securely erased)")
+            dataStore.edit { prefs ->
+                prefs.remove(KEY_USER_UUID)
+                prefs.remove(KEY_DISPLAY_NAME)
+                prefs.remove(KEY_EMAIL)
+                prefs.remove(KEY_AVATAR_URL)
+                prefs.remove(KEY_ACCESS_TOKEN)
+                prefs.remove(KEY_REFRESH_TOKEN)
+                prefs.remove(KEY_TOKEN_EXPIRY)
+                // KEY_LOCAL_USER_ID is intentionally preserved
+            }
+            Timber.d("Auth data cleared successfully (localUserId preserved)")
         } catch (e: Exception) {
             Timber.e(e, "Failed to clear auth data")
             throw e

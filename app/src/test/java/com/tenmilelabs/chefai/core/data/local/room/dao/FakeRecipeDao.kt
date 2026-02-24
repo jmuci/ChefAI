@@ -202,4 +202,25 @@ class FakeRecipeDao : RecipeDao {
     override suspend fun getDirty(): List<RecipeEntity> {
         return recipes.values.filter { it.syncState == SyncState.PENDING }
     }
+
+    // --- Account upgrade queries ---
+
+    override suspend fun reassignCreatorAndMarkPending(oldCreatorId: UUID, newCreatorId: UUID, updatedAt: Long) {
+        recipes.entries.filter { it.value.creatorId == oldCreatorId }.forEach { (key, recipe) ->
+            recipes[key] = recipe.copy(
+                creatorId = newCreatorId,
+                syncState = SyncState.PENDING,
+                updatedAt = updatedAt
+            )
+        }
+        triggerUpdate()
+    }
+
+    override suspend fun getRecipeIdsForUser(creatorId: UUID): List<UUID> {
+        return recipes.values.filter { it.creatorId == creatorId }.map { it.uuid }
+    }
+
+    override suspend fun countRecipesForUser(creatorId: UUID): Int {
+        return recipes.values.count { it.creatorId == creatorId }
+    }
 }

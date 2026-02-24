@@ -15,6 +15,15 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
+import com.tenmilelabs.chefai.auth.domain.usecase.AccountUpgradeUseCase
+import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
+import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import java.util.UUID
 import javax.inject.Provider
 
@@ -28,6 +37,12 @@ class SessionManagerTest {
     private lateinit var fakeSecurePreferences: FakeSecurePreferences
     private lateinit var fakeAuthNetworkDataSource: FakeAuthNetworkDataSource
     private lateinit var fakeUserDao: FakeUserDao
+    private lateinit var fakeRecipeDao: FakeRecipeDao
+    private lateinit var fakeRecipeStepDao: FakeRecipeStepDao
+    private lateinit var fakeRecipeIngredientDao: FakeRecipeIngredientDao
+    private lateinit var fakeRecipeTagCrossRefDao: FakeRecipeTagCrossRefDao
+    private lateinit var fakeRecipeLabelCrossRefDao: FakeRecipeLabelCrossRefDao
+    private lateinit var accountUpgradeUseCaseProvider: Provider<AccountUpgradeUseCase>
     private lateinit var testScope: TestScope
     private val testDispatcher = StandardTestDispatcher()
 
@@ -37,12 +52,30 @@ class SessionManagerTest {
         fakeSecurePreferences = FakeSecurePreferences()
         fakeAuthNetworkDataSource = FakeAuthNetworkDataSource()
         fakeUserDao = FakeUserDao()
+        fakeRecipeDao = FakeRecipeDao()
+        fakeRecipeStepDao = FakeRecipeStepDao()
+        fakeRecipeIngredientDao = FakeRecipeIngredientDao()
+        fakeRecipeTagCrossRefDao = FakeRecipeTagCrossRefDao()
+        fakeRecipeLabelCrossRefDao = FakeRecipeLabelCrossRefDao()
+
+        accountUpgradeUseCaseProvider = Provider {
+            AccountUpgradeUseCase(
+                transactionRunner = FakeTransactionRunner(),
+                userDao = fakeUserDao,
+                recipeDao = fakeRecipeDao,
+                recipeStepDao = fakeRecipeStepDao,
+                recipeIngredientDao = fakeRecipeIngredientDao,
+                recipeTagCrossRefDao = fakeRecipeTagCrossRefDao,
+                recipeLabelCrossRefDao = fakeRecipeLabelCrossRefDao
+            )
+        }
 
         // Create SessionManager with test scope
         sessionManager = SessionManager(
             securePreferences = fakeSecurePreferences,
             authNetworkDataSource = { fakeAuthNetworkDataSource },
             userDao = fakeUserDao,
+            accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
             applicationScope = testScope
         ).apply {
             uuidGenerator = { UUID.randomUUID() }
@@ -289,6 +322,7 @@ class SessionManagerTest {
             securePreferences = fakeSecurePreferences,
             authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
             userDao = fakeUserDao,
+            accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
             applicationScope = testScope
         ).apply { uuidGenerator = { UUID.randomUUID() } }
         advanceUntilIdle()
@@ -313,6 +347,7 @@ class SessionManagerTest {
             securePreferences = fakeSecurePreferences,
             authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
             userDao = fakeUserDao,
+            accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
             applicationScope = testScope
         ).apply { uuidGenerator = { UUID.randomUUID() } }
         advanceUntilIdle()
@@ -343,6 +378,7 @@ class SessionManagerTest {
             securePreferences = fakeSecurePreferences,
             authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
             userDao = fakeUserDao,
+            accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
             applicationScope = testScope
         ).apply { uuidGenerator = { UUID.randomUUID() } }
         advanceUntilIdle()
@@ -352,8 +388,8 @@ class SessionManagerTest {
     }
 
     @Test
-    fun `logout restores same anonymous UUID for data continuity`() = testScope.runTest {
-        // Given: Anonymous session established before login
+    fun `logout reuses same anonymous UUID from previous session`() = testScope.runTest {
+        // Given: Anonymous session
         sessionManager.loadSession()
         val firstSession = sessionManager.userSession.first() as UserSession.Anonymous
         val firstLocalUserId = firstSession.localUserId
@@ -362,9 +398,7 @@ class SessionManagerTest {
         sessionManager.login("test@example.com", "password123")
         sessionManager.logout()
 
-        // Then: Post-logout anonymous session reuses the same localUserId.
-        // Pocket Chef is a single-user personal device app — reusing the UUID gives
-        // data continuity (local recipes stay visible after logout) and simpler semantics.
+        // Then: Anonymous session reuses the same localUserId (RFC-001 Section 7.3)
         val newSession = sessionManager.userSession.first() as UserSession.Anonymous
         assertThat(newSession.localUserId).isEqualTo(firstLocalUserId)
     }
@@ -406,5 +440,114 @@ class SessionManagerTest {
 
         val session = sessionManager.userSession.value as UserSession.Authenticated
         assertThat(session.user.displayName).isEqualTo("myusername")
+    }
+
+    // --- Account Upgrade Tests ---
+
+    private fun createRecipeForUser(creatorId: UUID) = RecipeEntity(
+        uuid = UUID.randomUUID(),
+        title = "Test Recipe",
+        description = "A test recipe",
+        imageUrl = "",
+        imageUrlThumbnail = "",
+        prepTimeMinutes = 10,
+        cookTimeMinutes = 20,
+        servings = 4,
+        creatorId = creatorId,
+        recipeExternalUrl = null,
+        privacy = RecipePrivacy.PRIVATE,
+        updatedAt = 1000L,
+        deletedAt = null,
+        syncState = SyncState.PENDING
+    )
+
+    @Test
+    fun `login transfers anonymous recipes to authenticated user`() = testScope.runTest {
+        // Given: Anonymous session with a recipe
+        sessionManager.loadSession()
+        val anonSession = sessionManager.userSession.first() as UserSession.Anonymous
+        val anonUserId = anonSession.localUserId
+
+        val recipe = createRecipeForUser(anonUserId)
+        fakeRecipeDao.seed(
+            users = listOf(fakeUserDao.getUserById(anonUserId)!!),
+            recipes = listOf(recipe)
+        )
+
+        // When: User logs in
+        val result = sessionManager.login("test@example.com", "password123")
+
+        // Then: Login succeeds
+        assertThat(result.isSuccess).isTrue()
+        val authSession = sessionManager.userSession.first() as UserSession.Authenticated
+
+        // And: Recipe is now owned by the authenticated user
+        val updatedRecipe = fakeRecipeDao.getRecipeById(recipe.uuid)
+        assertThat(updatedRecipe?.creatorId).isEqualTo(authSession.user.uuid)
+    }
+
+    @Test
+    fun `register transfers anonymous recipes to authenticated user`() = testScope.runTest {
+        // Given: Anonymous session with a recipe
+        sessionManager.loadSession()
+        val anonSession = sessionManager.userSession.first() as UserSession.Anonymous
+        val anonUserId = anonSession.localUserId
+
+        val recipe = createRecipeForUser(anonUserId)
+        fakeRecipeDao.seed(
+            users = listOf(fakeUserDao.getUserById(anonUserId)!!),
+            recipes = listOf(recipe)
+        )
+
+        // When: User registers
+        val result = sessionManager.register("testuser", "test@example.com", "password123")
+
+        // Then: Registration succeeds
+        assertThat(result.isSuccess).isTrue()
+        val authSession = sessionManager.userSession.first() as UserSession.Authenticated
+
+        // And: Recipe is now owned by the authenticated user
+        val updatedRecipe = fakeRecipeDao.getRecipeById(recipe.uuid)
+        assertThat(updatedRecipe?.creatorId).isEqualTo(authSession.user.uuid)
+    }
+
+    @Test
+    fun `login succeeds even if upgrade throws`() = testScope.runTest {
+        // Given: Anonymous session
+        sessionManager.loadSession()
+
+        // Create a new SessionManager where upgrade provider throws
+        val throwingSessionManager = SessionManager(
+            securePreferences = fakeSecurePreferences,
+            authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
+            userDao = fakeUserDao,
+            accountUpgradeUseCaseProvider = Provider { throw RuntimeException("Upgrade failed") },
+            applicationScope = testScope
+        ).apply { uuidGenerator = { UUID.randomUUID() } }
+        advanceUntilIdle()
+
+        // When: User logs in (upgrade will throw)
+        val result = throwingSessionManager.login("test@example.com", "password123")
+
+        // Then: Login still succeeds despite upgrade failure
+        assertThat(result.isSuccess).isTrue()
+        val session = throwingSessionManager.userSession.first()
+        assertThat(session).isInstanceOf(UserSession.Authenticated::class.java)
+    }
+
+    @Test
+    fun `login without anonymous recipes skips upgrade gracefully`() = testScope.runTest {
+        // Given: Anonymous session with no recipes
+        sessionManager.loadSession()
+        val anonSession = sessionManager.userSession.first() as UserSession.Anonymous
+        assertThat(fakeRecipeDao.countRecipesForUser(anonSession.localUserId)).isEqualTo(0)
+
+        // When: User logs in
+        val result = sessionManager.login("test@example.com", "password123")
+
+        // Then: Login succeeds with no errors
+        assertThat(result.isSuccess).isTrue()
+        val session = sessionManager.userSession.first()
+        assertThat(session).isInstanceOf(UserSession.Authenticated::class.java)
     }
 }

@@ -33,15 +33,16 @@ class FakeSecurePreferences : SecurePreferencesInterface {
         refreshToken: String,
         tokenExpiry: Long
     ) {
-        storage.value = mapOf(
-            KEY_USER_UUID to userUuid.toString(),
-            KEY_DISPLAY_NAME to displayName,
-            KEY_EMAIL to email,
-            KEY_AVATAR_URL to avatarUrl,
-            KEY_ACCESS_TOKEN to accessToken,
-            KEY_REFRESH_TOKEN to refreshToken,
-            KEY_TOKEN_EXPIRY to tokenExpiry
-        )
+        storage.value = storage.value.toMutableMap().apply {
+            put(KEY_USER_UUID, userUuid.toString())
+            put(KEY_DISPLAY_NAME, displayName)
+            put(KEY_EMAIL, email)
+            put(KEY_AVATAR_URL, avatarUrl)
+            put(KEY_ACCESS_TOKEN, accessToken)
+            put(KEY_REFRESH_TOKEN, refreshToken)
+            put(KEY_TOKEN_EXPIRY, tokenExpiry)
+            // KEY_LOCAL_USER_ID is preserved (not replaced)
+        }
     }
 
     override fun getUserUuid(): Flow<UUID?> = storage.map { prefs ->
@@ -79,7 +80,16 @@ class FakeSecurePreferences : SecurePreferencesInterface {
     }
 
     override suspend fun clearAuthData() {
-        storage.value = emptyMap()
+        storage.value = storage.value.toMutableMap().apply {
+            remove(KEY_USER_UUID)
+            remove(KEY_DISPLAY_NAME)
+            remove(KEY_EMAIL)
+            remove(KEY_AVATAR_URL)
+            remove(KEY_ACCESS_TOKEN)
+            remove(KEY_REFRESH_TOKEN)
+            remove(KEY_TOKEN_EXPIRY)
+            // KEY_LOCAL_USER_ID is intentionally preserved
+        }
     }
 
     override suspend fun updateAccessToken(accessToken: String, tokenExpiry: Long) {
