@@ -3,7 +3,9 @@ package com.tenmilelabs.chefai.auth.domain
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
+import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
+import java.util.UUID
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -275,5 +277,29 @@ class SessionManagerTest {
         val restoredSession = newSessionManager.userSession.value as UserSession.Authenticated
         assertThat(restoredSession.user.displayName).isEqualTo(session.user.displayName)
         assertThat(restoredSession.user.email).isEqualTo(session.user.email)
+    }
+
+    @Test
+    fun `register uses input username when backend returns empty displayName`() = testScope.runTest {
+        // Given: Backend returns an empty username in the registration response
+        fakeAuthNetworkDataSource.authResponse = AuthResponse(
+            token = "fake_token",
+            refreshToken = "fake_refresh",
+            userId = UUID.randomUUID().toString(),
+            username = "",
+            email = "test@example.com",
+            expiresIn = 3600
+        )
+
+        // When: Registering with a username
+        val result = sessionManager.register("myusername", "test@example.com", "password123")
+
+        // Then: The session uses the input username as displayName
+        assertThat(result.isSuccess).isTrue()
+        val user = result.getOrNull()
+        assertThat(user?.displayName).isEqualTo("myusername")
+
+        val session = sessionManager.userSession.value as UserSession.Authenticated
+        assertThat(session.user.displayName).isEqualTo("myusername")
     }
 }
