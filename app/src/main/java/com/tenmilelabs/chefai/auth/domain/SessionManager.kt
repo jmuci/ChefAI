@@ -9,6 +9,10 @@ import com.tenmilelabs.chefai.auth.data.network.dto.RefreshTokenRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RegisterRequest
 import com.tenmilelabs.chefai.auth.domain.model.AuthToken
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
+import com.tenmilelabs.chefai.core.data.local.room.UserEntity
+import com.tenmilelabs.chefai.core.data.local.room.dao.UserDao
+import com.tenmilelabs.chefai.core.data.local.util.SyncState
+import com.tenmilelabs.chefai.core.data.local.util.generateUuid7
 import com.tenmilelabs.chefai.core.di.ApplicationScope
 import com.tenmilelabs.chefai.core.domain.model.User
 import kotlinx.coroutines.CoroutineScope
@@ -18,20 +22,26 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Singleton
 
 /**
- * Manages user authentication session state across the application.
- * This is a singleton that maintains the current user's authentication status.
+ * Manages user session state across the application.
+ * Implements an anonymous-first model: users always have a session context
+ * (either Anonymous or Authenticated). There is no "unauthenticated" state.
  */
 @Singleton
 class SessionManager @Inject constructor(
     private val securePreferences: SecurePreferencesInterface,
     private val authNetworkDataSource: Provider<AuthNetworkDataSource>,
+    private val userDao: UserDao,
     @param:ApplicationScope private val applicationScope: CoroutineScope
 ) : TokenProvider {
+
+    /** Override in tests to avoid the UUIDv7 library dependency. */
+    internal var uuidGenerator: () -> UUID = { generateUuid7() }
 
     private val _userSession = MutableStateFlow<UserSession>(UserSession.Loading)
     val userSession: StateFlow<UserSession> = _userSession.asStateFlow()
@@ -45,6 +55,12 @@ class SessionManager @Inject constructor(
 
     /**
      * Loads the user session from secure storage.
+     * Always resolves to either Authenticated or Anonymous — never leaves the user without a context.
+     *
+     * Flow:
+     * 1. If valid auth tokens exist → Authenticated
+     * 2. If expired tokens exist → try refresh → Authenticated or fall back to Anonymous
+     * 3. If no tokens → restore or create Anonymous session
      */
     suspend fun loadSession() {
         try {
@@ -72,8 +88,8 @@ class SessionManager @Inject constructor(
                     if (refreshResult.isSuccess) {
                         Timber.d("Session refreshed successfully")
                     } else {
-                        Timber.w("Failed to refresh session, user needs to login again")
-                        _userSession.value = UserSession.Unauthenticated
+                        Timber.w("Failed to refresh session, falling back to anonymous")
+                        enterAnonymousSession()
                     }
                 } else {
                     // Token is still valid, restore user from storage
@@ -94,13 +110,57 @@ class SessionManager @Inject constructor(
                     Timber.d("Session loaded successfully for user: ${user.uuid}")
                 }
             } else {
-                // No stored session
-                Timber.d("No stored session found")
-                _userSession.value = UserSession.Unauthenticated
+                // No stored auth session — enter anonymous mode
+                Timber.d("No stored session found, entering anonymous mode")
+                enterAnonymousSession()
             }
         } catch (e: Exception) {
-            Timber.e(e, "Failed to load session")
-            _userSession.value = UserSession.Unauthenticated
+            Timber.e(e, "Failed to load session, falling back to anonymous")
+            enterAnonymousSession()
+        }
+    }
+
+    /**
+     * Creates or restores an anonymous session.
+     * Reuses an existing localUserId if one was previously stored, otherwise generates a new UUIDv7.
+     * Also ensures a corresponding UserEntity exists in Room.
+     */
+    private suspend fun enterAnonymousSession() {
+        val existingLocalId = securePreferences.getLocalUserId().first()
+        val localUserId = if (existingLocalId != null) {
+            Timber.d("Restoring anonymous session with existing localUserId: $existingLocalId")
+            existingLocalId
+        } else {
+            val newId = uuidGenerator()
+            Timber.d("Creating new anonymous session with localUserId: $newId")
+            securePreferences.saveLocalUserId(newId)
+            newId
+        }
+
+        // Ensure the anonymous UserEntity exists in Room
+        ensureAnonymousUserEntity(localUserId)
+
+        _userSession.value = UserSession.Anonymous(localUserId)
+    }
+
+    /**
+     * Creates a UserEntity in Room for the anonymous user if it doesn't already exist.
+     */
+    private suspend fun ensureAnonymousUserEntity(localUserId: UUID) {
+        val existingUser = userDao.getUserById(localUserId)
+        if (existingUser == null) {
+            userDao.upsertUser(
+                UserEntity(
+                    uuid = localUserId,
+                    displayName = "Guest",
+                    email = "",
+                    avatarUrl = "",
+                    updatedAt = System.currentTimeMillis(),
+                    deletedAt = null,
+                    syncState = SyncState.PENDING
+                )
+            )
+            Timber.d("Created anonymous UserEntity in Room: $localUserId")
         }
     }
 
@@ -116,7 +176,7 @@ class SessionManager @Inject constructor(
             val response = authNetworkDataSource.get().login(
                 LoginRequest(email = email, password = password)
             )
-            
+
             val authToken = response.toAuthToken()
             val user = response.toUser()
 
@@ -140,7 +200,7 @@ class SessionManager @Inject constructor(
             Result.success(user)
         } catch (e: Exception) {
             Timber.e(e, "Login failed")
-            _userSession.value = UserSession.Unauthenticated
+            enterAnonymousSession()
             Result.failure(e)
         }
     }
@@ -157,7 +217,7 @@ class SessionManager @Inject constructor(
             val response = authNetworkDataSource.get().register(
                 RegisterRequest(email = email, username = username, password = password)
             )
-            
+
             val authToken = response.toAuthToken()
             val responseUser = response.toUser()
             // Use the username from the registration form if the backend doesn't return it
@@ -187,30 +247,38 @@ class SessionManager @Inject constructor(
             Result.success(user)
         } catch (e: Exception) {
             Timber.e(e, "Registration failed")
-            _userSession.value = UserSession.Unauthenticated
+            enterAnonymousSession()
             Result.failure(e)
         }
     }
 
     /**
-     * Logs out the current user and clears session data.
+     * Logs out the current user and returns to an anonymous session.
+     * Generates a new anonymous UUID (previous data stays on server).
      */
     suspend fun logout() {
         try {
             val currentUser = getCurrentUser()
             Timber.d("Logging out user: ${currentUser?.uuid}")
 
-            // Clear secure storage
+            // Clear auth data from secure storage
             securePreferences.clearAuthData()
 
-            // Clear session state
-            _userSession.value = UserSession.Unauthenticated
+            // Return to anonymous state with a new UUID
+            enterAnonymousSession()
 
-            Timber.d("Logout successful")
+            Timber.d("Logout successful, now in anonymous mode")
         } catch (e: Exception) {
             Timber.e(e, "Error during logout")
-            // Still mark as unauthenticated even if clear fails
-            _userSession.value = UserSession.Unauthenticated
+            // Still try to enter anonymous mode even if clear fails
+            try {
+                enterAnonymousSession()
+            } catch (inner: Exception) {
+                Timber.e(inner, "Failed to enter anonymous session after logout error")
+                // Last resort: create anonymous session without Room
+                val fallbackId = uuidGenerator()
+                _userSession.value = UserSession.Anonymous(fallbackId)
+            }
         }
     }
 
@@ -230,7 +298,7 @@ class SessionManager @Inject constructor(
             val response = authNetworkDataSource.get().refreshToken(
                 RefreshTokenRequest(refreshToken = currentSession.authToken.refreshToken)
             )
-            
+
             val newAuthToken = response.toAuthToken()
 
             // Update secure storage with new tokens
@@ -254,14 +322,24 @@ class SessionManager @Inject constructor(
             Result.success(Unit)
         } catch (e: Exception) {
             Timber.e(e, "Token refresh failed")
-            // If refresh fails, we should consider logging out the user
-            // But for now, just return the error
             Result.failure(e)
         }
     }
 
     /**
-     * Gets the current authenticated user, or null if not authenticated.
+     * Gets the current user ID regardless of session type.
+     * Returns the localUserId for Anonymous sessions and the user UUID for Authenticated sessions.
+     */
+    fun getCurrentUserId(): UUID? {
+        return when (val session = _userSession.value) {
+            is UserSession.Anonymous -> session.localUserId
+            is UserSession.Authenticated -> session.user.uuid
+            is UserSession.Loading -> null
+        }
+    }
+
+    /**
+     * Gets the current authenticated user, or null if anonymous/loading.
      */
     fun getCurrentUser(): User? {
         return when (val session = _userSession.value) {
