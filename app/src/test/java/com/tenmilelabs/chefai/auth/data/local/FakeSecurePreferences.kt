@@ -44,6 +44,7 @@ class FakeSecurePreferences : SecurePreferencesInterface {
             put(KEY_ACCESS_TOKEN, accessToken)
             put(KEY_REFRESH_TOKEN, refreshToken)
             put(KEY_TOKEN_EXPIRY, tokenExpiry)
+            // KEY_LOCAL_USER_ID is preserved (not replaced)
         }
     }
 
@@ -82,7 +83,16 @@ class FakeSecurePreferences : SecurePreferencesInterface {
     }
 
     override suspend fun clearAuthData() {
-        storage.value = emptyMap()
+        storage.value = storage.value.toMutableMap().apply {
+            remove(KEY_USER_UUID)
+            remove(KEY_DISPLAY_NAME)
+            remove(KEY_EMAIL)
+            remove(KEY_AVATAR_URL)
+            remove(KEY_ACCESS_TOKEN)
+            remove(KEY_REFRESH_TOKEN)
+            remove(KEY_TOKEN_EXPIRY)
+            // KEY_LOCAL_USER_ID is intentionally preserved
+        }
     }
 
     override suspend fun updateAccessToken(accessToken: String, tokenExpiry: Long) {
