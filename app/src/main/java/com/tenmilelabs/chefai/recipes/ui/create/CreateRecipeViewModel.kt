@@ -10,6 +10,7 @@ import com.tenmilelabs.chefai.core.domain.model.Label
 import com.tenmilelabs.chefai.core.domain.model.Recipe
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
+import com.tenmilelabs.chefai.core.domain.model.User
 import com.tenmilelabs.chefai.core.domain.repository.MetadataRepository
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -401,17 +402,25 @@ class CreateRecipeViewModel @Inject constructor(
             _uiState.update { it.copy(isSaving = true, saveError = null) }
 
             try {
-                // Get current user from session
-                val currentUser = sessionManager.getCurrentUser()
-                if (currentUser == null) {
+                // Get current user ID (works for both anonymous and authenticated sessions)
+                val userId = sessionManager.getCurrentUserId()
+                if (userId == null) {
                     _uiState.update {
                         it.copy(
                             isSaving = false,
-                            saveError = "User not authenticated"
+                            saveError = "No active session"
                         )
                     }
                     return@launch
                 }
+
+                // Use full User for authenticated, minimal User for anonymous
+                val currentUser = sessionManager.getCurrentUser() ?: User(
+                    uuid = userId,
+                    displayName = "Guest",
+                    email = "",
+                    avatarUrl = ""
+                )
 
                 val state = _uiState.value
                 val recipe = Recipe(
