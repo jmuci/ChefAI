@@ -80,6 +80,23 @@ class SessionManager @Inject constructor(
                     expiresAt = tokenExpiry
                 )
 
+                // Restore user from storage first so refreshToken() can
+                // read the current refresh token from the session state.
+                val displayName = securePreferences.getDisplayName().first() ?: ""
+                val email = securePreferences.getUserEmail().first() ?: ""
+                val avatarUrl = securePreferences.getUserAvatarUrl().first() ?: ""
+                val user = User(
+                    uuid = userUuid,
+                    displayName = displayName,
+                    email = email,
+                    avatarUrl = avatarUrl
+                )
+
+                _userSession.value = UserSession.Authenticated(
+                    user = user,
+                    authToken = authToken
+                )
+
                 // Check if token is expired
                 val currentTime = System.currentTimeMillis()
                 if (currentTime >= tokenExpiry) {
@@ -92,21 +109,6 @@ class SessionManager @Inject constructor(
                         enterAnonymousSession()
                     }
                 } else {
-                    // Token is still valid, restore user from storage
-                    val displayName = securePreferences.getDisplayName().first() ?: ""
-                    val email = securePreferences.getUserEmail().first() ?: ""
-                    val avatarUrl = securePreferences.getUserAvatarUrl().first() ?: ""
-                    val user = User(
-                        uuid = userUuid,
-                        displayName = displayName,
-                        email = email,
-                        avatarUrl = avatarUrl
-                    )
-
-                    _userSession.value = UserSession.Authenticated(
-                        user = user,
-                        authToken = authToken
-                    )
                     Timber.d("Session loaded successfully for user: ${user.uuid}")
                 }
             } else {

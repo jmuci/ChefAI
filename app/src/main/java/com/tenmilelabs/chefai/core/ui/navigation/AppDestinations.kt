@@ -63,9 +63,7 @@ class NavigationActions(private val navController: NavHostController) {
 
     fun navigateToLogin() {
         navController.navigate(ScreenBaseRoutes.LOGIN) {
-            popUpTo(navController.graph.id) {
-                inclusive = true
-            }
+            launchSingleTop = true
         }
     }
 
