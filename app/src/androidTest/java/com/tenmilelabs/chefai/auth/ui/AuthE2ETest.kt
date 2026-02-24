@@ -85,10 +85,16 @@ class AuthE2ETest {
             expiresIn = 3600
         )
 
-        // When: User enters credentials and taps Login
-        // First, wait for the login screen to be displayed
+        // App starts on HomeScreen (anonymous-first model); navigate to Login via profile menu
+        composeTestRule.waitUntilAtLeastOneExists(hasTestTag("HomeScreen"), 5_000)
+
+        composeTestRule.onNodeWithTag("UserProfileMenu").performClick()
+        composeTestRule.onNodeWithText("Log in / Register").performClick()
+
+        // Wait for the login screen to be displayed
         composeTestRule.waitUntilAtLeastOneExists(hasTestTag("LoginScreen"), 5_000)
 
+        // When: User enters credentials and taps Login
         composeTestRule.onNodeWithText("Email")
             .performTextInput(testEmail)
 
@@ -121,10 +127,16 @@ class AuthE2ETest {
         val testEmail = "bob@example.com"
         val testPassword = "password123"
 
-        // When: User navigates to registration screen
+        // App starts on HomeScreen (anonymous-first model); navigate to Login via profile menu
+        composeTestRule.waitUntilAtLeastOneExists(hasTestTag("HomeScreen"), 5_000)
+
+        composeTestRule.onNodeWithTag("UserProfileMenu").performClick()
+        composeTestRule.onNodeWithText("Log in / Register").performClick()
+
         // Wait for login screen
         composeTestRule.waitUntilAtLeastOneExists(hasTestTag("LoginScreen"), 5_000)
 
+        // When: User navigates to registration screen
         composeTestRule.onNodeWithTag("CreateAccountButton").performClick()
 
         // Wait for registration screen
@@ -160,6 +172,13 @@ class AuthE2ETest {
 
         // Click logout
         composeTestRule.onNodeWithTag("LogoutMenuItem").performClick()
+
+        // After logout, app returns to HomeScreen (anonymous mode)
+        composeTestRule.waitUntilAtLeastOneExists(hasTestTag("HomeScreen"), 5_000)
+
+        // Navigate to Login via profile menu again
+        composeTestRule.onNodeWithTag("UserProfileMenu").performClick()
+        composeTestRule.onNodeWithText("Log in / Register").performClick()
 
         // Wait for login screen
         composeTestRule.waitUntilAtLeastOneExists(hasTestTag("LoginScreen"), 5_000)
