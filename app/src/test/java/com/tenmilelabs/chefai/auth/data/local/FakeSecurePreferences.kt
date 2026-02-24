@@ -21,6 +21,7 @@ class FakeSecurePreferences : SecurePreferencesInterface {
         private const val KEY_ACCESS_TOKEN = "access_token"
         private const val KEY_REFRESH_TOKEN = "refresh_token"
         private const val KEY_TOKEN_EXPIRY = "token_expiry"
+        private const val KEY_LOCAL_USER_ID = "local_user_id"
     }
 
     override suspend fun saveAuthData(
@@ -91,6 +92,28 @@ class FakeSecurePreferences : SecurePreferencesInterface {
     override suspend fun updateRefreshToken(refreshToken: String) {
         storage.value = storage.value.toMutableMap().apply {
             put(KEY_REFRESH_TOKEN, refreshToken)
+        }
+    }
+
+    override suspend fun saveLocalUserId(uuid: UUID) {
+        storage.value = storage.value.toMutableMap().apply {
+            put(KEY_LOCAL_USER_ID, uuid.toString())
+        }
+    }
+
+    override fun getLocalUserId(): Flow<UUID?> = storage.map { prefs ->
+        prefs[KEY_LOCAL_USER_ID]?.let { uuidString ->
+            try {
+                UUID.fromString(uuidString as String)
+            } catch (e: IllegalArgumentException) {
+                null
+            }
+        }
+    }
+
+    override suspend fun clearLocalUserId() {
+        storage.value = storage.value.toMutableMap().apply {
+            remove(KEY_LOCAL_USER_ID)
         }
     }
 }

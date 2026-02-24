@@ -12,6 +12,8 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDa
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeTagDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
+import java.util.UUID
 import com.tenmilelabs.chefai.core.testutil.recipe1
 import com.tenmilelabs.chefai.core.testutil.recipe3
 import com.tenmilelabs.chefai.core.testutil.recipeEntity1
@@ -81,8 +83,11 @@ class DefaultRecipeRepositoryTest {
         sessionManager = SessionManager(
             securePreferences = fakeSecurePreferences,
             authNetworkDataSource = { fakeAuthNetworkDataSource },
+            userDao = FakeUserDao(),
             applicationScope = testScope
-        )
+        ).apply {
+            uuidGenerator = { UUID.randomUUID() }
+        }
         // Advance until the SessionManager init coroutine (loadSession) completes.
         testDispatcher.scheduler.advanceUntilIdle()
 
