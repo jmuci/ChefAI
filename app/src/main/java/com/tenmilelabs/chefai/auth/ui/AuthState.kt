@@ -28,7 +28,7 @@ class AuthStateViewModel @Inject constructor(
  * val userSession by rememberUserSession()
  * when (userSession) {
  *     is UserSession.Authenticated -> { /* Show authenticated content */ }
- *     is UserSession.Unauthenticated -> { /* Show login screen */ }
+ *     is UserSession.Anonymous -> { /* Show anonymous content */ }
  *     is UserSession.Loading -> { /* Show loading indicator */ }
  * }
  * ```
