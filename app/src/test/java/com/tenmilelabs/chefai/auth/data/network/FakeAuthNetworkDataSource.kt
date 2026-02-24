@@ -21,6 +21,12 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
     var shouldThrowError: Boolean = false
 
     /**
+     * Custom exception to throw when shouldThrowError is true.
+     * If null, throws a generic Exception.
+     */
+    var errorToThrow: Exception? = null
+
+    /**
      * Simulated delay in milliseconds for network operations.
      * Set to > 0 to test loading states.
      */
@@ -42,7 +48,7 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
         }
 
         if (shouldThrowError) {
-            throw Exception("Simulated network error during registration")
+            throw errorToThrow ?: Exception("Simulated network error during registration")
         }
 
         return authResponse ?: createDefaultAuthResponse(
@@ -109,6 +115,7 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
      */
     fun reset() {
         shouldThrowError = false
+        errorToThrow = null
         networkDelayMs = 0
         authResponse = null
         tokenRefreshResponse = null
