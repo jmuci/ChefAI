@@ -57,8 +57,8 @@ abstract class ChefAIDataBase : RoomDatabase() {
 }
 
 val MIGRATION_2_3 = object : Migration(2, 3) {
-    override fun migrate(database: SupportSQLiteDatabase) {
-        database.execSQL(
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
             """
             CREATE TABLE IF NOT EXISTS sync_metadata (
                 entityType TEXT NOT NULL PRIMARY KEY,
@@ -71,12 +71,12 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
 
 // TODO - merge migrations into new DB asset before rolling out to production
 val MIGRATION_1_2 = object : Migration(1, 2) {
-    override fun migrate(database: SupportSQLiteDatabase) {
+    override fun migrate(db: SupportSQLiteDatabase) {
         // Make email and avatarUrl NOT NULL in users table
         // SQLite doesn't support ALTER COLUMN, so we recreate the table
 
         // Step 1: Create new table with NOT NULL constraints
-        database.execSQL(
+        db.execSQL(
             """
             CREATE TABLE users_new (
                 uuid BLOB NOT NULL PRIMARY KEY,
@@ -91,7 +91,7 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
         )
 
         // Step 2: Copy data (only rows with non-null email and avatarUrl)
-        database.execSQL(
+        db.execSQL(
             """
             INSERT INTO users_new (uuid, displayName, email, avatarUrl, updatedAt, deletedAt, syncState)
             SELECT uuid, displayName, email, avatarUrl, updatedAt, deletedAt, syncState
@@ -101,12 +101,12 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
         )
 
         // Step 3: Drop old table
-        database.execSQL("DROP TABLE users")
+        db.execSQL("DROP TABLE users")
 
         // Step 4: Rename new table
-        database.execSQL("ALTER TABLE users_new RENAME TO users")
+        db.execSQL("ALTER TABLE users_new RENAME TO users")
 
         // Step 5: Recreate index
-        database.execSQL("CREATE INDEX index_users_syncState_updatedAt ON users(syncState, updatedAt)")
+        db.execSQL("CREATE INDEX index_users_syncState_updatedAt ON users(syncState, updatedAt)")
     }
 }
