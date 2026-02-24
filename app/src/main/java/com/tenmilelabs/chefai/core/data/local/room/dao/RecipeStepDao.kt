@@ -29,4 +29,7 @@ interface RecipeStepDao {
 
     @Upsert
     suspend fun upsertStep(step: RecipeStepEntity)
+
+    @Query("UPDATE recipe_steps SET syncState = 'PENDING', updatedAt = :updatedAt WHERE recipeId IN (:recipeIds)")
+    suspend fun markPendingForRecipes(recipeIds: List<UUID>, updatedAt: Long)
 }

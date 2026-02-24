@@ -91,4 +91,15 @@ interface RecipeDao {
     @Query("SELECT * FROM recipes WHERE syncState = 'PENDING'")
     suspend fun getDirty(): List<RecipeEntity>
 
+    // --- Account upgrade queries ---
+
+    @Query("UPDATE recipes SET creatorId = :newCreatorId, syncState = 'PENDING', updatedAt = :updatedAt WHERE creatorId = :oldCreatorId")
+    suspend fun reassignCreatorAndMarkPending(oldCreatorId: UUID, newCreatorId: UUID, updatedAt: Long)
+
+    @Query("SELECT uuid FROM recipes WHERE creatorId = :creatorId")
+    suspend fun getRecipeIdsForUser(creatorId: UUID): List<UUID>
+
+    @Query("SELECT COUNT(*) FROM recipes WHERE creatorId = :creatorId")
+    suspend fun countRecipesForUser(creatorId: UUID): Int
+
 }

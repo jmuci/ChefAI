@@ -39,4 +39,7 @@ interface RecipeIngredientDao {
         deleteAllForRecipe(recipeId)
         upsertAll(recipeIngredients)
     }
+
+    @Query("UPDATE recipe_ingredients SET syncState = 'PENDING', updatedAt = :updatedAt WHERE recipeId IN (:recipeIds)")
+    suspend fun markPendingForRecipes(recipeIds: List<UUID>, updatedAt: Long)
 }
