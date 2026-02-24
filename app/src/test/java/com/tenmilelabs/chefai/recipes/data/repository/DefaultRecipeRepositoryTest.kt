@@ -4,6 +4,8 @@ import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.auth.domain.usecase.AccountUpgradeUseCase
+import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeLabelDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
@@ -83,10 +85,18 @@ class DefaultRecipeRepositoryTest {
             )
         }
 
+        val fakeUserDao = FakeUserDao()
         sessionManager = SessionManager(
             securePreferences = fakeSecurePreferences,
             authNetworkDataSource = { fakeAuthNetworkDataSource },
-            userDao = FakeUserDao(),
+            userDao = fakeUserDao,
+            accountUpgradeUseCaseProvider = {
+                AccountUpgradeUseCase(
+                    FakeTransactionRunner(), fakeUserDao, FakeRecipeDao(),
+                    FakeRecipeStepDao(), FakeRecipeIngredientDao(),
+                    FakeRecipeTagCrossRefDao(), FakeRecipeLabelCrossRefDao()
+                )
+            },
             applicationScope = testScope
         ).apply {
             uuidGenerator = { UUID.randomUUID() }
