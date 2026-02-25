@@ -41,6 +41,7 @@ fun RecipeEntity.toSyncDto(
     creatorId = creatorId.toString(),
     recipeExternalUrl = recipeExternalUrl,
     privacy = privacy.name,
+    version = version,
     updatedAt = updatedAt,
     deletedAt = deletedAt,
     steps = steps.map { it.toSyncDto() },
@@ -102,6 +103,7 @@ fun SyncRecipeDto.toRecipeEntity(): RecipeEntity = RecipeEntity(
     creatorId = UUID.fromString(creatorId),
     recipeExternalUrl = recipeExternalUrl,
     privacy = RecipePrivacy.valueOf(privacy.uppercase()),
+    version = version,
     updatedAt = updatedAt,
     deletedAt = deletedAt,
     syncState = SyncState.SYNCED
