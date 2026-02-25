@@ -2,8 +2,7 @@ package com.tenmilelabs.chefai.core.data.local.room.relations
 
 import java.util.UUID
 
-// TODO Rename to Recipe Ingredients
-data class RecipeIngredient (
+data class RecipeIngredient(
     val ingredientId: UUID,
     val ingredientDisplayName: String,
     val quantity: Double,
