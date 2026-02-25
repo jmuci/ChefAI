@@ -14,6 +14,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import java.util.UUID
 
 /**
@@ -29,10 +30,9 @@ class FakeSyncScheduler : SyncScheduler {
 /**
  * Builds a real [SessionManager] wired with in-memory fakes, ready for use in unit tests.
  *
- * Uses [Dispatchers.Main] (which MainCoroutineRule sets to UnconfinedTestDispatcher) so the
- * anonymous session is resolved eagerly during [SessionManager.init], meaning
- * [SessionManager.getCurrentUserId] returns a non-null UUID immediately after construction —
- * no `advanceUntilIdle()` call required at the call site.
+ * Synchronously calls [SessionManager.loadSession] to ensure the anonymous session is fully
+ * loaded before returning, so [SessionManager.getCurrentUserId] returns a non-null UUID
+ * immediately without race conditions or uncaught async exceptions.
  *
  * Pass a custom [testScope] when the test already owns a [CoroutineScope] with a different
  * dispatcher and needs the session coroutines to participate in the same domain.
@@ -41,7 +41,7 @@ fun createTestSessionManager(
     testScope: CoroutineScope = CoroutineScope(Dispatchers.Main)
 ): SessionManager {
     val fakeUserDao = FakeUserDao()
-    return SessionManager(
+    val sessionManager = SessionManager(
         securePreferences = FakeSecurePreferences(),
         authNetworkDataSource = { FakeAuthNetworkDataSource() },
         userDao = fakeUserDao,
@@ -61,4 +61,12 @@ fun createTestSessionManager(
     ).apply {
         uuidGenerator = { UUID.randomUUID() }
     }
+
+    // Synchronously load the session to ensure it's fully initialized before the test runs.
+    // This prevents race conditions and uncaught exceptions in async coroutines.
+    runBlocking {
+        sessionManager.loadSession()
+    }
+
+    return sessionManager
 }
