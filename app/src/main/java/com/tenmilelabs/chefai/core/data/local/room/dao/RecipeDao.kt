@@ -62,6 +62,10 @@ interface RecipeDao {
     fun observeRecipesWithDetailsForUser(creatorId: UUID): Flow<List<RecipeWithDetails>>
 
     @Transaction
+    @Query("SELECT * FROM recipes WHERE privacy = 'PUBLIC'")
+    fun observePublicRecipesWithDetails(): Flow<List<RecipeWithDetails>>
+
+    @Transaction
     @Query("SELECT * FROM recipes WHERE uuid = :uuid")
     suspend fun getRecipeWithTags(uuid: UUID): RecipeWithTags?
 

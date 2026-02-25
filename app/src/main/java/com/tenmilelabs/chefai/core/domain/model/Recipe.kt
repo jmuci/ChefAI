@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.core.domain.model
 
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
 import java.util.UUID
 
@@ -18,6 +19,7 @@ data class Recipe(
     val servings: Int,
     val creator: User,
     val recipeExternalUrl: String?,
+    val privacy: RecipePrivacy = RecipePrivacy.PUBLIC,
     val ingredients: List<RecipeIngredient>,
     val steps: List<RecipeStep>,
     val tags: List<Tag>,

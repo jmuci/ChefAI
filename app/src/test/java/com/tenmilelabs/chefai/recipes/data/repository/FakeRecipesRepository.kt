@@ -74,6 +74,15 @@ class FakeRecipesRepository : RecipesRepository {
         return recipesPreviewListFlow
     }
 
+    override fun getPublicRecipesStream(): Flow<List<Recipe>> {
+        if (shouldReturnErrorForGetRecipes) {
+            return flow {
+                throw (exceptionForGetRecipes ?: Exception("Configured repository error"))
+            }
+        }
+        return recipesListFlow
+    }
+
     override fun getRecipesStream(): Flow<List<Recipe>> {
         if (shouldReturnErrorForGetRecipes) {
             return flow {
