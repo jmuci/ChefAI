@@ -24,6 +24,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDa
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
+import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import java.util.UUID
 import javax.inject.Provider
 
@@ -43,6 +44,7 @@ class SessionManagerTest {
     private lateinit var fakeRecipeTagCrossRefDao: FakeRecipeTagCrossRefDao
     private lateinit var fakeRecipeLabelCrossRefDao: FakeRecipeLabelCrossRefDao
     private lateinit var accountUpgradeUseCaseProvider: Provider<AccountUpgradeUseCase>
+    private lateinit var fakeSyncManager: FakeSyncManager
     private lateinit var testScope: TestScope
     private val testDispatcher = StandardTestDispatcher()
 
@@ -70,12 +72,15 @@ class SessionManagerTest {
             )
         }
 
+        fakeSyncManager = FakeSyncManager()
+
         // Create SessionManager with test scope
         sessionManager = SessionManager(
             securePreferences = fakeSecurePreferences,
             authNetworkDataSource = { fakeAuthNetworkDataSource },
             userDao = fakeUserDao,
             accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
+            syncSchedulerProvider = { fakeSyncManager },
             applicationScope = testScope
         ).apply {
             uuidGenerator = { UUID.randomUUID() }
@@ -323,6 +328,7 @@ class SessionManagerTest {
             authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
             userDao = fakeUserDao,
             accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
+            syncSchedulerProvider = { FakeSyncManager() },
             applicationScope = testScope
         ).apply { uuidGenerator = { UUID.randomUUID() } }
         advanceUntilIdle()
@@ -348,6 +354,7 @@ class SessionManagerTest {
             authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
             userDao = fakeUserDao,
             accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
+            syncSchedulerProvider = { FakeSyncManager() },
             applicationScope = testScope
         ).apply { uuidGenerator = { UUID.randomUUID() } }
         advanceUntilIdle()
@@ -379,6 +386,7 @@ class SessionManagerTest {
             authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
             userDao = fakeUserDao,
             accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
+            syncSchedulerProvider = { FakeSyncManager() },
             applicationScope = testScope
         ).apply { uuidGenerator = { UUID.randomUUID() } }
         advanceUntilIdle()
@@ -522,6 +530,7 @@ class SessionManagerTest {
             authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
             userDao = fakeUserDao,
             accountUpgradeUseCaseProvider = Provider { throw RuntimeException("Upgrade failed") },
+            syncSchedulerProvider = { FakeSyncManager() },
             applicationScope = testScope
         ).apply { uuidGenerator = { UUID.randomUUID() } }
         advanceUntilIdle()
@@ -549,5 +558,63 @@ class SessionManagerTest {
         assertThat(result.isSuccess).isTrue()
         val session = sessionManager.userSession.first()
         assertThat(session).isInstanceOf(UserSession.Authenticated::class.java)
+    }
+
+    // --- Sync Lifecycle Tests ---
+
+    @Test
+    fun `login triggers immediate sync and schedules periodic sync`() = testScope.runTest {
+        // Given: Anonymous session
+        sessionManager.loadSession()
+        fakeSyncManager.reset()
+
+        // When: User logs in
+        sessionManager.login("test@example.com", "password123")
+
+        // Then: Immediate sync was requested and periodic sync was scheduled
+        assertThat(fakeSyncManager.immediateSyncCount).isEqualTo(1)
+        assertThat(fakeSyncManager.periodicSyncCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `register triggers immediate sync and schedules periodic sync`() = testScope.runTest {
+        // Given: Anonymous session
+        sessionManager.loadSession()
+        fakeSyncManager.reset()
+
+        // When: User registers
+        sessionManager.register("testuser", "test@example.com", "password123")
+
+        // Then: Immediate sync was requested and periodic sync was scheduled
+        assertThat(fakeSyncManager.immediateSyncCount).isEqualTo(1)
+        assertThat(fakeSyncManager.periodicSyncCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `logout cancels all sync work`() = testScope.runTest {
+        // Given: User is logged in
+        sessionManager.login("test@example.com", "password123")
+        fakeSyncManager.reset()
+
+        // When: User logs out
+        sessionManager.logout()
+
+        // Then: All sync work was cancelled
+        assertThat(fakeSyncManager.cancelAllCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `login failure does not trigger sync`() = testScope.runTest {
+        // Given: Network error
+        fakeAuthNetworkDataSource.shouldThrowError = true
+        sessionManager.loadSession()
+        fakeSyncManager.reset()
+
+        // When: Login fails
+        sessionManager.login("test@example.com", "password123")
+
+        // Then: No sync was triggered
+        assertThat(fakeSyncManager.immediateSyncCount).isEqualTo(0)
+        assertThat(fakeSyncManager.periodicSyncCount).isEqualTo(0)
     }
 }

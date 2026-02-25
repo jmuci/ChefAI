@@ -15,6 +15,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDa
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
+import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import java.util.UUID
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -55,6 +56,7 @@ class LoginViewModelTest {
                     FakeRecipeTagCrossRefDao(), FakeRecipeLabelCrossRefDao()
                 )
             },
+            syncSchedulerProvider = { FakeSyncManager() },
             applicationScope = testScope
         ).apply {
             uuidGenerator = { UUID.randomUUID() }

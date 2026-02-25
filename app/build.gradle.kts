@@ -69,6 +69,7 @@ dependencies {
     implementation(libs.androidx.core.core)
     implementation(libs.material)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.navigation.ui.ktx)
     implementation(libs.kotlinx.coroutines.android)
 

@@ -14,6 +14,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UserEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.UserDao
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.local.util.generateUuid7
+import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import com.tenmilelabs.chefai.core.di.ApplicationScope
 import com.tenmilelabs.chefai.core.domain.model.User
 import kotlinx.coroutines.CoroutineScope
@@ -39,6 +40,7 @@ class SessionManager @Inject constructor(
     private val authNetworkDataSource: Provider<AuthNetworkDataSource>,
     private val userDao: UserDao,
     private val accountUpgradeUseCaseProvider: Provider<AccountUpgradeUseCase>,
+    private val syncSchedulerProvider: Provider<SyncScheduler>,
     @param:ApplicationScope private val applicationScope: CoroutineScope
 ) : TokenProvider {
 
@@ -106,12 +108,15 @@ class SessionManager @Inject constructor(
                     val refreshResult = refreshToken()
                     if (refreshResult.isSuccess) {
                         Timber.d("Session refreshed successfully")
+                        syncSchedulerProvider.get().schedulePeriodicSync()
                     } else {
                         Timber.w("Failed to refresh session, falling back to anonymous")
                         enterAnonymousSession()
                     }
                 } else {
                     Timber.d("Session loaded successfully for user: ${user.uuid}")
+                    // Resume periodic sync for restored authenticated session
+                    syncSchedulerProvider.get().schedulePeriodicSync()
                 }
             } else {
                 // No stored auth session — enter anonymous mode
@@ -218,6 +223,10 @@ class SessionManager @Inject constructor(
                 authToken = authToken
             )
 
+            // Trigger sync: push any local recipes and start periodic sync
+            syncSchedulerProvider.get().requestImmediateSync()
+            syncSchedulerProvider.get().schedulePeriodicSync()
+
             Timber.d("Login successful for user: ${user.uuid}")
             Result.success(user)
         } catch (e: Exception) {
@@ -283,6 +292,10 @@ class SessionManager @Inject constructor(
                 authToken = authToken
             )
 
+            // Trigger sync: push any local recipes and start periodic sync
+            syncSchedulerProvider.get().requestImmediateSync()
+            syncSchedulerProvider.get().schedulePeriodicSync()
+
             Timber.d("Registration successful for user: ${user.uuid}")
             Result.success(user)
         } catch (e: Exception) {
@@ -301,6 +314,9 @@ class SessionManager @Inject constructor(
         try {
             val currentUser = getCurrentUser()
             Timber.d("Logging out user: ${currentUser?.uuid}")
+
+            // Cancel all sync work before clearing auth data
+            syncSchedulerProvider.get().cancelAllSync()
 
             // Clear auth data (preserves localUserId)
             securePreferences.clearAuthData()
