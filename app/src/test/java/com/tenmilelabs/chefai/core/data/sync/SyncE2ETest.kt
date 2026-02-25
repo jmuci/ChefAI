@@ -5,11 +5,14 @@ import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeStepEntity
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeAllergenDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSourceClassificationDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSyncMetadataDao
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
@@ -46,6 +49,9 @@ class SyncE2ETest {
     private lateinit var recipeDao: FakeRecipeDao
     private lateinit var recipeStepDao: FakeRecipeStepDao
     private lateinit var recipeIngredientDao: FakeRecipeIngredientDao
+    private lateinit var allergenDao: FakeAllergenDao
+    private lateinit var sourceClassificationDao: FakeSourceClassificationDao
+    private lateinit var ingredientDao: FakeIngredientDao
     private lateinit var recipeTagCrossRefDao: FakeRecipeTagCrossRefDao
     private lateinit var recipeLabelCrossRefDao: FakeRecipeLabelCrossRefDao
     private lateinit var syncMetadataDao: FakeSyncMetadataDao
@@ -65,6 +71,9 @@ class SyncE2ETest {
         recipeDao = FakeRecipeDao()
         recipeStepDao = FakeRecipeStepDao()
         recipeIngredientDao = FakeRecipeIngredientDao()
+        allergenDao = FakeAllergenDao()
+        sourceClassificationDao = FakeSourceClassificationDao()
+        ingredientDao = FakeIngredientDao()
         recipeTagCrossRefDao = FakeRecipeTagCrossRefDao()
         recipeLabelCrossRefDao = FakeRecipeLabelCrossRefDao()
         syncMetadataDao = FakeSyncMetadataDao()
@@ -74,6 +83,9 @@ class SyncE2ETest {
             syncNetworkDataSource = syncNetworkDataSource,
             recipeDao = recipeDao,
             recipeStepDao = recipeStepDao,
+            allergenDao = allergenDao,
+            sourceClassificationDao = sourceClassificationDao,
+            ingredientDao = ingredientDao,
             recipeIngredientDao = recipeIngredientDao,
             recipeTagCrossRefDao = recipeTagCrossRefDao,
             recipeLabelCrossRefDao = recipeLabelCrossRefDao,
