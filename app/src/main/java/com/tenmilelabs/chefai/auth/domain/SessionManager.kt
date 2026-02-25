@@ -108,6 +108,7 @@ class SessionManager @Inject constructor(
                     val refreshResult = refreshToken()
                     if (refreshResult.isSuccess) {
                         Timber.d("Session refreshed successfully")
+                        syncSchedulerProvider.get().requestImmediateSync()
                         syncSchedulerProvider.get().schedulePeriodicSync()
                     } else {
                         Timber.w("Failed to refresh session, falling back to anonymous")
@@ -115,7 +116,8 @@ class SessionManager @Inject constructor(
                     }
                 } else {
                     Timber.d("Session loaded successfully for user: ${user.uuid}")
-                    // Resume periodic sync for restored authenticated session
+                    // Resume sync for restored authenticated session
+                    syncSchedulerProvider.get().requestImmediateSync()
                     syncSchedulerProvider.get().schedulePeriodicSync()
                 }
             } else {
