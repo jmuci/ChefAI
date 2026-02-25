@@ -17,7 +17,6 @@ class ChefAIApiService @Inject constructor(
 ): RecipeNetworkDataSource {
 
     override suspend fun getRecipes(): NetworkRecipeList =
-        // TODO call client.close?
         client.get(RECIPES_ENDPOINT).body()
 
     override suspend fun getRecipe(uuid: String): NetworkRecipe {

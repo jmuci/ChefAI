@@ -19,6 +19,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.ui.UserProfileMenu
+import com.tenmilelabs.chefai.core.ui.sync.SyncStatusIndicator
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,6 +58,8 @@ fun ChefAITopAppBar(
             }
         },
         actions = {
+            // Sync status indicator (hidden when idle)
+            SyncStatusIndicator()
             // User profile menu on the right side
             UserProfileMenu(
                 onLogin = onLogin,

@@ -17,7 +17,7 @@ import java.util.UUID
             entity = UserEntity::class,
             parentColumns = ["uuid"],
             childColumns = ["creatorId"],
-            onDelete = ForeignKey.CASCADE //TODO We might want to preserve recipes.
+            onDelete = ForeignKey.CASCADE
         )
     ],
     indices = [

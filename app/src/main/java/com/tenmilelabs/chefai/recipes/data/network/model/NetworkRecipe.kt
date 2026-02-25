@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 data class NetworkRecipe(
     val uuid: String,
     val title: String,
-    val label: String, //TODO there should be a table for labels
+    val label: String,
     val description: String,
     val preparationTimeMinutes: Int,
     val recipeUrl: String,
