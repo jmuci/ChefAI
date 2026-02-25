@@ -11,6 +11,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDa
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
+import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -68,5 +69,28 @@ fun createTestSessionManager(
         sessionManager.loadSession()
     }
 
+    return sessionManager
+}
+
+fun createRealSessionManagerWithFakes(
+    testScope: CoroutineScope = CoroutineScope(Dispatchers.Main)
+): SessionManager {
+    val fakeUserDao = FakeUserDao()
+    val sessionManager = SessionManager(
+        securePreferences = FakeSecurePreferences(),
+        authNetworkDataSource = { FakeAuthNetworkDataSource() },
+        userDao = fakeUserDao,
+        accountUpgradeUseCaseProvider = {
+            AccountUpgradeUseCase(
+                FakeTransactionRunner(), fakeUserDao, FakeRecipeDao(),
+                FakeRecipeStepDao(), FakeRecipeIngredientDao(),
+                FakeRecipeTagCrossRefDao(), FakeRecipeLabelCrossRefDao()
+            )
+        },
+        syncSchedulerProvider = { FakeSyncManager() },
+        applicationScope = testScope
+    ).apply {
+        uuidGenerator = { UUID.randomUUID() }
+    }
     return sessionManager
 }

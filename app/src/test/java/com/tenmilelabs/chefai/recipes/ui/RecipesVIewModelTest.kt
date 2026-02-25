@@ -6,7 +6,7 @@ import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.core.testutil.TEST_DOMAIN_RECIPE_PREVIEWS_LIST
-import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
+import com.tenmilelabs.chefai.core.testutil.createRealSessionManagerWithFakes
 import com.tenmilelabs.chefai.core.testutil.recipePreview1
 import com.tenmilelabs.chefai.core.testutil.recipePreview2
 import com.tenmilelabs.chefai.core.testutil.recipePreview3
@@ -35,7 +35,8 @@ class RecipesViewModelTest {
     @Before
     fun setup() {
         recipesRepository = FakeRecipesRepository()
-        sessionManager = createTestSessionManager()
+        sessionManager = createRealSessionManagerWithFakes()
+
         viewModel = RecipesViewModel(recipesRepository, sessionManager)
     }
 
