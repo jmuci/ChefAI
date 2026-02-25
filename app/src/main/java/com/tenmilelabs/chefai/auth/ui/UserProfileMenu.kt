@@ -77,12 +77,19 @@ fun UserProfileMenu(
         IconButton(onClick = { expanded = true }) {
             if (userSession is UserSession.Authenticated && (userSession as UserSession.Authenticated).user.avatarUrl.isNotEmpty()) {
                 val user = (userSession as UserSession.Authenticated).user
+                timber.log.Timber.tag("UserProfileMenu").d(
+                    "🖼️ UserProfileMenu building ImageRequest:\n" +
+                    "  User: ${user.displayName}\n" +
+                    "  Avatar URL: ${user.avatarUrl}\n" +
+                    "  URL is null/empty: ${user.avatarUrl.isEmpty()}"
+                )
                 val imageRequest = ImageRequest.Builder(LocalContext.current)
                     .data(user.avatarUrl)
                     .crossfade(true)
                     .listener(
-                        onError = { _, result -> timber.log.Timber.e("Image loading ERROR: ${recipe.imageUrlThumbnail}, error: ${result.throwable}") },
-                        onCancel = { timber.log.Timber.d("Image loading CANCELLED: ${recipe.imageUrlThumbnail}") }
+                        onSuccess = { _, result -> timber.log.Timber.tag("UserProfileMenu").d("✅ Avatar loading SUCCESS: ${user.avatarUrl}") },
+                        onError = { _, result -> timber.log.Timber.tag("UserProfileMenu").e("❌ Avatar loading ERROR: ${user.avatarUrl}, error: ${result.throwable}") },
+                        onCancel = { timber.log.Timber.tag("UserProfileMenu").d("⏸️ Avatar loading CANCELLED: ${user.avatarUrl}") }
                     )
                     .build()
                 AsyncImage(

@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.core.di
 import android.content.Context
 import coil3.ImageLoader
 import coil3.disk.DiskCache
+import coil3.intercept.Interceptor
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
@@ -56,6 +57,37 @@ object ImageLoaderModule {
             .components {
                 // Add OkHttp network engine for image loading
                 add(OkHttpNetworkFetcherFactory())
+                add(object : Interceptor {
+                    override suspend fun intercept(chain: Interceptor.Chain): coil3.request.ImageResult {
+                        val request = chain.request
+                        val data = request.data
+                        val dataType = data?.javaClass?.simpleName ?: "null"
+                        val dataValue = data?.toString() ?: "null"
+
+                        Timber.tag("ImageLoader_DEBUG").d(
+                            "📸 INTERCEPTOR >> Attempting to load image:\n" +
+                                    "  Data Type: $dataType\n" +
+                                    "  Data Value: $dataValue\n" +
+                                    "  Data is null: ${data == null}\n" +
+                                    "  Data toString empty: ${dataValue.isEmpty()}"
+                        )
+
+                        return try {
+                            val result = chain.proceed()
+                            Timber.tag("ImageLoader_DEBUG").d("✅ INTERCEPTOR >> Load succeeded for: $dataValue")
+                            result
+                        } catch (e: Exception) {
+                            Timber.tag("ImageLoader_DEBUG").e(
+                                e,
+                                "❌ INTERCEPTOR >> Load failed for data:\n" +
+                                        "  Type: $dataType\n" +
+                                        "  Value: $dataValue\n" +
+                                        "  Error: ${e.message}"
+                            )
+                            throw e
+                        }
+                    }
+                })
             }
             .memoryCache {
                 MemoryCache.Builder()

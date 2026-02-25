@@ -111,6 +111,17 @@ fun RecipeDetailsContent(
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.padding(top = dimensionResource(id = R.dimen.padding_medium))
             )
+
+            // Log image loading attempt
+            Timber.tag("RecipeDetailsScreen").d(
+                "🖼️ RecipeDetailsScreen loading image:\n" +
+                "  Recipe: ${recipe.title}\n" +
+                "  Main Image URL: ${recipe.imageUrl}\n" +
+                "  Thumbnail URL: ${recipe.imageUrlThumbnail}\n" +
+                "  Main URL is null/empty: ${recipe.imageUrl.isEmpty()}\n" +
+                "  Thumbnail URL is null/empty: ${recipe.imageUrlThumbnail.isEmpty()}"
+            )
+
             AsyncImage(
                 model = recipe.imageUrl,
                 placeholder = painterResource(R.drawable.ic_img_placeholder),
