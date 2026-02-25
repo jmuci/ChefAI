@@ -15,6 +15,7 @@ import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeWithDetails
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeWithLabels
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeWithTags
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -139,6 +140,10 @@ class FakeRecipeDao : RecipeDao {
 
     override fun observeRecipesWithDetailsForUser(creatorId: UUID): Flow<List<RecipeWithDetails>> {
         return trigger.map { recipes.values.filter { it.creatorId == creatorId }.map { assembleRecipeWithDetails(it) } }
+    }
+
+    override fun observePublicRecipesWithDetails(): Flow<List<RecipeWithDetails>> {
+        return trigger.map { recipes.values.filter { it.privacy == RecipePrivacy.PUBLIC }.map { assembleRecipeWithDetails(it) } }
     }
 
     override suspend fun getRecipeWithTags(uuid: UUID): RecipeWithTags? {
