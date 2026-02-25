@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.core.domain.model
 
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import java.util.UUID
 
 /**
@@ -15,6 +16,7 @@ data class RecipePreview(
     val cookTimeMinutes: Int,
     val servings: Int,
     val creatorId: UUID,
+    val privacy: RecipePrivacy = RecipePrivacy.PUBLIC,
     val tags: List<Tag>,
     val labels: List<Label>,
 )

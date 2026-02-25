@@ -39,6 +39,7 @@ fun RecipeWithDetails.toDomain(ingredients: List<RecipeIngredient> = emptyList()
         servings = recipe.servings,
         creator = creator.toDomain(),
         recipeExternalUrl = recipe.recipeExternalUrl,
+        privacy = recipe.privacy,
         ingredients = ingredients,
         steps = steps.map { it.toDomain() },
         tags = tags.map { it.toDomain() },
@@ -60,6 +61,7 @@ fun RecipeWithDetails.toPreviewDomain(): RecipePreview {
         cookTimeMinutes = recipe.cookTimeMinutes,
         servings = recipe.servings,
         creatorId = creator.uuid,
+        privacy = recipe.privacy,
         tags = tags.map { it.toDomain() },
         labels = labels.map { it.toDomain() },
     )
@@ -139,6 +141,7 @@ fun Recipe.toRoomEntity(): RecipeEntity = RecipeEntity(
     servings = servings,
     creatorId = creator.uuid,
     recipeExternalUrl = recipeExternalUrl,
+    privacy = privacy,
     updatedAt = updatedAt,
     deletedAt = null, // or appropriate value
     syncState = com.tenmilelabs.chefai.core.data.local.util.SyncState.PENDING

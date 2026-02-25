@@ -60,6 +60,22 @@ class DefaultRecipeRepository @Inject constructor(
         }
     }
 
+    override fun getRecipesPreviewStreamForUser(userUuid: UUID): Flow<List<RecipePreview>> {
+        return recipeDao.observeRecipesWithDetailsForUser(userUuid).map { recipes ->
+            recipes.toRecipePreviewDomain()
+        }.catch { e ->
+            logAndReThrow(e, emptyList())
+        }
+    }
+
+    override fun getPublicRecipesStream(): Flow<List<Recipe>> {
+        return recipeDao.observePublicRecipesWithDetails().map { recipes ->
+            recipes.toDomain()
+        }.catch { e ->
+            logAndReThrow(e)
+        }
+    }
+
     override fun getRecipesStream(): Flow<List<Recipe>> {
         return if (false) { // Network
             flow {
