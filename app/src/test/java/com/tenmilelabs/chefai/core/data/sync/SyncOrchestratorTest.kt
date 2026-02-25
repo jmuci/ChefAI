@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.core.data.sync
 
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
@@ -47,9 +48,7 @@ class SyncOrchestratorTest {
     private lateinit var syncNetworkDataSource: FakeSyncNetworkDataSource
 
     /** A pass-through TransactionRunner that just executes the block (no real transaction). */
-    private val fakeTransactionRunner = object : TransactionRunner {
-        override suspend fun <R> invoke(block: suspend () -> R): R = block()
-    }
+    private val fakeTransactionRunner = FakeTransactionRunner()
 
     private val testDispatcher = StandardTestDispatcher()
 

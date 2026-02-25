@@ -61,7 +61,7 @@ class AccountUpgradeUseCase @Inject constructor(
         }
 
         // Run the entire upgrade in a single transaction
-        return transactionRunner.withTransaction {
+        return transactionRunner.invoke {
             val now = System.currentTimeMillis()
 
             // Step 1: Create the authenticated UserEntity first (FK target must exist)

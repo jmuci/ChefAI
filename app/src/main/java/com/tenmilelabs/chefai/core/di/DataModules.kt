@@ -35,10 +35,6 @@ abstract class RepositoryModule {
     @Singleton
     @Binds
     abstract fun bindSecurePreferences(securePreferences: SecurePreferences): SecurePreferencesInterface
-
-    @Singleton
-    @Binds
-    abstract fun bindTransactionRunner(impl: RoomTransactionRunner): TransactionRunner
 }
 
 

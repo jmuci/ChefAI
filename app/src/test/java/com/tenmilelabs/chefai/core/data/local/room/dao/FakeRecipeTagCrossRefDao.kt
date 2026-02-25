@@ -1,6 +1,8 @@
 package com.tenmilelabs.chefai.core.data.local.room.dao
 
 import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
+import com.tenmilelabs.chefai.core.data.local.util.SyncState
+import java.util.UUID
 
 class FakeRecipeTagCrossRefDao : RecipeTagCrossRefDao {
 
@@ -29,9 +31,31 @@ class FakeRecipeTagCrossRefDao : RecipeTagCrossRefDao {
         recipeTags.removeAll { it.recipeId == recipeId }
     }
 
-    override suspend fun updateSyncStateForRecipe(recipeId: UUID, syncState: SyncState, updatedAt: Long) {
+    override suspend fun updateSyncStateForRecipe(
+        recipeId: UUID,
+        syncState: SyncState,
+        updatedAt: Long
+    ) {
         val updated = recipeTags.map { tag ->
-            if (tag.recipeId == recipeId) tag.copy(syncState = syncState, updatedAt = updatedAt) else tag
+            if (tag.recipeId == recipeId) tag.copy(
+                syncState = syncState,
+                updatedAt = updatedAt
+            ) else tag
+        }
+        recipeTags.clear()
+        recipeTags.addAll(updated)
+    }
+
+    override suspend fun markPendingForRecipes(
+        recipeIds: List<UUID>,
+        updatedAt: Long
+    ) {
+        val updated = recipeTags.map { tagCrossRef ->
+            if (tagCrossRef.recipeId in recipeIds) {
+                tagCrossRef.copy(syncState = SyncState.PENDING, updatedAt = updatedAt)
+            } else {
+                tagCrossRef
+            }
         }
         recipeTags.clear()
         recipeTags.addAll(updated)
