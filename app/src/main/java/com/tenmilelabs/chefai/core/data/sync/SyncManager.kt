@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.core.data.sync
 
 import android.content.Context
+import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
@@ -16,12 +17,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 private const val PERIODIC_SYNC_INTERVAL = 15L
+private const val BACKOFF_DELAY_SECONDS = 30L
 
 @Singleton
 class SyncManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val syncStatusHolder: SyncStatusHolder
-) {
+) : SyncScheduler {
     companion object {
         const val SYNC_WORK_NAME = "recipe_sync"
         const val PERIODIC_SYNC_WORK_NAME = "recipe_periodic_sync"
@@ -33,9 +35,10 @@ class SyncManager @Inject constructor(
      * Enqueue a one-time sync immediately (e.g., on app foreground, after login).
      * Uses KEEP policy to avoid stacking duplicate requests.
      */
-    fun requestImmediateSync() {
+    override fun requestImmediateSync() {
         val request = OneTimeWorkRequestBuilder<SyncWorker>()
             .setConstraints(connectedConstraints())
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_DELAY_SECONDS, TimeUnit.SECONDS)
             .build()
         WorkManager.getInstance(context)
             .enqueueUniqueWork(SYNC_WORK_NAME, ExistingWorkPolicy.KEEP, request)
@@ -46,10 +49,11 @@ class SyncManager @Inject constructor(
      * 5-second delay allows batching multiple rapid mutations into one sync cycle.
      * Uses KEEP policy so rapid mutations don't stack requests.
      */
-    fun requestMutationSync() {
+    override fun requestMutationSync() {
         val request = OneTimeWorkRequestBuilder<SyncWorker>()
             .setConstraints(connectedConstraints())
             .setInitialDelay(5, TimeUnit.SECONDS)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_DELAY_SECONDS, TimeUnit.SECONDS)
             .build()
         WorkManager.getInstance(context)
             .enqueueUniqueWork(SYNC_WORK_NAME, ExistingWorkPolicy.KEEP, request)
@@ -59,9 +63,10 @@ class SyncManager @Inject constructor(
      * Schedule periodic sync every 15 minutes.
      * WorkManager's minimum interval is 15 minutes.
      */
-    fun schedulePeriodicSync() {
+    override fun schedulePeriodicSync() {
         val request = PeriodicWorkRequestBuilder<SyncWorker>(PERIODIC_SYNC_INTERVAL, TimeUnit.MINUTES)
             .setConstraints(connectedConstraints())
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_DELAY_SECONDS, TimeUnit.SECONDS)
             .build()
         WorkManager.getInstance(context)
             .enqueueUniquePeriodicWork(
@@ -74,7 +79,7 @@ class SyncManager @Inject constructor(
     /**
      * Cancel all sync work (e.g., on logout).
      */
-    fun cancelAllSync() {
+    override fun cancelAllSync() {
         val wm = WorkManager.getInstance(context)
         wm.cancelUniqueWork(SYNC_WORK_NAME)
         wm.cancelUniqueWork(PERIODIC_SYNC_WORK_NAME)

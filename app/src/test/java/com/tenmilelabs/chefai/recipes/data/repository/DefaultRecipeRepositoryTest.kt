@@ -15,8 +15,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeTagDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
-import com.tenmilelabs.chefai.core.data.sync.SyncManager
-import io.mockk.mockk
+import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import java.util.UUID
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.UserEntity
@@ -99,6 +98,7 @@ class DefaultRecipeRepositoryTest {
                     FakeRecipeTagCrossRefDao(), FakeRecipeLabelCrossRefDao()
                 )
             },
+            syncSchedulerProvider = { FakeSyncManager() },
             applicationScope = testScope
         ).apply {
             uuidGenerator = { UUID.randomUUID() }
@@ -128,7 +128,7 @@ class DefaultRecipeRepositoryTest {
                 recipeLabelDao,
                 remoteDataSource,
                 sessionManager,
-                mockk(relaxed = true) // SyncManager — relaxed mock since it's Android-dependent
+                FakeSyncManager()
             )
 
         // Seed the fake DAO with our test data.
