@@ -85,7 +85,7 @@ class RecipesViewModelTest {
         // Need to create a new ViewModel for this test with error configuration
         val errorRepository = FakeRecipesRepository()
         errorRepository.setShouldReturnErrorForGetRecipes(true)
-        val testViewModel = RecipesViewModel(errorRepository, createTestSessionManager())
+        val testViewModel = RecipesViewModel(errorRepository, sessionManager)
 
         // Collect and verify UI state
         testViewModel.uiState.test {
@@ -110,7 +110,7 @@ class RecipesViewModelTest {
         // Need a new ViewModel for error scenario
         val errorRepository = FakeRecipesRepository()
         errorRepository.setShouldReturnErrorForGetRecipes(true)
-        val testViewModel = RecipesViewModel(errorRepository, createTestSessionManager())
+        val testViewModel = RecipesViewModel(errorRepository, sessionManager)
 
         // Trigger uiState collection to ensure the flow starts
         testViewModel.uiState.test {
@@ -198,7 +198,7 @@ class RecipesViewModelTest {
         // Need a new ViewModel for error scenario
         val errorRepository = FakeRecipesRepository()
         errorRepository.setShouldReturnErrorForGetRecipes(true)
-        val testViewModel = RecipesViewModel(errorRepository, createTestSessionManager())
+        val testViewModel = RecipesViewModel(errorRepository, sessionManager)
 
         testViewModel.uiState.test {
             val errorState = awaitItem()
@@ -261,7 +261,7 @@ class RecipesViewModelTest {
         // Second test: success state (with new repository/viewmodel instance)
         val successRepository = FakeRecipesRepository()
         successRepository.setRecipePreviewsToEmit(TEST_DOMAIN_RECIPE_PREVIEWS_LIST)
-        val successViewModel = RecipesViewModel(successRepository, createTestSessionManager())
+        val successViewModel = RecipesViewModel(successRepository, sessionManager)
 
         successViewModel.uiState.test {
             val successState = awaitItem()
