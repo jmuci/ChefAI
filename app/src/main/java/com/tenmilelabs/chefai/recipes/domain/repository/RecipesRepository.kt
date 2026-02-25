@@ -10,6 +10,8 @@ interface RecipesRepository {
 
     fun getRecipesPreviewStream(): Flow<List<RecipePreview>>
 
+    fun getRecipesPreviewStreamForUser(userUuid: UUID): Flow<List<RecipePreview>>
+
     suspend fun getRecipe(uuid: UUID): Recipe?
     fun getRecipeStream(uuid: UUID): Flow<Recipe?>
 
