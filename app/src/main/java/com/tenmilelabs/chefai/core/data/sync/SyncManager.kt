@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private const val PERIODIC_SYNC_INTERVAL = 15L
+private const val PERIODIC_SYNC_INTERVAL = 1440L  // 24 hours in minutes
 private const val BACKOFF_DELAY_SECONDS = 30L
 
 @Singleton
@@ -60,12 +60,12 @@ class SyncManager @Inject constructor(
     }
 
     /**
-     * Schedule periodic sync every 15 minutes.
-     * WorkManager's minimum interval is 15 minutes.
+     * Schedule periodic sync approximately every 24 hours.
+     * Only runs when device is charging and has network connectivity.
      */
     override fun schedulePeriodicSync() {
         val request = PeriodicWorkRequestBuilder<SyncWorker>(PERIODIC_SYNC_INTERVAL, TimeUnit.MINUTES)
-            .setConstraints(connectedConstraints())
+            .setConstraints(periodicSyncConstraints())
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_DELAY_SECONDS, TimeUnit.SECONDS)
             .build()
         WorkManager.getInstance(context)
@@ -87,5 +87,10 @@ class SyncManager @Inject constructor(
 
     private fun connectedConstraints() = Constraints.Builder()
         .setRequiredNetworkType(NetworkType.CONNECTED)
+        .build()
+
+    private fun periodicSyncConstraints() = Constraints.Builder()
+        .setRequiredNetworkType(NetworkType.CONNECTED)
+        .setRequiresCharging(true)
         .build()
 }
