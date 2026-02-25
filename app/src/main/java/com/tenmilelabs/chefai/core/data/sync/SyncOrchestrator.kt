@@ -3,16 +3,22 @@ package com.tenmilelabs.chefai.core.data.sync
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.SyncMetadataEntity
 import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
+import com.tenmilelabs.chefai.core.data.local.room.dao.AllergenDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.IngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeLabelCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeTagCrossRefDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.SourceClassificationDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.SyncMetadataDao
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
+import com.tenmilelabs.chefai.core.data.sync.mapper.toAllergenEntity
 import com.tenmilelabs.chefai.core.data.sync.mapper.toIngredientEntities
+import com.tenmilelabs.chefai.core.data.sync.mapper.toIngredientEntity
 import com.tenmilelabs.chefai.core.data.sync.mapper.toLabelCrossRefs
 import com.tenmilelabs.chefai.core.data.sync.mapper.toRecipeEntity
+import com.tenmilelabs.chefai.core.data.sync.mapper.toSourceClassificationEntity
 import com.tenmilelabs.chefai.core.data.sync.mapper.toStepEntities
 import com.tenmilelabs.chefai.core.data.sync.mapper.toSyncDto
 import com.tenmilelabs.chefai.core.data.sync.mapper.toTagCrossRefs
@@ -48,6 +54,9 @@ data class PullResult(
 @Singleton
 class SyncOrchestrator @Inject constructor(
     private val syncNetworkDataSource: SyncNetworkDataSource,
+    private val allergenDao: AllergenDao,
+    private val sourceClassificationDao: SourceClassificationDao,
+    private val ingredientDao: IngredientDao,
     private val recipeDao: RecipeDao,
     private val recipeStepDao: RecipeStepDao,
     private val recipeIngredientDao: RecipeIngredientDao,
@@ -145,6 +154,14 @@ class SyncOrchestrator @Inject constructor(
             Timber.d("Pull: received ${response.recipes.size} recipes, hasMore=${response.hasMore}")
 
             transactionRunner {
+                // Upsert reference data in FK dependency order before recipes:
+                //   allergens (leaf) → ingredients.allergenId (RESTRICT)
+                //   source_classifications (leaf) → ingredients.sourcePrimaryId (SET_NULL)
+                //   ingredients → recipe_ingredients.ingredientId (RESTRICT)
+                allergenDao.upsertAll(response.allergens.map { it.toAllergenEntity() })
+                sourceClassificationDao.upsertAll(response.sourceClassifications.map { it.toSourceClassificationEntity() })
+                ingredientDao.upsertAll(response.ingredients.map { it.toIngredientEntity() })
+
                 for (syncRecipe in response.recipes) {
                     val result = applyPulledRecipe(syncRecipe)
                     if (result == ApplyResult.DELETED) totalDeleted++ else totalUpserted++

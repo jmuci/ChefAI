@@ -71,8 +71,38 @@ data class SyncErrorDto(
 )
 
 @Serializable
+data class SyncIngredientDto(
+    val uuid: String,
+    val displayName: String,
+    val allergenId: String?,
+    val sourcePrimaryId: String?,
+    val updatedAt: Long,
+    val deletedAt: Long?
+)
+
+@Serializable
+data class SyncAllergenDto(
+    val uuid: String,
+    val displayName: String,
+    val updatedAt: Long,
+    val deletedAt: Long?
+)
+
+@Serializable
+data class SyncSourceClassificationDto(
+    val uuid: String,
+    val category: String,
+    val subcategory: String?,
+    val updatedAt: Long,
+    val deletedAt: Long?
+)
+
+@Serializable
 data class SyncPullResponse(
     val recipes: List<SyncRecipeDto>,
     val serverTimestamp: Long,
-    val hasMore: Boolean
+    val hasMore: Boolean,
+    val allergens: List<SyncAllergenDto> = emptyList(),
+    val sourceClassifications: List<SyncSourceClassificationDto> = emptyList(),
+    val ingredients: List<SyncIngredientDto> = emptyList()
 )

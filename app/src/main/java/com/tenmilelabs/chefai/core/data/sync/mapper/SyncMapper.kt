@@ -1,15 +1,21 @@
 package com.tenmilelabs.chefai.core.data.sync.mapper
 
+import com.tenmilelabs.chefai.core.data.local.room.AllergenEntity
+import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.RecipeStepEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
+import com.tenmilelabs.chefai.core.data.local.room.SourceClassificationEntity
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncAllergenDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncIngredientDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeIngredientDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeStepDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncSourceClassificationDto
 import java.util.UUID
 
 // --- Push direction: Room entities → DTO ---
@@ -52,6 +58,33 @@ fun RecipeIngredientEntity.toSyncDto(): SyncRecipeIngredientDto = SyncRecipeIngr
 )
 
 // --- Pull direction: DTO → Room entities ---
+
+fun SyncAllergenDto.toAllergenEntity(): AllergenEntity = AllergenEntity(
+    uuid = UUID.fromString(uuid),
+    displayName = displayName,
+    updatedAt = updatedAt,
+    deletedAt = deletedAt,
+    syncState = SyncState.SYNCED
+)
+
+fun SyncSourceClassificationDto.toSourceClassificationEntity(): SourceClassificationEntity = SourceClassificationEntity(
+    uuid = UUID.fromString(uuid),
+    category = category,
+    subcategory = subcategory,
+    updatedAt = updatedAt,
+    deletedAt = deletedAt,
+    syncState = SyncState.SYNCED
+)
+
+fun SyncIngredientDto.toIngredientEntity(): IngredientEntity = IngredientEntity(
+    uuid = UUID.fromString(uuid),
+    displayName = displayName,
+    allergenId = allergenId?.let { UUID.fromString(it) },
+    sourcePrimaryId = sourcePrimaryId?.let { UUID.fromString(it) },
+    updatedAt = updatedAt,
+    deletedAt = deletedAt,
+    syncState = SyncState.SYNCED
+)
 
 fun SyncRecipeDto.toRecipeEntity(): RecipeEntity = RecipeEntity(
     uuid = UUID.fromString(uuid),

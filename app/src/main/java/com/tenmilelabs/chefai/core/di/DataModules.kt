@@ -68,6 +68,12 @@ object DatabaseModules {
     fun provideIngredientDao(database: ChefAIDataBase) = database.ingredientDao()
 
     @Provides
+    fun provideAllergenDao(database: ChefAIDataBase) = database.allergenDao()
+
+    @Provides
+    fun provideSourceClassificationDao(database: ChefAIDataBase) = database.sourceClassificationDao()
+
+    @Provides
     fun provideLabelDao(database: ChefAIDataBase) = database.labelDao()
 
     @Provides
