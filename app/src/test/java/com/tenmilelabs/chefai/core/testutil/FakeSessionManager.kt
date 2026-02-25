@@ -11,9 +11,20 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDa
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
+import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import java.util.UUID
+
+/**
+ * No-op implementation of [SyncScheduler] for testing.
+ */
+class FakeSyncScheduler : SyncScheduler {
+    override fun requestImmediateSync() {}
+    override fun requestMutationSync() {}
+    override fun schedulePeriodicSync() {}
+    override fun cancelAllSync() {}
+}
 
 /**
  * Builds a real [SessionManager] wired with in-memory fakes, ready for use in unit tests.
@@ -45,6 +56,7 @@ fun createTestSessionManager(
                 FakeRecipeLabelCrossRefDao()
             )
         },
+        syncSchedulerProvider = { FakeSyncScheduler() },
         applicationScope = testScope
     ).apply {
         uuidGenerator = { UUID.randomUUID() }
