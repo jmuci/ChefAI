@@ -105,6 +105,13 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
     ksp(libs.hilt.android.compiler)
 
+    // WorkManager
+    implementation(libs.androidx.work.runtime.ktx)
+
+    // Hilt + WorkManager integration
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
+
     // DataStore for encrypted storage (replaces deprecated EncryptedSharedPreferences)
     implementation(libs.androidx.datastore.preferences)
 
@@ -152,6 +159,9 @@ dependencies {
     testImplementation(libs.google.truth)
     testImplementation(libs.turbine)
     testImplementation(libs.hilt.android.testing)
+    testImplementation(libs.mockk)
+    testImplementation(libs.ktor.client.mock)
+    testImplementation(libs.androidx.work.testing)
     kspTest(libs.hilt.android.compiler)
 
 
