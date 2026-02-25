@@ -5,5 +5,5 @@ package com.tenmilelabs.chefai.core.data.local.room
  * in a Room transaction (no Android context needed).
  */
 class FakeTransactionRunner : TransactionRunner {
-    override suspend fun <R> withTransaction(block: suspend () -> R): R = block()
+    override suspend fun <R> invoke(block: suspend () -> R): R = block()
 }

@@ -5,6 +5,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
+import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeWithDetails
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeWithLabels
@@ -90,6 +91,12 @@ interface RecipeDao {
 
     @Query("SELECT * FROM recipes WHERE syncState = 'PENDING'")
     suspend fun getDirty(): List<RecipeEntity>
+
+    @Query("SELECT * FROM recipes WHERE syncState IN ('PENDING', 'DELETED')")
+    suspend fun getAllDirty(): List<RecipeEntity>
+
+    @Query("UPDATE recipes SET syncState = :syncState, updatedAt = :updatedAt WHERE uuid = :uuid")
+    suspend fun updateSyncState(uuid: UUID, syncState: SyncState, updatedAt: Long)
 
     // --- Account upgrade queries ---
 

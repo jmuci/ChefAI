@@ -12,6 +12,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.TagDao
 import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.core.data.sync.SyncManager
 import com.tenmilelabs.chefai.core.domain.model.Recipe
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.recipes.data.mapper.toCrossRef
@@ -46,7 +47,8 @@ class DefaultRecipeRepository @Inject constructor(
     private val recipeTagDao: RecipeTagCrossRefDao,
     private val recipeLabelDao: RecipeLabelCrossRefDao,
     private val networkDataSource: RecipeNetworkDataSource,
-    private val sessionManager: SessionManager) : RecipesRepository {
+    private val sessionManager: SessionManager,
+    private val syncManager: SyncManager) : RecipesRepository {
 
     override fun getRecipesPreviewStream(): Flow<List<RecipePreview>> {
         // TODO pass the userId to only show recipes from the user when filtering.
@@ -165,10 +167,13 @@ class DefaultRecipeRepository @Inject constructor(
                 )
             )
         }
+
+        syncManager.requestMutationSync()
     }
 
     override suspend fun updateRecipe(recipe: Recipe) {
         recipeDao.upsertRecipe(recipe.toRoomEntity())
+        syncManager.requestMutationSync()
     }
 
     override suspend fun deleteAllRecipes() {
@@ -177,6 +182,7 @@ class DefaultRecipeRepository @Inject constructor(
 
     override suspend fun deleteRecipe(recipeId: UUID) {
         recipeDao.deleteRecipe(recipeId)
+        syncManager.requestMutationSync()
     }
 
     private suspend fun <T> FlowCollector<T>.logAndReThrow(

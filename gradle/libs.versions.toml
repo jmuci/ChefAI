@@ -27,6 +27,9 @@ roomRuntime = "2.8.4"
 slf4jAndroid = "1.7.36"
 timber = "5.0.1"
 truth = "1.4.5"
+workManager = "2.10.0"
+androidxHiltWork = "1.2.0"
+mockk = "1.13.16"
 turbine = "1.2.1"
 uiTextGoogleFonts = "1.10.0"
 uuidv7 = "1.1.0"
@@ -80,8 +83,13 @@ logback-core = { module = "ch.qos.logback:logback-core", version.ref = "logbackC
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 slf4j-android = { module = "org.slf4j:slf4j-android", version.ref = "slf4jAndroid" }
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
+mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
-
+androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workManager" }
+androidx-work-testing = { module = "androidx.work:work-testing", version.ref = "workManager" }
+androidx-hilt-work = { module = "androidx.hilt:hilt-work", version.ref = "androidxHiltWork" }
+androidx-hilt-compiler = { module = "androidx.hilt:hilt-compiler", version.ref = "androidxHiltWork" }
+ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktorVersion" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

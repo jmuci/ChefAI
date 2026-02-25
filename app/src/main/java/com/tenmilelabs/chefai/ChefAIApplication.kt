@@ -1,6 +1,8 @@
 package com.tenmilelabs.chefai
 
 import android.app.Application
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
@@ -11,13 +13,21 @@ import dagger.hilt.android.HiltAndroidApp
 import dagger.hilt.components.SingletonComponent
 import timber.log.Timber
 import timber.log.Timber.DebugTree
+import javax.inject.Inject
 
 /**
  * Custom Application class for ChefAI.
- * Sets up Timber logging and provides Coil ImageLoader via Hilt DI.
+ * Sets up Timber logging, Coil ImageLoader, and WorkManager via Hilt DI.
  */
 @HiltAndroidApp
-class ChefAIApplication : Application(), SingletonImageLoader.Factory {
+class ChefAIApplication : Application(), SingletonImageLoader.Factory, Configuration.Provider {
+
+    @Inject lateinit var workerFactory: HiltWorkerFactory
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(workerFactory)
+            .build()
 
     @EntryPoint
     @InstallIn(SingletonComponent::class)

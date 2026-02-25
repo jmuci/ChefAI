@@ -15,6 +15,8 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeTagDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
+import com.tenmilelabs.chefai.core.data.sync.SyncManager
+import io.mockk.mockk
 import java.util.UUID
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.UserEntity
@@ -125,7 +127,8 @@ class DefaultRecipeRepositoryTest {
                 recipeTagDao,
                 recipeLabelDao,
                 remoteDataSource,
-                sessionManager
+                sessionManager,
+                mockk(relaxed = true) // SyncManager — relaxed mock since it's Android-dependent
             )
 
         // Seed the fake DAO with our test data.

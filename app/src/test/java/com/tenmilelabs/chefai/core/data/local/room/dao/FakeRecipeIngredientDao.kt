@@ -45,6 +45,16 @@ class FakeRecipeIngredientDao : RecipeIngredientDao {
         return recipeIngredientsFlow.value.filter { it.syncState == SyncState.PENDING }
     }
 
+    override suspend fun getIngredientsForRecipe(recipeId: UUID): List<RecipeIngredientEntity> {
+        return recipeIngredientsFlow.value.filter { it.recipeId == recipeId }
+    }
+
+    override suspend fun updateSyncStateForRecipe(recipeId: UUID, syncState: SyncState, updatedAt: Long) {
+        recipeIngredientsFlow.value = recipeIngredientsFlow.value.map { ingredient ->
+            if (ingredient.recipeId == recipeId) ingredient.copy(syncState = syncState, updatedAt = updatedAt) else ingredient
+        }
+    }
+
     override suspend fun markPendingForRecipes(recipeIds: List<UUID>, updatedAt: Long) {
         recipeIngredientsFlow.value = recipeIngredientsFlow.value.map { ri ->
             if (ri.recipeId in recipeIds) {

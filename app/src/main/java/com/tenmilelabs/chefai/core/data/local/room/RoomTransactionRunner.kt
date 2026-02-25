@@ -12,7 +12,7 @@ import javax.inject.Singleton
 class RoomTransactionRunner @Inject constructor(
     private val database: ChefAIDataBase
 ) : TransactionRunner {
-    override suspend fun <R> withTransaction(block: suspend () -> R): R {
+    override suspend fun <R> invoke(block: suspend () -> R): R {
         return database.withTransaction { block() }
     }
 }
