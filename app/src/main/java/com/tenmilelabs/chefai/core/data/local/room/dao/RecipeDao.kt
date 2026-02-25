@@ -105,6 +105,9 @@ interface RecipeDao {
     @Query("UPDATE recipes SET syncState = :syncState, updatedAt = :updatedAt WHERE uuid = :uuid")
     suspend fun updateSyncState(uuid: UUID, syncState: SyncState, updatedAt: Long)
 
+    @Query("UPDATE recipes SET deletedAt = :deletedAt, syncState = 'DELETED', updatedAt = :deletedAt WHERE uuid = :uuid")
+    suspend fun softDelete(uuid: UUID, deletedAt: Long)
+
     // --- Account upgrade queries ---
 
     @Query("UPDATE recipes SET creatorId = :newCreatorId, syncState = 'PENDING', updatedAt = :updatedAt WHERE creatorId = :oldCreatorId")

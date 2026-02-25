@@ -20,6 +20,7 @@ data class SyncRecipeDto(
     val creatorId: String,
     val recipeExternalUrl: String?,
     val privacy: String,
+    val version: Int = 1,
     val updatedAt: Long,
     val deletedAt: Long?,
     val steps: List<SyncRecipeStepDto>,

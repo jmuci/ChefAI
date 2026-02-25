@@ -22,6 +22,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeTagDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
+import java.util.UUID
 import com.tenmilelabs.chefai.core.testutil.recipe1
 import com.tenmilelabs.chefai.core.testutil.recipe3
 import com.tenmilelabs.chefai.core.testutil.recipeEntity1

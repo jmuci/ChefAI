@@ -232,6 +232,17 @@ class FakeRecipeDao : RecipeDao {
         triggerUpdate()
     }
 
+    override suspend fun softDelete(uuid: UUID, deletedAt: Long) {
+        recipes[uuid]?.let {
+            recipes[uuid] = it.copy(
+                deletedAt = deletedAt,
+                syncState = SyncState.DELETED,
+                updatedAt = deletedAt
+            )
+        }
+        triggerUpdate()
+    }
+
     // --- Account upgrade queries ---
 
     override suspend fun reassignCreatorAndMarkPending(oldCreatorId: UUID, newCreatorId: UUID, updatedAt: Long) {
