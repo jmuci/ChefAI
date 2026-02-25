@@ -5,6 +5,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
 import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
+import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import java.util.UUID
 
 /**
@@ -26,6 +27,12 @@ interface RecipeIngredientDao {
 
     @Query("SELECT * FROM recipe_ingredients WHERE syncState = 'PENDING'")
     suspend fun getDirty(): List<RecipeIngredientEntity>
+
+    @Query("SELECT * FROM recipe_ingredients WHERE recipeId = :recipeId")
+    suspend fun getIngredientsForRecipe(recipeId: UUID): List<RecipeIngredientEntity>
+
+    @Query("UPDATE recipe_ingredients SET syncState = :syncState, updatedAt = :updatedAt WHERE recipeId = :recipeId")
+    suspend fun updateSyncStateForRecipe(recipeId: UUID, syncState: SyncState, updatedAt: Long)
 
     /**
      * Upserts all ingredient cross-references for a recipe.
