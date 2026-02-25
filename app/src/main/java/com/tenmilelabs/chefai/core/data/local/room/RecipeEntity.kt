@@ -37,6 +37,7 @@ data class RecipeEntity(
     val creatorId: UUID,
     val recipeExternalUrl: String?,
     val privacy: RecipePrivacy = RecipePrivacy.PUBLIC,
+    val version: Int = 1,
     override val updatedAt: Long,
     override val deletedAt: Long?,
     override val syncState: SyncState = SyncState.PENDING,
