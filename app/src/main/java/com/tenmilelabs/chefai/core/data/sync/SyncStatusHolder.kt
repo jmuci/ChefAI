@@ -11,6 +11,7 @@ sealed class SyncStatus {
     data object Syncing : SyncStatus()
     data class Synced(val lastSyncedAt: Long) : SyncStatus()
     data class Error(val message: String) : SyncStatus()
+    data object Offline : SyncStatus()
 }
 
 @Singleton
