@@ -13,7 +13,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.Dispatchers
 import java.util.UUID
 
 /**
@@ -29,16 +29,16 @@ class FakeSyncScheduler : SyncScheduler {
 /**
  * Builds a real [SessionManager] wired with in-memory fakes, ready for use in unit tests.
  *
- * Uses [UnconfinedTestDispatcher] by default so the anonymous session is resolved
- * eagerly during [SessionManager.init], meaning [SessionManager.getCurrentUserId]
- * returns a non-null UUID immediately after construction — no `advanceUntilIdle()`
- * call required at the call site.
+ * Uses [Dispatchers.Main] (which MainCoroutineRule sets to UnconfinedTestDispatcher) so the
+ * anonymous session is resolved eagerly during [SessionManager.init], meaning
+ * [SessionManager.getCurrentUserId] returns a non-null UUID immediately after construction —
+ * no `advanceUntilIdle()` call required at the call site.
  *
- * Pass a custom [testScope] when the test already owns a [CoroutineScope] and needs
- * the session coroutines to participate in the same virtual-time domain.
+ * Pass a custom [testScope] when the test already owns a [CoroutineScope] with a different
+ * dispatcher and needs the session coroutines to participate in the same domain.
  */
 fun createTestSessionManager(
-    testScope: CoroutineScope = CoroutineScope(UnconfinedTestDispatcher())
+    testScope: CoroutineScope = CoroutineScope(Dispatchers.Main)
 ): SessionManager {
     val fakeUserDao = FakeUserDao()
     return SessionManager(
