@@ -1,3 +1,6 @@
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+import org.gradle.api.tasks.testing.logging.TestLogEvent
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -51,6 +54,18 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/INDEX.LIST"
+        }
+    }
+    testOptions {
+        unitTests.all {
+            it.testLogging {
+                events(TestLogEvent.FAILED, TestLogEvent.STANDARD_ERROR)
+                exceptionFormat = TestExceptionFormat.FULL
+                showExceptions = true
+                showCauses = true
+                showStackTraces = true
+                showStandardStreams = true
+            }
         }
     }
 }
