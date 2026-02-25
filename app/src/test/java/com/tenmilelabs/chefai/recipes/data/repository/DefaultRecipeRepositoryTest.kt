@@ -20,9 +20,12 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeTagDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
+import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
-import java.util.UUID
+import com.tenmilelabs.chefai.core.domain.model.Label
+import com.tenmilelabs.chefai.core.domain.model.RecipeStep
+import com.tenmilelabs.chefai.core.domain.model.Tag
 import com.tenmilelabs.chefai.core.testutil.recipe1
 import com.tenmilelabs.chefai.core.testutil.recipe3
 import com.tenmilelabs.chefai.core.testutil.recipeEntity1
@@ -40,15 +43,16 @@ import com.tenmilelabs.chefai.core.testutil.testSteps3
 import com.tenmilelabs.chefai.core.testutil.testTags
 import com.tenmilelabs.chefai.core.testutil.testUser
 import com.tenmilelabs.chefai.recipes.data.network.FakeApiService
+import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
-import io.mockk.mockk
 import org.junit.Before
 import org.junit.Test
+import java.util.UUID
 
 @ExperimentalCoroutinesApi
 class DefaultRecipeRepositoryTest {
@@ -322,5 +326,116 @@ class DefaultRecipeRepositoryTest {
         assertThat(savedEntity).isNotNull()
         assertThat(savedEntity?.syncState).isEqualTo(SyncState.PENDING)
         assertThat(savedEntity?.title).isEqualTo("New Test Recipe")
+    }
+
+    @Test
+    fun `updateRecipe() replaces steps, ingredients, tags, and labels`() = runTest {
+        // Given: recipe1 exists with 3 steps, 2 ingredients, tags, and labels
+        val originalRecipe = recipeRepository.getRecipeStream(recipeId1).first()
+        assertThat(originalRecipe).isNotNull()
+        assertThat(originalRecipe?.steps).hasSize(3)
+        assertThat(originalRecipe?.ingredients).hasSize(2)
+
+        // When: Updating with new steps and ingredients
+        val newStep = RecipeStep(
+            uuid = UUID.randomUUID(),
+            orderIndex = 0,
+            instruction = "New single step"
+        )
+        val newIngredient = RecipeIngredient(
+            ingredientId = testIngredients[2].uuid,
+            ingredientDisplayName = testIngredients[2].displayName,
+            quantity = 100.0,
+            unit = "ml",
+            allergenName = null,
+            srcCategory = null,
+            srcSubcategory = null
+        )
+        val newTag = Tag(uuid = UUID.randomUUID(), displayName = "updated-tag")
+        val newLabel = Label(uuid = UUID.randomUUID(), displayName = "Updated Label")
+
+        val updatedRecipe = originalRecipe!!.copy(
+            title = "Updated Pancakes",
+            steps = listOf(newStep),
+            ingredients = listOf(newIngredient),
+            tags = listOf(newTag),
+            labels = listOf(newLabel)
+        )
+        recipeRepository.updateRecipe(updatedRecipe)
+
+        // Then: Recipe entity title is updated
+        val savedEntity = recipeDao.getRecipeById(recipeId1)
+        assertThat(savedEntity?.title).isEqualTo("Updated Pancakes")
+
+        // And: Steps are replaced (old 3 removed, new 1 added)
+        val savedSteps = recipeStepDao.getStepsForRecipe(recipeId1)
+        assertThat(savedSteps).hasSize(1)
+        assertThat(savedSteps.first().instruction).isEqualTo("New single step")
+
+        // And: Ingredients are replaced
+        val savedIngredients = recipeIngredientDao.getIngredientsForRecipe(recipeId1)
+        assertThat(savedIngredients).hasSize(1)
+        assertThat(savedIngredients.first().unit).isEqualTo("ml")
+
+        // And: Tags are replaced
+        val savedTags = recipeTagDao.getTagsForRecipe(recipeId1)
+        assertThat(savedTags).hasSize(1)
+        assertThat(savedTags.first().tagId).isEqualTo(newTag.uuid)
+
+        // And: Labels are replaced
+        val savedLabels = recipeLabelDao.getLabelsForRecipe(recipeId1)
+        assertThat(savedLabels).hasSize(1)
+        assertThat(savedLabels.first().labelId).isEqualTo(newLabel.uuid)
+    }
+
+    @Test
+    fun `updateRecipe() preserves version field`() = runTest {
+        // Given: recipe1 with default version 1
+        val originalRecipe = recipeRepository.getRecipeStream(recipeId1).first()
+        assertThat(originalRecipe?.version).isEqualTo(1)
+
+        // When: Updating with version preserved
+        val updatedRecipe = originalRecipe!!.copy(title = "Version Test")
+        recipeRepository.updateRecipe(updatedRecipe)
+
+        // Then: version is preserved
+        val savedEntity = recipeDao.getRecipeById(recipeId1)
+        assertThat(savedEntity?.version).isEqualTo(1)
+    }
+
+    @Test
+    fun `softDeleteRecipe() sets DELETED syncState and deletedAt`() = runTest {
+        // Given: recipe1 exists
+        val recipeBefore = recipeDao.getRecipeById(recipeId1)
+        assertThat(recipeBefore).isNotNull()
+        assertThat(recipeBefore?.deletedAt).isNull()
+        assertThat(recipeBefore?.syncState).isEqualTo(SyncState.PENDING)
+
+        // When: Soft deleting the recipe
+        recipeRepository.softDeleteRecipe(recipeId1)
+
+        // Then: The entity is marked as DELETED with a timestamp
+        val recipeAfter = recipeDao.getRecipeById(recipeId1)
+        assertThat(recipeAfter).isNotNull()
+        assertThat(recipeAfter?.syncState).isEqualTo(SyncState.DELETED)
+        assertThat(recipeAfter?.deletedAt).isNotNull()
+        assertThat(recipeAfter?.deletedAt).isGreaterThan(0)
+    }
+
+    @Test
+    fun `softDeleteRecipe() entity still exists in database`() = runTest {
+        // Given: 3 recipes exist
+        assertThat(recipeRepository.getRecipesStream().first()).hasSize(3)
+
+        // When: Soft deleting recipe1
+        recipeRepository.softDeleteRecipe(recipeId1)
+
+        // Then: Entity still exists in DB (not hard-deleted)
+        val entity = recipeDao.getRecipeById(recipeId1)
+        assertThat(entity).isNotNull()
+
+        // And: It appears in getAllDirty (DELETED state)
+        val dirtyRecipes = recipeDao.getAllDirty()
+        assertThat(dirtyRecipes.any { it.uuid == recipeId1 && it.syncState == SyncState.DELETED }).isTrue()
     }
 }
