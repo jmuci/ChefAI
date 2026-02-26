@@ -85,12 +85,19 @@ fun LargeCard(
             modifier = Modifier.fillMaxSize()
         ) {
             // Background Image
+            timber.log.Timber.tag("LargeCard").d(
+                "🖼️ LargeCard building ImageRequest:\n" +
+                "  Recipe: ${recipe.title}\n" +
+                "  Image URL: ${recipe.imageUrlThumbnail}\n" +
+                "  URL is null/empty: ${recipe.imageUrlThumbnail.isEmpty()}"
+            )
             val imageRequest = ImageRequest.Builder(LocalContext.current)
                 .data(recipe.imageUrlThumbnail)
                 .crossfade(true)
                 .listener(
-                    onError = { _, result -> timber.log.Timber.e("Image loading ERROR: ${recipe.imageUrlThumbnail}, error: ${result.throwable}") },
-                    onCancel = { timber.log.Timber.d("Image loading CANCELLED: ${recipe.imageUrlThumbnail}") }
+                    onSuccess = { _, result -> timber.log.Timber.tag("LargeCard").d("✅ Image loading SUCCESS: ${recipe.imageUrlThumbnail}") },
+                    onError = { _, result -> timber.log.Timber.tag("LargeCard").e("❌ Image loading ERROR: ${recipe.imageUrlThumbnail}, error: ${result.throwable}") },
+                    onCancel = { timber.log.Timber.tag("LargeCard").d("⏸️ Image loading CANCELLED: ${recipe.imageUrlThumbnail}") }
                 )
                 .build()
 

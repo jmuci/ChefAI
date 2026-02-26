@@ -5,12 +5,22 @@ import com.tenmilelabs.chefai.core.domain.model.User
 import com.tenmilelabs.chefai.recipes.data.network.model.NetworkRecipe
 import com.tenmilelabs.chefai.recipes.data.network.model.NetworkRecipeList
 import java.util.UUID
+import timber.log.Timber
 
 /**
  * Maps network DTOs to domain models.
  */
 
 fun NetworkRecipe.toDomain(): Recipe {
+    Timber.tag("NetworkDomainMap").d(
+        "📡 Mapping NetworkRecipe to Recipe domain model:\n" +
+        "  Title: $title\n" +
+        "  Image URL (from network): $imageUrl\n" +
+        "  Image Thumbnail (from network): $imageUrlThumbnail\n" +
+        "  Image URL is null/empty: ${imageUrl.isEmpty()}\n" +
+        "  Thumbnail is null/empty: ${imageUrlThumbnail.isEmpty()}"
+    )
+
     return Recipe(
         uuid = UUID.fromString(uuid),
         title = title,
@@ -27,7 +37,14 @@ fun NetworkRecipe.toDomain(): Recipe {
         tags = emptyList(),
         labels = emptyList(),
         updatedAt = System.currentTimeMillis() // Or a default value
-    )
+    ).also {
+        Timber.tag("NetworkDomainMap").d(
+            "✅ Recipe domain model created:\n" +
+            "  Title: ${it.title}\n" +
+            "  Image URL (in domain): ${it.imageUrl}\n" +
+            "  Image Thumbnail (in domain): ${it.imageUrlThumbnail}"
+        )
+    }
 }
 
 fun List<NetworkRecipe>.toDomain(): List<Recipe> = map (NetworkRecipe::toDomain)
