@@ -143,6 +143,17 @@ Two-step sync per [ADR-006](docs/adrs/adr-006-anonymous-first-sync.md):
 - For major architectural decisions: write an ADR in `docs/adrs/` following existing format
 - When unsure: ask clarifying questions before large refactors; suggest alternatives with tradeoffs
 
+## Verification After Code Changes
+After completing any code change (bug fix, feature, refactor), always run the unit tests as a final verification step:
+
+```
+./gradlew :app:testDebugUnitTest
+```
+
+- Report the number of tests passed/failed
+- If any tests fail, fix them before considering the task done
+- Do not ask the user whether to run tests — just run them
+
 ---
 
 ## Current Gaps (Feb 2026)
