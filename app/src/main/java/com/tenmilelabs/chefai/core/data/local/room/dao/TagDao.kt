@@ -48,4 +48,7 @@ interface TagDao {
 
     @Query("SELECT * FROM tags WHERE syncState = 'PENDING'")
     suspend fun getDirty(): List<TagEntity>
+
+    @Query("SELECT uuid FROM tags WHERE uuid IN (:uuids)")
+    suspend fun getExistingIds(uuids: List<UUID>): List<UUID>
 }

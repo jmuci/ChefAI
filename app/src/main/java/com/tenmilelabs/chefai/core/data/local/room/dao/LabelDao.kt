@@ -42,4 +42,10 @@ interface LabelDao {
 
     @Upsert
     suspend fun upsertLabel(label: LabelEntity)
+
+    @Upsert
+    suspend fun upsertAll(labels: List<LabelEntity>)
+
+    @Query("SELECT uuid FROM labels WHERE uuid IN (:uuids)")
+    suspend fun getExistingIds(uuids: List<UUID>): List<UUID>
 }

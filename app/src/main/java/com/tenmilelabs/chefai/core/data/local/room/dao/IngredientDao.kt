@@ -57,4 +57,7 @@ interface IngredientDao {
 
     @Query("SELECT * FROM ingredients WHERE syncState = 'PENDING'")
     suspend fun getDirty(): List<IngredientEntity>
+
+    @Query("SELECT uuid FROM ingredients WHERE uuid IN (:uuids)")
+    suspend fun getExistingIds(uuids: List<UUID>): List<UUID>
 }

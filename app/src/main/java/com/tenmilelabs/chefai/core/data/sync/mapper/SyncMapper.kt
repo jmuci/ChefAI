@@ -2,20 +2,24 @@ package com.tenmilelabs.chefai.core.data.sync.mapper
 
 import com.tenmilelabs.chefai.core.data.local.room.AllergenEntity
 import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
+import com.tenmilelabs.chefai.core.data.local.room.LabelEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.RecipeStepEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.SourceClassificationEntity
+import com.tenmilelabs.chefai.core.data.local.room.TagEntity
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncAllergenDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncIngredientDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncLabelDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeIngredientDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeStepDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncSourceClassificationDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncTagDto
 import java.util.UUID
 
 // --- Push direction: Room entities → DTO ---
@@ -150,3 +154,19 @@ fun SyncRecipeDto.toLabelCrossRefs(): List<RecipeLabelCrossRef> =
             syncState = SyncState.SYNCED
         )
     }
+
+fun SyncTagDto.toTagEntity(): TagEntity = TagEntity(
+    uuid = UUID.fromString(uuid),
+    displayName = displayName,
+    updatedAt = updatedAt,
+    deletedAt = deletedAt,
+    syncState = SyncState.SYNCED
+)
+
+fun SyncLabelDto.toLabelEntity(): LabelEntity = LabelEntity(
+    uuid = UUID.fromString(uuid),
+    displayName = displayName,
+    updatedAt = updatedAt,
+    deletedAt = deletedAt,
+    syncState = SyncState.SYNCED
+)

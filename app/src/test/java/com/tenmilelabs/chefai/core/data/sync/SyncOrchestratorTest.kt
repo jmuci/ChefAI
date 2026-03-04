@@ -10,6 +10,7 @@ import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeAllergenDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeIngredientDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeLabelDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDao
@@ -17,6 +18,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSourceClassificationDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSyncMetadataDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeTagDao
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.sync.network.FakeSyncNetworkDataSource
@@ -47,6 +49,8 @@ class SyncOrchestratorTest {
     private lateinit var allergenDao: FakeAllergenDao
     private lateinit var sourceClassificationDao: FakeSourceClassificationDao
     private lateinit var ingredientDao: FakeIngredientDao
+    private lateinit var labelDao: FakeLabelDao
+    private lateinit var tagDao: FakeTagDao
     private lateinit var recipeIngredientDao: FakeRecipeIngredientDao
     private lateinit var recipeTagCrossRefDao: FakeRecipeTagCrossRefDao
     private lateinit var recipeLabelCrossRefDao: FakeRecipeLabelCrossRefDao
@@ -75,6 +79,8 @@ class SyncOrchestratorTest {
         allergenDao = FakeAllergenDao()
         sourceClassificationDao = FakeSourceClassificationDao()
         ingredientDao = FakeIngredientDao()
+        labelDao = FakeLabelDao()
+        tagDao = FakeTagDao()
         recipeTagCrossRefDao = FakeRecipeTagCrossRefDao()
         recipeLabelCrossRefDao = FakeRecipeLabelCrossRefDao()
         syncMetadataDao = FakeSyncMetadataDao()
@@ -87,6 +93,8 @@ class SyncOrchestratorTest {
             allergenDao = allergenDao,
             sourceClassificationDao = sourceClassificationDao,
             ingredientDao = ingredientDao,
+            tagDao = tagDao,
+            labelDao = labelDao,
             recipeIngredientDao = recipeIngredientDao,
             recipeTagCrossRefDao = recipeTagCrossRefDao,
             recipeLabelCrossRefDao = recipeLabelCrossRefDao,
