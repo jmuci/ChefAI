@@ -98,11 +98,29 @@ data class SyncSourceClassificationDto(
 )
 
 @Serializable
+data class SyncTagDto(
+    val uuid: String,
+    val displayName: String,
+    val updatedAt: Long,
+    val deletedAt: Long?
+)
+
+@Serializable
+data class SyncLabelDto(
+    val uuid: String,
+    val displayName: String,
+    val updatedAt: Long,
+    val deletedAt: Long?
+)
+
+@Serializable
 data class SyncPullResponse(
     val recipes: List<SyncRecipeDto>,
     val serverTimestamp: Long,
     val hasMore: Boolean,
     val allergens: List<SyncAllergenDto> = emptyList(),
     val sourceClassifications: List<SyncSourceClassificationDto> = emptyList(),
-    val ingredients: List<SyncIngredientDto> = emptyList()
+    val ingredients: List<SyncIngredientDto> = emptyList(),
+    val tags: List<SyncTagDto> = emptyList(),
+    val labels: List<SyncLabelDto> = emptyList()
 )

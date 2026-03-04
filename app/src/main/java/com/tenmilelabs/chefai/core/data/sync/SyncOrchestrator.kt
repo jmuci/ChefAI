@@ -5,6 +5,7 @@ import com.tenmilelabs.chefai.core.data.local.room.SyncMetadataEntity
 import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.AllergenDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.IngredientDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.LabelDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeLabelCrossRefDao
@@ -12,16 +13,19 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.SourceClassificationDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.SyncMetadataDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.TagDao
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.sync.mapper.toAllergenEntity
 import com.tenmilelabs.chefai.core.data.sync.mapper.toIngredientEntities
 import com.tenmilelabs.chefai.core.data.sync.mapper.toIngredientEntity
 import com.tenmilelabs.chefai.core.data.sync.mapper.toLabelCrossRefs
+import com.tenmilelabs.chefai.core.data.sync.mapper.toLabelEntity
 import com.tenmilelabs.chefai.core.data.sync.mapper.toRecipeEntity
 import com.tenmilelabs.chefai.core.data.sync.mapper.toSourceClassificationEntity
 import com.tenmilelabs.chefai.core.data.sync.mapper.toStepEntities
 import com.tenmilelabs.chefai.core.data.sync.mapper.toSyncDto
 import com.tenmilelabs.chefai.core.data.sync.mapper.toTagCrossRefs
+import com.tenmilelabs.chefai.core.data.sync.mapper.toTagEntity
 import com.tenmilelabs.chefai.core.data.sync.network.SyncNetworkDataSource
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPushRequest
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPushResponse
@@ -57,6 +61,8 @@ class SyncOrchestrator @Inject constructor(
     private val allergenDao: AllergenDao,
     private val sourceClassificationDao: SourceClassificationDao,
     private val ingredientDao: IngredientDao,
+    private val tagDao: TagDao,
+    private val labelDao: LabelDao,
     private val recipeDao: RecipeDao,
     private val recipeStepDao: RecipeStepDao,
     private val recipeIngredientDao: RecipeIngredientDao,
@@ -158,9 +164,13 @@ class SyncOrchestrator @Inject constructor(
                 //   allergens (leaf) → ingredients.allergenId (RESTRICT)
                 //   source_classifications (leaf) → ingredients.sourcePrimaryId (SET_NULL)
                 //   ingredients → recipe_ingredients.ingredientId (RESTRICT)
+                //   tags (leaf) → recipe_tags.tagId (RESTRICT)
+                //   labels (leaf) → recipe_labels.labelId (RESTRICT)
                 allergenDao.upsertAll(response.allergens.map { it.toAllergenEntity() })
                 sourceClassificationDao.upsertAll(response.sourceClassifications.map { it.toSourceClassificationEntity() })
                 ingredientDao.upsertAll(response.ingredients.map { it.toIngredientEntity() })
+                tagDao.upsertAll(response.tags.map { it.toTagEntity() })
+                labelDao.upsertAll(response.labels.map { it.toLabelEntity() })
 
                 for (syncRecipe in response.recipes) {
                     val result = applyPulledRecipe(syncRecipe)
@@ -229,13 +239,44 @@ class SyncOrchestrator @Inject constructor(
         recipeStepDao.upsertAll(syncRecipe.toStepEntities())
 
         recipeIngredientDao.deleteAllForRecipe(recipeId)
-        recipeIngredientDao.upsertAll(syncRecipe.toIngredientEntities())
+        val ingredientEntities = syncRecipe.toIngredientEntities()
+        // We prevent upserting recipes that reference ingredients that that don't exist in Room.
+        if (ingredientEntities.isNotEmpty()) {
+            val referencedIds = ingredientEntities.map { it.ingredientId }
+            val existingIds = ingredientDao.getExistingIds(referencedIds).toSet()
+            val validEntities = ingredientEntities.filter { it.ingredientId in existingIds }
+            if (validEntities.size < ingredientEntities.size) {
+                val missing = referencedIds.filterNot { it in existingIds }
+                Timber.w("upsertRecipeAggregate: recipe %s references %d unknown ingredientId(s), skipping them: %s", syncRecipe.uuid, missing.size, missing)
+            }
+            recipeIngredientDao.upsertAll(validEntities)
+        }
 
         recipeTagCrossRefDao.deleteAllForRecipe(recipeId)
-        recipeTagCrossRefDao.upsertAll(syncRecipe.toTagCrossRefs())
+        val tagCrossRefs = syncRecipe.toTagCrossRefs()
+        if (tagCrossRefs.isNotEmpty()) {
+            val referencedTagIds = tagCrossRefs.map { it.tagId }
+            val existingTagIds = tagDao.getExistingIds(referencedTagIds).toSet()
+            val validTagRefs = tagCrossRefs.filter { it.tagId in existingTagIds }
+            if (validTagRefs.size < tagCrossRefs.size) {
+                val missing = referencedTagIds.filterNot { it in existingTagIds }
+                Timber.w("upsertRecipeAggregate: recipe %s references %d unknown tagId(s), skipping them: %s", syncRecipe.uuid, missing.size, missing)
+            }
+            recipeTagCrossRefDao.upsertAll(validTagRefs)
+        }
 
         recipeLabelCrossRefDao.deleteAllForRecipe(recipeId)
-        recipeLabelCrossRefDao.upsertAll(syncRecipe.toLabelCrossRefs())
+        val labelCrossRefs = syncRecipe.toLabelCrossRefs()
+        if (labelCrossRefs.isNotEmpty()) {
+            val referencedLabelIds = labelCrossRefs.map { it.labelId }
+            val existingLabelIds = labelDao.getExistingIds(referencedLabelIds).toSet()
+            val validLabelRefs = labelCrossRefs.filter { it.labelId in existingLabelIds }
+            if (validLabelRefs.size < labelCrossRefs.size) {
+                val missing = referencedLabelIds.filterNot { it in existingLabelIds }
+                Timber.w("upsertRecipeAggregate: recipe %s references %d unknown labelId(s), skipping them: %s", syncRecipe.uuid, missing.size, missing)
+            }
+            recipeLabelCrossRefDao.upsertAll(validLabelRefs)
+        }
     }
 
     private enum class ApplyResult { UPSERTED, DELETED }
