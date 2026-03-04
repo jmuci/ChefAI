@@ -38,5 +38,9 @@ google-services.json
 # AI working folders
 /.ai/
 /.prompts_history/
+
+# Claude session state (ephemeral, reconstructed each session)
+.claude/session-context.md
+.claude/worktrees/
 #Obsidian
 docs/.obsidian/
