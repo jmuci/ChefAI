@@ -38,9 +38,42 @@ Domain (Use Cases, Domain Entities, Repository Interfaces)
 - Contains repository implementations, data sources (Room, Ktor), DTOs, and mappers.
 - Owns the **single source of truth** for persisted or cached data.
 - Responsible for coordinating between network, local storage, and mapping to/from domain.
-- **Pagination:** Recipes use AndroidX Paging 3 with a custom `RecipesPagingSource` backed by Room.
 
-Current DB Schema as of 11/11/2025
+### BE Sync Mechanism 
+
+
+```
+┌──────────────────────────────────────────────────┐
+│                    UI Layer                       │
+│  Compose Screens ← ViewModel ← StateFlow/Paging  │
+└──────────────────────┬───────────────────────────┘
+                       │ observes
+┌──────────────────────▼───────────────────────────┐
+│                 Domain Layer                      │
+│  Repository interfaces, Use Cases, Domain Models  │
+└──────────────────────┬───────────────────────────┘
+                       │ implements
+┌──────────────────────▼───────────────────────────┐
+│                  Data Layer                       │
+│                                                   │
+│  ┌─────────────┐    ┌──────────────┐             │
+│  │  Room (SSOT) │    │ Ktor Client  │             │
+│  │  11 entities │    │ Auth + Sync  │             │
+│  │  sync_meta   │    │ endpoints    │             │
+│  └──────┬──────┘    └──────┬───────┘             │
+│         │                   │                     │
+│         └───────┬───────────┘                     │
+│                 │                                 │
+│         ┌───────▼────────┐                        │
+│         │  SyncWorker    │                        │
+│         │  (WorkManager) │                        │
+│         │  Push → Pull   │                        │
+│         └────────────────┘                        │
+│                                                   │
+│  SessionManager (Anonymous | Authenticated)       │
+└───────────────────────────────────────────────────┘
+```
+
 
 ![Database Schema Details](img/chefAI-datamodel.png)
 
