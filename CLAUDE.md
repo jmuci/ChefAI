@@ -156,9 +156,30 @@ Two-step sync per [ADR-006](docs/adrs/adr-006-anonymous-first-sync.md):
 
 ---
 
+## Skills (Task Playbooks)
+
+When performing specific tasks, load the matching skill from `.claude/skills/`:
+
+| Task | Skill File |
+|------|-----------|
+| Build a new Compose screen or component | [`.claude/skills/compose-component.md`](.claude/skills/compose-component.md) |
+| Create or modify a ViewModel | [`.claude/skills/viewmodel.md`](.claude/skills/viewmodel.md) |
+| Review code (PR or ad-hoc) | [`.claude/skills/code-review.md`](.claude/skills/code-review.md) |
+| Modify existing code (bug fix, refactor, feature addition) | [`.claude/skills/update-code.md`](.claude/skills/update-code.md) |
+
+---
+
 ## Reference Docs
+
+### Project Docs
 - [Architecture Overview](docs/architecture.md)
 - [Authentication System](docs/authentication.md)
 - [RFC-001: Offline-First Sync](docs/rfcs/rfc-001-offline-first-sync.md)
 - [Project Analysis & Roadmap](docs/project-analysis-feb-2026.md)
 - ADRs in [docs/adrs/](docs/adrs/)
+
+### Claude Docs
+- [Decisions (ADR Index)](docs/claude/decisions.md)
+- [Code Conventions](docs/claude/conventions.md)
+- [Gotchas & Lessons](docs/claude/gotchas.md)
+- [Session Onboarding](docs/claude/onboarding.md)
