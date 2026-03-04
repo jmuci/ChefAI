@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.core.data.local.room.dao
 
 import com.tenmilelabs.chefai.core.data.local.room.LabelEntity
 import com.tenmilelabs.chefai.core.data.local.room.relations.LabelWithRecipes
+import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -54,5 +55,23 @@ class FakeLabelDao : LabelDao {
             currentList.add(label)
         }
         labelsFlow.value = currentList
+    }
+
+    override suspend fun upsertAll(labels: List<LabelEntity>) {
+        val currentList = labelsFlow.value.toMutableList()
+        labels.forEach { label ->
+            val existingIndex = currentList.indexOfFirst { it.uuid == label.uuid }
+            if (existingIndex != -1) {
+                currentList[existingIndex] = label
+            } else {
+                currentList.add(label)
+            }
+        }
+        labelsFlow.value = currentList
+    }
+
+    override suspend fun getExistingIds(uuids: List<UUID>): List<UUID> {
+        val existing = labelsFlow.value.map { it.uuid }.toSet()
+        return uuids.filter { it in existing }
     }
 }

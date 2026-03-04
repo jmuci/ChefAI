@@ -73,4 +73,9 @@ class FakeTagDao : TagDao {
     override suspend fun getDirty(): List<TagEntity> {
         return tagsFlow.value.filter { it.syncState == SyncState.PENDING }
     }
+
+    override suspend fun getExistingIds(uuids: List<UUID>): List<UUID> {
+        val existing = tagsFlow.value.map { it.uuid }.toSet()
+        return uuids.filter { it in existing }
+    }
 }
