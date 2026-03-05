@@ -87,6 +87,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.navigation.ui.ktx)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.ui.test)
 
     // Jetpack Compose ===
     val composeBom = platform("androidx.compose:compose-bom:${libs.versions.androidxComposeBom.get()}")
@@ -178,6 +179,7 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.ktor.client.mock)
     testImplementation(libs.androidx.work.testing)
+    testImplementation(libs.robolectric)
     kspTest(libs.hilt.android.compiler)
 
 
