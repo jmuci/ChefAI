@@ -1,7 +1,6 @@
 package com.tenmilelabs.chefai.core.ui.preview
 
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
-import com.tenmilelabs.chefai.core.data.local.util.generateUUIDV7
 import com.tenmilelabs.chefai.core.domain.model.Label
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.domain.model.Tag

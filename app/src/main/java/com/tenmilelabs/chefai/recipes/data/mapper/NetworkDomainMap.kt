@@ -4,8 +4,8 @@ import com.tenmilelabs.chefai.core.domain.model.Recipe
 import com.tenmilelabs.chefai.core.domain.model.User
 import com.tenmilelabs.chefai.recipes.data.network.model.NetworkRecipe
 import com.tenmilelabs.chefai.recipes.data.network.model.NetworkRecipeList
-import java.util.UUID
 import timber.log.Timber
+import java.util.UUID
 
 /**
  * Maps network DTOs to domain models.
