@@ -1,4 +1,4 @@
-# 🔄 ADR 006 – Anonymous-First Session Model & Sync Protocol
+# 🔄 ADR 006 – Sync Protocol: Logic, Triggers and Conflicts
 
 **Date:** 2026-02-25
 
@@ -6,38 +6,13 @@
 
 **Context:** ChefAI must work fully offline, allow recipe creation without login, and sync data incrementally when connected. This ADR captures the key architectural decisions made during the implementation of RFC-001 (Phases 1–5).
 
-**Supersedes:** ADR-003 (Two-Step Sync)
+**Supersedes:** ADR-003 [adr-003–two-step-BE-sync](adr-003%E2%80%93two-step-BE-sync.md)(Two-Step Sync)
 
 **Related:** ADR-001 (Hybrid Architecture), ADR-002 (Local DB & ID Generation), RFC-001
 
 ---
 
-## Decision 1: Anonymous-First Session Model
-
-Users interact with the app immediately without registration. The session model has three states:
-
-```kotlin
-sealed class UserSession {
-    data object Loading : UserSession()
-    data class Anonymous(val localUserId: UUID) : UserSession()
-    data class Authenticated(val user: User, val authToken: AuthToken) : UserSession()
-}
-```
-
-- On first launch, a `UUIDv7` local user ID is generated, stored in `SecurePreferences`, and a corresponding `UserEntity` is inserted into Room.
-- All recipes created offline use `creatorId = localUserId`.
-- There is **no server-side anonymous user**. The backend only knows about a user after registration.
-- Registration triggers an account-upgrade flow (`POST /auth/upgrade`) that re-parents all local recipes from the anonymous UUID to the new authenticated user UUID.
-
-### Rationale
-
-- Eliminates the login barrier — users can explore and create recipes instantly.
-- UUIDv7 (client-generated, time-sortable) avoids the need for a server round-trip to assign IDs.
-- Not creating server-side anonymous users keeps the backend simple and avoids ghost-account accumulation.
-
----
-
-## Decision 2: Push-Before-Pull Sync Protocol
+## Decision 1: Push-Before-Pull Sync Protocol
 
 Sync follows a strict two-phase order:
 
@@ -63,7 +38,7 @@ Recipes are synced as **complete aggregates** (recipe + steps + ingredients + ta
 
 ---
 
-## Decision 3: Last-Writer-Wins Conflict Resolution
+## Decision 2: Last-Writer-Wins Conflict Resolution
 
 All conflicts are resolved by comparing `updatedAt` timestamps:
 
@@ -82,7 +57,7 @@ The server is **authoritative** once data is synced — there is no client-side 
 
 ---
 
-## Decision 4: Sync Lifecycle Triggers
+## Decision 3: Sync Lifecycle Triggers
 
 Sync is triggered at four points via `SyncScheduler` (backed by Android WorkManager):
 
@@ -105,7 +80,7 @@ All work requests require network connectivity (`NetworkType.CONNECTED` constrai
 
 ---
 
-## Decision 5: SyncScheduler Abstraction
+## Decision 4: SyncScheduler Abstraction
 
 `SessionManager` and `DefaultRecipeRepository` depend on a `SyncScheduler` interface rather than `SyncManager` directly:
 
@@ -134,7 +109,6 @@ interface SyncScheduler {
 
 ### Benefits
 
-- **Zero-friction onboarding:** Users create recipes immediately; registration is optional.
 - **Full offline capability:** All CRUD operations work without connectivity.
 - **Predictable sync:** Push-before-pull with last-writer-wins is deterministic and debuggable.
 - **Testable:** `SyncScheduler` and `ConnectivityObserver` interfaces enable 169 unit tests with zero Android framework dependency.
@@ -145,7 +119,6 @@ interface SyncScheduler {
 - **Last-writer-wins can lose edits:** If two devices edit the same recipe simultaneously, the slower device's changes are silently overwritten. Acceptable for v1 single-user scenarios.
 - **No real-time push:** Sync is poll-based (periodic + event-driven). A future WebSocket/FCM layer could reduce latency.
 - **Aggregate-level granularity:** Editing a single step re-syncs the entire recipe aggregate. Fine for typical recipe sizes but may need refinement for very large entities.
-- **Anonymous data is local-only:** If the user uninstalls without registering, all anonymous data is lost. This is by design — the upgrade flow incentivizes registration.
 
 ---
 
