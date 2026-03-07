@@ -7,8 +7,8 @@ import java.util.UUID
  * Wrapper over Blocks UUIDv7 library.
  * Using a static object instead of DI for simplicity. We don't need to mock it or fake it in tests.
  */
-object UuidV7Generator : IdGenerator {
-    override fun newId(): UUID {
+object UuidV7Generator {
+    fun newId(): UUID {
         return UUIDv7.generate()
     }
 }
