@@ -1,9 +1,13 @@
 # 🔄 ADR 006 – Anonymous-First Session Model & Sync Protocol
 
 **Date:** 2026-02-25
+
 **Status:** Accepted
+
 **Context:** ChefAI must work fully offline, allow recipe creation without login, and sync data incrementally when connected. This ADR captures the key architectural decisions made during the implementation of RFC-001 (Phases 1–5).
+
 **Supersedes:** ADR-003 (Two-Step Sync)
+
 **Related:** ADR-001 (Hybrid Architecture), ADR-002 (Local DB & ID Generation), RFC-001
 
 ---

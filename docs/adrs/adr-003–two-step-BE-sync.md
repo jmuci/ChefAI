@@ -1,7 +1,7 @@
-# 🔄 ADR 003 – Two-Step Synchronization with Backend
+# 🔄 ~~ADR 003 – Two-Step Synchronization with Backend~~
 
 **Date:** 2025-11-10  
-**Status:** Accepted  
+**Status:** Deprecated -> [adr-006-anonymous-first-sync](adr-006-anonymous-first-sync.md)
 **Context:** The ChefAI app must keep user data (recipes, ingredients, meal plans) synchronized between local SQLite storage and the backend. The app is offline-first, and sync must be efficient and robust against intermittent connectivity.
 
 ---
