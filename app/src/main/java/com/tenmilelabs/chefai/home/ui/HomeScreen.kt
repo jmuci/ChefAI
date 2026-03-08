@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.home.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -72,58 +73,62 @@ fun HomeContent(
     recipes: List<RecipePreview>,
     onRecipeClick: (UUID) -> Unit = {}
 ) {
-    if (loading) {
-        LoadingContent()
-    } else if (recipes.isEmpty()) {
-        EmptyContent(
-            R.string.no_recipes_title,
-            R.string.no_recipes_subtitle,
-            R.drawable.ic_chef_hat_black_24dp
-        )
-    } else {
-        LazyColumn(
-            modifier = Modifier
-                .testTag("HomeScreen")
-                .fillMaxSize(),
-            contentPadding = PaddingValues(vertical = dimensionResource(id = R.dimen.padding_extra_small))
-        ) {
-            item {
-                RecipeCarouselSection(
-                    title = stringResource(R.string.home_recipe_suggestions_title),
-                    subtitle = stringResource(R.string.home_recipe_suggestions_subtitle),
-                    recipes = recipes,
-                    onRecipeClick = onRecipeClick
-                )
-            }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("HomeScreen")
+    ) {
+        if (loading) {
+            LoadingContent()
+        } else if (recipes.isEmpty()) {
+            EmptyContent(
+                R.string.no_recipes_title,
+                R.string.no_recipes_subtitle,
+                R.drawable.ic_chef_hat_black_24dp
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(vertical = dimensionResource(id = R.dimen.padding_extra_small))
+            ) {
+                item {
+                    RecipeCarouselSection(
+                        title = stringResource(R.string.home_recipe_suggestions_title),
+                        subtitle = stringResource(R.string.home_recipe_suggestions_subtitle),
+                        recipes = recipes,
+                        onRecipeClick = onRecipeClick
+                    )
+                }
 
-            item { Spacer(modifier = Modifier.height(8.dp)) }
+                item { Spacer(modifier = Modifier.height(8.dp)) }
 
-            // Repeated test data
-            item {
-                RecipeCarouselSection(
-                    title = stringResource(R.string.home_recipe_suggestions_dietary_title),
-                    subtitle = stringResource(R.string.home_recipe_suggestions_dietary_subtitle),
-                    recipes = recipes.shuffled(),
-                    onRecipeClick = onRecipeClick
-                )
-            }
+                // Repeated test data
+                item {
+                    RecipeCarouselSection(
+                        title = stringResource(R.string.home_recipe_suggestions_dietary_title),
+                        subtitle = stringResource(R.string.home_recipe_suggestions_dietary_subtitle),
+                        recipes = recipes.shuffled(),
+                        onRecipeClick = onRecipeClick
+                    )
+                }
 
-            item {
-                RecipeCarouselSection(
-                    title = stringResource(R.string.home_recipe_suggestions_world_cuisine_title),
-                    subtitle = stringResource(R.string.home_recipe_suggestions_world_cuisine_subtitle),
-                    recipes = recipes.shuffled(),
-                    onRecipeClick = onRecipeClick
-                )
-            }
+                item {
+                    RecipeCarouselSection(
+                        title = stringResource(R.string.home_recipe_suggestions_world_cuisine_title),
+                        subtitle = stringResource(R.string.home_recipe_suggestions_world_cuisine_subtitle),
+                        recipes = recipes.shuffled(),
+                        onRecipeClick = onRecipeClick
+                    )
+                }
 
-            item {
-                RecipeCarouselSection(
-                    title = stringResource(R.string.home_recipe_suggestions_dessets_title),
-                    subtitle = stringResource(R.string.home_recipe_suggestions_desserts_subtitle),
-                    recipes = recipes.shuffled(),
-                    onRecipeClick = onRecipeClick
-                )
+                item {
+                    RecipeCarouselSection(
+                        title = stringResource(R.string.home_recipe_suggestions_dessets_title),
+                        subtitle = stringResource(R.string.home_recipe_suggestions_desserts_subtitle),
+                        recipes = recipes.shuffled(),
+                        onRecipeClick = onRecipeClick
+                    )
+                }
             }
         }
     }

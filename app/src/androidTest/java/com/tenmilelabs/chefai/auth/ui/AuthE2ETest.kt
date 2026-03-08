@@ -173,7 +173,7 @@ class AuthE2ETest {
         // Click logout
         composeTestRule.onNodeWithTag("LogoutMenuItem").performClick()
 
-        // After logout, app returns to HomeScreen (anonymous mode)
+        // After logout, user stays on the current screen (HomeScreen) in anonymous mode
         composeTestRule.waitUntilAtLeastOneExists(hasTestTag("HomeScreen"), 5_000)
 
         // Navigate to Login via profile menu again
