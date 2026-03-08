@@ -21,7 +21,10 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +37,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusManager
@@ -90,6 +96,8 @@ fun LoginScreen(
         uiState = uiState,
         focusManager = focusManager,
         onEmailChange = viewModel::onEmailChange,
+        onEmailSuggestionSelected = viewModel::onEmailSuggestionSelected,
+        onEmailSuggestionsDismissed = viewModel::onEmailSuggestionsDismissed,
         onPasswordChange = viewModel::onPasswordChange,
         onRememberMeChange = viewModel::onRememberMeChange,
         onPasswordVisibilityToggle = viewModel::onPasswordVisibilityToggle,
@@ -103,6 +111,8 @@ fun LoginScreenContent(
     uiState: LoginUiState,
     focusManager: FocusManager,
     onEmailChange: (String) -> Unit = {},
+    onEmailSuggestionSelected: (EmailSuggestion) -> Unit = {},
+    onEmailSuggestionsDismissed: () -> Unit = {},
     onPasswordChange: (String) -> Unit = {},
     onRememberMeChange: (Boolean) -> Unit = {},
     onPasswordVisibilityToggle: () -> Unit = {},
@@ -154,10 +164,13 @@ fun LoginScreenContent(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Email Field
+            // Email Field with autocomplete dropdown
             EmailTextField(
                 email = uiState.email,
+                suggestions = uiState.emailSuggestions,
                 onEmailChange = onEmailChange,
+                onSuggestionSelected = onEmailSuggestionSelected,
+                onDismissSuggestions = onEmailSuggestionsDismissed,
                 error = uiState.emailError,
                 onNext = { focusManager.clearFocus() },
                 modifier = Modifier.fillMaxWidth()
@@ -227,8 +240,10 @@ fun LoginScreenContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                TextButton(onClick = onCreateAccountClick,
-                    modifier = Modifier.testTag("CreateAccountButton"),) {
+                TextButton(
+                    onClick = onCreateAccountClick,
+                    modifier = Modifier.testTag("CreateAccountButton")
+                ) {
                     Text(
                         stringResource(R.string.create_account),
                         style = MaterialTheme.typography.bodyMedium,
@@ -241,38 +256,76 @@ fun LoginScreenContent(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EmailTextField(
     email: String,
+    suggestions: List<EmailSuggestion>,
     onEmailChange: (String) -> Unit,
+    onSuggestionSelected: (EmailSuggestion) -> Unit,
+    onDismissSuggestions: () -> Unit,
     error: String?,
     onNext: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    OutlinedTextField(
-        value = email,
-        onValueChange = onEmailChange,
-        modifier = modifier,
-        label = { Text(stringResource(R.string.label_email)) },
-        leadingIcon = {
-            Icon(
-                imageVector = Icons.Default.Email,
-                contentDescription = null
-            )
-        },
-        isError = error != null,
-        supportingText = if (error != null) {
-            { Text(text = error, color = MaterialTheme.colorScheme.error) }
-        } else null,
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Email,
-            imeAction = ImeAction.Next
-        ),
-        keyboardActions = KeyboardActions(
-            onNext = { onNext() }
-        ),
-        singleLine = true
-    )
+    var expanded by rememberSaveable { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded && suggestions.isNotEmpty(),
+        onExpandedChange = { if (!it) onDismissSuggestions() },
+        modifier = modifier
+    ) {
+        OutlinedTextField(
+            value = email,
+            onValueChange = {
+                onEmailChange(it)
+                expanded = true
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
+            label = { Text(stringResource(R.string.label_email)) },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Email,
+                    contentDescription = null
+                )
+            },
+            isError = error != null,
+            supportingText = if (error != null) {
+                { Text(text = error, color = MaterialTheme.colorScheme.error) }
+            } else null,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Email,
+                imeAction = ImeAction.Next
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = {
+                    expanded = false
+                    onNext()
+                }
+            ),
+            singleLine = true
+        )
+
+        ExposedDropdownMenu(
+            expanded = expanded && suggestions.isNotEmpty(),
+            onDismissRequest = {
+                expanded = false
+                onDismissSuggestions()
+            }
+        ) {
+            suggestions.forEach { suggestion ->
+                DropdownMenuItem(
+                    text = { Text(suggestion.email) },
+                    onClick = {
+                        expanded = false
+                        onSuggestionSelected(suggestion)
+                    }
+                )
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -336,9 +389,9 @@ private fun RememberMeCheckbox(
             checked = isChecked,
             onCheckedChange = onCheckedChange
         )
-        
+
         Spacer(modifier = Modifier.size(8.dp))
-        
+
         Text(
             stringResource(R.string.remember_me),
             style = MaterialTheme.typography.bodyMedium,

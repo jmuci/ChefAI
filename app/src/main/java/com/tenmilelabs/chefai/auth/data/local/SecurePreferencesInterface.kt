@@ -43,4 +43,10 @@ interface SecurePreferencesInterface {
 
     /** Reads the last authenticated user ID, or null if no user has logged in yet. */
     fun getStoredCurrentUserId(): Flow<UUID?>
+
+    /** Persists the email used during a successful login so it can be prefilled next time. */
+    suspend fun saveLastLoginEmail(email: String)
+
+    /** Reads the last successfully used login email, or null if none has been stored. */
+    fun getLastLoginEmail(): Flow<String?>
 }

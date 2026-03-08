@@ -23,6 +23,7 @@ class FakeSecurePreferences : SecurePreferencesInterface {
         private const val KEY_TOKEN_EXPIRY = "token_expiry"
         private const val KEY_LOCAL_USER_ID = "local_user_id"
         private const val KEY_CURRENT_USER_ID = "current_user_id"
+        private const val KEY_LAST_LOGIN_EMAIL = "last_login_email"
     }
 
     override suspend fun saveAuthData(
@@ -145,5 +146,15 @@ class FakeSecurePreferences : SecurePreferencesInterface {
                 null
             }
         }
+    }
+
+    override suspend fun saveLastLoginEmail(email: String) {
+        storage.value = storage.value.toMutableMap().apply {
+            put(KEY_LAST_LOGIN_EMAIL, email)
+        }
+    }
+
+    override fun getLastLoginEmail(): Flow<String?> = storage.map { prefs ->
+        prefs[KEY_LAST_LOGIN_EMAIL] as? String
     }
 }

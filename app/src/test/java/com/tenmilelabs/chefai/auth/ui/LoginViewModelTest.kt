@@ -20,11 +20,15 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import io.mockk.mockk
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 
@@ -43,6 +47,7 @@ class LoginViewModelTest {
 
     @Before
     fun setup() {
+        Dispatchers.setMain(testDispatcher)
         testScope = TestScope(testDispatcher)
         fakeSecurePreferences = FakeSecurePreferences()
         fakeAuthNetworkDataSource = FakeAuthNetworkDataSource()
@@ -72,7 +77,12 @@ class LoginViewModelTest {
             uuidGenerator = { UuidV7Generator.newId() }
         }
 
-        viewModel = LoginViewModel(sessionManager)
+        viewModel = LoginViewModel(sessionManager, fakeSecurePreferences)
+    }
+
+    @After
+    fun teardown() {
+        Dispatchers.resetMain()
     }
 
     @Test
@@ -300,8 +310,8 @@ class LoginViewModelTest {
         advanceUntilIdle()
 
         // When: Creating new ViewModel with authenticated session
-        val newViewModel = LoginViewModel(sessionManager)
-        
+        val newViewModel = LoginViewModel(sessionManager, fakeSecurePreferences)
+
         // Then: ViewModel should have triggered navigation
         newViewModel.uiEvents.test {
             // The event may have already been emitted during init
@@ -309,5 +319,100 @@ class LoginViewModelTest {
             val session = sessionManager.userSession.value
             assertThat(session).isInstanceOf(UserSession.Authenticated::class.java)
         }
+    }
+
+    @Test
+    fun `init prefills email from last successful login`() = testScope.runTest {
+        // Given: A previously saved login email
+        fakeSecurePreferences.saveLastLoginEmail("saved@example.com")
+
+        // When: Creating a new ViewModel
+        val newViewModel = LoginViewModel(sessionManager, fakeSecurePreferences)
+        advanceUntilIdle()
+
+        // Then: Email field is prefilled
+        assertThat(newViewModel.uiState.value.email).isEqualTo("saved@example.com")
+    }
+
+    @Test
+    fun `successful login saves email to preferences`() = testScope.runTest {
+        // Given: Valid credentials
+        viewModel.onEmailChange("test@example.com")
+        viewModel.onPasswordChange("password123")
+
+        // When: Login succeeds
+        viewModel.onLoginClick()
+        advanceUntilIdle()
+
+        // Then: Email is persisted
+        fakeSecurePreferences.getLastLoginEmail().test {
+            assertThat(awaitItem()).isEqualTo("test@example.com")
+        }
+    }
+
+    @Test
+    fun `on email change shows matching suggestions`() = testScope.runTest {
+        // Given: A saved login email stored in preferences
+        fakeSecurePreferences.saveLastLoginEmail("user@example.com")
+        val vm = LoginViewModel(sessionManager, fakeSecurePreferences)
+        advanceUntilIdle() // let init coroutine run so savedEmail is set
+
+        // When: User types a prefix that matches the saved email
+        vm.onEmailChange("user")
+
+        // Then: The saved email appears in suggestions
+        val suggestions = vm.uiState.value.emailSuggestions
+        assertThat(suggestions.map { it.email }).contains("user@example.com")
+    }
+
+    @Test
+    fun `on email change shows no suggestions when input is blank`() = testScope.runTest {
+        // When: User clears the field
+        viewModel.onEmailChange("")
+
+        // Then: No suggestions shown
+        assertThat(viewModel.uiState.value.emailSuggestions).isEmpty()
+    }
+
+    @Test
+    fun `on email suggestion selected fills email and clears suggestions`() = testScope.runTest {
+        // Given: Some suggestions visible
+        viewModel.onEmailChange("test")
+
+        // When: User selects a suggestion with no autofill password
+        val suggestion = EmailSuggestion("saved@example.com")
+        viewModel.onEmailSuggestionSelected(suggestion)
+
+        // Then: Email is filled, suggestions are cleared, password unchanged
+        val state = viewModel.uiState.value
+        assertThat(state.email).isEqualTo("saved@example.com")
+        assertThat(state.emailSuggestions).isEmpty()
+        assertThat(state.password).isEmpty()
+    }
+
+    @Test
+    fun `on email suggestion selected with test account autofills password`() = testScope.runTest {
+        // When: User selects a debug test account suggestion
+        val suggestion = EmailSuggestion("test1@ex.com", autofillPassword = "test123!")
+        viewModel.onEmailSuggestionSelected(suggestion)
+
+        // Then: Both email and password are filled
+        val state = viewModel.uiState.value
+        assertThat(state.email).isEqualTo("test1@ex.com")
+        assertThat(state.password).isEqualTo("test123!")
+        assertThat(state.emailSuggestions).isEmpty()
+        assertThat(state.isLoading).isFalse()
+    }
+
+    @Test
+    fun `on email suggestions dismissed clears suggestions`() = testScope.runTest {
+        // Given: Some suggestions visible
+        viewModel.onEmailChange("test")
+
+        // When: Dismissed
+        viewModel.onEmailSuggestionsDismissed()
+
+        // Then: Suggestions are cleared
+        assertThat(viewModel.uiState.value.emailSuggestions).isEmpty()
     }
 }
