@@ -1,12 +1,10 @@
 package com.tenmilelabs.chefai.auth.domain.usecase
 
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
-import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
-import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.RecipeStepEntity
-import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.UserEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
@@ -37,9 +35,9 @@ class AccountUpgradeUseCaseTest {
     private lateinit var fakeRecipeTagCrossRefDao: FakeRecipeTagCrossRefDao
     private lateinit var fakeRecipeLabelCrossRefDao: FakeRecipeLabelCrossRefDao
 
-    private val anonymousId = UUID.randomUUID()
+    private val anonymousId = UuidV7Generator.newId()
     private val authUser = User(
-        uuid = UUID.randomUUID(),
+        uuid = UuidV7Generator.newId(),
         displayName = "Alice",
         email = "alice@example.com",
         avatarUrl = ""
@@ -77,7 +75,7 @@ class AccountUpgradeUseCaseTest {
         syncState = SyncState.PENDING
     )
 
-    private fun createRecipe(id: UUID = UUID.randomUUID(), creatorId: UUID = anonymousId) = RecipeEntity(
+    private fun createRecipe(id: UUID = UuidV7Generator.newId(), creatorId: UUID = anonymousId) = RecipeEntity(
         uuid = id,
         title = "Test Recipe",
         description = "A test recipe",
@@ -95,7 +93,7 @@ class AccountUpgradeUseCaseTest {
     )
 
     private fun createStep(recipeId: UUID) = RecipeStepEntity(
-        uuid = UUID.randomUUID(),
+        uuid = UuidV7Generator.newId(),
         recipeId = recipeId,
         orderIndex = 0,
         instruction = "Do something",
@@ -211,7 +209,7 @@ class AccountUpgradeUseCaseTest {
     @Test
     fun `upgrade does not affect other users recipes`() = runTest {
         // Given: recipes from both anonymous user and another user
-        val otherUserId = UUID.randomUUID()
+        val otherUserId = UuidV7Generator.newId()
         val otherUser = UserEntity(
             uuid = otherUserId, displayName = "Other", email = "other@test.com",
             avatarUrl = "", updatedAt = 1000L, deletedAt = null, syncState = SyncState.SYNCED

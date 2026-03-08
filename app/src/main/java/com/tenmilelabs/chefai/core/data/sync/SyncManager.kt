@@ -21,7 +21,7 @@ private const val BACKOFF_DELAY_SECONDS = 30L
 
 @Singleton
 class SyncManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val syncStatusHolder: SyncStatusHolder
 ) : SyncScheduler {
     companion object {

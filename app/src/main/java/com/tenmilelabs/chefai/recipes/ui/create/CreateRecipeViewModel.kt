@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.recipes.ui.create
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.core.di.IoDispatcher
 import com.tenmilelabs.chefai.core.domain.model.Ingredient
@@ -24,59 +25,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
-import java.util.UUID
 import javax.inject.Inject
-
-data class IngredientsFields(
-    val input: String = "",
-    val quantity: String = "",
-    val unit: String = "",
-    val selectedIngredients: List<RecipeIngredient> = emptyList(),
-    val suggestions: List<String> = emptyList(),
-)
-
-data class StepsFields(
-    val input: String = "",
-    val steps: List<RecipeStep> = emptyList(),
-)
-
-data class TagsFields(
-    val input: String = "",
-    val selectedTags: List<Tag> = emptyList(),
-    val suggestions: List<String> = emptyList(),
-)
-
-data class LabelsFields(
-    val input: String = "",
-    val selectedLabels: List<Label> = emptyList(),
-    val suggestions: List<String> = emptyList(),
-)
-
-data class RecipeFields(
-    val title: String = "",
-    val description: String = "",
-    val imageUrl: String = "",
-    val selectedImageUri: String? = null, // Local image URI from picker
-    val prepTimeMinutes: String = "",
-    val cookTimeMinutes: String = "",
-    val servings: String = "",
-    val externalUrl: String = "",
-)
-
-/**
- * UiState for the Create Recipe screen
- */
-data class CreateRecipeUiState(
-    val recipeFields: RecipeFields = RecipeFields(),
-    val ingredients: IngredientsFields = IngredientsFields(),
-    val steps: StepsFields = StepsFields(),
-    val tags: TagsFields = TagsFields(),
-    val labels: LabelsFields = LabelsFields(),
-    // Validation & Status
-    val isSaving: Boolean = false,
-    val saveError: String? = null,
-    val isFormValid: Boolean = false
-)
 
 @HiltViewModel
 class CreateRecipeViewModel @Inject constructor(
@@ -187,7 +136,7 @@ class CreateRecipeViewModel @Inject constructor(
         val state = _uiState.value.ingredients
         if (state.quantity.isNotBlank() && state.quantity.toDoubleOrNull() != null) {
             val existingIngredient = allIngredients.value.find { it.displayName.equals(ingredientName, ignoreCase = true) }
-            val ingredientId = existingIngredient?.uuid ?: UUID.randomUUID()
+            val ingredientId = existingIngredient?.uuid ?: UuidV7Generator.newId()
 
             val ingredient = RecipeIngredient(
                 ingredientId = ingredientId,
@@ -230,7 +179,7 @@ class CreateRecipeViewModel @Inject constructor(
         val stepText = _uiState.value.steps.input.trim()
         if (stepText.isNotBlank()) {
             val newStep = RecipeStep(
-                uuid = UUID.randomUUID(),
+                uuid = UuidV7Generator.newId(),
                 orderIndex = _uiState.value.steps.steps.size,
                 instruction = stepText
             )
@@ -315,7 +264,7 @@ class CreateRecipeViewModel @Inject constructor(
         if (tagName.isNotBlank() && _uiState.value.tags.selectedTags.none { it.displayName == tagName }) {
             val existingTag = allTags.value.find { it.displayName.equals(tagName, ignoreCase = true) }
             val newTag = existingTag ?: Tag(
-                uuid = UUID.randomUUID(),
+                uuid = UuidV7Generator.newId(),
                 displayName = tagName
             )
             _uiState.update {
@@ -359,7 +308,7 @@ class CreateRecipeViewModel @Inject constructor(
         if (labelName.isNotBlank() && _uiState.value.labels.selectedLabels.none { it.displayName == labelName }) {
             val existingLabel = allLabels.value.find { it.displayName.equals(labelName, ignoreCase = true) }
             val newLabel = existingLabel ?: Label(
-                uuid = UUID.randomUUID(),
+                uuid = UuidV7Generator.newId(),
                 displayName = labelName
             )
             _uiState.update {
@@ -424,7 +373,7 @@ class CreateRecipeViewModel @Inject constructor(
 
                 val state = _uiState.value
                 val recipe = Recipe(
-                    uuid = UUID.randomUUID(),
+                    uuid = UuidV7Generator.newId(),
                     title = state.recipeFields.title,
                     description = state.recipeFields.description,
                     imageUrl = state.recipeFields.imageUrl,

@@ -38,8 +38,8 @@ import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.ui.preview.RecipePreviewProvider
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
-import java.util.UUID
 import timber.log.Timber
+import java.util.UUID
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

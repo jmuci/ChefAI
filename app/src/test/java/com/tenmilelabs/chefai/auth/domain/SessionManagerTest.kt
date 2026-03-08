@@ -5,8 +5,19 @@ import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
+import com.tenmilelabs.chefai.auth.domain.usecase.AccountUpgradeUseCase
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
+import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
+import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
+import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -15,16 +26,6 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
-import com.tenmilelabs.chefai.auth.domain.usecase.AccountUpgradeUseCase
-import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
-import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
-import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
-import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
-import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDao
-import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
-import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
-import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
-import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import java.util.UUID
 import javax.inject.Provider
 
@@ -83,7 +84,7 @@ class SessionManagerTest {
             syncSchedulerProvider = { fakeSyncManager },
             applicationScope = testScope
         ).apply {
-            uuidGenerator = { UUID.randomUUID() }
+            uuidGenerator = { UuidV7Generator.newId() }
         }
     }
 
@@ -330,7 +331,7 @@ class SessionManagerTest {
             accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
             syncSchedulerProvider = { FakeSyncManager() },
             applicationScope = testScope
-        ).apply { uuidGenerator = { UUID.randomUUID() } }
+        ).apply { uuidGenerator = { UuidV7Generator.newId() } }
         advanceUntilIdle()
 
         // Then: Session is restored from storage
@@ -356,7 +357,7 @@ class SessionManagerTest {
             accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
             syncSchedulerProvider = { FakeSyncManager() },
             applicationScope = testScope
-        ).apply { uuidGenerator = { UUID.randomUUID() } }
+        ).apply { uuidGenerator = { UuidV7Generator.newId() } }
         advanceUntilIdle()
 
         // Then: displayName and email are restored from storage instead of fallback placeholders
@@ -388,7 +389,7 @@ class SessionManagerTest {
             accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
             syncSchedulerProvider = { FakeSyncManager() },
             applicationScope = testScope
-        ).apply { uuidGenerator = { UUID.randomUUID() } }
+        ).apply { uuidGenerator = { UuidV7Generator.newId() } }
         advanceUntilIdle()
         val restoredSession = newSessionManager.userSession.value as UserSession.Authenticated
         assertThat(restoredSession.user.displayName).isEqualTo(session.user.displayName)
@@ -432,7 +433,7 @@ class SessionManagerTest {
         fakeAuthNetworkDataSource.authResponse = AuthResponse(
             token = "fake_token",
             refreshToken = "fake_refresh",
-            userId = UUID.randomUUID().toString(),
+            userId = UuidV7Generator.newId().toString(),
             username = "",
             email = "test@example.com",
             expiresIn = 3600
@@ -453,7 +454,7 @@ class SessionManagerTest {
     // --- Account Upgrade Tests ---
 
     private fun createRecipeForUser(creatorId: UUID) = RecipeEntity(
-        uuid = UUID.randomUUID(),
+        uuid = UuidV7Generator.newId(),
         title = "Test Recipe",
         description = "A test recipe",
         imageUrl = "",
@@ -532,7 +533,7 @@ class SessionManagerTest {
             accountUpgradeUseCaseProvider = Provider { throw RuntimeException("Upgrade failed") },
             syncSchedulerProvider = { FakeSyncManager() },
             applicationScope = testScope
-        ).apply { uuidGenerator = { UUID.randomUUID() } }
+        ).apply { uuidGenerator = { UuidV7Generator.newId() } }
         advanceUntilIdle()
 
         // When: User logs in (upgrade will throw)

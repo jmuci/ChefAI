@@ -32,7 +32,6 @@ import coil3.request.crossfade
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
-import com.tenmilelabs.chefai.core.ui.preview.RecipeData.recipe
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch

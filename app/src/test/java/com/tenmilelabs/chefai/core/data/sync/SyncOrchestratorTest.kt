@@ -1,13 +1,13 @@
 package com.tenmilelabs.chefai.core.data.sync
 
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
+import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
-import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeStepEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
-import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeAllergenDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeLabelDao
@@ -63,13 +63,13 @@ class SyncOrchestratorTest {
     private val testDispatcher = StandardTestDispatcher()
 
     // Test data
-    private val creatorId = UUID.randomUUID()
-    private val recipeId1 = UUID.randomUUID()
-    private val recipeId2 = UUID.randomUUID()
-    private val stepId1 = UUID.randomUUID()
-    private val ingredientId1 = UUID.randomUUID()
-    private val tagId1 = UUID.randomUUID()
-    private val labelId1 = UUID.randomUUID()
+    private val creatorId = UuidV7Generator.newId()
+    private val recipeId1 = UuidV7Generator.newId()
+    private val recipeId2 = UuidV7Generator.newId()
+    private val stepId1 = UuidV7Generator.newId()
+    private val ingredientId1 = UuidV7Generator.newId()
+    private val tagId1 = UuidV7Generator.newId()
+    private val labelId1 = UuidV7Generator.newId()
 
     @Before
     fun setup() {
@@ -107,7 +107,7 @@ class SyncOrchestratorTest {
     // --- Helper functions ---
 
     private fun createDirtyRecipe(
-        uuid: UUID = UUID.randomUUID(),
+        uuid: UUID = UuidV7Generator.newId(),
         title: String = "Dirty Recipe",
         syncState: SyncState = SyncState.PENDING,
         updatedAt: Long = 1000L
@@ -129,7 +129,7 @@ class SyncOrchestratorTest {
     )
 
     private fun createSyncRecipeDto(
-        uuid: UUID = UUID.randomUUID(),
+        uuid: UUID = UuidV7Generator.newId(),
         title: String = "Server Recipe",
         updatedAt: Long = 2000L,
         deletedAt: Long? = null
@@ -148,7 +148,7 @@ class SyncOrchestratorTest {
         updatedAt = updatedAt,
         deletedAt = deletedAt,
         steps = listOf(
-            SyncRecipeStepDto(uuid = UUID.randomUUID().toString(), orderIndex = 0, instruction = "Step 1")
+            SyncRecipeStepDto(uuid = UuidV7Generator.newId().toString(), orderIndex = 0, instruction = "Step 1")
         ),
         ingredients = listOf(
             SyncRecipeIngredientDto(ingredientId = ingredientId1.toString(), quantity = 100.0, unit = "grams")
@@ -468,7 +468,7 @@ class SyncOrchestratorTest {
         val existingRecipe = createDirtyRecipe(uuid = recipeId1, syncState = SyncState.SYNCED)
         recipeDao.upsertRecipe(existingRecipe)
         recipeStepDao.upsertStep(
-            RecipeStepEntity(UUID.randomUUID(), recipeId1, 0, "Old step", 1000L, null)
+            RecipeStepEntity(UuidV7Generator.newId(), recipeId1, 0, "Old step", 1000L, null)
         )
 
         val serverRecipe = createSyncRecipeDto(uuid = recipeId1, updatedAt = 5000L)

@@ -30,10 +30,7 @@ Below are a couple of the app screens to get an idea of how it looks.
 ## Overall architecture
 ![architecture diagram](docs/img/ChefAI-Architecure.png)
 
-
 ### 🏗️ Architecture Overview
-
-
 
 ChefAI follows a Clean Architecture with an offline-first design.
 

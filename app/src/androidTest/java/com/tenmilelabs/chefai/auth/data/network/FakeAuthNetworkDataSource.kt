@@ -5,7 +5,7 @@ import com.tenmilelabs.chefai.auth.data.network.dto.LoginRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RefreshTokenRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RegisterRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.TokenRefreshResponse
-import java.util.UUID
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 
 /**
  * Fake implementation of AuthNetworkDataSource for instrumented tests.
@@ -99,7 +99,7 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
         return AuthResponse(
             token = "fake_access_token_${System.currentTimeMillis()}",
             refreshToken = "fake_refresh_token_${System.currentTimeMillis()}",
-            userId = UUID.randomUUID().toString(),
+            userId = UuidV7Generator.newId().toString(),
             username = username,
             email = email,
             expiresIn = 3600 // 1 hour in seconds
@@ -113,7 +113,7 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
         return TokenRefreshResponse(
             accessToken = "fake_new_access_token_${System.currentTimeMillis()}",
             refreshToken = "fake_new_refresh_token_${System.currentTimeMillis()}",
-            userId = UUID.randomUUID().toString(),
+            userId = UuidV7Generator.newId().toString(),
             expiresIn = 3600 // 1 hour in seconds
         )
     }

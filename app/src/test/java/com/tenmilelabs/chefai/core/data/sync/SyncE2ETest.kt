@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.core.data.sync
 
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
@@ -64,11 +65,11 @@ class SyncE2ETest {
     private val testDispatcher = StandardTestDispatcher()
 
     // Stable test IDs
-    private val creatorId = UUID.randomUUID()
-    private val ingredientId1 = UUID.randomUUID()
-    private val ingredientId2 = UUID.randomUUID()
-    private val tagId1 = UUID.randomUUID()
-    private val labelId1 = UUID.randomUUID()
+    private val creatorId = UuidV7Generator.newId()
+    private val ingredientId1 = UuidV7Generator.newId()
+    private val ingredientId2 = UuidV7Generator.newId()
+    private val tagId1 = UuidV7Generator.newId()
+    private val labelId1 = UuidV7Generator.newId()
 
     @Before
     fun setup() {
@@ -106,7 +107,7 @@ class SyncE2ETest {
     // --- Helpers ---
 
     private fun createLocalRecipe(
-        uuid: UUID = UUID.randomUUID(),
+        uuid: UUID = UuidV7Generator.newId(),
         title: String = "Local Recipe",
         syncState: SyncState = SyncState.PENDING,
         updatedAt: Long = 1000L,
@@ -129,7 +130,7 @@ class SyncE2ETest {
     )
 
     private fun createServerRecipeDto(
-        uuid: UUID = UUID.randomUUID(),
+        uuid: UUID = UuidV7Generator.newId(),
         title: String = "Server Recipe",
         updatedAt: Long = 2000L,
         deletedAt: Long? = null,
@@ -164,7 +165,7 @@ class SyncE2ETest {
     @Test
     fun `offline create then sync pushes recipe and marks as synced`() = runTest(testDispatcher) {
         // GIVEN: user creates a recipe offline → PENDING state
-        val recipeId = UUID.randomUUID()
+        val recipeId = UuidV7Generator.newId()
         recipeDao.upsertRecipe(createLocalRecipe(uuid = recipeId, title = "Homemade Pasta"))
 
         // Server accepts the push
@@ -194,9 +195,9 @@ class SyncE2ETest {
     @Test
     fun `offline create with steps and ingredients syncs complete aggregate`() = runTest(testDispatcher) {
         // GIVEN: recipe with steps + ingredients created offline
-        val recipeId = UUID.randomUUID()
-        val stepId1 = UUID.randomUUID()
-        val stepId2 = UUID.randomUUID()
+        val recipeId = UuidV7Generator.newId()
+        val stepId1 = UuidV7Generator.newId()
+        val stepId2 = UuidV7Generator.newId()
 
         recipeDao.upsertRecipe(createLocalRecipe(uuid = recipeId, title = "Pancakes"))
         recipeStepDao.upsertStep(RecipeStepEntity(stepId1, recipeId, 0, "Mix dry ingredients", 1000L, null))
@@ -250,7 +251,7 @@ class SyncE2ETest {
     @Test
     fun `delete offline then sync pushes soft delete`() = runTest(testDispatcher) {
         // GIVEN: recipe existed and user deletes it offline
-        val recipeId = UUID.randomUUID()
+        val recipeId = UuidV7Generator.newId()
         val deletedRecipe = createLocalRecipe(
             uuid = recipeId,
             title = "To Be Deleted",
@@ -290,7 +291,7 @@ class SyncE2ETest {
     @Test
     fun `push conflict - server newer replaces local`() = runTest(testDispatcher) {
         // GIVEN: local recipe with updatedAt=1000, PENDING
-        val recipeId = UUID.randomUUID()
+        val recipeId = UuidV7Generator.newId()
         recipeDao.upsertRecipe(
             createLocalRecipe(uuid = recipeId, title = "My Local Version", updatedAt = 1000L)
         )
@@ -300,7 +301,7 @@ class SyncE2ETest {
             uuid = recipeId,
             title = "Other Device Version",
             updatedAt = 2000L,
-            steps = listOf(SyncRecipeStepDto(UUID.randomUUID().toString(), 0, "Server step"))
+            steps = listOf(SyncRecipeStepDto(UuidV7Generator.newId().toString(), 0, "Server step"))
         )
         syncNetworkDataSource.pushResponses.addLast(
             SyncPushResponse(
@@ -336,7 +337,7 @@ class SyncE2ETest {
     @Test
     fun `pull conflict - local PENDING newer preserved`() = runTest(testDispatcher) {
         // GIVEN: local recipe is newer (updatedAt=5000) and PENDING
-        val recipeId = UUID.randomUUID()
+        val recipeId = UuidV7Generator.newId()
         recipeDao.upsertRecipe(
             createLocalRecipe(uuid = recipeId, title = "Local Newer Edit", updatedAt = 5000L)
         )
@@ -378,7 +379,7 @@ class SyncE2ETest {
     @Test
     fun `full cycle - push accepted then pull brings other device changes`() = runTest(testDispatcher) {
         // GIVEN: a local PENDING recipe
-        val localRecipeId = UUID.randomUUID()
+        val localRecipeId = UuidV7Generator.newId()
         recipeDao.upsertRecipe(
             createLocalRecipe(uuid = localRecipeId, title = "My Recipe", updatedAt = 1000L)
         )
@@ -395,13 +396,13 @@ class SyncE2ETest {
         )
 
         // Pull phase: server returns a different recipe from another device
-        val otherDeviceRecipeId = UUID.randomUUID()
+        val otherDeviceRecipeId = UuidV7Generator.newId()
         val otherDeviceRecipe = createServerRecipeDto(
             uuid = otherDeviceRecipeId,
             title = "Recipe From Other Device",
             updatedAt = 4500L,
             steps = listOf(
-                SyncRecipeStepDto(UUID.randomUUID().toString(), 0, "Step from other device")
+                SyncRecipeStepDto(UuidV7Generator.newId().toString(), 0, "Step from other device")
             )
         )
         syncNetworkDataSource.pullResponses.addLast(

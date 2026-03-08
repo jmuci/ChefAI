@@ -4,7 +4,6 @@ import com.tenmilelabs.chefai.core.data.sync.network.dto.AcceptedEntityDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPullResponse
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPushRequest
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPushResponse
-import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeDto
 
 /**
  * A configurable fake [SyncNetworkDataSource] for testing.

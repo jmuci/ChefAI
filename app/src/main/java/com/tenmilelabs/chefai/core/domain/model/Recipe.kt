@@ -1,7 +1,7 @@
 package com.tenmilelabs.chefai.core.domain.model
 
-import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import java.util.UUID
 
 /**

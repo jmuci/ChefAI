@@ -4,6 +4,7 @@ import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.usecase.AccountUpgradeUseCase
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
@@ -16,7 +17,6 @@ import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
-import java.util.UUID
 
 /**
  * No-op implementation of [SyncScheduler] for testing.
@@ -60,7 +60,7 @@ fun createTestSessionManager(
         syncSchedulerProvider = { FakeSyncScheduler() },
         applicationScope = testScope
     ).apply {
-        uuidGenerator = { UUID.randomUUID() }
+        uuidGenerator = { UuidV7Generator.newId() }
     }
 
     // Synchronously load the session to ensure it's fully initialized before the test runs.
@@ -90,7 +90,7 @@ fun createRealSessionManagerWithFakes(
         syncSchedulerProvider = { FakeSyncManager() },
         applicationScope = testScope
     ).apply {
-        uuidGenerator = { UUID.randomUUID() }
+        uuidGenerator = { UuidV7Generator.newId() }
     }
     return sessionManager
 }

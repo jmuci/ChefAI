@@ -10,10 +10,10 @@ import com.tenmilelabs.chefai.auth.data.network.dto.RegisterRequest
 import com.tenmilelabs.chefai.auth.domain.model.AuthToken
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.auth.domain.usecase.AccountUpgradeUseCase
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.UserEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.UserDao
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
-import com.tenmilelabs.chefai.core.data.local.util.generateUuid7
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import com.tenmilelabs.chefai.core.di.ApplicationScope
 import com.tenmilelabs.chefai.core.domain.model.User
@@ -45,7 +45,7 @@ class SessionManager @Inject constructor(
 ) : TokenProvider {
 
     /** Override in tests to avoid the UUIDv7 library dependency. */
-    internal var uuidGenerator: () -> UUID = { generateUuid7() }
+    internal var uuidGenerator: () -> UUID = { UuidV7Generator.newId() }
 
     private val _userSession = MutableStateFlow<UserSession>(UserSession.Loading)
     val userSession: StateFlow<UserSession> = _userSession.asStateFlow()

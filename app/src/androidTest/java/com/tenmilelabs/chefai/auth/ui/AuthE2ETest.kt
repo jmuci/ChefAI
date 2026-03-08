@@ -14,13 +14,13 @@ import com.tenmilelabs.chefai.MainActivity
 import com.tenmilelabs.chefai.R.string
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import java.util.UUID
 import javax.inject.Inject
 
 /**
@@ -79,7 +79,7 @@ class AuthE2ETest {
         fakeAuthDataSource.existingUsers[testEmail] = AuthResponse(
             token = "fake_access_token",
             refreshToken = "fake_refresh_token",
-            userId = UUID.randomUUID().toString(),
+            userId = UuidV7Generator.newId().toString(),
             username = testUsername,
             email = testEmail,
             expiresIn = 3600

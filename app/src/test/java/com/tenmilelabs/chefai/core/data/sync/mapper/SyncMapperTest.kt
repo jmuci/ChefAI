@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.core.data.sync.mapper
 
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
@@ -17,14 +18,14 @@ import java.util.UUID
 class SyncMapperTest {
 
     // --- Test data ---
-    private val recipeId = UUID.randomUUID()
-    private val creatorId = UUID.randomUUID()
-    private val ingredientId1 = UUID.randomUUID()
-    private val ingredientId2 = UUID.randomUUID()
-    private val stepId1 = UUID.randomUUID()
-    private val stepId2 = UUID.randomUUID()
-    private val tagId1 = UUID.randomUUID()
-    private val labelId1 = UUID.randomUUID()
+    private val recipeId = UuidV7Generator.newId()
+    private val creatorId = UuidV7Generator.newId()
+    private val ingredientId1 = UuidV7Generator.newId()
+    private val ingredientId2 = UuidV7Generator.newId()
+    private val stepId1 = UuidV7Generator.newId()
+    private val stepId2 = UuidV7Generator.newId()
+    private val tagId1 = UuidV7Generator.newId()
+    private val labelId1 = UuidV7Generator.newId()
     private val updatedAt = 1000000L
 
     private val recipeEntity = RecipeEntity(
