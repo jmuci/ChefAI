@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.core.testutil
 
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.AllergenEntity
 import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.LabelEntity

@@ -1,9 +1,9 @@
 package com.tenmilelabs.chefai.core.data.local.util
 
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
-import java.util.UUID
 
 class UuidExtensionsTest {
 

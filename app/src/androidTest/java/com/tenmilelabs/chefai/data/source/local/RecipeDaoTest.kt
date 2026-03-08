@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider.getApplicationContext
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.UserEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
@@ -16,7 +17,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.util.UUID
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)

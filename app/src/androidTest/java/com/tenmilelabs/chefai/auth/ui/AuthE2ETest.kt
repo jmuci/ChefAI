@@ -14,13 +14,13 @@ import com.tenmilelabs.chefai.MainActivity
 import com.tenmilelabs.chefai.R.string
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import java.util.UUID
 import javax.inject.Inject
 
 /**

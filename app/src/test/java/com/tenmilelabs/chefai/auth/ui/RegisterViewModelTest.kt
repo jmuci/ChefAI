@@ -7,6 +7,7 @@ import com.tenmilelabs.chefai.auth.data.network.AuthHttpException
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.usecase.AccountUpgradeUseCase
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
@@ -24,7 +25,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import java.util.UUID
 
 /**
  * Unit tests for RegisterViewModel.

@@ -5,7 +5,7 @@ import com.tenmilelabs.chefai.auth.data.network.dto.LoginRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RefreshTokenRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RegisterRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.TokenRefreshResponse
-import java.util.UUID
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 
 /**
  * Fake implementation of AuthNetworkDataSource for instrumented tests.

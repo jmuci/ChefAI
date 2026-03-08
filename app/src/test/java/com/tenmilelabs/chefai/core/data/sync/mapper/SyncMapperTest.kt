@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.core.data.sync.mapper
 
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef

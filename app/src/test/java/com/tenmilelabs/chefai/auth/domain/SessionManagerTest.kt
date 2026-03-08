@@ -6,6 +6,7 @@ import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.auth.domain.usecase.AccountUpgradeUseCase
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
