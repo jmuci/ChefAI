@@ -1,14 +1,14 @@
 # 🔄 ADR 006 – Sync Protocol: Logic, Triggers and Conflicts
 
-**Date:** 2026-02-25
+**Date:** 2026-03-08 (updated from 2026-02-25)
 
 **Status:** Accepted
 
-**Context:** ChefAI must work fully offline, allow recipe creation without login, and sync data incrementally when connected. This ADR captures the key architectural decisions made during the implementation of RFC-001 (Phases 1–5).
+**Context:** ChefAI must work fully offline, allow recipe creation without login, and sync data incrementally when connected. This ADR captures the key architectural decisions made during the implementation of RFC-001 (Phases 1–5) and subsequent refinements.
 
-**Supersedes:** ADR-003 [adr-003–two-step-BE-sync](adr-003%E2%80%93two-step-BE-sync.md)(Two-Step Sync)
+**Supersedes:** ADR-003 [adr-003–two-step-BE-sync](adr-003%E2%80%93two-step-BE-sync.md) (Two-Step Sync)
 
-**Related:** ADR-001 (Hybrid Architecture), ADR-002 (Local DB & ID Generation), RFC-001
+**Related:** ADR-001 (Hybrid Architecture), ADR-002 (Local DB & ID Generation), ADR-007 (Anonymous-First), ADR-008 (Data Handling Across Sessions), RFC-001
 
 ---
 
@@ -25,6 +25,20 @@ Push runs first so that the server has the client's latest state before computin
 
 Recipes are synced as **complete aggregates** (recipe + steps + ingredients + tags + labels) in a single DTO. This avoids partial-entity states on the server and simplifies conflict resolution — the server never sees an orphaned step without its parent recipe.
 
+### Push Ingredient Filtering
+
+Push payloads only include ingredient refs where the ingredient has `syncState = SYNCED` in the local `ingredients` table — i.e., it was previously pulled from the server. Locally-seeded or unrecognized ingredient IDs are dropped with a warning log. This prevents `INGREDIENT_NOT_FOUND` rejections that would leave recipes stuck as `PENDING` indefinitely.
+
+### Pull Reference Data Ordering
+
+The pull response includes reference data alongside recipes. These are upserted in FK dependency order before any recipe row is written:
+
+```
+allergens → source_classifications → ingredients → tags → labels → recipes
+```
+
+Before a recipe is inserted, the orchestrator checks that its `creatorId` exists in the local `users` table. If not, a stub user (`syncState = SYNCED`, empty display fields) is inserted. This handles post-wipe re-sync and public recipes authored by other server users.
+
 ### Batching & Pagination
 
 - Push batches dirty recipes in groups of 50.
@@ -33,7 +47,9 @@ Recipes are synced as **complete aggregates** (recipe + steps + ingredients + ta
 ### Rationale
 
 - Push-before-pull reduces conflict frequency by ensuring the server sees local changes before reporting deltas.
-- Aggregate-level sync maintains data consistency without requiring cross-table transactional sync.
+- Aggregate-level sync maintains consistency without cross-table transactional sync.
+- Ingredient filtering prevents server rejections from locally-seeded or legacy data.
+- Creator stub insertion unblocks pull for cross-user recipes without a schema migration.
 - Batching keeps HTTP payloads bounded for large offline editing sessions.
 
 ---
@@ -111,20 +127,26 @@ interface SyncScheduler {
 
 - **Full offline capability:** All CRUD operations work without connectivity.
 - **Predictable sync:** Push-before-pull with last-writer-wins is deterministic and debuggable.
-- **Testable:** `SyncScheduler` and `ConnectivityObserver` interfaces enable 169 unit tests with zero Android framework dependency.
+- **Testable:** `SyncScheduler` and `ConnectivityObserver` interfaces enable 350+ unit tests with zero Android framework dependency.
 - **Observable:** `SyncStatusIndicator` in the TopAppBar shows real-time sync state (syncing, synced, error, offline).
+- **Resilient to data gaps:** Pull gracefully handles missing creator users via stub insertion; push skips unrecognized ingredient references.
 
 ### Trade-offs
 
 - **Last-writer-wins can lose edits:** If two devices edit the same recipe simultaneously, the slower device's changes are silently overwritten. Acceptable for v1 single-user scenarios.
 - **No real-time push:** Sync is poll-based (periodic + event-driven). A future WebSocket/FCM layer could reduce latency.
 - **Aggregate-level granularity:** Editing a single step re-syncs the entire recipe aggregate. Fine for typical recipe sizes but may need refinement for very large entities.
+- **Creator stubs are placeholder data:** Stub users have empty display fields and are not enriched unless a future user-profile sync endpoint is introduced.
+- **Ingredient filtering is silent:** Ingredient refs dropped during push are not surfaced to the user. If this happens in production, it indicates a data integrity issue worth investigating.
 
 ---
 
 ## References
 
 - [RFC-001: Offline-First Architecture & Sync Protocol](../rfcs/rfc-001-offline-first-sync.md)
+- [Sync Deep Dive: Step-by-Step & Manual Testing](../sync-deep-dive.md)
 - ADR-001: Hybrid Architecture Choice
 - ADR-002: Local DB Choice & ID Generation
 - ADR-003: Two-Step Synchronization (superseded by this ADR)
+- ADR-007: Anonymous-First Session Model
+- ADR-008: Local Database Behavior on Logout and Account Switch
