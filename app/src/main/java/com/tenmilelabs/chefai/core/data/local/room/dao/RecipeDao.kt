@@ -87,6 +87,9 @@ interface RecipeDao {
     @Query("DELETE FROM recipes")
     suspend fun deleteAllRecipes()
 
+    @Query("DELETE FROM recipes WHERE creatorId = :creatorId")
+    suspend fun deleteRecipesForUser(creatorId: UUID)
+
     @Upsert
     suspend fun upsertRecipe(recipe: RecipeEntity)
 

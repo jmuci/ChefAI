@@ -194,6 +194,19 @@ class FakeRecipeDao : RecipeDao {
         triggerUpdate()
     }
 
+    override suspend fun deleteRecipesForUser(creatorId: UUID) {
+        val recipeIds = recipes.values
+            .filter { it.creatorId == creatorId }
+            .map { it.uuid }
+            .toSet()
+        recipes.entries.removeAll { it.value.creatorId == creatorId }
+        steps.values.removeAll { it.recipeId in recipeIds }
+        recipeIngredients.removeAll { it.recipeId in recipeIds }
+        recipeLabels.removeAll { it.recipeId in recipeIds }
+        recipeTags.removeAll { it.recipeId in recipeIds }
+        triggerUpdate()
+    }
+
     override suspend fun upsertRecipe(recipe: RecipeEntity) {
         recipes[recipe.uuid] = recipe
         triggerUpdate()
