@@ -141,10 +141,7 @@ fun ChefAINavGraph(
                     } else {
                         null
                     },
-                    onLogout = {
-                        // User returns to anonymous mode; stay on Home
-                        navActions.navigateToHome()
-                    },
+                    onLogout = {},
                     onLogin = {
                         navActions.navigateToLogin()
                     }

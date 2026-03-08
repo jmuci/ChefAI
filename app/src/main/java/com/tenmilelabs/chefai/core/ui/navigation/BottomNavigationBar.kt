@@ -9,8 +9,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -19,6 +18,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 
@@ -48,19 +48,21 @@ enum class TopLevelDestination(
 fun BottomNavigationBar(
     navController: NavController
 ) {
-    val selectedNavigationIndex = rememberSaveable {
-        mutableIntStateOf(0)
-    }
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
 
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.primaryContainer,
     ) {
         TopLevelDestination.entries.forEachIndexed { index, item ->
             NavigationBarItem(
-                selected = selectedNavigationIndex.intValue == index,
+                selected = currentRoute == item.appDestination.route,
                 onClick = {
-                    selectedNavigationIndex.intValue = index
-                    navController.navigate(item.appDestination.route)
+                    navController.navigate(item.appDestination.route) {
+                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
                 },
                 icon = {
                     Icon(
