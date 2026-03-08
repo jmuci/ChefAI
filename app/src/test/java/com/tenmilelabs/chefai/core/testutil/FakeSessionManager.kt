@@ -2,18 +2,21 @@ package com.tenmilelabs.chefai.core.testutil
 
 import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
+import com.tenmilelabs.chefai.auth.domain.AccountSwitchHandler
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.usecase.AccountUpgradeUseCase
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
-import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
+import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -42,10 +45,17 @@ fun createTestSessionManager(
     testScope: CoroutineScope = CoroutineScope(Dispatchers.Main)
 ): SessionManager {
     val fakeUserDao = FakeUserDao()
+    val fakeSecurePreferences = FakeSecurePreferences()
     val sessionManager = SessionManager(
-        securePreferences = FakeSecurePreferences(),
+        securePreferences = fakeSecurePreferences,
         authNetworkDataSource = { FakeAuthNetworkDataSource() },
         userDao = fakeUserDao,
+        accountSwitchHandler = AccountSwitchHandler(
+            securePreferences = fakeSecurePreferences,
+            database = mockk<ChefAIDataBase>(relaxed = true),
+            recipeDao = FakeRecipeDao(),
+            userDao = fakeUserDao
+        ),
         accountUpgradeUseCaseProvider = {
             AccountUpgradeUseCase(
                 FakeTransactionRunner(),
@@ -76,10 +86,17 @@ fun createRealSessionManagerWithFakes(
     testScope: CoroutineScope = CoroutineScope(Dispatchers.Main)
 ): SessionManager {
     val fakeUserDao = FakeUserDao()
+    val fakeSecurePreferences = FakeSecurePreferences()
     val sessionManager = SessionManager(
-        securePreferences = FakeSecurePreferences(),
+        securePreferences = fakeSecurePreferences,
         authNetworkDataSource = { FakeAuthNetworkDataSource() },
         userDao = fakeUserDao,
+        accountSwitchHandler = AccountSwitchHandler(
+            securePreferences = fakeSecurePreferences,
+            database = mockk<ChefAIDataBase>(relaxed = true),
+            recipeDao = FakeRecipeDao(),
+            userDao = fakeUserDao
+        ),
         accountUpgradeUseCaseProvider = {
             AccountUpgradeUseCase(
                 FakeTransactionRunner(), fakeUserDao, FakeRecipeDao(),
