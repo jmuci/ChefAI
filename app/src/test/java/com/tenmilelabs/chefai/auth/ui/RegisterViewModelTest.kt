@@ -5,10 +5,12 @@ import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
 import com.tenmilelabs.chefai.auth.data.network.AuthHttpException
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
+import com.tenmilelabs.chefai.auth.domain.AccountSwitchHandler
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.usecase.AccountUpgradeUseCase
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
+import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDao
@@ -17,6 +19,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
+import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -49,13 +52,20 @@ class RegisterViewModelTest {
         fakeAuthNetworkDataSource = FakeAuthNetworkDataSource()
 
         val fakeUserDao = FakeUserDao()
+        val fakeRecipeDao = FakeRecipeDao()
         sessionManager = SessionManager(
             securePreferences = fakeSecurePreferences,
             authNetworkDataSource = { fakeAuthNetworkDataSource },
             userDao = fakeUserDao,
+            accountSwitchHandler = AccountSwitchHandler(
+                securePreferences = fakeSecurePreferences,
+                database = mockk<ChefAIDataBase>(relaxed = true),
+                recipeDao = fakeRecipeDao,
+                userDao = fakeUserDao
+            ),
             accountUpgradeUseCaseProvider = {
                 AccountUpgradeUseCase(
-                    FakeTransactionRunner(), fakeUserDao, FakeRecipeDao(),
+                    FakeTransactionRunner(), fakeUserDao, fakeRecipeDao,
                     FakeRecipeStepDao(), FakeRecipeIngredientDao(),
                     FakeRecipeTagCrossRefDao(), FakeRecipeLabelCrossRefDao()
                 )

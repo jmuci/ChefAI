@@ -18,6 +18,8 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
+import io.mockk.coVerify
+import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -28,6 +30,7 @@ import org.junit.Before
 import org.junit.Test
 import java.util.UUID
 import javax.inject.Provider
+import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 
 /**
  * Unit tests for SessionManager with anonymous-first session model.
@@ -46,6 +49,8 @@ class SessionManagerTest {
     private lateinit var fakeRecipeLabelCrossRefDao: FakeRecipeLabelCrossRefDao
     private lateinit var accountUpgradeUseCaseProvider: Provider<AccountUpgradeUseCase>
     private lateinit var fakeSyncManager: FakeSyncManager
+    private lateinit var mockDatabase: ChefAIDataBase
+    private lateinit var accountSwitchHandler: AccountSwitchHandler
     private lateinit var testScope: TestScope
     private val testDispatcher = StandardTestDispatcher()
 
@@ -74,12 +79,20 @@ class SessionManagerTest {
         }
 
         fakeSyncManager = FakeSyncManager()
+        mockDatabase = mockk(relaxed = true)
+        accountSwitchHandler = AccountSwitchHandler(
+            securePreferences = fakeSecurePreferences,
+            database = mockDatabase,
+            recipeDao = fakeRecipeDao,
+            userDao = fakeUserDao
+        )
 
         // Create SessionManager with test scope
         sessionManager = SessionManager(
             securePreferences = fakeSecurePreferences,
             authNetworkDataSource = { fakeAuthNetworkDataSource },
             userDao = fakeUserDao,
+            accountSwitchHandler = accountSwitchHandler,
             accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
             syncSchedulerProvider = { fakeSyncManager },
             applicationScope = testScope
@@ -328,6 +341,7 @@ class SessionManagerTest {
             securePreferences = fakeSecurePreferences,
             authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
             userDao = fakeUserDao,
+            accountSwitchHandler = accountSwitchHandler,
             accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
             syncSchedulerProvider = { FakeSyncManager() },
             applicationScope = testScope
@@ -354,6 +368,7 @@ class SessionManagerTest {
             securePreferences = fakeSecurePreferences,
             authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
             userDao = fakeUserDao,
+            accountSwitchHandler = accountSwitchHandler,
             accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
             syncSchedulerProvider = { FakeSyncManager() },
             applicationScope = testScope
@@ -386,6 +401,7 @@ class SessionManagerTest {
             securePreferences = fakeSecurePreferences,
             authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
             userDao = fakeUserDao,
+            accountSwitchHandler = accountSwitchHandler,
             accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
             syncSchedulerProvider = { FakeSyncManager() },
             applicationScope = testScope
@@ -449,6 +465,53 @@ class SessionManagerTest {
 
         val session = sessionManager.userSession.value as UserSession.Authenticated
         assertThat(session.user.displayName).isEqualTo("myusername")
+    }
+
+    @Test
+    fun `login stores authenticated user id for future account switch checks`() = testScope.runTest {
+        sessionManager.login("alice@example.com", "password123")
+
+        val storedUserId = sessionManager.getStoredCurrentUserId()
+        val session = sessionManager.userSession.value as UserSession.Authenticated
+
+        assertThat(storedUserId).isEqualTo(session.user.uuid)
+    }
+
+    @Test
+    fun `login with same stored account keeps local database`() = testScope.runTest {
+        val sameUserId = UuidV7Generator.newId()
+        fakeSecurePreferences.setCurrentUserId(sameUserId)
+        fakeAuthNetworkDataSource.authResponse = AuthResponse(
+            token = "fake_token",
+            refreshToken = "fake_refresh",
+            userId = sameUserId.toString(),
+            username = "sameuser",
+            email = "same@example.com",
+            expiresIn = 3600
+        )
+
+        sessionManager.login("same@example.com", "password123")
+
+        coVerify(exactly = 0) { mockDatabase.clearAllTables() }
+    }
+
+    @Test
+    fun `login with different stored account while anonymous session exists preserves anonymous path`() = testScope.runTest {
+        fakeSecurePreferences.setCurrentUserId(UuidV7Generator.newId())
+        val newUserId = UuidV7Generator.newId()
+        fakeAuthNetworkDataSource.authResponse = AuthResponse(
+            token = "fake_token",
+            refreshToken = "fake_refresh",
+            userId = newUserId.toString(),
+            username = "newuser",
+            email = "new@example.com",
+            expiresIn = 3600
+        )
+
+        sessionManager.login("new@example.com", "password123")
+
+        coVerify(exactly = 0) { mockDatabase.clearAllTables() }
+        assertThat(sessionManager.getStoredCurrentUserId()).isEqualTo(newUserId)
     }
 
     // --- Account Upgrade Tests ---
@@ -521,6 +584,118 @@ class SessionManagerTest {
     }
 
     @Test
+    fun `first anonymous to registered upgrade keeps local data and does not clear database`() = testScope.runTest {
+        // Given: First-time anonymous session with local data and no prior authenticated user
+        sessionManager.loadSession()
+        val anonSession = sessionManager.userSession.first() as UserSession.Anonymous
+        val anonUserId = anonSession.localUserId
+        assertThat(fakeSecurePreferences.getStoredCurrentUserId().first()).isNull()
+
+        val recipe = createRecipeForUser(anonUserId)
+        fakeRecipeDao.seed(
+            users = listOf(fakeUserDao.getUserById(anonUserId)!!),
+            recipes = listOf(recipe)
+        )
+
+        // When: The anonymous user registers for the first time
+        val result = sessionManager.register("firstuser", "first@example.com", "password123")
+
+        // Then: The database is not cleared
+        assertThat(result.isSuccess).isTrue()
+        coVerify(exactly = 0) { mockDatabase.clearAllTables() }
+
+        // And: The local anonymous recipe is preserved by being reassigned to the new account
+        val authSession = sessionManager.userSession.first() as UserSession.Authenticated
+        val updatedRecipe = fakeRecipeDao.getRecipeById(recipe.uuid)
+        assertThat(updatedRecipe).isNotNull()
+        assertThat(updatedRecipe?.creatorId).isEqualTo(authSession.user.uuid)
+        assertThat(fakeSecurePreferences.getStoredCurrentUserId().first()).isEqualTo(authSession.user.uuid)
+    }
+
+    @Test
+    fun `login skips anonymous recipe transfer when account switched`() = testScope.runTest {
+        sessionManager.loadSession()
+        val anonSession = sessionManager.userSession.first() as UserSession.Anonymous
+        val anonUserId = anonSession.localUserId
+        val recipe = createRecipeForUser(anonUserId)
+        fakeRecipeDao.seed(
+            users = listOf(fakeUserDao.getUserById(anonUserId)!!),
+            recipes = listOf(recipe)
+        )
+
+        fakeSecurePreferences.setCurrentUserId(UuidV7Generator.newId())
+        val newUserId = UuidV7Generator.newId()
+        fakeAuthNetworkDataSource.authResponse = AuthResponse(
+            token = "fake_token",
+            refreshToken = "fake_refresh",
+            userId = newUserId.toString(),
+            username = "switched",
+            email = "switched@example.com",
+            expiresIn = 3600
+        )
+
+        val result = sessionManager.login("switched@example.com", "password123")
+
+        assertThat(result.isSuccess).isTrue()
+        coVerify(exactly = 0) { mockDatabase.clearAllTables() }
+        val migratedRecipe = fakeRecipeDao.getRecipeById(recipe.uuid)
+        val authSession = sessionManager.userSession.first() as UserSession.Authenticated
+        assertThat(migratedRecipe?.creatorId).isEqualTo(authSession.user.uuid)
+    }
+
+    @Test
+    fun `login as different user after logout preserves new anonymous data but removes previous authenticated data`() = testScope.runTest {
+        sessionManager.loadSession()
+        val initialAnonymousSession = sessionManager.userSession.first() as UserSession.Anonymous
+
+        val previousLogin = sessionManager.login("user1@example.com", "password123")
+        assertThat(previousLogin.isSuccess).isTrue()
+        val user1Session = sessionManager.userSession.first() as UserSession.Authenticated
+        val user1Id = user1Session.user.uuid
+
+        val user1Recipe = createRecipeForUser(user1Id)
+        fakeRecipeDao.seed(
+            users = listOf(fakeUserDao.getUserById(initialAnonymousSession.localUserId)!!),
+            recipes = listOf(user1Recipe)
+        )
+        fakeUserDao.upsertUser(
+            com.tenmilelabs.chefai.core.data.local.room.UserEntity(
+                uuid = user1Id,
+                displayName = user1Session.user.displayName,
+                email = user1Session.user.email,
+                avatarUrl = user1Session.user.avatarUrl,
+                updatedAt = System.currentTimeMillis(),
+                deletedAt = null,
+                syncState = SyncState.SYNCED
+            )
+        )
+
+        sessionManager.logout()
+        val anonymousAfterLogout = sessionManager.userSession.first() as UserSession.Anonymous
+        val anonymousRecipe = createRecipeForUser(anonymousAfterLogout.localUserId)
+        fakeRecipeDao.upsertRecipe(anonymousRecipe)
+
+        val user2Id = UuidV7Generator.newId()
+        fakeAuthNetworkDataSource.authResponse = AuthResponse(
+            token = "fake_token",
+            refreshToken = "fake_refresh",
+            userId = user2Id.toString(),
+            username = "user2",
+            email = "user2@example.com",
+            expiresIn = 3600
+        )
+
+        val result = sessionManager.login("user2@example.com", "password123")
+
+        assertThat(result.isSuccess).isTrue()
+        coVerify(exactly = 0) { mockDatabase.clearAllTables() }
+        val authSession = sessionManager.userSession.first() as UserSession.Authenticated
+        assertThat(fakeRecipeDao.getRecipeById(user1Recipe.uuid)).isNull()
+        assertThat(fakeUserDao.getUserById(user1Id)).isNull()
+        assertThat(fakeRecipeDao.getRecipeById(anonymousRecipe.uuid)?.creatorId).isEqualTo(authSession.user.uuid)
+    }
+
+    @Test
     fun `login succeeds even if upgrade throws`() = testScope.runTest {
         // Given: Anonymous session
         sessionManager.loadSession()
@@ -530,6 +705,7 @@ class SessionManagerTest {
             securePreferences = fakeSecurePreferences,
             authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
             userDao = fakeUserDao,
+            accountSwitchHandler = accountSwitchHandler,
             accountUpgradeUseCaseProvider = Provider { throw RuntimeException("Upgrade failed") },
             syncSchedulerProvider = { FakeSyncManager() },
             applicationScope = testScope

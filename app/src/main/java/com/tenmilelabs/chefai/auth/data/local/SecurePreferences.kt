@@ -51,6 +51,7 @@ class SecurePreferences @Inject constructor(
         private val KEY_REFRESH_TOKEN = stringPreferencesKey("refresh_token")
         private val KEY_TOKEN_EXPIRY = stringPreferencesKey("token_expiry")
         private val KEY_LOCAL_USER_ID = stringPreferencesKey("local_user_id")
+        private val KEY_CURRENT_USER_ID = stringPreferencesKey("current_user_id")
     }
 
     private val dataStore: DataStore<Preferences> = context.dataStore
@@ -253,6 +254,29 @@ class SecurePreferences @Inject constructor(
         } catch (e: Exception) {
             Timber.e(e, "Failed to clear local user ID")
             throw e
+        }
+    }
+
+    override suspend fun setCurrentUserId(userId: UUID) {
+        try {
+            dataStore.edit { prefs ->
+                prefs[KEY_CURRENT_USER_ID] = encrypt(userId.toString())
+            }
+            Timber.d("Current authenticated user ID saved securely")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to save current authenticated user ID")
+            throw e
+        }
+    }
+
+    override fun getStoredCurrentUserId(): Flow<UUID?> = dataStore.data.map { prefs ->
+        prefs[KEY_CURRENT_USER_ID]?.let { encrypted ->
+            try {
+                UUID.fromString(decrypt(encrypted))
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to read current authenticated user ID from preferences")
+                null
+            }
         }
     }
 }

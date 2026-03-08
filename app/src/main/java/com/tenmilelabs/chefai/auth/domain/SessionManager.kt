@@ -39,6 +39,7 @@ class SessionManager @Inject constructor(
     private val securePreferences: SecurePreferencesInterface,
     private val authNetworkDataSource: Provider<AuthNetworkDataSource>,
     private val userDao: UserDao,
+    private val accountSwitchHandler: AccountSwitchHandler,
     private val accountUpgradeUseCaseProvider: Provider<AccountUpgradeUseCase>,
     private val syncSchedulerProvider: Provider<SyncScheduler>,
     @param:ApplicationScope private val applicationScope: CoroutineScope
@@ -197,9 +198,13 @@ class SessionManager @Inject constructor(
 
             val authToken = response.toAuthToken()
             val user = response.toUser()
+            val accountSwitchOutcome = accountSwitchHandler.handleLogin(
+                newUserId = user.uuid,
+                anonymousUserId = anonymousUserId
+            )
 
             // Run the anonymous → authenticated data upgrade if we had anonymous data
-            if (anonymousUserId != null) {
+            if (anonymousUserId != null && accountSwitchOutcome != AccountSwitchOutcome.CLEARED_DATABASE) {
                 try {
                     val upgraded = accountUpgradeUseCaseProvider.get()
                         .execute(anonymousUserId, user)
@@ -207,6 +212,8 @@ class SessionManager @Inject constructor(
                 } catch (e: Exception) {
                     Timber.e(e, "Account upgrade failed, but login succeeded. Recipes may not be transferred.")
                 }
+            } else if (accountSwitchOutcome == AccountSwitchOutcome.CLEARED_DATABASE) {
+                Timber.d("Skipped anonymous data upgrade because local database was cleared for account switch")
             }
 
             // Save to secure storage
@@ -266,9 +273,13 @@ class SessionManager @Inject constructor(
             } else {
                 responseUser
             }
+            val accountSwitchOutcome = accountSwitchHandler.handleLogin(
+                newUserId = user.uuid,
+                anonymousUserId = anonymousUserId
+            )
 
             // Run the anonymous → authenticated data upgrade if we had anonymous data
-            if (anonymousUserId != null) {
+            if (anonymousUserId != null && accountSwitchOutcome != AccountSwitchOutcome.CLEARED_DATABASE) {
                 try {
                     val upgraded = accountUpgradeUseCaseProvider.get()
                         .execute(anonymousUserId, user)
@@ -276,6 +287,8 @@ class SessionManager @Inject constructor(
                 } catch (e: Exception) {
                     Timber.e(e, "Account upgrade failed, but registration succeeded.")
                 }
+            } else if (accountSwitchOutcome == AccountSwitchOutcome.CLEARED_DATABASE) {
+                Timber.d("Skipped anonymous data upgrade because local database was cleared for account switch")
             }
 
             // Save to secure storage
@@ -395,6 +408,10 @@ class SessionManager @Inject constructor(
             is UserSession.Authenticated -> session.user.uuid
             is UserSession.Loading -> null
         }
+    }
+
+    suspend fun getStoredCurrentUserId(): UUID? {
+        return securePreferences.getStoredCurrentUserId().first()
     }
 
     /**
