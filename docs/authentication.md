@@ -5,11 +5,11 @@
 The ChefAI app implements a comprehensive authentication system with secure token management. The
 system is designed to:
 
-- Securely store authentication tokens using Android's EncryptedDataStore
+- Securely store authentication tokens and session identifiers using encrypted DataStore
 - Manage user session state across the application
 - Automatically add auth tokens to network requests
 - Support token refresh functionality
-- Provide a mock user for development until backend authentication is ready
+- Support the app's anonymous-first model and account upgrade flow
 
 ## Architecture
 
@@ -24,7 +24,9 @@ The core singleton class that manages user authentication state.
 - Exposes `userSession: StateFlow<UserSession>` for observing authentication state
 - Handles login, logout, and token refresh operations
 - Automatically loads session on app startup
-- Uses mock user (`F47AC10B58CC4372A5670E02B2C3D479`) for development
+- Always resolves to either an anonymous session or an authenticated session
+- Preserves anonymous data on anonymous-to-authenticated upgrade
+- Runs account-switch handling before scheduling sync work
 
 **Main Methods:**
 
@@ -33,7 +35,10 @@ The core singleton class that manages user authentication state.
 suspend fun loadSession()
 
 // Login with credentials 
-suspend fun login(email: String, password: String): Result<Unit>
+suspend fun login(email: String, password: String): Result<User>
+
+// Register a new user
+suspend fun register(username: String, email: String, password: String): Result<User>
 
 // Logout and clear session
 suspend fun logout()
@@ -43,6 +48,9 @@ suspend fun refreshToken(): Result<Unit>
 
 // Get current authenticated user
 fun getCurrentUser(): User?
+
+// Get current active user ID (anonymous localUserId or authenticated user UUID)
+fun getCurrentUserId(): UUID?
 
 // Get current access token
 fun getAccessToken(): String?
@@ -58,30 +66,62 @@ Manages encrypted storage of authentication data.
 **Stored Data:**
 
 - User UUID
+- Display name
+- Email
+- Avatar URL
 - Access Token
 - Refresh Token
 - Token Expiry (timestamp in milliseconds)
+- Anonymous `localUserId`
+- Last authenticated `currentUserId`
 
 **Security:**
 
-- Uses Android Security Crypto library
 - AES256-GCM encryption scheme
 - DataStore for structured preferences storage
-- MasterKey managed by Android KeyStore
+- Secret key managed by Android KeyStore
 
 **Key Methods:**
 
 ```kotlin
-suspend fun saveAuthData(userUuid: UUID, accessToken: String, refreshToken: String, tokenExpiry: Long)
+suspend fun saveAuthData(
+    userUuid: UUID,
+    displayName: String,
+    email: String,
+    avatarUrl: String,
+    accessToken: String,
+    refreshToken: String,
+    tokenExpiry: Long
+)
 suspend fun clearAuthData()
 suspend fun updateAccessToken(accessToken: String, tokenExpiry: Long)
+suspend fun saveLocalUserId(uuid: UUID)
+suspend fun setCurrentUserId(userId: UUID)
 fun getUserUuid(): Flow<UUID?>
 fun getAccessToken(): Flow<String?>
 fun getRefreshToken(): Flow<String?>
 fun getTokenExpiry(): Flow<Long?>
+fun getLocalUserId(): Flow<UUID?>
+fun getStoredCurrentUserId(): Flow<UUID?>
 ```
 
-#### 3. **AuthInterceptor** (`AuthInterceptor.kt`)
+#### 3. **AccountSwitchHandler** (`AccountSwitchHandler.kt`)
+
+Handles cross-account login behavior before sync begins.
+
+**Functionality:**
+
+- Reads the last authenticated user ID from secure storage
+- Detects whether the new login is:
+  - first authenticated login
+  - same-account re-login
+  - different-account login with active anonymous data
+  - different-account login without anonymous data
+- Preserves anonymous data created after logout when switching accounts
+- Removes stale data from the previous authenticated account
+- Falls back to `database.clearAllTables()` only when there is no anonymous session to preserve
+
+#### 4. **AuthInterceptor** (`AuthInterceptor.kt`)
 
 Ktor client plugin that automatically adds authentication headers to HTTP requests.
 
@@ -91,7 +131,7 @@ Ktor client plugin that automatically adds authentication headers to HTTP reques
 - Adds `Authorization: Bearer <token>` header if user is authenticated
 - Logs auth status for debugging
 
-#### 4. **Domain Models**
+#### 5. **Domain Models**
 
 **AuthToken** (`AuthToken.kt`):
 
@@ -108,10 +148,55 @@ data class AuthToken(
 ```kotlin
 sealed class UserSession {
     data class Authenticated(val user: User, val authToken: AuthToken) : UserSession()
-    data object Unauthenticated : UserSession()
+    data class Anonymous(val localUserId: UUID) : UserSession()
     data object Loading : UserSession()
 }
 ```
+
+## Session and Account-Switch Behavior
+
+ChefAI is anonymous-first. There is always a user context:
+
+- `Anonymous(localUserId)` when no authenticated account is active
+- `Authenticated(user, authToken)` when login or registration succeeds
+- `Loading` while the session is being restored
+
+### Anonymous upgrade
+
+When an anonymous user logs in or registers for the first time:
+
+- the local database is preserved
+- anonymous recipes are reassigned to the authenticated user
+- the new authenticated user ID is stored for future account-switch decisions
+
+### Logout
+
+When a user logs out:
+
+- auth tokens are cleared
+- the app returns to an anonymous session
+- the anonymous `localUserId` is preserved
+- local data is not cleared
+
+### Switching accounts
+
+When a different authenticated user logs in:
+
+- if there is no active anonymous session to preserve, the app clears Room before sync
+- if there is active anonymous data, the app preserves that anonymous data, removes stale local data from the previous authenticated user, and then upgrades the anonymous data into the new authenticated account
+
+This means the following flow is supported safely:
+
+1. Login as `user1`
+2. Logout to anonymous mode
+3. Create recipes anonymously
+4. Login as `user2`
+
+Result:
+
+- `user1` local data is removed
+- the anonymous recipes created after logout are preserved
+- those anonymous recipes are reassigned to `user2`
 
 ## Usage Examples
 
@@ -127,9 +212,8 @@ fun MyScreen(viewModel: MyViewModel = hiltViewModel()) {
             val user = (userSession as UserSession.Authenticated).user
             Text("Welcome, ${user.displayName}!")
         }
-        is UserSession.Unauthenticated -> {
-            // Show login button or redirect to login
-            LoginPrompt()
+        is UserSession.Anonymous -> {
+            Text("Browsing as guest")
         }
         is UserSession.Loading -> {
             CircularProgressIndicator()

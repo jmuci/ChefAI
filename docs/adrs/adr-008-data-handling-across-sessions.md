@@ -4,7 +4,13 @@
 
 **Status:** Accepted
 
-**Context:** Because the app is offline-first, local data from a previously logged in user may exist without immediate server synchronization. We need to define how the **local Room database behaves when a user logs out and logs in with another account**.
+**Context:** Because the app is offline-first and anonymous-first, local data may exist for:
+
+- a previously authenticated user
+- the current anonymous session after logout
+- local changes that have not yet synced
+
+We need to define how the **local Room database behaves when a user logs out and logs in with another account** without losing new anonymous work or leaking previous authenticated data across accounts.
 
 **Related:** ADR-002 (Local DB & ID Generation)
 
@@ -12,36 +18,45 @@
 
 When a user logs in:
 
-- If the **newly authenticated user ID is different from the previous user ID**, the application **clears the local Room database**.
-- If the **same user logs in again**, the database is **preserved**.
-- Logging out **does not immediately clear local data**.
+- If there is **no previous authenticated user ID**, the database is **preserved**.
+- If the **same authenticated user logs in again**, the database is **preserved**.
+- If a **different authenticated user logs in** and there is **active anonymous data**, the app:
+  - preserves the anonymous data
+  - removes stale data belonging to the previous authenticated user
+  - upgrades the anonymous data into the new authenticated account
+- If a **different authenticated user logs in** and there is **no anonymous session to preserve**, the application **clears the local Room database**.
+- Logging out **does not immediately clear local data** and returns the app to an anonymous session.
 
-Implementation rule:
-```kotlin
-if (previousUserId != null && previousUserId != newUserId) {
-    database.clearAllTables()
-}
-```
-
-The database reset happens **after successful authentication but before synchronization begins**.
+The account-switch handling happens **after successful authentication but before synchronization begins**.
 
 ---
 
 ## Rationale
 
-This approach significantly **simplifies the synchronization system**.
+This approach preserves the offline-first anonymous workflow without allowing stale local data from `user1` to flow into `user2`.
 
-Because the database only contains data for **one user at a time**, we avoid:
+The original "always clear on account switch" rule was safe, but too aggressive for this flow:
 
-- Multi-user data scoping
-- Per-query filtering
-- Sync conflicts between multiple local owners
+1. login as `user1`
+2. logout
+3. create recipes anonymously
+4. login as `user2`
 
-The sync engine can safely assume:
+In that case, a full database wipe would destroy the anonymous recipes created after logout, which is not acceptable for an anonymous-first product.
 
-> "All local data belongs to the currently authenticated user."
+At the same time, we still want to avoid:
 
-This dramatically reduces edge cases and simplifies both client and backend logic.
+- pushing stale `user1` data while `user2` is active
+- showing `user1` local data during `user2`'s session
+- forcing global `ownerId` filtering onto every query today
+
+The decision therefore is:
+
+- preserve current anonymous work
+- remove stale previous-account local data
+- only fall back to full DB clearing when there is no anonymous work to preserve
+
+This keeps the sync model practical while respecting offline-first expectations.
 
 ---
 
@@ -53,12 +68,14 @@ This dramatically reduces edge cases and simplifies both client and backend logi
 - Fewer edge cases
 - Easier debugging
 - Offline-first UX preserved
-- Simple implementation
+- Anonymous work created after logout is preserved across the next login
+- Cross-account local leakage is still prevented
 
 ### Negative
 
-- Multi-user device scenarios are not supported
-- Local data for the previous user is removed when switching accounts
+- Multi-user device scenarios are still not fully supported
+- Local data for the previous authenticated user is removed when switching accounts
+- Account-switch logic is more nuanced than a simple `clearAllTables()` rule
 
 ---
 
@@ -113,12 +130,12 @@ Rejected because it **violates offline-first principles and harms UX**.
 
 ---
 
-### Option 3 — Wipe data only when a different account logs in (Selected)
+### Option 3 — Wipe data only when a different account logs in
 
 **Description**
 
 Local data is preserved on logout.  
-If a different user logs in, the local database is cleared before syncing.
+If a different user logs in, the local database is always cleared before syncing.
 
 **Pros**
 
@@ -130,11 +147,41 @@ If a different user logs in, the local database is cleared before syncing.
 
 **Cons**
 
-- Data for a logged-out user remains locally until another account logs in
+- Anonymous work created after logout is lost when the next account logs in
 
 **Conclusion**
 
-Selected as the **best balance between simplicity, correctness, and user experience**.
+Rejected because it is too destructive for the anonymous-first workflow.
+
+---
+
+### Option 4 — Preserve current anonymous data, remove previous authenticated data, clear only as fallback (Selected)
+
+**Description**
+
+Local data is preserved on logout.  
+If a different user logs in:
+
+- preserve anonymous data created after logout
+- remove stale local data that belongs to the previous authenticated account
+- upgrade the anonymous data into the new account
+- clear the full database only when there is no anonymous session to preserve
+
+**Pros**
+
+- Preserves offline-first anonymous work
+- Prevents cross-account data leakage
+- Avoids pushing stale previous-account data during the next sync
+- Fits the app's anonymous-first product model
+
+**Cons**
+
+- Slightly more complex than unconditional database clearing
+- Requires explicit handling of previous authenticated data during account switch
+
+**Conclusion**
+
+Selected as the best balance between **correctness, offline-first UX, and implementation complexity**.
 
 ---
 
