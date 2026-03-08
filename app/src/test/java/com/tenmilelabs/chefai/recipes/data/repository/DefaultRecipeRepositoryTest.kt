@@ -3,12 +3,14 @@ package com.tenmilelabs.chefai.recipes.data.repository
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
+import com.tenmilelabs.chefai.auth.domain.AccountSwitchHandler
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.usecase.AccountUpgradeUseCase
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.UserEntity
+import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeLabelDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
@@ -43,6 +45,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
+import io.mockk.mockk
 import org.junit.Before
 import org.junit.Test
 
@@ -87,13 +90,20 @@ class DefaultRecipeRepositoryTest {
         }
 
         val fakeUserDao = FakeUserDao()
+        val accountSwitchRecipeDao = FakeRecipeDao()
         sessionManager = SessionManager(
             securePreferences = fakeSecurePreferences,
             authNetworkDataSource = { fakeAuthNetworkDataSource },
             userDao = fakeUserDao,
+            accountSwitchHandler = AccountSwitchHandler(
+                securePreferences = fakeSecurePreferences,
+                database = mockk<ChefAIDataBase>(relaxed = true),
+                recipeDao = accountSwitchRecipeDao,
+                userDao = fakeUserDao
+            ),
             accountUpgradeUseCaseProvider = {
                 AccountUpgradeUseCase(
-                    FakeTransactionRunner(), fakeUserDao, FakeRecipeDao(),
+                    FakeTransactionRunner(), fakeUserDao, accountSwitchRecipeDao,
                     FakeRecipeStepDao(), FakeRecipeIngredientDao(),
                     FakeRecipeTagCrossRefDao(), FakeRecipeLabelCrossRefDao()
                 )
