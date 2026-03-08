@@ -79,7 +79,7 @@ class AuthE2ETest {
         fakeAuthDataSource.existingUsers[testEmail] = AuthResponse(
             token = "fake_access_token",
             refreshToken = "fake_refresh_token",
-            userId = UUID.randomUUID().toString(),
+            userId = UuidV7Generator.newId().toString(),
             username = testUsername,
             email = testEmail,
             expiresIn = 3600

@@ -1,12 +1,12 @@
 package com.tenmilelabs.chefai.core.ui.preview
 
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.domain.model.Recipe
-import java.util.UUID
 
 object RecipeData {
     val recipe =
         Recipe(
-            uuid = UUID.randomUUID(),
+            uuid = UuidV7Generator.newId(),
             title = "Spaghetti Carbonara",
             description = "A very tasty and easy to make grilled chicken recipe. Perfect for a summer barbecue. Follow the steps carefully for the best results.",
             imageUrl = "https://via.placeholder.com/200",

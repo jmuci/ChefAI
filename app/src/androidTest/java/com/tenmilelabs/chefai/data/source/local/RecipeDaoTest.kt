@@ -26,7 +26,7 @@ class RecipeDaoTest {
 
     // Test data
     private val testUser = UserEntity(
-        uuid = UUID.randomUUID(),
+        uuid = UuidV7Generator.newId(),
         displayName = "Test User",
         email = "test@test.com",
         avatarUrl = "",
@@ -35,7 +35,7 @@ class RecipeDaoTest {
     )
 
     private val recipe1 = RecipeEntity(
-        uuid = UUID.randomUUID(),
+        uuid = UuidV7Generator.newId(),
         title = "Pancakes",
         description = "Fluffy American-style pancakes.",
         imageUrl = "",
@@ -50,7 +50,7 @@ class RecipeDaoTest {
     )
 
     private val recipe2 = RecipeEntity(
-        uuid = UUID.randomUUID(),
+        uuid = UuidV7Generator.newId(),
         title = "French Toast",
         description = "Classic sweet French toast.",
         imageUrl = "",

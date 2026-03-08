@@ -34,7 +34,7 @@ val testUser = UserEntity(
 
 val testIngredients = listOf(
     IngredientEntity(
-        uuid = UUID.randomUUID(),
+        uuid = UuidV7Generator.newId(),
         displayName = "Flour",
         allergenId = null,
         sourcePrimaryId = null,
@@ -42,7 +42,7 @@ val testIngredients = listOf(
         deletedAt = null
     ),
     IngredientEntity(
-        uuid = UUID.randomUUID(),
+        uuid = UuidV7Generator.newId(),
         displayName = "Milk",
         allergenId = null,
         sourcePrimaryId = null,
@@ -50,7 +50,7 @@ val testIngredients = listOf(
         deletedAt = null
     ),
     IngredientEntity(
-        uuid = UUID.randomUUID(),
+        uuid = UuidV7Generator.newId(),
         displayName = "Eggs",
         allergenId = null,
         sourcePrimaryId = null,
@@ -60,19 +60,19 @@ val testIngredients = listOf(
 )
 val testLabels = listOf(
     LabelEntity(
-        uuid = UUID.randomUUID(),
+        uuid = UuidV7Generator.newId(),
         displayName = "Breakfast",
         updatedAt = updatedTimeSt,
         deletedAt = null
     ),
     LabelEntity(
-        uuid = UUID.randomUUID(),
+        uuid = UuidV7Generator.newId(),
         displayName = "Dessert",
         updatedAt = updatedTimeSt,
         deletedAt = null
     ),
     LabelEntity(
-        uuid = UUID.randomUUID(),
+        uuid = UuidV7Generator.newId(),
         displayName = "Vegetarian",
         updatedAt = updatedTimeSt,
         deletedAt = null
@@ -81,26 +81,26 @@ val testLabels = listOf(
 
 val testTags = listOf(
     TagEntity(
-        uuid = UUID.randomUUID(),
+        uuid = UuidV7Generator.newId(),
         displayName = "easy",
         updatedAt = updatedTimeSt,
         deletedAt = null
     ),
     TagEntity(
-        uuid = UUID.randomUUID(),
+        uuid = UuidV7Generator.newId(),
         displayName = "quick",
         updatedAt = updatedTimeSt,
         deletedAt = null
     ),
     TagEntity(
-        uuid = UUID.randomUUID(),
+        uuid = UuidV7Generator.newId(),
         displayName = "family-friendly",
         updatedAt = updatedTimeSt,
         deletedAt = null
     )
 )
 
-val recipeId1: UUID = UUID.randomUUID()
+val recipeId1: UUID = UuidV7Generator.newId()
 val recipeEntity1 = RecipeEntity(
     uuid = recipeId1,
     title = "Pancakes",
@@ -116,7 +116,7 @@ val recipeEntity1 = RecipeEntity(
     deletedAt = null
 )
 
-val recipeId2: UUID = UUID.randomUUID()
+val recipeId2: UUID = UuidV7Generator.newId()
 val recipeEntity2 = RecipeEntity(
     uuid = recipeId2,
     title = "French Toast",
@@ -132,7 +132,7 @@ val recipeEntity2 = RecipeEntity(
     deletedAt = null
 )
 
-val recipeId3: UUID = UUID.randomUUID()
+val recipeId3: UUID = UuidV7Generator.newId()
 val recipeEntity3 = RecipeEntity(
     uuid = recipeId3,
     title = "Omelette",
@@ -181,18 +181,18 @@ val testRecipeIngredients = listOf(
     )
 )
 
-val allergenGluten = AllergenEntity(UUID.randomUUID(), "Gluten", updatedTimeSt, null)
-val allergenNuts = AllergenEntity(UUID.randomUUID(), "Nuts", updatedTimeSt, null)
-val allergenEggs = AllergenEntity(UUID.randomUUID(), "Eggs", updatedTimeSt, null)
-val allergenMilk = AllergenEntity(UUID.randomUUID(), "Milk", updatedTimeSt, null)
-val allergenPeanuts = AllergenEntity(UUID.randomUUID(), "Peanuts", updatedTimeSt, null)
+val allergenGluten = AllergenEntity(UuidV7Generator.newId(), "Gluten", updatedTimeSt, null)
+val allergenNuts = AllergenEntity(UuidV7Generator.newId(), "Nuts", updatedTimeSt, null)
+val allergenEggs = AllergenEntity(UuidV7Generator.newId(), "Eggs", updatedTimeSt, null)
+val allergenMilk = AllergenEntity(UuidV7Generator.newId(), "Milk", updatedTimeSt, null)
+val allergenPeanuts = AllergenEntity(UuidV7Generator.newId(), "Peanuts", updatedTimeSt, null)
 
-val srcPork = SourceClassificationEntity(UUID.randomUUID(), "Animal", "Pork", updatedTimeSt, null)
-val srcBeef = SourceClassificationEntity(UUID.randomUUID(), "Animal", "Beef", updatedTimeSt, null)
-val srcFish = SourceClassificationEntity(UUID.randomUUID(), "Animal", "Fish", updatedTimeSt, null)
+val srcPork = SourceClassificationEntity(UuidV7Generator.newId(), "Animal", "Pork", updatedTimeSt, null)
+val srcBeef = SourceClassificationEntity(UuidV7Generator.newId(), "Animal", "Beef", updatedTimeSt, null)
+val srcFish = SourceClassificationEntity(UuidV7Generator.newId(), "Animal", "Fish", updatedTimeSt, null)
 val srcVegetable =
-    SourceClassificationEntity(UUID.randomUUID(), "Plant", "Vegetable", updatedTimeSt, null)
-val srcFruit = SourceClassificationEntity(UUID.randomUUID(), "Plant", "Fruit", updatedTimeSt, null)
+    SourceClassificationEntity(UuidV7Generator.newId(), "Plant", "Vegetable", updatedTimeSt, null)
+val srcFruit = SourceClassificationEntity(UuidV7Generator.newId(), "Plant", "Fruit", updatedTimeSt, null)
 
 val ingredient1 = RecipeIngredient(
     testIngredients[0].uuid,
@@ -268,7 +268,7 @@ val testRecipeTags = listOf(recipeTag1, recipeTag2)
 
 val testSteps1 = listOf(
     RecipeStepEntity(
-        uuid = UUID.randomUUID(),
+        uuid = UuidV7Generator.newId(),
         recipeId = recipeId1,
         orderIndex = 0,
         instruction = "Mix dry ingredients.",
@@ -276,7 +276,7 @@ val testSteps1 = listOf(
         deletedAt = null
     ),
     RecipeStepEntity(
-        uuid = UUID.randomUUID(),
+        uuid = UuidV7Generator.newId(),
         recipeId = recipeId1,
         orderIndex = 1,
         instruction = "Add wet ingredients.",
@@ -284,7 +284,7 @@ val testSteps1 = listOf(
         deletedAt = null
     ),
     RecipeStepEntity(
-        uuid = UUID.randomUUID(),
+        uuid = UuidV7Generator.newId(),
         recipeId = recipeId1,
         orderIndex = 2,
         instruction = "Cook on a griddle.",
@@ -294,7 +294,7 @@ val testSteps1 = listOf(
 )
 val testSteps2 = listOf(
     RecipeStepEntity(
-        uuid = UUID.randomUUID(),
+        uuid = UuidV7Generator.newId(),
         recipeId = recipeId2,
         orderIndex = 0,
         instruction = "Mix dry ingredients.",
@@ -302,7 +302,7 @@ val testSteps2 = listOf(
         deletedAt = null
     ),
     RecipeStepEntity(
-        uuid = UUID.randomUUID(),
+        uuid = UuidV7Generator.newId(),
         recipeId = recipeId2,
         orderIndex = 1,
         instruction = "Add wet ingredients.",
@@ -312,7 +312,7 @@ val testSteps2 = listOf(
 )
 val testSteps3 = listOf(
     RecipeStepEntity(
-        uuid = UUID.randomUUID(),
+        uuid = UuidV7Generator.newId(),
         recipeId = recipeId3,
         orderIndex = 0,
         instruction = "Mix dry ingredients.",

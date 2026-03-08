@@ -60,7 +60,7 @@ fun createTestSessionManager(
         syncSchedulerProvider = { FakeSyncScheduler() },
         applicationScope = testScope
     ).apply {
-        uuidGenerator = { UUID.randomUUID() }
+        uuidGenerator = { UuidV7Generator.newId() }
     }
 
     // Synchronously load the session to ensure it's fully initialized before the test runs.
@@ -90,7 +90,7 @@ fun createRealSessionManagerWithFakes(
         syncSchedulerProvider = { FakeSyncManager() },
         applicationScope = testScope
     ).apply {
-        uuidGenerator = { UUID.randomUUID() }
+        uuidGenerator = { UuidV7Generator.newId() }
     }
     return sessionManager
 }

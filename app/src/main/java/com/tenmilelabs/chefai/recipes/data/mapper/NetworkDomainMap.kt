@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.recipes.data.mapper
 
 import com.tenmilelabs.chefai.core.domain.model.Recipe
 import com.tenmilelabs.chefai.core.domain.model.User
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.recipes.data.network.model.NetworkRecipe
 import com.tenmilelabs.chefai.recipes.data.network.model.NetworkRecipeList
 import timber.log.Timber
@@ -30,7 +31,7 @@ fun NetworkRecipe.toDomain(): Recipe {
         prepTimeMinutes = preparationTimeMinutes,
         cookTimeMinutes = 0, // Not available in network DTO
         servings = 0, // Not available in network DTO
-        creator = User(UUID.randomUUID(), "", "", ""), // Not available in network DTO
+        creator = User(UuidV7Generator.newId(), "", "", ""), // Not available in network DTO
         recipeExternalUrl = recipeUrl,
         ingredients = emptyList(),
         steps = emptyList(),

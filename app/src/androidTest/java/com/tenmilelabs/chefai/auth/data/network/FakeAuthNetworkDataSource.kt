@@ -99,7 +99,7 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
         return AuthResponse(
             token = "fake_access_token_${System.currentTimeMillis()}",
             refreshToken = "fake_refresh_token_${System.currentTimeMillis()}",
-            userId = UUID.randomUUID().toString(),
+            userId = UuidV7Generator.newId().toString(),
             username = username,
             email = email,
             expiresIn = 3600 // 1 hour in seconds
@@ -113,7 +113,7 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
         return TokenRefreshResponse(
             accessToken = "fake_new_access_token_${System.currentTimeMillis()}",
             refreshToken = "fake_new_refresh_token_${System.currentTimeMillis()}",
-            userId = UUID.randomUUID().toString(),
+            userId = UuidV7Generator.newId().toString(),
             expiresIn = 3600 // 1 hour in seconds
         )
     }

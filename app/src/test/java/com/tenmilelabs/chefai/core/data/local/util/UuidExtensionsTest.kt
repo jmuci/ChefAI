@@ -9,7 +9,7 @@ class UuidExtensionsTest {
 
     @Test
     fun `uuid converts to bytes and back correctly`() {
-        val original = UUID.randomUUID()
+        val original = UuidV7Generator.newId()
 
         val bytes = original.toBytes()
         val restored = bytes.toUuid()
@@ -19,8 +19,8 @@ class UuidExtensionsTest {
 
     @Test
     fun `two different uuids produce different byte arrays`() {
-        val uuid1 = UUID.randomUUID()
-        val uuid2 = UUID.randomUUID()
+        val uuid1 = UuidV7Generator.newId()
+        val uuid2 = UuidV7Generator.newId()
 
         val bytes1 = uuid1.toBytes()
         val bytes2 = uuid2.toBytes()

@@ -59,7 +59,7 @@ class LoginViewModelTest {
             syncSchedulerProvider = { FakeSyncManager() },
             applicationScope = testScope
         ).apply {
-            uuidGenerator = { UUID.randomUUID() }
+            uuidGenerator = { UuidV7Generator.newId() }
         }
 
         viewModel = LoginViewModel(sessionManager)

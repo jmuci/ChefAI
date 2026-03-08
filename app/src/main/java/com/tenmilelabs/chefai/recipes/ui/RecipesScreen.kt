@@ -21,6 +21,7 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.ui.components.RecipeListCard
 import com.tenmilelabs.chefai.core.ui.components.SectionHeaderWithSubtitle
@@ -117,7 +118,7 @@ fun RecipesListScreenPreview() {
         for (i in 0 until 60) {
             val baseRecipe = baseList[i % baseList.size]
             // Create a copy with a unique UUID for each item
-            add(baseRecipe.copy(uuid = UUID.randomUUID()))
+            add(baseRecipe.copy(uuid = UuidV7Generator.newId()))
         }
     }
     ChefAITheme {

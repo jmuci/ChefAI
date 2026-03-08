@@ -101,7 +101,7 @@ class DefaultRecipeRepositoryTest {
             syncSchedulerProvider = { FakeSyncManager() },
             applicationScope = testScope
         ).apply {
-            uuidGenerator = { UUID.randomUUID() }
+            uuidGenerator = { UuidV7Generator.newId() }
         }
         // Advance until the SessionManager init coroutine (loadSession) completes.
         testDispatcher.scheduler.advanceUntilIdle()
@@ -251,7 +251,7 @@ class DefaultRecipeRepositoryTest {
     @Test
     fun `getRecipesPreviewStream returns recipes created by anonymous user`() = runTest {
         // Given: A recipe created with an anonymous user's creatorId
-        val anonymousUserId = UUID.randomUUID()
+        val anonymousUserId = UuidV7Generator.newId()
         val anonymousUser = UserEntity(
             uuid = anonymousUserId,
             displayName = "Guest",
@@ -262,7 +262,7 @@ class DefaultRecipeRepositoryTest {
             syncState = SyncState.PENDING
         )
         val anonymousRecipe = RecipeEntity(
-            uuid = UUID.randomUUID(),
+            uuid = UuidV7Generator.newId(),
             title = "Anonymous Recipe",
             description = "Created offline",
             imageUrl = "",
@@ -301,7 +301,7 @@ class DefaultRecipeRepositoryTest {
     @Test
     fun `createRecipe persists recipe with PENDING syncState`() = runTest {
         // Given: A new recipe to save
-        val newRecipe = recipe1.copy(uuid = UUID.randomUUID(), title = "New Test Recipe")
+        val newRecipe = recipe1.copy(uuid = UuidV7Generator.newId(), title = "New Test Recipe")
 
         // When: Saving the recipe
         recipeRepository.createRecipe(newRecipe)
