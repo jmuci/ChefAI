@@ -37,4 +37,10 @@ interface SecurePreferencesInterface {
 
     /** Clears the anonymous local user ID (e.g., after account upgrade). */
     suspend fun clearLocalUserId()
+
+    /** Persists the last authenticated user ID across logouts and app restarts. */
+    suspend fun setCurrentUserId(userId: UUID)
+
+    /** Reads the last authenticated user ID, or null if no user has logged in yet. */
+    fun getStoredCurrentUserId(): Flow<UUID?>
 }
