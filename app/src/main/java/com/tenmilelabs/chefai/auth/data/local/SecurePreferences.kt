@@ -52,6 +52,7 @@ class SecurePreferences @Inject constructor(
         private val KEY_TOKEN_EXPIRY = stringPreferencesKey("token_expiry")
         private val KEY_LOCAL_USER_ID = stringPreferencesKey("local_user_id")
         private val KEY_CURRENT_USER_ID = stringPreferencesKey("current_user_id")
+        private val KEY_LAST_LOGIN_EMAIL = stringPreferencesKey("last_login_email")
     }
 
     private val dataStore: DataStore<Preferences> = context.dataStore
@@ -278,5 +279,19 @@ class SecurePreferences @Inject constructor(
                 null
             }
         }
+    }
+
+    override suspend fun saveLastLoginEmail(email: String) {
+        try {
+            dataStore.edit { prefs ->
+                prefs[KEY_LAST_LOGIN_EMAIL] = encrypt(email)
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to save last login email")
+        }
+    }
+
+    override fun getLastLoginEmail(): Flow<String?> = dataStore.data.map { prefs ->
+        prefs[KEY_LAST_LOGIN_EMAIL]?.let { runCatching { decrypt(it) }.getOrNull() }
     }
 }

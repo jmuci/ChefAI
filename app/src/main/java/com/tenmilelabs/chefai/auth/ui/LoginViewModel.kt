@@ -2,7 +2,9 @@ package com.tenmilelabs.chefai.auth.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tenmilelabs.chefai.BuildConfig
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.auth.data.local.SecurePreferencesInterface
 import com.tenmilelabs.chefai.auth.data.network.AuthHttpException
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
@@ -12,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.io.IOException
@@ -19,6 +22,12 @@ import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import javax.inject.Inject
+
+/**
+ * A suggestion shown in the email field's autocomplete dropdown.
+ * [autofillPassword] is non-null only for debug test accounts.
+ */
+data class EmailSuggestion(val email: String, val autofillPassword: String? = null)
 
 /**
  * UiState for the login screen.
@@ -30,7 +39,8 @@ data class LoginUiState(
     val rememberMe: Boolean = false,
     val isPasswordVisible: Boolean = false,
     val emailError: String? = null,
-    val passwordError: String? = null
+    val passwordError: String? = null,
+    val emailSuggestions: List<EmailSuggestion> = emptyList()
 )
 
 /**
@@ -47,8 +57,21 @@ sealed interface LoginUiEvent {
  */
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val securePreferences: SecurePreferencesInterface
 ) : ViewModel() {
+
+    private val testAccounts: List<EmailSuggestion> = if (BuildConfig.DEBUG) {
+        listOf(
+            EmailSuggestion("test1@ex.com", "test123!"),
+            EmailSuggestion("test2@ex.com", "test123!"),
+            EmailSuggestion("test3@ex.com", "test123!")
+        )
+    } else {
+        emptyList()
+    }
+
+    private var savedEmail: String? = null
 
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
@@ -63,14 +86,37 @@ class LoginViewModel @Inject constructor(
             viewModelScope.launch {
                 _uiEvent.emit(LoginUiEvent.NavigateToHome)
             }
+        } else {
+            // Prefill the email used during the last successful login
+            viewModelScope.launch {
+                val email = securePreferences.getLastLoginEmail().first()
+                savedEmail = email
+                if (!email.isNullOrBlank()) {
+                    _uiState.value = _uiState.value.copy(email = email)
+                }
+            }
         }
     }
 
     fun onEmailChange(email: String) {
         _uiState.value = _uiState.value.copy(
             email = email,
+            emailError = null,
+            emailSuggestions = computeSuggestions(email)
+        )
+    }
+
+    fun onEmailSuggestionSelected(suggestion: EmailSuggestion) {
+        _uiState.value = _uiState.value.copy(
+            email = suggestion.email,
+            password = suggestion.autofillPassword ?: _uiState.value.password,
+            emailSuggestions = emptyList(),
             emailError = null
         )
+    }
+
+    fun onEmailSuggestionsDismissed() {
+        _uiState.value = _uiState.value.copy(emailSuggestions = emptyList())
     }
 
     fun onPasswordChange(password: String) {
@@ -107,7 +153,8 @@ class LoginViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = false)
 
             result.fold(
-                onSuccess = { user ->
+                onSuccess = { _ ->
+                    securePreferences.saveLastLoginEmail(email)
                     _uiEvent.emit(LoginUiEvent.NavigateToHome)
                 },
                 onFailure = { exception ->
@@ -193,6 +240,21 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             _uiEvent.emit(LoginUiEvent.NavigateToRegister)
         }
+    }
+
+    private fun computeSuggestions(input: String): List<EmailSuggestion> {
+        if (input.isBlank()) return emptyList()
+        val result = mutableListOf<EmailSuggestion>()
+        savedEmail?.let { saved ->
+            if (saved.contains(input, ignoreCase = true)) {
+                result.add(EmailSuggestion(saved))
+            }
+        }
+        testAccounts
+            .filter { it.email.contains(input, ignoreCase = true) }
+            .filterNot { it.email == savedEmail }
+            .forEach { result.add(it) }
+        return result
     }
 
     private fun validateInputs(email: String, password: String): Boolean {

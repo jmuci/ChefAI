@@ -22,6 +22,8 @@ class FakeSecurePreferences : SecurePreferencesInterface {
         private const val KEY_REFRESH_TOKEN = "refresh_token"
         private const val KEY_TOKEN_EXPIRY = "token_expiry"
         private const val KEY_LOCAL_USER_ID = "local_user_id"
+        private const val KEY_CURRENT_USER_ID = "current_user_id"
+        private const val KEY_LAST_LOGIN_EMAIL = "last_login_email"
     }
 
     override suspend fun saveAuthData(
@@ -125,5 +127,31 @@ class FakeSecurePreferences : SecurePreferencesInterface {
         storage.value = storage.value.toMutableMap().apply {
             remove(KEY_LOCAL_USER_ID)
         }
+    }
+
+    override suspend fun setCurrentUserId(userId: UUID) {
+        storage.value = storage.value.toMutableMap().apply {
+            put(KEY_CURRENT_USER_ID, userId.toString())
+        }
+    }
+
+    override fun getStoredCurrentUserId(): Flow<UUID?> = storage.map { prefs ->
+        prefs[KEY_CURRENT_USER_ID]?.let { uuidString ->
+            try {
+                UUID.fromString(uuidString as String)
+            } catch (e: IllegalArgumentException) {
+                null
+            }
+        }
+    }
+
+    override suspend fun saveLastLoginEmail(email: String) {
+        storage.value = storage.value.toMutableMap().apply {
+            put(KEY_LAST_LOGIN_EMAIL, email)
+        }
+    }
+
+    override fun getLastLoginEmail(): Flow<String?> = storage.map { prefs ->
+        prefs[KEY_LAST_LOGIN_EMAIL] as? String
     }
 }
