@@ -24,4 +24,6 @@ interface RecipesRepository {
     suspend fun deleteAllRecipes()
 
     suspend fun deleteRecipe(recipeId: UUID)
+
+    suspend fun softDeleteRecipe(recipeId: UUID)
 }

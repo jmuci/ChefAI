@@ -34,7 +34,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         TagEntity::class,
         UserEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 @TypeConverters(
@@ -66,6 +66,12 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
             )
         """.trimIndent()
         )
+    }
+}
+
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE recipes ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
     }
 }
 

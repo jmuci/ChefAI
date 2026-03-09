@@ -20,6 +20,7 @@ data class Recipe(
     val creator: User,
     val recipeExternalUrl: String?,
     val privacy: RecipePrivacy = RecipePrivacy.PUBLIC,
+    val version: Int = 1,
     val ingredients: List<RecipeIngredient>,
     val steps: List<RecipeStep>,
     val tags: List<Tag>,

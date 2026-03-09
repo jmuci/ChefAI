@@ -14,6 +14,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.SourceClassificationDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.SyncMetadataDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.TagDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.UserDao
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.sync.mapper.toAllergenEntity
 import com.tenmilelabs.chefai.core.data.sync.mapper.toIngredientEntities
@@ -26,6 +27,7 @@ import com.tenmilelabs.chefai.core.data.sync.mapper.toStepEntities
 import com.tenmilelabs.chefai.core.data.sync.mapper.toSyncDto
 import com.tenmilelabs.chefai.core.data.sync.mapper.toTagCrossRefs
 import com.tenmilelabs.chefai.core.data.sync.mapper.toTagEntity
+import com.tenmilelabs.chefai.core.data.sync.mapper.toUserEntity
 import com.tenmilelabs.chefai.core.data.sync.network.SyncNetworkDataSource
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPushRequest
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPushResponse
@@ -63,6 +65,7 @@ class SyncOrchestrator @Inject constructor(
     private val ingredientDao: IngredientDao,
     private val tagDao: TagDao,
     private val labelDao: LabelDao,
+    private val userDao: UserDao,
     private val recipeDao: RecipeDao,
     private val recipeStepDao: RecipeStepDao,
     private val recipeIngredientDao: RecipeIngredientDao,
@@ -187,6 +190,8 @@ class SyncOrchestrator @Inject constructor(
                 //   ingredients → recipe_ingredients.ingredientId (RESTRICT)
                 //   tags (leaf) → recipe_tags.tagId (RESTRICT)
                 //   labels (leaf) → recipe_labels.labelId (RESTRICT)
+                //   creators (leaf) → recipes.creatorId (CASCADE)
+                userDao.upsertAll(response.creators.map { it.toUserEntity() })
                 allergenDao.upsertAll(response.allergens.map { it.toAllergenEntity() })
                 sourceClassificationDao.upsertAll(response.sourceClassifications.map { it.toSourceClassificationEntity() })
                 ingredientDao.upsertAll(response.ingredients.map { it.toIngredientEntity() })

@@ -186,8 +186,62 @@ class DefaultRecipeRepository @Inject constructor(
         syncManager.requestMutationSync()
     }
 
+    @Transaction
     override suspend fun updateRecipe(recipe: Recipe) {
+        // Update the recipe entity
         recipeDao.upsertRecipe(recipe.toRoomEntity())
+
+        // Replace steps: delete old, insert new
+        recipeStepDao.deleteAllForRecipe(recipe.uuid)
+        recipe.steps.forEach { step ->
+            recipeStepDao.upsertStep(step.toRoomEntity(recipe.uuid))
+        }
+
+        // Upsert ingredients (ensure ingredient entities exist)
+        recipe.ingredients.forEach { ingredient ->
+            ingredientDao.upsertIngredient(ingredient.toRoomEntity())
+        }
+
+        // Replace ingredient cross-references
+        recipeIngredientDao.upsertAllForRecipe(
+            recipe.uuid,
+            recipe.ingredients.map { it.toCrossRef(recipe.uuid) }
+        )
+
+        // Upsert tags and replace cross-references
+        recipe.tags.forEach { tag ->
+            tagDao.upsertTag(tag.toRoomEntity())
+        }
+        recipeTagDao.deleteAllForRecipe(recipe.uuid)
+        recipe.tags.forEach { tag ->
+            recipeTagDao.upsertCrossRef(
+                RecipeTagCrossRef(
+                    recipeId = recipe.uuid,
+                    tagId = tag.uuid,
+                    updatedAt = System.currentTimeMillis(),
+                    deletedAt = null,
+                    syncState = com.tenmilelabs.chefai.core.data.local.util.SyncState.PENDING
+                )
+            )
+        }
+
+        // Upsert labels and replace cross-references
+        recipe.labels.forEach { label ->
+            labelDao.upsertLabel(label.toRoomEntity())
+        }
+        recipeLabelDao.deleteAllForRecipe(recipe.uuid)
+        recipe.labels.forEach { label ->
+            recipeLabelDao.upsertCrossRef(
+                RecipeLabelCrossRef(
+                    recipeId = recipe.uuid,
+                    labelId = label.uuid,
+                    updatedAt = System.currentTimeMillis(),
+                    deletedAt = null,
+                    syncState = com.tenmilelabs.chefai.core.data.local.util.SyncState.PENDING
+                )
+            )
+        }
+
         syncManager.requestMutationSync()
     }
 
@@ -197,6 +251,11 @@ class DefaultRecipeRepository @Inject constructor(
 
     override suspend fun deleteRecipe(recipeId: UUID) {
         recipeDao.deleteRecipe(recipeId)
+        syncManager.requestMutationSync()
+    }
+
+    override suspend fun softDeleteRecipe(recipeId: UUID) {
+        recipeDao.softDelete(recipeId, System.currentTimeMillis())
         syncManager.requestMutationSync()
     }
 

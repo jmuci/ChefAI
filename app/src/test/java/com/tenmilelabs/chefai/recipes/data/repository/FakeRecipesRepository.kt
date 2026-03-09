@@ -125,4 +125,8 @@ class FakeRecipesRepository : RecipesRepository {
     override suspend fun deleteRecipe(recipeId: UUID) {
         // No-op
     }
+
+    override suspend fun softDeleteRecipe(recipeId: UUID) {
+        // No-op
+    }
 }
