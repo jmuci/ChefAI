@@ -12,11 +12,11 @@
       "type": "carousel",
       "id": "carousel-for-you",
       "items": [
-        { "type": "large_card", "id": "for-you-1", "recipeId": "00000000-0000-7000-8000-000000000001" },
-        { "type": "large_card", "id": "for-you-2", "recipeId": "00000000-0000-7000-8000-000000000002" },
-        { "type": "large_card", "id": "for-you-3", "recipeId": "00000000-0000-7000-8000-000000000003" },
-        { "type": "large_card", "id": "for-you-4", "recipeId": "00000000-0000-7000-8000-000000000004" },
-        { "type": "large_card", "id": "for-you-5", "recipeId": "00000000-0000-7000-8000-000000000005" }
+        { "type": "large_card", "id": "for-you-1", "recipeId": "88888888-8888-8888-8888-888888888888" },
+        { "type": "large_card", "id": "for-you-2", "recipeId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" },
+        { "type": "large_card", "id": "for-you-3", "recipeId": "cccccccc-cccc-cccc-cccc-cccccccccccc" },
+        { "type": "large_card", "id": "for-you-4", "recipeId": "44444444-4444-4444-4444-444444444444" },
+        { "type": "large_card", "id": "for-you-5", "recipeId": "22222222-2222-2222-2222-222222222222" }
       ]
     },
     {
@@ -29,10 +29,10 @@
       "type": "carousel",
       "id": "carousel-italian-classics",
       "items": [
-        { "type": "large_card",   "id": "italian-1", "recipeId": "00000000-0000-7000-8000-000000000006" },
-        { "type": "squared_card", "id": "italian-2", "recipeId": "00000000-0000-7000-8000-000000000007" },
-        { "type": "squared_card", "id": "italian-3", "recipeId": "00000000-0000-7000-8000-000000000008" },
-        { "type": "large_card",   "id": "italian-4", "recipeId": "00000000-0000-7000-8000-000000000009" }
+        { "type": "large_card",   "id": "italian-1", "recipeId": "11111111-1111-1111-1111-111111111111" },
+        { "type": "squared_card", "id": "italian-2", "recipeId": "66666666-6666-6666-6666-666666666666" },
+        { "type": "squared_card", "id": "italian-3", "recipeId": "77777777-7777-7777-7777-777777777777" },
+        { "type": "large_card",   "id": "italian-4", "recipeId": "12121212-1212-1212-1212-121212121212" }
       ]
     },
     {
@@ -45,10 +45,10 @@
       "type": "carousel",
       "id": "carousel-quick-healthy",
       "items": [
-        { "type": "squared_card", "id": "quick-1", "recipeId": "11111111111111111111111111111111" },
-        { "type": "squared_card", "id": "quick-2", "recipeId": "22222222222222222222222222222222" },
-        { "type": "squared_card", "id": "quick-3", "recipeId": "00000000-0000-7000-8000-000000000012" },
-        { "type": "squared_card", "id": "quick-4", "recipeId": "00000000-0000-7000-8000-000000000013" }
+        { "type": "squared_card", "id": "quick-1", "recipeId": "55555555-5555-5555-5555-555555555555" },
+        { "type": "squared_card", "id": "quick-2", "recipeId": "99999999-9999-9999-9999-999999999999" },
+        { "type": "squared_card", "id": "quick-3", "recipeId": "dddddddd-dddd-dddd-dddd-dddddddddddd" },
+        { "type": "squared_card", "id": "quick-4", "recipeId": "14141414-1414-1414-1414-141414141414" }
       ]
     },
     {
@@ -61,10 +61,10 @@
       "type": "carousel",
       "id": "carousel-seafood",
       "items": [
-        { "type": "list_card", "id": "seafood-1", "recipeId": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE" },
-        { "type": "list_card", "id": "seafood-2", "recipeId": "00000000-0000-7000-8000-000000000015" },
-        { "type": "list_card", "id": "seafood-3", "recipeId": "00000000-0000-7000-8000-000000000016" },
-        { "type": "list_card", "id": "seafood-4", "recipeId": "00000000-0000-7000-8000-000000000017" }
+        { "type": "list_card", "id": "seafood-1", "recipeId": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" },
+        { "type": "list_card", "id": "seafood-2", "recipeId": "33333333-3333-3333-3333-333333333333" },
+        { "type": "list_card", "id": "seafood-3", "recipeId": "15151515-1515-1515-1515-151515151515" },
+        { "type": "list_card", "id": "seafood-4", "recipeId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" }
       ]
     },
     {
@@ -77,9 +77,9 @@
       "type": "carousel",
       "id": "carousel-desserts",
       "items": [
-        { "type": "squared_card", "id": "dessert-1", "recipeId": "00000000-0000-7000-8000-000000000018" },
-        { "type": "squared_card", "id": "dessert-2", "recipeId": "00000000-0000-7000-8000-000000000019" },
-        { "type": "squared_card", "id": "dessert-3", "recipeId": "00000000-0000-7000-8000-000000000020" }
+        { "type": "squared_card", "id": "dessert-1", "recipeId": "ffffffff-ffff-ffff-ffff-ffffffffffff" },
+        { "type": "squared_card", "id": "dessert-2", "recipeId": "10101010-1010-1010-1010-101010101010" },
+        { "type": "squared_card", "id": "dessert-3", "recipeId": "13131313-1313-1313-1313-131313131313" }
       ]
     }
   ]

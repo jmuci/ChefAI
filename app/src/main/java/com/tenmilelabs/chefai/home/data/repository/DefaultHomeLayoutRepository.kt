@@ -20,7 +20,8 @@ class DefaultHomeLayoutRepository @Inject constructor(
 
     override fun getHomeLayout(): Flow<HomeLayoutModel> = flow {
         // 1. Try disk cache first (stale-while-revalidate)
-        val cached = cacheDataSource.readCachedLayout()
+        // val cached = cacheDataSource.readCachedLayout() // TODO uncomment after network is implemented
+        val cached = cacheDataSource.readBundledLayout()    // TODO delete  after network is implemented
         if (cached != null) {
             emit(cached)
         }
