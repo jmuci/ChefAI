@@ -62,6 +62,7 @@ class LoginViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val testAccounts: List<EmailSuggestion> = if (BuildConfig.DEBUG) {
+        // TODO Move those to the repository layer.
         listOf(
             EmailSuggestion("test1@ex.com", "test123!"),
             EmailSuggestion("test2@ex.com", "test123!"),
