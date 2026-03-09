@@ -67,6 +67,7 @@ fun HomeScreen(
         is HomeUiState.Success -> HomeContent(
             components = state.components,
             recipes = state.recipes,
+            bookmarkedRecipeIds = state.bookmarkedRecipeIds,
             onAction = viewModel::onAction,
         )
     }
@@ -81,6 +82,7 @@ fun HomeScreen(
 fun HomeContent(
     components: List<ComponentModel>,
     recipes: Map<String, RecipePreview>,
+    bookmarkedRecipeIds: Set<UUID> = emptySet(),
     onAction: (HomeAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -107,6 +109,7 @@ fun HomeContent(
             ComponentRenderer(
                 component = component,
                 recipes = recipes,
+                bookmarkedRecipeIds = bookmarkedRecipeIds,
                 onAction = onAction,
                 modifier = Modifier.animateItem(),
             )
