@@ -7,9 +7,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,6 +34,7 @@ import com.tenmilelabs.chefai.core.util.EmptyContent
 import com.tenmilelabs.chefai.core.util.LoadingContent
 import java.util.UUID
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecipesScreen(
     viewModel: RecipesViewModel = hiltViewModel(),
@@ -41,11 +44,16 @@ fun RecipesScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    RecipesContent(
-        loading = uiState.isLoading,
-        recipes = uiState.items,
-        recipeCardOnClick = onRecipeCardClick,
-    )
+    PullToRefreshBox(
+        isRefreshing = uiState.isRefreshing,
+        onRefresh = viewModel::onRefresh,
+    ) {
+        RecipesContent(
+            loading = uiState.isLoading,
+            recipes = uiState.items,
+            recipeCardOnClick = onRecipeCardClick,
+        )
+    }
 
     // Collect and handle UI events
     LaunchedEffect(viewModel) {
@@ -59,7 +67,6 @@ fun RecipesScreen(
                 }
             }
         }
-
     }
 }
 

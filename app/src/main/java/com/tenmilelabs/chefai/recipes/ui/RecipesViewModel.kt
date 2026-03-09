@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
+import com.tenmilelabs.chefai.core.data.sync.SyncStatus
+import com.tenmilelabs.chefai.core.data.sync.SyncStatusHolder
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.util.Async
 import com.tenmilelabs.chefai.core.util.WhileUiSubscribed
@@ -29,7 +32,8 @@ import javax.inject.Inject
  */
 data class RecipesUiState(
     val items: List<RecipePreview> = emptyList(),
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
 )
 
 /**
@@ -42,7 +46,9 @@ sealed interface RecipesUiEvent {
 @HiltViewModel
 class RecipesViewModel @Inject constructor(
     recipesRepository: RecipesRepository,
-    sessionManager: SessionManager
+    sessionManager: SessionManager,
+    private val syncScheduler: SyncScheduler,
+    private val syncStatusHolder: SyncStatusHolder,
 ) : ViewModel() {
 
     private val _isLoading = MutableStateFlow(false)
@@ -58,31 +64,39 @@ class RecipesViewModel @Inject constructor(
             emit(Async.Error(R.string.loading_recipes_error))
         }
 
-    val uiState: StateFlow<RecipesUiState> = combine(_isLoading, _recipesAsync)
-        { isLoading, recipesAsync ->
-            when (recipesAsync) {
-                Async.Loading -> {
-                    RecipesUiState(isLoading = true)
+    val uiState: StateFlow<RecipesUiState> = combine(
+        _isLoading, _recipesAsync, syncStatusHolder.syncStatus
+    ) { isLoading, recipesAsync, syncStatus ->
+        val isRefreshing = syncStatus is SyncStatus.Syncing
+        when (recipesAsync) {
+            Async.Loading -> {
+                RecipesUiState(isLoading = true, isRefreshing = isRefreshing)
+            }
+            is Async.Error -> {
+                // Emit error event asynchronously
+                viewModelScope.launch {
+                    _uiEvent.emit(RecipesUiEvent.ShowSnackbar(recipesAsync.errorMessage))
                 }
-                is Async.Error -> {
-                    // Emit error event asynchronously
-                    viewModelScope.launch {
-                        _uiEvent.emit(RecipesUiEvent.ShowSnackbar(recipesAsync.errorMessage))
-                    }
-                    RecipesUiState(isLoading = false)
-                }
-                is Async.Success -> {
-                    RecipesUiState(
-                        items = recipesAsync.data,
-                        isLoading = isLoading
-                    )
-                }
+                RecipesUiState(isLoading = false, isRefreshing = isRefreshing)
+            }
+            is Async.Success -> {
+                RecipesUiState(
+                    items = recipesAsync.data,
+                    isLoading = isLoading,
+                    isRefreshing = isRefreshing,
+                )
             }
         }
+    }
         .stateIn(
             scope = viewModelScope,
             started = WhileUiSubscribed,
             initialValue = RecipesUiState(isLoading = true)
         )
+
+    fun onRefresh() {
+        syncStatusHolder.emitStatus(SyncStatus.Syncing)
+        syncScheduler.requestManualSync()
+    }
 
 }

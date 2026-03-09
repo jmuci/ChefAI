@@ -13,6 +13,9 @@ class FakeSyncManager : SyncScheduler {
     var mutationSyncCount = 0
         private set
 
+    var manualSyncCount = 0
+        private set
+
     var periodicSyncCount = 0
         private set
 
@@ -27,6 +30,10 @@ class FakeSyncManager : SyncScheduler {
         mutationSyncCount++
     }
 
+    override fun requestManualSync() {
+        manualSyncCount++
+    }
+
     override fun schedulePeriodicSync() {
         periodicSyncCount++
     }
@@ -38,6 +45,7 @@ class FakeSyncManager : SyncScheduler {
     fun reset() {
         immediateSyncCount = 0
         mutationSyncCount = 0
+        manualSyncCount = 0
         periodicSyncCount = 0
         cancelAllCount = 0
     }

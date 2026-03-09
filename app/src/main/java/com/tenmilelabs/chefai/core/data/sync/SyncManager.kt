@@ -45,6 +45,19 @@ class SyncManager @Inject constructor(
     }
 
     /**
+     * Enqueue a sync immediately, replacing any queued (but not yet running) work.
+     * Used for user-initiated pull-to-refresh so the request is never silently ignored.
+     */
+    override fun requestManualSync() {
+        val request = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setConstraints(connectedConstraints())
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_DELAY_SECONDS, TimeUnit.SECONDS)
+            .build()
+        WorkManager.getInstance(context)
+            .enqueueUniqueWork(SYNC_WORK_NAME, ExistingWorkPolicy.REPLACE, request)
+    }
+
+    /**
      * Enqueue a debounced sync after a local mutation.
      * 5-second delay allows batching multiple rapid mutations into one sync cycle.
      * Uses KEEP policy so rapid mutations don't stack requests.
