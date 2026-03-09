@@ -1,0 +1,86 @@
+{
+  "schemaVersion": "1.0.0",
+  "layoutChecksum": "sdui-v2-id-only",
+  "components": [
+    {
+      "type": "section_header",
+      "id": "header-for-you",
+      "title": "For You",
+      "subtitle": "Personalized recipe picks"
+    },
+    {
+      "type": "carousel",
+      "id": "carousel-for-you",
+      "items": [
+        { "type": "large_card", "id": "for-you-1", "recipeId": "00000000-0000-7000-8000-000000000001" },
+        { "type": "large_card", "id": "for-you-2", "recipeId": "00000000-0000-7000-8000-000000000002" },
+        { "type": "large_card", "id": "for-you-3", "recipeId": "00000000-0000-7000-8000-000000000003" },
+        { "type": "large_card", "id": "for-you-4", "recipeId": "00000000-0000-7000-8000-000000000004" },
+        { "type": "large_card", "id": "for-you-5", "recipeId": "00000000-0000-7000-8000-000000000005" }
+      ]
+    },
+    {
+      "type": "section_header",
+      "id": "header-italian-classics",
+      "title": "Italian Classics",
+      "subtitle": "Pasta, pizza and more"
+    },
+    {
+      "type": "carousel",
+      "id": "carousel-italian-classics",
+      "items": [
+        { "type": "large_card",   "id": "italian-1", "recipeId": "00000000-0000-7000-8000-000000000006" },
+        { "type": "squared_card", "id": "italian-2", "recipeId": "00000000-0000-7000-8000-000000000007" },
+        { "type": "squared_card", "id": "italian-3", "recipeId": "00000000-0000-7000-8000-000000000008" },
+        { "type": "large_card",   "id": "italian-4", "recipeId": "00000000-0000-7000-8000-000000000009" }
+      ]
+    },
+    {
+      "type": "section_header",
+      "id": "header-quick-healthy",
+      "title": "Quick & Healthy",
+      "subtitle": "Ready in under 30 minutes"
+    },
+    {
+      "type": "carousel",
+      "id": "carousel-quick-healthy",
+      "items": [
+        { "type": "squared_card", "id": "quick-1", "recipeId": "11111111111111111111111111111111" },
+        { "type": "squared_card", "id": "quick-2", "recipeId": "22222222222222222222222222222222" },
+        { "type": "squared_card", "id": "quick-3", "recipeId": "00000000-0000-7000-8000-000000000012" },
+        { "type": "squared_card", "id": "quick-4", "recipeId": "00000000-0000-7000-8000-000000000013" }
+      ]
+    },
+    {
+      "type": "section_header",
+      "id": "header-seafood",
+      "title": "Seafood",
+      "subtitle": "From the ocean to your plate"
+    },
+    {
+      "type": "carousel",
+      "id": "carousel-seafood",
+      "items": [
+        { "type": "list_card", "id": "seafood-1", "recipeId": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE" },
+        { "type": "list_card", "id": "seafood-2", "recipeId": "00000000-0000-7000-8000-000000000015" },
+        { "type": "list_card", "id": "seafood-3", "recipeId": "00000000-0000-7000-8000-000000000016" },
+        { "type": "list_card", "id": "seafood-4", "recipeId": "00000000-0000-7000-8000-000000000017" }
+      ]
+    },
+    {
+      "type": "section_header",
+      "id": "header-desserts",
+      "title": "Desserts",
+      "subtitle": "Sweet treats"
+    },
+    {
+      "type": "carousel",
+      "id": "carousel-desserts",
+      "items": [
+        { "type": "squared_card", "id": "dessert-1", "recipeId": "00000000-0000-7000-8000-000000000018" },
+        { "type": "squared_card", "id": "dessert-2", "recipeId": "00000000-0000-7000-8000-000000000019" },
+        { "type": "squared_card", "id": "dessert-3", "recipeId": "00000000-0000-7000-8000-000000000020" }
+      ]
+    }
+  ]
+}
