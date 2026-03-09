@@ -5,6 +5,8 @@ import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
+import com.tenmilelabs.chefai.core.data.sync.SyncStatusHolder
 import com.tenmilelabs.chefai.core.testutil.TEST_DOMAIN_RECIPE_PREVIEWS_LIST
 import com.tenmilelabs.chefai.core.testutil.createRealSessionManagerWithFakes
 import com.tenmilelabs.chefai.core.testutil.recipePreview1
@@ -31,13 +33,17 @@ class RecipesViewModelTest {
     private lateinit var viewModel: RecipesViewModel
     private lateinit var recipesRepository: FakeRecipesRepository
     private lateinit var sessionManager: SessionManager
+    private lateinit var fakeSyncManager: FakeSyncManager
+    private lateinit var syncStatusHolder: SyncStatusHolder
 
     @Before
     fun setup() {
         recipesRepository = FakeRecipesRepository()
         sessionManager = createRealSessionManagerWithFakes()
+        fakeSyncManager = FakeSyncManager()
+        syncStatusHolder = SyncStatusHolder()
 
-        viewModel = RecipesViewModel(recipesRepository, sessionManager)
+        viewModel = RecipesViewModel(recipesRepository, sessionManager, fakeSyncManager, syncStatusHolder)
     }
 
     @Test
@@ -86,7 +92,7 @@ class RecipesViewModelTest {
         // Need to create a new ViewModel for this test with error configuration
         val errorRepository = FakeRecipesRepository()
         errorRepository.setShouldReturnErrorForGetRecipes(true)
-        val testViewModel = RecipesViewModel(errorRepository, sessionManager)
+        val testViewModel = RecipesViewModel(errorRepository, sessionManager, fakeSyncManager, syncStatusHolder)
 
         // Collect and verify UI state
         testViewModel.uiState.test {
@@ -111,7 +117,7 @@ class RecipesViewModelTest {
         // Need a new ViewModel for error scenario
         val errorRepository = FakeRecipesRepository()
         errorRepository.setShouldReturnErrorForGetRecipes(true)
-        val testViewModel = RecipesViewModel(errorRepository, sessionManager)
+        val testViewModel = RecipesViewModel(errorRepository, sessionManager, fakeSyncManager, syncStatusHolder)
 
         // Trigger uiState collection to ensure the flow starts
         testViewModel.uiState.test {
@@ -199,7 +205,7 @@ class RecipesViewModelTest {
         // Need a new ViewModel for error scenario
         val errorRepository = FakeRecipesRepository()
         errorRepository.setShouldReturnErrorForGetRecipes(true)
-        val testViewModel = RecipesViewModel(errorRepository, sessionManager)
+        val testViewModel = RecipesViewModel(errorRepository, sessionManager, fakeSyncManager, syncStatusHolder)
 
         testViewModel.uiState.test {
             val errorState = awaitItem()
@@ -242,7 +248,7 @@ class RecipesViewModelTest {
 
         // First test: error state
         recipesRepository.setShouldReturnErrorForGetRecipes(true)
-        val errorViewModel = RecipesViewModel(recipesRepository, sessionManager)
+        val errorViewModel = RecipesViewModel(recipesRepository, sessionManager, fakeSyncManager, syncStatusHolder)
 
         errorViewModel.uiState.test {
             val errorState = awaitItem()
@@ -262,7 +268,7 @@ class RecipesViewModelTest {
         // Second test: success state (with new repository/viewmodel instance)
         val successRepository = FakeRecipesRepository()
         successRepository.setRecipePreviewsToEmit(TEST_DOMAIN_RECIPE_PREVIEWS_LIST)
-        val successViewModel = RecipesViewModel(successRepository, sessionManager)
+        val successViewModel = RecipesViewModel(successRepository, sessionManager, fakeSyncManager, syncStatusHolder)
 
         successViewModel.uiState.test {
             val successState = awaitItem()
