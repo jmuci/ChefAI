@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import coil3.ImageLoader
 import coil3.request.ImageRequest
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.util.WhileUiSubscribed
 import com.tenmilelabs.chefai.home.data.model.ComponentModel
@@ -17,6 +19,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -35,7 +38,8 @@ sealed interface HomeUiState {
         val components: List<ComponentModel>,
         /** Recipe data keyed by UUID string, resolved from Room for each card in [components]. */
         val recipes: Map<String, RecipePreview>,
-    ) : HomeUiState
+        val bookmarkedRecipeIds: Set<UUID> = emptySet(),
+        ) : HomeUiState
     data class Error(val message: Int) : HomeUiState
 }
 
@@ -50,11 +54,17 @@ class HomeViewModel @Inject constructor(
     homeLayoutRepository: HomeLayoutRepository,
     private val recipesRepository: RecipesRepository,
     private val imageLoader: ImageLoader,
+    private val collectionsRepository: CollectionsRepository,
+    private val sessionManager: SessionManager,
     @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     private val _uiEvent = Channel<HomeUiEvent>()
     val uiEvents = _uiEvent.receiveAsFlow()
+
+    private val _bookmarkedIds = sessionManager.getCurrentUserId()
+        ?.let { collectionsRepository.observeBookmarkedRecipeIds(it) }
+        ?: flowOf(emptySet())
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<HomeUiState> = homeLayoutRepository.getHomeLayout()
@@ -62,14 +72,25 @@ class HomeViewModel @Inject constructor(
             val filtered = layout.components.filterNot { it is ComponentModel.Unknown }
             val recipeIds = extractRecipeIds(filtered)
             if (recipeIds.isEmpty()) {
-                flowOf(HomeUiState.Success(components = filtered, recipes = emptyMap()))
-            } else {
-                recipesRepository.getRecipePreviewsByIds(recipeIds).map { recipeList ->
-                    prefetchImages(recipeList)
+                _bookmarkedIds.map { bookmarkedIds ->
                     HomeUiState.Success(
                         components = filtered,
-                        recipes = recipeList.associateBy { it.uuid.toString() },
+                        recipes = emptyMap(),
+                        bookmarkedRecipeIds = bookmarkedIds,
                     )
+                }
+            } else {
+                val recipesFlow = recipesRepository.getRecipePreviewsByIds(recipeIds)
+                    .map { list ->
+                        prefetchImages(list)
+                        list.associateBy { it.uuid.toString() }
+                    }
+                combine(recipesFlow, _bookmarkedIds) { recipesMap, bookmarkedIds ->
+                    HomeUiState.Success(
+                        components = filtered,
+                        recipes = recipesMap,
+                        bookmarkedRecipeIds = bookmarkedIds,
+                    ) as HomeUiState
                 }
             }
         }
@@ -102,6 +123,18 @@ class HomeViewModel @Inject constructor(
             is HomeAction.SectionActionClicked -> {
                 // TODO: Handle deep-link / section action navigation
                 Timber.d("Section action clicked: ${action.actionUrl}")
+            }
+            is HomeAction.BookmarkToggled -> {
+                val userId = sessionManager.getCurrentUserId() ?: return
+                val currentBookmarks =
+                    (uiState.value as? HomeUiState.Success)?.bookmarkedRecipeIds ?: emptySet()
+                viewModelScope.launch {
+                    if (action.recipeId in currentBookmarks) {
+                        collectionsRepository.removeBookmark(userId, action.recipeId)
+                    } else {
+                        collectionsRepository.addBookmark(userId, action.recipeId)
+                    }
+                }
             }
         }
     }
