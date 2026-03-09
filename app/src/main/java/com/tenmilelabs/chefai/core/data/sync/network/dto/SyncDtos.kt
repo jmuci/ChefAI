@@ -115,10 +115,21 @@ data class SyncLabelDto(
 )
 
 @Serializable
+data class SyncCreatorDto(
+    val uuid: String,
+    val displayName: String,
+    val email: String? = null,
+    val avatarUrl: String? = null,
+    val updatedAt: Long,
+    val deletedAt: Long?
+)
+
+@Serializable
 data class SyncPullResponse(
     val recipes: List<SyncRecipeDto>,
     val serverTimestamp: Long,
     val hasMore: Boolean,
+    val creators: List<SyncCreatorDto> = emptyList(),
     val allergens: List<SyncAllergenDto> = emptyList(),
     val sourceClassifications: List<SyncSourceClassificationDto> = emptyList(),
     val ingredients: List<SyncIngredientDto> = emptyList(),

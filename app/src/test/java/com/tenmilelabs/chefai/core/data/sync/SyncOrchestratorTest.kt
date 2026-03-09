@@ -20,12 +20,14 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSourceClassificationDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSyncMetadataDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeTagDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.sync.network.FakeSyncNetworkDataSource
 import com.tenmilelabs.chefai.core.data.sync.network.dto.AcceptedEntityDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.ConflictEntityDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncErrorDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncCreatorDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPullResponse
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPushResponse
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeDto
@@ -55,6 +57,7 @@ class SyncOrchestratorTest {
     private lateinit var recipeIngredientDao: FakeRecipeIngredientDao
     private lateinit var recipeTagCrossRefDao: FakeRecipeTagCrossRefDao
     private lateinit var recipeLabelCrossRefDao: FakeRecipeLabelCrossRefDao
+    private lateinit var userDao: FakeUserDao
     private lateinit var syncMetadataDao: FakeSyncMetadataDao
     private lateinit var syncNetworkDataSource: FakeSyncNetworkDataSource
 
@@ -82,6 +85,7 @@ class SyncOrchestratorTest {
         ingredientDao = FakeIngredientDao()
         labelDao = FakeLabelDao()
         tagDao = FakeTagDao()
+        userDao = FakeUserDao()
         recipeTagCrossRefDao = FakeRecipeTagCrossRefDao()
         recipeLabelCrossRefDao = FakeRecipeLabelCrossRefDao()
         syncMetadataDao = FakeSyncMetadataDao()
@@ -96,6 +100,7 @@ class SyncOrchestratorTest {
             ingredientDao = ingredientDao,
             tagDao = tagDao,
             labelDao = labelDao,
+            userDao = userDao,
             recipeIngredientDao = recipeIngredientDao,
             recipeTagCrossRefDao = recipeTagCrossRefDao,
             recipeLabelCrossRefDao = recipeLabelCrossRefDao,
@@ -351,6 +356,41 @@ class SyncOrchestratorTest {
         val localRecipe = recipeDao.getRecipeById(recipeId1)!!
         assertThat(localRecipe.title).isEqualTo("From Server")
         assertThat(localRecipe.syncState).isEqualTo(SyncState.SYNCED)
+    }
+
+    @Test
+    fun `pull upserts creators from response before recipes`() = runTest(testDispatcher) {
+        val unknownCreatorId = UUID.randomUUID()
+        val serverRecipe = createSyncRecipeDto(uuid = recipeId1, title = "From Server").copy(
+            creatorId = unknownCreatorId.toString()
+        )
+        syncNetworkDataSource.pullResponses.addLast(
+            SyncPullResponse(
+                recipes = listOf(serverRecipe),
+                serverTimestamp = 5000L,
+                hasMore = false,
+                creators = listOf(
+                    SyncCreatorDto(
+                        uuid = unknownCreatorId.toString(),
+                        displayName = "Chef Jane",
+                        email = "jane@example.com",
+                        avatarUrl = "https://example.com/avatar.jpg",
+                        updatedAt = 5000L,
+                        deletedAt = null
+                    )
+                )
+            )
+        )
+
+        syncOrchestrator.sync()
+
+        val creator = userDao.getUserById(unknownCreatorId)
+        assertThat(creator).isNotNull()
+        val existingCreator = creator!!
+        assertThat(existingCreator.displayName).isEqualTo("Chef Jane")
+        assertThat(existingCreator.email).isEqualTo("jane@example.com")
+        assertThat(existingCreator.avatarUrl).isEqualTo("https://example.com/avatar.jpg")
+        assertThat(existingCreator.syncState).isEqualTo(SyncState.SYNCED)
     }
 
     @Test

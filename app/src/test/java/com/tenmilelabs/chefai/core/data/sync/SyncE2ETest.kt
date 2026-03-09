@@ -18,6 +18,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSourceClassificationDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSyncMetadataDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeTagDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.sync.network.FakeSyncNetworkDataSource
@@ -60,6 +61,7 @@ class SyncE2ETest {
     private lateinit var recipeTagCrossRefDao: FakeRecipeTagCrossRefDao
     private lateinit var labelDao: FakeLabelDao
     private lateinit var tagDao: FakeTagDao
+    private lateinit var userDao: FakeUserDao
     private lateinit var recipeLabelCrossRefDao: FakeRecipeLabelCrossRefDao
     private lateinit var syncMetadataDao: FakeSyncMetadataDao
     private lateinit var syncNetworkDataSource: FakeSyncNetworkDataSource
@@ -87,6 +89,7 @@ class SyncE2ETest {
         syncNetworkDataSource = FakeSyncNetworkDataSource()
         labelDao = FakeLabelDao()
         tagDao = FakeTagDao()
+        userDao = FakeUserDao()
 
         // Seed server-known ingredients so push filtering passes for tests that use them
         runBlocking {
@@ -107,6 +110,7 @@ class SyncE2ETest {
             ingredientDao = ingredientDao,
             tagDao = tagDao,
             labelDao = labelDao,
+            userDao = userDao,
             recipeIngredientDao = recipeIngredientDao,
             recipeTagCrossRefDao = recipeTagCrossRefDao,
             recipeLabelCrossRefDao = recipeLabelCrossRefDao,

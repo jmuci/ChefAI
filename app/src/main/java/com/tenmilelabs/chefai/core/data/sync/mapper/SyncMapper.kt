@@ -10,6 +10,7 @@ import com.tenmilelabs.chefai.core.data.local.room.RecipeStepEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.SourceClassificationEntity
 import com.tenmilelabs.chefai.core.data.local.room.TagEntity
+import com.tenmilelabs.chefai.core.data.local.room.UserEntity
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncAllergenDto
@@ -20,6 +21,7 @@ import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeIngredientDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeStepDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncSourceClassificationDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncTagDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncCreatorDto
 import java.util.UUID
 
 // --- Push direction: Room entities → DTO ---
@@ -168,6 +170,16 @@ fun SyncTagDto.toTagEntity(): TagEntity = TagEntity(
 fun SyncLabelDto.toLabelEntity(): LabelEntity = LabelEntity(
     uuid = UUID.fromString(uuid),
     displayName = displayName,
+    updatedAt = updatedAt,
+    deletedAt = deletedAt,
+    syncState = SyncState.SYNCED
+)
+
+fun SyncCreatorDto.toUserEntity(): UserEntity = UserEntity(
+    uuid = UUID.fromString(uuid),
+    displayName = displayName,
+    email = email.orEmpty(),
+    avatarUrl = avatarUrl.orEmpty(),
     updatedAt = updatedAt,
     deletedAt = deletedAt,
     syncState = SyncState.SYNCED
