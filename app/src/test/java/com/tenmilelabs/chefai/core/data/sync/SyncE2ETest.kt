@@ -6,6 +6,7 @@ import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeStepEntity
+import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeAllergenDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeLabelDao
@@ -29,6 +30,7 @@ import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeIngredientDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeStepDto
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -85,6 +87,16 @@ class SyncE2ETest {
         syncNetworkDataSource = FakeSyncNetworkDataSource()
         labelDao = FakeLabelDao()
         tagDao = FakeTagDao()
+
+        // Seed server-known ingredients so push filtering passes for tests that use them
+        runBlocking {
+            ingredientDao.upsertAll(
+                listOf(
+                    IngredientEntity(ingredientId1, "Ingredient 1", null, null, 0L, null, SyncState.SYNCED),
+                    IngredientEntity(ingredientId2, "Ingredient 2", null, null, 0L, null, SyncState.SYNCED),
+                )
+            )
+        }
 
         syncOrchestrator = SyncOrchestrator(
             syncNetworkDataSource = syncNetworkDataSource,

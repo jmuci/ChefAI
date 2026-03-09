@@ -60,4 +60,7 @@ interface IngredientDao {
 
     @Query("SELECT uuid FROM ingredients WHERE uuid IN (:uuids)")
     suspend fun getExistingIds(uuids: List<UUID>): List<UUID>
+
+    @Query("SELECT uuid FROM ingredients WHERE uuid IN (:uuids) AND syncState = 'SYNCED'")
+    suspend fun getSyncedExistingIds(uuids: List<UUID>): List<UUID>
 }

@@ -88,4 +88,10 @@ class FakeIngredientDao : IngredientDao {
     override suspend fun getExistingIds(uuids: List<UUID>): List<UUID> {
         return ingredientsFlow.value.filter { uuids.contains(it.uuid) }.map { it.uuid }
     }
+
+    override suspend fun getSyncedExistingIds(uuids: List<UUID>): List<UUID> {
+        return ingredientsFlow.value
+            .filter { uuids.contains(it.uuid) && it.syncState == SyncState.SYNCED }
+            .map { it.uuid }
+    }
 }

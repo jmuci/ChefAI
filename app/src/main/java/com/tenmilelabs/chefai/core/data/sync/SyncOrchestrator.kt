@@ -114,9 +114,30 @@ class SyncOrchestrator @Inject constructor(
 
     private suspend fun buildSyncRecipeDto(recipe: RecipeEntity): SyncRecipeDto {
         val steps = recipeStepDao.getStepsForRecipe(recipe.uuid)
-        val ingredients = recipeIngredientDao.getIngredientsForRecipe(recipe.uuid)
+        val allIngredients = recipeIngredientDao.getIngredientsForRecipe(recipe.uuid)
         val tags = recipeTagCrossRefDao.getTagsForRecipe(recipe.uuid)
         val labels = recipeLabelCrossRefDao.getLabelsForRecipe(recipe.uuid)
+
+        // Only push ingredient refs that are known to the server (i.e., pulled via sync).
+        // Locally-seeded or fake ingredient IDs will not have syncState=SYNCED and would
+        // cause INGREDIENT_NOT_FOUND on the backend.
+        // TODO Revisit after https://github.com/jmuci/ChefAI/issues/101
+        val ingredients = if (allIngredients.isEmpty()) {
+            emptyList()
+        } else {
+            val ids = allIngredients.map { it.ingredientId }
+            val syncedIds = ingredientDao.getSyncedExistingIds(ids).toSet()
+            val filtered = allIngredients.filter { it.ingredientId in syncedIds }
+            if (filtered.size < allIngredients.size) {
+                Timber.w(
+                    "buildSyncRecipeDto: recipe %s has %d ingredient ref(s) not known to server, skipping",
+                    recipe.uuid,
+                    allIngredients.size - filtered.size
+                )
+            }
+            filtered
+        }
+
         return recipe.toSyncDto(steps, ingredients, tags, labels)
     }
 
