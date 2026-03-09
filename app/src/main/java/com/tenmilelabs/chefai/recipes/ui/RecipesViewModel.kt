@@ -56,6 +56,7 @@ class RecipesViewModel @Inject constructor(
     val uiEvents: SharedFlow<RecipesUiEvent> = _uiEvent.asSharedFlow()
 
     private val _recipesAsync = (sessionManager.getCurrentUserId()?.let { userId ->
+        // TODO when user logs out, we should stop showing the last users recipes.
         recipesRepository.getRecipesPreviewStreamForUser(userId)
     } ?: emptyFlow())
         .map { Async.Success(it) }

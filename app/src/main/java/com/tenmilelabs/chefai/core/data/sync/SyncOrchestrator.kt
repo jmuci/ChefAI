@@ -185,12 +185,12 @@ class SyncOrchestrator @Inject constructor(
 
             transactionRunner {
                 // Upsert reference data in FK dependency order before recipes:
+                //   creators (leaf) → recipes.creatorId (CASCADE)
                 //   allergens (leaf) → ingredients.allergenId (RESTRICT)
                 //   source_classifications (leaf) → ingredients.sourcePrimaryId (SET_NULL)
                 //   ingredients → recipe_ingredients.ingredientId (RESTRICT)
                 //   tags (leaf) → recipe_tags.tagId (RESTRICT)
                 //   labels (leaf) → recipe_labels.labelId (RESTRICT)
-                //   creators (leaf) → recipes.creatorId (CASCADE)
                 userDao.upsertAll(response.creators.map { it.toUserEntity() })
                 allergenDao.upsertAll(response.allergens.map { it.toAllergenEntity() })
                 sourceClassificationDao.upsertAll(response.sourceClassifications.map { it.toSourceClassificationEntity() })
