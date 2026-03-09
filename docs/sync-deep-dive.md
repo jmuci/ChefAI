@@ -56,6 +56,8 @@ For each dirty recipe, `buildSyncRecipeDto` assembles the full aggregate:
 
 **Ingredient filtering:** Only ingredient refs where the `ingredientId` exists in the local `ingredients` table with `syncState = SYNCED` are included. This ensures only server-known ingredients reach the backend. Refs referencing unknown or locally-seeded IDs are dropped with a `Timber.w`.
 
+**NOTE** : Down the line we need to support client created ingredients. 
+
 ### Step 3 — Batch and POST
 
 Recipes are grouped into batches of 50 and sent to `POST /sync/push`.
@@ -95,8 +97,9 @@ GET /sync/pull?since=<checkpoint>&limit=100
 ```
 
 The response contains:
+
 - `recipes` — full recipe aggregates (with steps, ingredients, tag/label IDs)
-- `allergens`, `source_classifications`, `ingredients`, `tags`, `labels` — reference data
+- `creators`, `allergens`, `source_classifications`, `ingredients`, `tags`, `labels` — reference data
 - `serverTimestamp` — new checkpoint
 - `hasMore` — whether another page exists
 
@@ -105,6 +108,7 @@ The response contains:
 All reference tables are upserted **before** any recipe row, in dependency order:
 
 ```
+creators				(no FKs)
 allergens           (no FKs)
 source_classifications  (no FKs)
 ingredients         (FK → allergens, source_classifications)
@@ -131,7 +135,7 @@ syncRecipe.deletedAt != null?
 
 ### Step 5 — upsertRecipeAggregate
 
-The FK `recipes.creatorId → users.uuid` is satisfied because `SessionManager` writes the authenticated user to the local `users` table during `login()`, `register()`, and `loadSession()` — before sync fires. No stub insertion is needed inside `upsertRecipeAggregate`.
+The FK `recipes.creatorId → users.uuid` is satisfied because `SessionManager` writes the authenticated user to the local `users` table during `login()`, `register()`, and `loadSession()` — before sync fires. 
 
 The aggregate is written atomically within the outer Room transaction:
 
