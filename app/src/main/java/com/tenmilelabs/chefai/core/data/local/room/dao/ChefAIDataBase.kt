@@ -6,6 +6,7 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.tenmilelabs.chefai.core.data.local.room.AllergenEntity
+import com.tenmilelabs.chefai.core.data.local.room.BookmarkedRecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.LabelEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeDraftEntity
@@ -23,6 +24,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
 @Database(
     entities = [
         AllergenEntity::class,
+        BookmarkedRecipeEntity::class,
         IngredientEntity::class,
         LabelEntity::class,
         RecipeDraftEntity::class,
@@ -36,7 +38,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         TagEntity::class,
         UserEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 @TypeConverters(
@@ -45,6 +47,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
 )
 abstract class ChefAIDataBase : RoomDatabase() {
     abstract fun allergenDao(): AllergenDao
+    abstract fun bookmarkedRecipeDao(): BookmarkedRecipeDao
     abstract fun ingredientDao(): IngredientDao
     abstract fun labelDao(): LabelDao
     abstract fun recipeDao(): RecipeDao
@@ -98,6 +101,27 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
             )
         """.trimIndent()
         )
+    }
+}
+
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS bookmarked_recipes (
+                userId BLOB NOT NULL,
+                recipeId BLOB NOT NULL,
+                updatedAt INTEGER NOT NULL,
+                deletedAt INTEGER,
+                syncState TEXT NOT NULL,
+                PRIMARY KEY(userId, recipeId),
+                FOREIGN KEY(userId) REFERENCES users(uuid) ON DELETE CASCADE,
+                FOREIGN KEY(recipeId) REFERENCES recipes(uuid) ON DELETE CASCADE
+            )
+        """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX index_bookmarked_recipes_recipeId ON bookmarked_recipes(recipeId)")
+        db.execSQL("CREATE INDEX index_bookmarked_recipes_syncState_updatedAt ON bookmarked_recipes(syncState, updatedAt)")
     }
 }
 
