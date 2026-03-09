@@ -103,12 +103,11 @@ class AuthE2ETest {
 
         composeTestRule.onNodeWithTag("LoginButton").performClick()
 
-        // Then: Home screen should be displayed
-        // Wait for navigation to complete and verify we're on the home screen
+        // Then: Home screen should be displayed (empty state — test DB has no seed recipes)
         composeTestRule.waitUntilAtLeastOneExists(hasTestTag("HomeScreen"), 5_000)
 
         composeTestRule
-            .onNodeWithText(context.getString(string.home_recipe_suggestions_title))
+            .onNodeWithText(context.getString(string.no_recipes_title))
             .assertIsDisplayed()
     }
 
@@ -161,9 +160,10 @@ class AuthE2ETest {
         composeTestRule.onNodeWithTag("RegisterButton").performClick()
 
         // Then: Should navigate to home screen directly after successful registration
+        // (empty state — test DB has no seed recipes)
         composeTestRule.waitUntilAtLeastOneExists(hasTestTag("HomeScreen"), 5_000)
 
-        composeTestRule.onNodeWithText(context.getString(string.home_recipe_suggestions_title))
+        composeTestRule.onNodeWithText(context.getString(string.no_recipes_title))
             .assertIsDisplayed()
 
         // Additional verification: Logout and login with the same credentials
@@ -192,10 +192,10 @@ class AuthE2ETest {
 
         composeTestRule.onNodeWithTag("LoginButton").performClick()
 
-        // Verify we're back on the home screen
+        // Verify we're back on the home screen (empty state — test DB has no seed recipes)
         composeTestRule.waitUntilAtLeastOneExists(hasTestTag("HomeScreen"), 5_000)
 
-        composeTestRule.onNodeWithText(context.getString(string.home_recipe_suggestions_title))
+        composeTestRule.onNodeWithText(context.getString(string.no_recipes_title))
             .assertIsDisplayed()
     }
 }
