@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.core.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -52,9 +53,7 @@ import java.util.UUID
  * Designed for horizontal scrolling carousels and featured content.
  *
  * @param recipe The recipe preview data to display
- * @param modifier Modifier for customizing the card appearance and behavior
- * @param width The width of the card (default 300dp for carousel use)
- * @param height The height of the card (default 250dp)
+ * @param modifier Modifier for customizing the card appearance and behavior. Default size is 300x220dp.
  * @param isInCollection Whether the recipe is already saved to collection (default false)
  * @param onClick Callback when the card is clicked, receives the recipe UUID
  * @param onSaveToCollection Callback when the save to collection button is clicked, receives the recipe UUID
@@ -63,18 +62,16 @@ import java.util.UUID
 @Composable
 fun LargeCard(
     recipe: RecipePreview,
-    modifier: Modifier = Modifier,
-    width: Int = 300,
-    height: Int = 220,
+    modifier: Modifier = Modifier
+        .width(300.dp)
+        .height(220.dp),
     isInCollection: Boolean = false,
     onClick: (UUID) -> Unit = {},
     onSaveToCollection: (UUID) -> Unit = {}
 ) {
     timber.log.Timber.d("LargeCard composing for recipe: ${recipe.title}, imageUrl: ${recipe.imageUrlThumbnail}")
     Card(
-        modifier = modifier
-            .width(width.dp)
-            .height(height.dp),
+        modifier = modifier,
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(
             defaultElevation = 4.dp
@@ -149,92 +146,100 @@ fun LargeCard(
             }
 
             // Content overlay
-            Column(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.SpaceBetween
+                    .padding(16.dp)
             ) {
-                // Top section - Labels/Tags
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    maxLines = 1
+                val cardHeight = maxHeight
+                val cardWidth = maxWidth
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    recipe.labels.take(2).forEach { label ->
-                        InfoChip(
-                            text = label.displayName,
-                            type = InfoChipType.LABEL
-                        )
-                    }
-                }
-
-                // Bottom section - Recipe info
-                Column {
-                    // Title
-                    Text(
-                        text = recipe.title,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    // Description
-                    Text(
-                        text = recipe.description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.9f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Metadata row (time and servings)
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    // Top section - Labels/Tags
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        maxLines = 1
                     ) {
-                        // Time indicator
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.AccessTime,
-                                contentDescription = "Time",
-                                tint = Color.White,
-                                modifier = Modifier.height(16.dp)
-                            )
-                            Text(
-                                text = "${recipe.prepTimeMinutes + recipe.cookTimeMinutes}m",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = Color.White,
-                                fontWeight = FontWeight.Medium
+                        recipe.labels.take(2).forEach { label ->
+                            InfoChip(
+                                text = label.displayName,
+                                type = InfoChipType.LABEL
                             )
                         }
+                    }
 
-                        // Servings indicator
+                    // Bottom section - Recipe info
+                    Column {
+                        // Title
+                        Text(
+                            text = recipe.title,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // Description (only show if card height >= 200dp)
+                        if (cardHeight >= 180.dp || cardWidth >= 220.dp) {
+                            Text(
+                                text = recipe.description,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White.copy(alpha = 0.9f),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+
+                        // Metadata row (time and servings)
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.People,
-                                contentDescription = "Servings",
-                                tint = Color.White,
-                                modifier = Modifier.height(16.dp)
-                            )
-                            Text(
-                                text = "${recipe.servings} servings",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = Color.White,
-                                fontWeight = FontWeight.Medium
-                            )
+                            // Time indicator
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AccessTime,
+                                    contentDescription = "Time",
+                                    tint = Color.White,
+                                    modifier = Modifier.height(16.dp)
+                                )
+                                Text(
+                                    text = "${recipe.prepTimeMinutes + recipe.cookTimeMinutes}m",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+
+                            // Servings indicator
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.People,
+                                    contentDescription = "Servings",
+                                    tint = Color.White,
+                                    modifier = Modifier.height(16.dp)
+                                )
+                                Text(
+                                    text = "${recipe.servings} servings",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
                     }
                 }
@@ -247,11 +252,8 @@ fun LargeCard(
 @Composable
 private fun LargeCardPreview() {
     ChefAITheme {
-        Surface {
-            LargeCard(
-                recipe = PreviewData.grilledChickenRecipe,
-                modifier = Modifier.padding(16.dp)
-            )
+        Surface(modifier = Modifier.padding(16.dp)) {
+            LargeCard(recipe = PreviewData.grilledChickenRecipe)
         }
     }
 }
@@ -259,10 +261,9 @@ private fun LargeCardPreview() {
 @Composable
 private fun LargeCardInCollectionPreview() {
     ChefAITheme {
-        Surface {
+        Surface(modifier = Modifier.padding(16.dp)) {
             LargeCard(
                 recipe = PreviewData.grilledChickenRecipe,
-                modifier = Modifier.padding(16.dp),
                 isInCollection = true
             )
         }
@@ -273,11 +274,8 @@ private fun LargeCardInCollectionPreview() {
 @Composable
 private fun LargeCardDarkPreview() {
     ChefAITheme(darkTheme = true) {
-        Surface {
-            LargeCard(
-                recipe = PreviewData.grilledChickenRecipe,
-                modifier = Modifier.padding(16.dp)
-            )
+        Surface(modifier = Modifier.padding(16.dp)) {
+            LargeCard(recipe = PreviewData.grilledChickenRecipe)
         }
     }
 }

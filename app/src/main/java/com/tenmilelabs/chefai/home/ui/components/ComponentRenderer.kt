@@ -1,7 +1,11 @@
 package com.tenmilelabs.chefai.home.ui.components
 
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.ui.components.LargeCard
 import com.tenmilelabs.chefai.core.ui.components.RecipeListCard
@@ -43,17 +47,15 @@ fun ComponentRenderer(
             LargeCard(
                 recipe = recipe,
                 onClick = { onAction(HomeAction.CardClicked(it.toString())) },
-                modifier = modifier,
+                modifier = modifier.width(300.dp).height(220.dp),
             )
         }
         is ComponentModel.SquaredCard -> {
             val recipe = component.recipeId?.let { recipes[it] } ?: return
             LargeCard(
                 recipe = recipe,
-                width = 160,
-                height = 160,
                 onClick = { onAction(HomeAction.CardClicked(it.toString())) },
-                modifier = modifier,
+                modifier = modifier.size(180.dp),
             )
         }
         is ComponentModel.ListCard -> {
