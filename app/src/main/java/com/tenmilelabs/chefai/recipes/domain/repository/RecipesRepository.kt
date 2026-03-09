@@ -26,4 +26,12 @@ interface RecipesRepository {
     suspend fun deleteRecipe(recipeId: UUID)
 
     suspend fun softDeleteRecipe(recipeId: UUID)
+
+    /**
+     * Returns a flow of recipe previews for the given UUIDs, resolved from Room.
+     * The result is filtered in-memory from the full recipe stream, so the flow
+     * updates reactively whenever any matching recipe changes in the database.
+     * Returns an empty flow immediately if [ids] is empty.
+     */
+    fun getRecipePreviewsByIds(ids: List<UUID>): Flow<List<RecipePreview>>
 }

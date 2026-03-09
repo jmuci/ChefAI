@@ -6,6 +6,8 @@ import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import java.util.UUID
 
 class FakeRecipesRepository : RecipesRepository {
@@ -128,5 +130,11 @@ class FakeRecipesRepository : RecipesRepository {
 
     override suspend fun softDeleteRecipe(recipeId: UUID) {
         // No-op
+    }
+
+    override fun getRecipePreviewsByIds(ids: List<UUID>): Flow<List<RecipePreview>> {
+        if (ids.isEmpty()) return flowOf(emptyList())
+        val idSet = ids.toHashSet()
+        return recipesPreviewListFlow.map { all -> all.filter { it.uuid in idSet } }
     }
 }
