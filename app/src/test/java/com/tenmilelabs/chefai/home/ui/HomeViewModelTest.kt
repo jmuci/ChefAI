@@ -1,12 +1,15 @@
 package com.tenmilelabs.chefai.home.ui
 
 import app.cash.turbine.test
+import coil3.ImageLoader
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
-import com.tenmilelabs.chefai.core.testutil.TEST_DOMAIN_RECIPE_PREVIEWS_LIST
-import com.tenmilelabs.chefai.core.testutil.recipePreview1
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
-import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
+import com.tenmilelabs.chefai.home.data.model.ComponentModel
+import com.tenmilelabs.chefai.home.data.model.HomeLayoutModel
+import com.tenmilelabs.chefai.home.data.repository.FakeHomeLayoutRepository
+import com.tenmilelabs.chefai.home.data.repository.FakeRecipesRepository
+import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -20,107 +23,182 @@ class HomeViewModelTest {
     val mainCoroutineRule = MainCoroutineRule()
 
     private lateinit var viewModel: HomeViewModel
+    private lateinit var homeLayoutRepository: FakeHomeLayoutRepository
     private lateinit var recipesRepository: FakeRecipesRepository
+    private val imageLoader: ImageLoader = mockk(relaxed = true)
+    private val appContext: android.content.Context = mockk(relaxed = true)
 
     @Before
     fun setup() {
+        homeLayoutRepository = FakeHomeLayoutRepository()
         recipesRepository = FakeRecipesRepository()
-        viewModel = HomeViewModel(recipesRepository)
+        viewModel = HomeViewModel(
+            homeLayoutRepository = homeLayoutRepository,
+            recipesRepository = recipesRepository,
+            imageLoader = imageLoader,
+            appContext = appContext,
+        )
     }
 
     @Test
-    fun `initial state is loading when no data emitted yet`() = runTest {
+    fun `initial state is Loading before any layout emitted`() = runTest {
         viewModel.uiState.test {
-            val initialState = awaitItem()
-            assertThat(initialState.isLoading).isTrue()
-            assertThat(initialState.recipes).isEmpty()
-
+            val initial = awaitItem()
+            assertThat(initial).isInstanceOf(HomeUiState.Loading::class.java)
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun `uiState shows recipes when repository emits data`() = runTest {
-        recipesRepository.setRecipePreviewsToEmit(TEST_DOMAIN_RECIPE_PREVIEWS_LIST)
-
-        viewModel.uiState.test {
-            val state = awaitItem()
-            assertThat(state.isLoading).isFalse()
-            assertThat(state.recipes).isEqualTo(TEST_DOMAIN_RECIPE_PREVIEWS_LIST)
-            assertThat(state.recipes).hasSize(3)
-
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun `uiState shows empty list when repository emits empty data`() = runTest {
-        recipesRepository.setRecipePreviewsToEmit(emptyList())
+    fun `uiState becomes Success when repository emits a layout with no recipe cards`() = runTest {
+        // A layout with only headers (no recipe IDs) should go directly to Success with empty map.
+        homeLayoutRepository.emit(
+            HomeLayoutModel(
+                schemaVersion = "1.0.0",
+                components = listOf(
+                    ComponentModel.SectionHeader(id = "hdr", title = "Title"),
+                ),
+            )
+        )
 
         viewModel.uiState.test {
-            val state = awaitItem()
-            assertThat(state.isLoading).isFalse()
-            assertThat(state.recipes).isEmpty()
-
+            val state = awaitItem().let {
+                if (it is HomeUiState.Loading) awaitItem() else it
+            }
+            assertThat(state).isInstanceOf(HomeUiState.Success::class.java)
+            val success = state as HomeUiState.Success
+            assertThat(success.components).hasSize(1)
+            assertThat(success.recipes).isEmpty()
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun `uiState shows error and emits ShowSnackbar when repository throws`() = runTest {
-        val errorRepository = FakeRecipesRepository()
-        errorRepository.setShouldReturnErrorForGetRecipes(true)
-        val testViewModel = HomeViewModel(errorRepository)
+    fun `uiState becomes Success when layout and recipes both emit`() = runTest {
+        homeLayoutRepository.emitDefault()
+        recipesRepository.emitPreviews(emptyList())
 
-        testViewModel.uiState.test {
-            val errorState = awaitItem()
-            assertThat(errorState.isLoading).isFalse()
-            assertThat(errorState.recipes).isEmpty()
+        viewModel.uiState.test {
+            val state = awaitItem().let {
+                if (it is HomeUiState.Loading) awaitItem() else it
+            }
+            assertThat(state).isInstanceOf(HomeUiState.Success::class.java)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 
+    @Test
+    fun `Success state components exclude Unknown variants`() = runTest {
+        homeLayoutRepository.emit(
+            HomeLayoutModel(
+                schemaVersion = "1.0.0",
+                components = listOf(
+                    ComponentModel.SectionHeader(id = "hdr", title = "Title"),
+                    ComponentModel.Unknown(id = "unk", originalType = "future_type"),
+                    ComponentModel.Carousel(
+                        id = "c1",
+                        items = listOf(
+                            ComponentModel.LargeCard(id = "lc1", recipeId = null),
+                        ),
+                    ),
+                ),
+            )
+        )
+        // Carousel has no recipe IDs, so flatMapLatest emits immediately with empty recipes
+        viewModel.uiState.test {
+            val state = awaitItem().let {
+                if (it is HomeUiState.Loading) awaitItem() else it
+            }
+            assertThat(state).isInstanceOf(HomeUiState.Success::class.java)
+            val components = (state as HomeUiState.Success).components
+            assertThat(components.none { it is ComponentModel.Unknown }).isTrue()
+            assertThat(components).hasSize(2)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `uiState becomes Error and emits ShowSnackbar when repository throws`() = runTest {
+        homeLayoutRepository.shouldError = true
+        val errorViewModel = HomeViewModel(
+            homeLayoutRepository = homeLayoutRepository,
+            recipesRepository = recipesRepository,
+            imageLoader = imageLoader,
+            appContext = appContext,
+        )
+
+        errorViewModel.uiState.test {
+            val state = awaitItem().let {
+                if (it is HomeUiState.Loading) awaitItem() else it
+            }
+            assertThat(state).isInstanceOf(HomeUiState.Error::class.java)
             cancelAndIgnoreRemainingEvents()
         }
 
-        testViewModel.uiEvents.test {
+        errorViewModel.uiEvents.test {
             val event = awaitItem()
             assertThat(event).isInstanceOf(HomeUiEvent.ShowSnackbar::class.java)
             assertThat((event as HomeUiEvent.ShowSnackbar).message)
                 .isEqualTo(R.string.loading_recipes_error)
-
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun `uiState updates when repository emits new data`() = runTest {
-        recipesRepository.setRecipePreviewsToEmit(emptyList())
+    fun `onAction CardClicked with valid UUID emits NavigateToRecipeDetail`() = runTest {
+        homeLayoutRepository.emitDefault()
+        recipesRepository.emitPreviews(emptyList())
+        val validId = "00000000-0000-0000-0000-000000000001"
 
-        viewModel.uiState.test {
-            val firstState = awaitItem()
-            assertThat(firstState.recipes).isEmpty()
-
-            recipesRepository.setRecipePreviewsToEmit(listOf(recipePreview1))
-
-            val secondState = awaitItem()
-            assertThat(secondState.recipes).hasSize(1)
-            assertThat(secondState.recipes[0]).isEqualTo(recipePreview1)
-
-            recipesRepository.setRecipePreviewsToEmit(TEST_DOMAIN_RECIPE_PREVIEWS_LIST)
-
-            val thirdState = awaitItem()
-            assertThat(thirdState.recipes).hasSize(3)
-
+        viewModel.uiEvents.test {
+            viewModel.onAction(HomeAction.CardClicked(validId))
+            val event = awaitItem()
+            assertThat(event).isInstanceOf(HomeUiEvent.NavigateToRecipeDetail::class.java)
+            assertThat((event as HomeUiEvent.NavigateToRecipeDetail).recipeUuid.toString())
+                .isEqualTo(validId)
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun `isLoading is false after successful load`() = runTest {
-        recipesRepository.setRecipePreviewsToEmit(TEST_DOMAIN_RECIPE_PREVIEWS_LIST)
+    fun `onAction CardClicked with invalid UUID logs warning and does not crash`() = runTest {
+        homeLayoutRepository.emitDefault()
+        recipesRepository.emitPreviews(emptyList())
 
+        viewModel.onAction(HomeAction.CardClicked("not-a-valid-uuid"))
+        viewModel.onAction(HomeAction.CardClicked(""))
+
+        viewModel.uiEvents.test {
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `uiState updates when repository emits a new layout`() = runTest {
         viewModel.uiState.test {
-            val state = awaitItem()
-            assertThat(state.isLoading).isFalse()
-            assertThat(state.recipes).hasSize(3)
+            assertThat(awaitItem()).isInstanceOf(HomeUiState.Loading::class.java)
+
+            // First emission — header only (no recipe IDs → Success immediately)
+            homeLayoutRepository.emitDefault()
+            recipesRepository.emitPreviews(emptyList())
+            val first = awaitItem()
+            assertThat(first).isInstanceOf(HomeUiState.Success::class.java)
+
+            // Second emission with header-only layout
+            homeLayoutRepository.emit(
+                HomeLayoutModel(
+                    schemaVersion = "1.0.0",
+                    components = listOf(
+                        ComponentModel.SectionHeader(id = "new-header", title = "New Section"),
+                    ),
+                )
+            )
+            val second = awaitItem()
+            assertThat(second).isInstanceOf(HomeUiState.Success::class.java)
+            val components = (second as HomeUiState.Success).components
+            assertThat(components).hasSize(1)
+            assertThat(components[0]).isInstanceOf(ComponentModel.SectionHeader::class.java)
 
             cancelAndIgnoreRemainingEvents()
         }

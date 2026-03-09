@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.io.IOException
 import timber.log.Timber
@@ -247,6 +248,12 @@ class DefaultRecipeRepository @Inject constructor(
 
     override suspend fun deleteAllRecipes() {
         recipeDao.deleteAllRecipes()
+    }
+
+    override fun getRecipePreviewsByIds(ids: List<UUID>): Flow<List<RecipePreview>> {
+        if (ids.isEmpty()) return flowOf(emptyList())
+        val idSet = ids.toHashSet()
+        return getRecipesPreviewStream().map { all -> all.filter { it.uuid in idSet } }
     }
 
     override suspend fun deleteRecipe(recipeId: UUID) {
