@@ -36,7 +36,15 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideHttpClient(tokenProvider: TokenProvider) = HttpClient(CIO) {
+    fun provideJson(): Json = Json {
+        prettyPrint = true
+        isLenient = true
+        ignoreUnknownKeys = true
+    }
+
+    @Provides
+    @Singleton
+    fun provideHttpClient(tokenProvider: TokenProvider, json: Json) = HttpClient(CIO) {
         expectSuccess = true
 
         // Install authentication interceptor
@@ -50,11 +58,7 @@ object NetworkModule {
         }
 
         install(ContentNegotiation) {
-            json(Json {
-                prettyPrint = true
-                isLenient = true
-                ignoreUnknownKeys = true
-            })
+            json(json)
         }
     }
 }
