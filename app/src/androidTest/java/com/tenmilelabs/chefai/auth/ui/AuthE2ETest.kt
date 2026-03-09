@@ -107,7 +107,7 @@ class AuthE2ETest {
         composeTestRule.waitUntilAtLeastOneExists(hasTestTag("HomeScreen"), 5_000)
 
         composeTestRule
-            .onNodeWithText(context.getString(string.no_recipes_title))
+            .onNodeWithText(context.getString(string.home_recipe_suggestions_title))
             .assertIsDisplayed()
     }
 
@@ -163,7 +163,7 @@ class AuthE2ETest {
         // (empty state — test DB has no seed recipes)
         composeTestRule.waitUntilAtLeastOneExists(hasTestTag("HomeScreen"), 5_000)
 
-        composeTestRule.onNodeWithText(context.getString(string.no_recipes_title))
+        composeTestRule.onNodeWithText(context.getString(string.home_recipe_suggestions_title))
             .assertIsDisplayed()
 
         // Additional verification: Logout and login with the same credentials
@@ -195,7 +195,7 @@ class AuthE2ETest {
         // Verify we're back on the home screen (empty state — test DB has no seed recipes)
         composeTestRule.waitUntilAtLeastOneExists(hasTestTag("HomeScreen"), 5_000)
 
-        composeTestRule.onNodeWithText(context.getString(string.no_recipes_title))
+        composeTestRule.onNodeWithText(context.getString(string.home_recipe_suggestions_title))
             .assertIsDisplayed()
     }
 }
