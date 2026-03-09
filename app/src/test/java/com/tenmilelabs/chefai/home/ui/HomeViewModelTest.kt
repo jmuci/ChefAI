@@ -41,7 +41,7 @@ class HomeViewModelTest {
         viewModel = HomeViewModel(
             homeLayoutRepository = homeLayoutRepository,
             recipesRepository = recipesRepository,
-            collectionsRepository = FakeCollectionsRepository(),
+            collectionsRepository = collectionsRepository,
             sessionManager = createTestSessionManager(),
             imageLoader = imageLoader,
             appContext = appContext,
@@ -216,13 +216,23 @@ class HomeViewModelTest {
 
     @Test
     fun `bookmarkedRecipeIds reflects repository state`() = runTest {
-        recipesRepository.setRecipePreviewsToEmit(TEST_DOMAIN_RECIPE_PREVIEWS_LIST)
         val targetId = TEST_DOMAIN_RECIPE_PREVIEWS_LIST.first().uuid
         collectionsRepository.setBookmarkedIds(setOf(targetId))
 
+        // Header-only layout — no recipe IDs → _bookmarkedIds.map branch fires immediately
+        homeLayoutRepository.emit(
+            HomeLayoutModel(
+                schemaVersion = "1.0.0",
+                components = listOf(ComponentModel.SectionHeader(id = "hdr", title = "Title")),
+            )
+        )
+
         viewModel.uiState.test {
-            val state = awaitItem()
-            assertThat(state.bookmarkedRecipeIds).contains(targetId)
+            val state = awaitItem().let {
+                if (it is HomeUiState.Loading) awaitItem() else it
+            }
+            assertThat(state).isInstanceOf(HomeUiState.Success::class.java)
+            assertThat((state as HomeUiState.Success).bookmarkedRecipeIds).contains(targetId)
 
             cancelAndIgnoreRemainingEvents()
         }
