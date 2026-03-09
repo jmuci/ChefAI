@@ -102,6 +102,10 @@ class SessionManager @Inject constructor(
                     authToken = authToken
                 )
 
+                // Ensure the user row exists in Room before sync fires so that
+                // pulled recipes (which reference this creatorId) satisfy the FK constraint.
+                persistAuthenticatedUser(user)
+
                 // Check if token is expired
                 val currentTime = System.currentTimeMillis()
                 if (currentTime >= tokenExpiry) {
@@ -153,6 +157,27 @@ class SessionManager @Inject constructor(
         ensureAnonymousUserEntity(localUserId)
 
         _userSession.value = UserSession.Anonymous(localUserId)
+    }
+
+    /**
+     * Persists the authenticated user's profile to Room.
+     * Called after every successful login, registration, and session restore so that the
+     * FK constraint `recipes.creatorId → users.uuid` is satisfied before sync fires and
+     * pulls the user's recipes from the server.
+     */
+    private suspend fun persistAuthenticatedUser(user: User) {
+        userDao.upsertUser(
+            UserEntity(
+                uuid = user.uuid,
+                displayName = user.displayName,
+                email = user.email,
+                avatarUrl = user.avatarUrl,
+                updatedAt = System.currentTimeMillis(),
+                deletedAt = null,
+                syncState = SyncState.SYNCED
+            )
+        )
+        Timber.d("Persisted authenticated user to Room: ${user.uuid}")
     }
 
     /**
@@ -232,6 +257,10 @@ class SessionManager @Inject constructor(
                 authToken = authToken
             )
 
+            // Persist the authenticated user to Room before sync fires so that pulled
+            // recipes (which reference this creatorId) satisfy the FK constraint.
+            persistAuthenticatedUser(user)
+
             // Trigger sync: push any local recipes and start periodic sync
             syncSchedulerProvider.get().requestImmediateSync()
             syncSchedulerProvider.get().schedulePeriodicSync()
@@ -306,6 +335,10 @@ class SessionManager @Inject constructor(
                 user = user,
                 authToken = authToken
             )
+
+            // Persist the authenticated user to Room before sync fires so that pulled
+            // recipes (which reference this creatorId) satisfy the FK constraint.
+            persistAuthenticatedUser(user)
 
             // Trigger sync: push any local recipes and start periodic sync
             syncSchedulerProvider.get().requestImmediateSync()

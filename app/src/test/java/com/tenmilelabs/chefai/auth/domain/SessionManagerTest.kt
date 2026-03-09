@@ -794,4 +794,69 @@ class SessionManagerTest {
         assertThat(fakeSyncManager.immediateSyncCount).isEqualTo(0)
         assertThat(fakeSyncManager.periodicSyncCount).isEqualTo(0)
     }
+
+    // --- Room Persistence Tests ---
+
+    @Test
+    fun `login persists authenticated user to Room with SYNCED state`() = testScope.runTest {
+        // Given: Anonymous session
+        sessionManager.loadSession()
+
+        // When: User logs in
+        val result = sessionManager.login("test@example.com", "password123")
+        assertThat(result.isSuccess).isTrue()
+
+        // Then: The authenticated user is written to Room so that pulled recipes can
+        // satisfy the recipes.creatorId → users.uuid FK constraint without a stub.
+        val session = sessionManager.userSession.value as UserSession.Authenticated
+        val userEntity = fakeUserDao.getUserById(session.user.uuid)
+        assertThat(userEntity).isNotNull()
+        assertThat(userEntity!!.syncState).isEqualTo(SyncState.SYNCED)
+        assertThat(userEntity.email).isEqualTo("test@example.com")
+    }
+
+    @Test
+    fun `register persists authenticated user to Room with SYNCED state`() = testScope.runTest {
+        // Given: Anonymous session
+        sessionManager.loadSession()
+
+        // When: User registers
+        val result = sessionManager.register("testuser", "test@example.com", "password123")
+        assertThat(result.isSuccess).isTrue()
+
+        // Then: The authenticated user is written to Room so that pulled recipes can
+        // satisfy the recipes.creatorId → users.uuid FK constraint without a stub.
+        val session = sessionManager.userSession.value as UserSession.Authenticated
+        val userEntity = fakeUserDao.getUserById(session.user.uuid)
+        assertThat(userEntity).isNotNull()
+        assertThat(userEntity!!.syncState).isEqualTo(SyncState.SYNCED)
+        assertThat(userEntity.email).isEqualTo("test@example.com")
+    }
+
+    @Test
+    fun `load session persists restored authenticated user to Room`() = testScope.runTest {
+        // Given: A previous authenticated session saved to secure storage
+        sessionManager.login("restore@example.com", "password123")
+        val originalSession = sessionManager.userSession.value as UserSession.Authenticated
+        // Clear the in-memory fake so we simulate a cold start with only storage data
+        fakeUserDao.deleteUser(originalSession.user.uuid)
+
+        // When: A new SessionManager restores the session from secure storage
+        val newSessionManager = SessionManager(
+            securePreferences = fakeSecurePreferences,
+            authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
+            userDao = fakeUserDao,
+            accountSwitchHandler = accountSwitchHandler,
+            accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
+            syncSchedulerProvider = { FakeSyncManager() },
+            applicationScope = testScope
+        ).apply { uuidGenerator = { UuidV7Generator.newId() } }
+        advanceUntilIdle()
+
+        // Then: The restored user is written back to Room before sync fires
+        val restoredSession = newSessionManager.userSession.value as UserSession.Authenticated
+        val userEntity = fakeUserDao.getUserById(restoredSession.user.uuid)
+        assertThat(userEntity).isNotNull()
+        assertThat(userEntity!!.syncState).isEqualTo(SyncState.SYNCED)
+    }
 }
