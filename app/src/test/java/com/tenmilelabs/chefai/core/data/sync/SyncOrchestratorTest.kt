@@ -8,6 +8,7 @@ import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.RecipeStepEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
+import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeAllergenDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeLabelDao
@@ -188,6 +189,18 @@ class SyncOrchestratorTest {
         recipeDao.upsertRecipe(recipe)
         recipeStepDao.upsertStep(
             RecipeStepEntity(stepId1, recipeId1, 0, "Mix things", 1000L, null)
+        )
+        // Ingredient must be SYNCED (i.e. pulled from server) to pass the push filter
+        ingredientDao.upsertIngredient(
+            IngredientEntity(
+                uuid = ingredientId1,
+                displayName = "Test Ingredient",
+                allergenId = null,
+                sourcePrimaryId = null,
+                updatedAt = 1000L,
+                deletedAt = null,
+                syncState = SyncState.SYNCED
+            )
         )
         recipeIngredientDao.upsertRecipeIngredient(
             RecipeIngredientEntity(recipeId1, ingredientId1, 200.0, "grams", 1000L)
@@ -482,6 +495,21 @@ class SyncOrchestratorTest {
         assertThat(steps).hasSize(1)
         assertThat(steps[0].instruction).isEqualTo("Step 1")
         assertThat(steps[0].syncState).isEqualTo(SyncState.SYNCED)
+    }
+
+    @Test
+    fun `push filters out ingredient refs not known to server`() = runTest(testDispatcher) {
+        val fakeIngredientId = UUID.randomUUID() // not in ingredientDao → not SYNCED
+        val recipe = createDirtyRecipe(uuid = recipeId1)
+        recipeDao.upsertRecipe(recipe)
+        recipeIngredientDao.upsertRecipeIngredient(
+            RecipeIngredientEntity(recipeId1, fakeIngredientId, 1.0, "piece", 1000L)
+        )
+
+        syncOrchestrator.sync()
+
+        val dto = syncNetworkDataSource.capturedPushRequests[0].recipes[0]
+        assertThat(dto.ingredients).isEmpty()
     }
 
     // ==================== INTEGRATION TESTS ====================

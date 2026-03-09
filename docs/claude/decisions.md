@@ -11,7 +11,7 @@ All ADRs live in [`docs/adrs/`](../adrs/). This file is a quick-reference index.
 | 003 | [Two-Step Backend Sync](../adrs/adr-003–two-step-BE-sync.md) | Nov 2025 | Push dirty entities, then pull deltas. Last-writer-wins. |
 | 004 | [Data Layer Composition](../adrs/adr-004-data-layer.md) | Nov 2025 | Dual-source repositories (Room + Ktor). Outbox = syncState field. |
 | 005 | [Feature-Based Packages](../adrs/adr-0005-feature-based-package-structure.md) | Nov 2025 | Feature packages over layer packages. Start in feature, move to core/ when shared. |
-| 006 | [Anonymous-First Sync](../adrs/adr-006-anonymous-first-sync.md) | Feb 2026 | App works without login. Anonymous → Authenticated upgrade merges data. |
+| 006 | [Anonymous-First Sync](../adrs/adr-006-sync-protocol.md) | Feb 2026 | App works without login. Anonymous → Authenticated upgrade merges data. |
 
 ## RFCs
 

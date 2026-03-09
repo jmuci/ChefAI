@@ -83,7 +83,7 @@ See [ADR-005](docs/adrs/adr-0005-feature-based-package-structure.md) for full gu
 - Networking: Ktor client + Kotlinx Serialization; robust error handling; no blocking I/O
 
 ### Sync Protocol 
-Two-step sync per [ADR-006](docs/adrs/adr-006-anonymous-first-sync.md):
+Two-step sync per [ADR-006](docs/adrs/adr-006-sync-protocol.md):
 1. `POST /sync/push` — uploads entities with `syncState IN (PENDING, DELETED)`
 2. `GET /sync/pull?since=<timestamp>` — fetches backend deltas
 - Conflicts: last-writer-wins based on `updatedAt`
