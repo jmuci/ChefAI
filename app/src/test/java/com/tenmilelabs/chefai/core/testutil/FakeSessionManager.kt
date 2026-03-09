@@ -27,6 +27,7 @@ import kotlinx.coroutines.runBlocking
 class FakeSyncScheduler : SyncScheduler {
     override fun requestImmediateSync() {}
     override fun requestMutationSync() {}
+    override fun requestManualSync() {}
     override fun schedulePeriodicSync() {}
     override fun cancelAllSync() {}
 }

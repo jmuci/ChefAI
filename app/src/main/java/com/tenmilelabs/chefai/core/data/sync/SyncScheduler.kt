@@ -8,6 +8,8 @@ package com.tenmilelabs.chefai.core.data.sync
 interface SyncScheduler {
     fun requestImmediateSync()
     fun requestMutationSync()
+    /** Cancels any queued sync and enqueues a new one immediately (user-initiated). */
+    fun requestManualSync()
     fun schedulePeriodicSync()
     fun cancelAllSync()
 }
