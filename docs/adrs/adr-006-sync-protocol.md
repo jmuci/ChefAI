@@ -37,7 +37,7 @@ The pull response includes reference data alongside recipes. These are upserted 
 allergens → source_classifications → ingredients → tags → labels → recipes
 ```
 
-Before a recipe is inserted, the orchestrator checks that its `creatorId` exists in the local `users` table. If not, a stub user (`syncState = SYNCED`, empty display fields) is inserted. This handles post-wipe re-sync and public recipes authored by other server users.
+The `recipes.creatorId → users.uuid` FK constraint is satisfied without any stub creation. `SessionManager` writes the authenticated user to the local `users` table during `login()`, `register()`, and `loadSession()` — before sync fires — so pulled recipes that reference the owner's `creatorId` always find a matching row.
 
 ### Batching & Pagination
 
@@ -49,7 +49,7 @@ Before a recipe is inserted, the orchestrator checks that its `creatorId` exists
 - Push-before-pull reduces conflict frequency by ensuring the server sees local changes before reporting deltas.
 - Aggregate-level sync maintains consistency without cross-table transactional sync.
 - Ingredient filtering prevents server rejections from locally-seeded or legacy data.
-- Creator stub insertion unblocks pull for cross-user recipes without a schema migration.
+- Persisting the authenticated user at login/register/loadSession satisfies the FK before pull fires, with no stub rows needed.
 - Batching keeps HTTP payloads bounded for large offline editing sessions.
 
 ---
@@ -129,14 +129,13 @@ interface SyncScheduler {
 - **Predictable sync:** Push-before-pull with last-writer-wins is deterministic and debuggable.
 - **Testable:** `SyncScheduler` and `ConnectivityObserver` interfaces enable 350+ unit tests with zero Android framework dependency.
 - **Observable:** `SyncStatusIndicator` in the TopAppBar shows real-time sync state (syncing, synced, error, offline).
-- **Resilient to data gaps:** Pull gracefully handles missing creator users via stub insertion; push skips unrecognized ingredient references.
+- **Resilient to data gaps:** The authenticated user is persisted to Room at login so the FK is satisfied before pull fires; push skips unrecognized ingredient references.
 
 ### Trade-offs
 
 - **Last-writer-wins can lose edits:** If two devices edit the same recipe simultaneously, the slower device's changes are silently overwritten. Acceptable for v1 single-user scenarios.
 - **No real-time push:** Sync is poll-based (periodic + event-driven). A future WebSocket/FCM layer could reduce latency.
 - **Aggregate-level granularity:** Editing a single step re-syncs the entire recipe aggregate. Fine for typical recipe sizes but may need refinement for very large entities.
-- **Creator stubs are placeholder data:** Stub users have empty display fields and are not enriched unless a future user-profile sync endpoint is introduced.
 - **Ingredient filtering is silent:** Ingredient refs dropped during push are not surfaced to the user. If this happens in production, it indicates a data integrity issue worth investigating.
 
 ---
