@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.home.data.model
 
 import com.google.common.truth.Truth.assertThat
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Test
 
@@ -315,6 +316,51 @@ class ComponentModelSerializationTest {
         val unknown = result.items[1] as ComponentModel.Unknown
         assertThat(unknown.id).isEqualTo("mystery-1")
         assertThat(unknown.originalType).isEqualTo("mystery_component")
+    }
+
+    // endregion
+
+    // region Serialization roundtrip
+
+    @Test
+    fun `HomeLayoutModel survives serialize then deserialize with all type discriminators preserved`() {
+        val original = HomeLayoutModel(
+            schemaVersion = "1.0.0",
+            layoutChecksum = "test-checksum",
+            components = listOf(
+                ComponentModel.SectionHeader(id = "sh-1", title = "For You", subtitle = "Picks"),
+                ComponentModel.Carousel(
+                    id = "c-1",
+                    items = listOf(
+                        ComponentModel.LargeCard(id = "lc-1", recipeId = "r1"),
+                        ComponentModel.SquaredCard(id = "sc-1", recipeId = "r2"),
+                        ComponentModel.ListCard(id = "list-1", recipeId = "r3"),
+                    ),
+                ),
+            ),
+        )
+
+        val serialized = json.encodeToString(original)
+        val deserialized = json.decodeFromString<HomeLayoutModel>(serialized)
+
+        assertThat(deserialized).isEqualTo(original)
+        assertThat(deserialized.components[0]).isInstanceOf(ComponentModel.SectionHeader::class.java)
+        val carousel = deserialized.components[1] as ComponentModel.Carousel
+        assertThat(carousel.items[0]).isInstanceOf(ComponentModel.LargeCard::class.java)
+        assertThat(carousel.items[1]).isInstanceOf(ComponentModel.SquaredCard::class.java)
+        assertThat(carousel.items[2]).isInstanceOf(ComponentModel.ListCard::class.java)
+    }
+
+    @Test
+    fun `Unknown component survives roundtrip without becoming a different Unknown`() {
+        val raw = """{"type":"future_widget","id":"fw-1","extra":"data"}"""
+        val decoded = json.decodeFromString<ComponentModel>(raw) as ComponentModel.Unknown
+        // Encode via the sealed interface type so ComponentModelSerializer is used
+        val reEncoded = json.encodeToString<ComponentModel>(decoded)
+        val reDecoded = json.decodeFromString<ComponentModel>(reEncoded) as ComponentModel.Unknown
+
+        assertThat(reDecoded.id).isEqualTo("fw-1")
+        assertThat(reDecoded.originalType).isEqualTo("future_widget")
     }
 
     // endregion
