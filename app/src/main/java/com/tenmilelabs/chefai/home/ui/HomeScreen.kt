@@ -86,7 +86,7 @@ fun HomeContent(
 ) {
     if (components.isEmpty()) {
         EmptyContent(
-            title = R.string.no_recipes_title,
+            title = R.string.error_loading_home,
             subtitle = R.string.no_recipes_subtitle,
             noRecipesIconRes = R.drawable.ic_chef_hat_black_24dp,
         )

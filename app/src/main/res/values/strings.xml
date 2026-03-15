@@ -116,5 +116,6 @@
     <string name="error_server_error">Server error. Please try again later.</string>
     <string name="error_login_failed">Login failed. Please try again.</string>
     <string name="error_registration_failed">Registration failed. Please try again.</string>
+    <string name="error_loading_home">Error Loading Home Screen</string>
 
 </resources>
