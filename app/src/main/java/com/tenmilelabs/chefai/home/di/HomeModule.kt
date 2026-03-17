@@ -6,7 +6,9 @@ import com.tenmilelabs.chefai.home.data.cache.LayoutCacheDataSource
 import com.tenmilelabs.chefai.home.data.network.HomeLayoutApiService
 import com.tenmilelabs.chefai.home.data.network.HomeNetworkDataSource
 import com.tenmilelabs.chefai.home.data.repository.DefaultHomeLayoutRepository
+import com.tenmilelabs.chefai.home.data.repository.DefaultHomeRecipeSidecarRepository
 import com.tenmilelabs.chefai.home.domain.repository.HomeLayoutRepository
+import com.tenmilelabs.chefai.home.domain.repository.HomeRecipeSidecarRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -26,6 +28,12 @@ abstract class HomeModule {
     abstract fun bindHomeLayoutRepository(
         impl: DefaultHomeLayoutRepository,
     ): HomeLayoutRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindHomeRecipeSidecarRepository(
+        impl: DefaultHomeRecipeSidecarRepository,
+    ): HomeRecipeSidecarRepository
 
     @Binds
     @Singleton

@@ -7,6 +7,7 @@ import com.tenmilelabs.chefai.home.data.model.HomeLayoutModel
 import com.tenmilelabs.chefai.home.data.network.HomeLayoutNetworkResult
 import com.tenmilelabs.chefai.home.data.network.HomeNetworkDataSource
 import com.tenmilelabs.chefai.home.domain.repository.HomeLayoutRepository
+import com.tenmilelabs.chefai.home.domain.repository.HomeRecipeSidecarRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
@@ -20,6 +21,7 @@ import javax.inject.Inject
 class DefaultHomeLayoutRepository @Inject constructor(
     private val cacheDataSource: LayoutCacheDataSource,
     private val networkDataSource: HomeNetworkDataSource,
+    private val sidecarRepository: HomeRecipeSidecarRepository,
     private val json: Json,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : HomeLayoutRepository {
@@ -57,12 +59,19 @@ class DefaultHomeLayoutRepository @Inject constructor(
                 Timber.d("SDUI: shouldUpdate: $shouldUpdate .")
                 // Fresh Emission: It emits the new layout to the UI and sets emittedFreshLayout = true.
                 if (shouldUpdate) {
-                    emit(normalizedLayout)
+                    // Seed Room with sidecar recipe data before emitting so cards can render immediately
+                    normalizedLayout.sidecar?.let { sidecar ->
+                        val written = sidecarRepository.upsertSidecar(sidecar)
+                        Timber.d("SDUI: Upserted $written sidecar recipes from network response")
+                    }
+                    // Strip sidecar before emitting and caching — UI only needs layout components
+                    val layoutToEmit = normalizedLayout.copy(sidecar = null)
+                    emit(layoutToEmit)
                     emittedFreshLayout = true
-                    val knownCount = normalizedLayout.knownComponentCount()
+                    val knownCount = layoutToEmit.knownComponentCount()
                     if (knownCount >= MIN_CACHEABLE_KNOWN_COMPONENTS) {
-                        Timber.d("SDUI: Update cache and emit refreshed value. Normalized Layout Checksum: ${normalizedLayout.layoutChecksum} and $knownCount known components.")
-                        cacheDataSource.writeCachedLayout(json.encodeToString(normalizedLayout))
+                        Timber.d("SDUI: Update cache and emit refreshed value. Normalized Layout Checksum: ${layoutToEmit.layoutChecksum} and $knownCount known components.")
+                        cacheDataSource.writeCachedLayout(json.encodeToString(layoutToEmit))
                     } else {
                         Timber.w("SDUI: Skipping cache write — only $knownCount known components (threshold: $MIN_CACHEABLE_KNOWN_COMPONENTS). BE response may have unrecognized component types.")
                     }
@@ -72,13 +81,24 @@ class DefaultHomeLayoutRepository @Inject constructor(
 
         // 3. If no cache was found and network had no fresh layout, fall back to bundled asset
         if (cached == null && !emittedFreshLayout) {
-            Timber.w("SDUI: Falling back to bundled layout!! ")
-            emit(cacheDataSource.readBundledLayout())
+            Timber.w("SDUI: Falling back to bundled layout!!")
+            val bundled = cacheDataSource.readBundledLayout()
+            bundled.sidecar?.let { sidecar ->
+                val written = sidecarRepository.upsertSidecar(sidecar)
+                Timber.d("SDUI: Upserted $written sidecar recipes from bundled asset")
+            }
+            emit(bundled.copy(sidecar = null))
         }
     }.catch { e ->
         if (e is CancellationException) throw e
         Timber.e(e, "Error loading home layout, falling back to bundled asset")
-        emit(cacheDataSource.readBundledLayout())
+        val bundled = cacheDataSource.readBundledLayout()
+        bundled.sidecar?.let { sidecar ->
+            runCatching { sidecarRepository.upsertSidecar(sidecar) }
+                .onSuccess { written -> Timber.d("SDUI: Upserted $written sidecar recipes from bundled asset (catch)") }
+                .onFailure { err -> Timber.e(err, "SDUI: Failed to upsert bundled sidecar") }
+        }
+        emit(bundled.copy(sidecar = null))
     }.flowOn(ioDispatcher)
 
     companion object {
