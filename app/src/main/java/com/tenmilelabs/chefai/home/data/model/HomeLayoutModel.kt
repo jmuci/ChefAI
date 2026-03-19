@@ -10,10 +10,14 @@ import kotlinx.serialization.Serializable
  * @property layoutChecksum Optional content checksum for cache invalidation.
  *   Clients compare this with their cached copy to skip redundant updates.
  * @property components Ordered list of UI components to render on the home screen.
+ * @property sidecar Optional recipe bundle. Present on network responses; stripped before
+ *   writing to the disk cache. Upserted into Room before the layout is emitted so that
+ *   every card has backing data even on a fresh install.
  */
 @Serializable
 data class HomeLayoutModel(
     val schemaVersion: String,
     val layoutChecksum: String? = null,
     val components: List<ComponentModel> = emptyList(),
+    val sidecar: HomeSidecarDto? = null,
 )

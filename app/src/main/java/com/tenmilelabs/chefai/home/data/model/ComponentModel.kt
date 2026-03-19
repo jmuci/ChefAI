@@ -1,6 +1,5 @@
 package com.tenmilelabs.chefai.home.data.model
 
-import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -9,13 +8,13 @@ import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.descriptors.element
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.json.JsonContentPolymorphicSerializer
 import kotlinx.serialization.json.JsonDecoder
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import timber.log.Timber
 
 /**
@@ -81,62 +80,62 @@ sealed interface ComponentModel {
 }
 
 /**
- * Custom polymorphic serializer that reads the "type" discriminator from JSON
- * and routes to the appropriate [ComponentModel] variant. Unrecognized types
- * are deserialized to [ComponentModel.Unknown] instead of throwing.
+ * Custom polymorphic serializer for [ComponentModel] that reads and writes the "type"
+ * discriminator field explicitly.
+ *
+ * Implements [KSerializer] directly (rather than extending [JsonContentPolymorphicSerializer])
+ * so that we own both the serialization and deserialization paths. The base class's `serialize`
+ * is final and does not inject the "type" discriminator — without that field the cache write
+ * produces JSON that deserializes every component back as [ComponentModel.Unknown].
  */
-object ComponentModelSerializer : JsonContentPolymorphicSerializer<ComponentModel>(ComponentModel::class) {
+object ComponentModelSerializer : KSerializer<ComponentModel> {
 
-    override fun selectDeserializer(element: JsonElement): DeserializationStrategy<ComponentModel> {
-        val jsonObject = element.jsonObject
-        val type = jsonObject["type"]?.jsonPrimitive?.content
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("ComponentModel") {
+        element<String>("type")
+        element<String>("id")
+    }
+
+    override fun deserialize(decoder: Decoder): ComponentModel {
+        val jsonDecoder = decoder as JsonDecoder
+        val element = jsonDecoder.decodeJsonElement().jsonObject
+        val type = element["type"]?.jsonPrimitive?.content
         Timber.d("Deserializing component with type: $type")
         return when (type) {
-            "section_header" -> ComponentModel.SectionHeader.serializer()
-            "carousel" -> ComponentModel.Carousel.serializer()
-            "large_card" -> ComponentModel.LargeCard.serializer()
-            "squared_card" -> ComponentModel.SquaredCard.serializer()
-            "list_card" -> ComponentModel.ListCard.serializer()
-            else -> UnknownComponentFallbackSerializer(type ?: "missing_type")
+            "section_header" -> jsonDecoder.json.decodeFromJsonElement(ComponentModel.SectionHeader.serializer(), element)
+            "carousel" -> jsonDecoder.json.decodeFromJsonElement(ComponentModel.Carousel.serializer(), element)
+            "large_card" -> jsonDecoder.json.decodeFromJsonElement(ComponentModel.LargeCard.serializer(), element)
+            "squared_card" -> jsonDecoder.json.decodeFromJsonElement(ComponentModel.SquaredCard.serializer(), element)
+            "list_card" -> jsonDecoder.json.decodeFromJsonElement(ComponentModel.ListCard.serializer(), element)
+            else -> {
+                val id = element["id"]?.jsonPrimitive?.content ?: "unknown_${element.hashCode()}"
+                Timber.w("Got Unknown Component from the Backend with id $id and type $type")
+                ComponentModel.Unknown(id = id, originalType = type ?: "missing_type")
+            }
         }
     }
-}
 
-/**
- * Serializer that absorbs any JSON object and produces [ComponentModel.Unknown].
- * Extracts the "id" field if present for stable key support.
- *
- * Must implement [KSerializer] (not just [DeserializationStrategy]) because
- * [JsonContentPolymorphicSerializer] casts the returned strategy to [KSerializer]
- * internally before calling [kotlinx.serialization.json.Json.decodeFromJsonElement].
- */
-private class UnknownComponentFallbackSerializer(
-    private val originalType: String,
-) : KSerializer<ComponentModel.Unknown> {
-
-    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("ComponentModel.Unknown") {
-        element<String>("id", isOptional = true)
-        element<String>("type", isOptional = true)
-    }
-
-    override fun serialize(encoder: Encoder, value: ComponentModel.Unknown) {
+    override fun serialize(encoder: Encoder, value: ComponentModel) {
         val jsonEncoder = encoder as JsonEncoder
-        jsonEncoder.encodeJsonElement(
-            JsonObject(
-                mapOf(
-                    "type" to kotlinx.serialization.json.JsonPrimitive(value.originalType),
-                    "id" to kotlinx.serialization.json.JsonPrimitive(value.id),
-                )
-            )
-        )
-    }
-
-    override fun deserialize(decoder: Decoder): ComponentModel.Unknown {
-        val jsonDecoder = decoder as JsonDecoder
-        val jsonObject = jsonDecoder.decodeJsonElement().jsonObject
-        val id = jsonObject["id"]?.jsonPrimitive?.content ?: "unknown_${jsonObject.hashCode()}"
-        Timber.w("Got Unknown Component from the Backend with id $id")
-        return ComponentModel.Unknown(id = id, originalType = originalType)
+        val typeValue = when (value) {
+            is ComponentModel.SectionHeader -> "section_header"
+            is ComponentModel.Carousel -> "carousel"
+            is ComponentModel.LargeCard -> "large_card"
+            is ComponentModel.SquaredCard -> "squared_card"
+            is ComponentModel.ListCard -> "list_card"
+            is ComponentModel.Unknown -> value.originalType
+        }
+        val innerElement: JsonObject = when (value) {
+            is ComponentModel.SectionHeader -> jsonEncoder.json.encodeToJsonElement(ComponentModel.SectionHeader.serializer(), value).jsonObject
+            is ComponentModel.Carousel -> jsonEncoder.json.encodeToJsonElement(ComponentModel.Carousel.serializer(), value).jsonObject
+            is ComponentModel.LargeCard -> jsonEncoder.json.encodeToJsonElement(ComponentModel.LargeCard.serializer(), value).jsonObject
+            is ComponentModel.SquaredCard -> jsonEncoder.json.encodeToJsonElement(ComponentModel.SquaredCard.serializer(), value).jsonObject
+            is ComponentModel.ListCard -> jsonEncoder.json.encodeToJsonElement(ComponentModel.ListCard.serializer(), value).jsonObject
+            is ComponentModel.Unknown -> buildJsonObject { put("id", value.id) }
+        }
+        jsonEncoder.encodeJsonElement(buildJsonObject {
+            put("type", typeValue)
+            innerElement.forEach { (k, v) -> put(k, v) }
+        })
     }
 }
 

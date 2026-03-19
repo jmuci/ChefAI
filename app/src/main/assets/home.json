@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "layoutChecksum": "sdui-v2-id-only",
+  "layoutChecksum": "sdui-v3-sidecar",
   "components": [
     {
       "type": "section_header",
@@ -12,11 +12,11 @@
       "type": "carousel",
       "id": "carousel-for-you",
       "items": [
-        { "type": "large_card", "id": "for-you-1", "recipeId": "88888888-8888-8888-8888-888888888888" },
-        { "type": "large_card", "id": "for-you-2", "recipeId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" },
-        { "type": "large_card", "id": "for-you-3", "recipeId": "cccccccc-cccc-cccc-cccc-cccccccccccc" },
-        { "type": "large_card", "id": "for-you-4", "recipeId": "44444444-4444-4444-4444-444444444444" },
-        { "type": "large_card", "id": "for-you-5", "recipeId": "22222222-2222-2222-2222-222222222222" }
+        { "type": "large_card", "id": "for-you-1", "recipeId": "dead0000-cafe-4000-8000-000000000101" },
+        { "type": "large_card", "id": "for-you-2", "recipeId": "dead0000-cafe-4000-8000-000000000102" },
+        { "type": "large_card", "id": "for-you-3", "recipeId": "dead0000-cafe-4000-8000-000000000103" },
+        { "type": "large_card", "id": "for-you-4", "recipeId": "dead0000-cafe-4000-8000-000000000104" },
+        { "type": "large_card", "id": "for-you-5", "recipeId": "dead0000-cafe-4000-8000-000000000105" }
       ]
     },
     {
@@ -29,10 +29,10 @@
       "type": "carousel",
       "id": "carousel-italian-classics",
       "items": [
-        { "type": "large_card",   "id": "italian-1", "recipeId": "11111111-1111-1111-1111-111111111111" },
-        { "type": "squared_card", "id": "italian-2", "recipeId": "66666666-6666-6666-6666-666666666666" },
-        { "type": "squared_card", "id": "italian-3", "recipeId": "77777777-7777-7777-7777-777777777777" },
-        { "type": "large_card",   "id": "italian-4", "recipeId": "12121212-1212-1212-1212-121212121212" }
+        { "type": "large_card",   "id": "italian-1", "recipeId": "dead0000-cafe-4000-8000-000000000106" },
+        { "type": "squared_card", "id": "italian-2", "recipeId": "dead0000-cafe-4000-8000-000000000107" },
+        { "type": "squared_card", "id": "italian-3", "recipeId": "dead0000-cafe-4000-8000-000000000108" },
+        { "type": "large_card",   "id": "italian-4", "recipeId": "dead0000-cafe-4000-8000-000000000109" }
       ]
     },
     {
@@ -45,10 +45,10 @@
       "type": "carousel",
       "id": "carousel-quick-healthy",
       "items": [
-        { "type": "squared_card", "id": "quick-1", "recipeId": "55555555-5555-5555-5555-555555555555" },
-        { "type": "squared_card", "id": "quick-2", "recipeId": "99999999-9999-9999-9999-999999999999" },
-        { "type": "squared_card", "id": "quick-3", "recipeId": "dddddddd-dddd-dddd-dddd-dddddddddddd" },
-        { "type": "squared_card", "id": "quick-4", "recipeId": "14141414-1414-1414-1414-141414141414" }
+        { "type": "squared_card", "id": "quick-1", "recipeId": "dead0000-cafe-4000-8000-00000000010a" },
+        { "type": "squared_card", "id": "quick-2", "recipeId": "dead0000-cafe-4000-8000-00000000010b" },
+        { "type": "squared_card", "id": "quick-3", "recipeId": "dead0000-cafe-4000-8000-00000000010c" },
+        { "type": "squared_card", "id": "quick-4", "recipeId": "dead0000-cafe-4000-8000-00000000010d" }
       ]
     },
     {
@@ -61,10 +61,10 @@
       "type": "carousel",
       "id": "carousel-seafood",
       "items": [
-        { "type": "list_card", "id": "seafood-1", "recipeId": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" },
-        { "type": "list_card", "id": "seafood-2", "recipeId": "33333333-3333-3333-3333-333333333333" },
-        { "type": "list_card", "id": "seafood-3", "recipeId": "15151515-1515-1515-1515-151515151515" },
-        { "type": "list_card", "id": "seafood-4", "recipeId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" }
+        { "type": "list_card", "id": "seafood-1", "recipeId": "dead0000-cafe-4000-8000-00000000010e" },
+        { "type": "list_card", "id": "seafood-2", "recipeId": "dead0000-cafe-4000-8000-00000000010f" },
+        { "type": "list_card", "id": "seafood-3", "recipeId": "dead0000-cafe-4000-8000-000000000110" },
+        { "type": "list_card", "id": "seafood-4", "recipeId": "dead0000-cafe-4000-8000-000000000111" }
       ]
     },
     {
@@ -77,10 +77,335 @@
       "type": "carousel",
       "id": "carousel-desserts",
       "items": [
-        { "type": "squared_card", "id": "dessert-1", "recipeId": "ffffffff-ffff-ffff-ffff-ffffffffffff" },
-        { "type": "squared_card", "id": "dessert-2", "recipeId": "10101010-1010-1010-1010-101010101010" },
-        { "type": "squared_card", "id": "dessert-3", "recipeId": "13131313-1313-1313-1313-131313131313" }
+        { "type": "squared_card", "id": "dessert-1", "recipeId": "dead0000-cafe-4000-8000-000000000112" },
+        { "type": "squared_card", "id": "dessert-2", "recipeId": "dead0000-cafe-4000-8000-000000000113" },
+        { "type": "squared_card", "id": "dessert-3", "recipeId": "dead0000-cafe-4000-8000-000000000114" }
       ]
     }
-  ]
+  ],
+  "sidecar": {
+    "creators": [
+      {
+        "uuid": "dead0000-cafe-4000-8000-000000000001",
+        "displayName": "ChefAI Editorial",
+        "avatarUrl": null
+      }
+    ],
+    "tags": [
+      { "uuid": "dead0000-cafe-4000-8000-000000000010", "displayName": "Italian" },
+      { "uuid": "dead0000-cafe-4000-8000-000000000011", "displayName": "Seafood" },
+      { "uuid": "dead0000-cafe-4000-8000-000000000012", "displayName": "Quick" },
+      { "uuid": "dead0000-cafe-4000-8000-000000000013", "displayName": "Healthy" },
+      { "uuid": "dead0000-cafe-4000-8000-000000000014", "displayName": "Dessert" },
+      { "uuid": "dead0000-cafe-4000-8000-000000000015", "displayName": "Vegetarian" },
+      { "uuid": "dead0000-cafe-4000-8000-000000000016", "displayName": "Chicken" }
+    ],
+    "labels": [
+      { "uuid": "dead0000-cafe-4000-8000-000000000020", "displayName": "Staff Pick" },
+      { "uuid": "dead0000-cafe-4000-8000-000000000021", "displayName": "Trending" },
+      { "uuid": "dead0000-cafe-4000-8000-000000000022", "displayName": "New" }
+    ],
+    "recipes": [
+      {
+        "uuid": "dead0000-cafe-4000-8000-000000000101",
+        "title": "Herb-Crusted Chicken",
+        "description": "Juicy roasted chicken with a golden herb crust. A weeknight favourite.",
+        "imageUrl": "https://images.chefai.app/recipes/herb-crusted-chicken.jpg",
+        "imageUrlThumbnail": "https://images.chefai.app/recipes/thumb/herb-crusted-chicken.jpg",
+        "prepTimeMinutes": 15,
+        "cookTimeMinutes": 40,
+        "servings": 4,
+        "creatorId": "dead0000-cafe-4000-8000-000000000001",
+        "privacy": "PUBLIC",
+        "updatedAt": 1773792000000,
+        "tagIds": ["dead0000-cafe-4000-8000-000000000016"],
+        "labelIds": ["dead0000-cafe-4000-8000-000000000020"]
+      },
+      {
+        "uuid": "dead0000-cafe-4000-8000-000000000102",
+        "title": "Mushroom Risotto",
+        "description": "Creamy Arborio rice with wild mushrooms, white wine and Parmesan.",
+        "imageUrl": "https://images.chefai.app/recipes/mushroom-risotto.jpg",
+        "imageUrlThumbnail": "https://images.chefai.app/recipes/thumb/mushroom-risotto.jpg",
+        "prepTimeMinutes": 10,
+        "cookTimeMinutes": 30,
+        "servings": 2,
+        "creatorId": "dead0000-cafe-4000-8000-000000000001",
+        "privacy": "PUBLIC",
+        "updatedAt": 1773792000000,
+        "tagIds": ["dead0000-cafe-4000-8000-000000000010", "dead0000-cafe-4000-8000-000000000015"],
+        "labelIds": ["dead0000-cafe-4000-8000-000000000021"]
+      },
+      {
+        "uuid": "dead0000-cafe-4000-8000-000000000103",
+        "title": "Avocado Toast with Poached Egg",
+        "description": "Smashed avocado on sourdough, topped with a perfectly poached egg and chilli flakes.",
+        "imageUrl": "https://images.chefai.app/recipes/avocado-toast.jpg",
+        "imageUrlThumbnail": "https://images.chefai.app/recipes/thumb/avocado-toast.jpg",
+        "prepTimeMinutes": 10,
+        "cookTimeMinutes": 5,
+        "servings": 1,
+        "creatorId": "dead0000-cafe-4000-8000-000000000001",
+        "privacy": "PUBLIC",
+        "updatedAt": 1773792000000,
+        "tagIds": ["dead0000-cafe-4000-8000-000000000012", "dead0000-cafe-4000-8000-000000000013"],
+        "labelIds": ["dead0000-cafe-4000-8000-000000000021"]
+      },
+      {
+        "uuid": "dead0000-cafe-4000-8000-000000000104",
+        "title": "Thai Green Curry",
+        "description": "Fragrant coconut milk curry with vegetables, lemongrass and fresh basil.",
+        "imageUrl": "https://images.chefai.app/recipes/thai-green-curry.jpg",
+        "imageUrlThumbnail": "https://images.chefai.app/recipes/thumb/thai-green-curry.jpg",
+        "prepTimeMinutes": 15,
+        "cookTimeMinutes": 25,
+        "servings": 3,
+        "creatorId": "dead0000-cafe-4000-8000-000000000001",
+        "privacy": "PUBLIC",
+        "updatedAt": 1773792000000,
+        "tagIds": ["dead0000-cafe-4000-8000-000000000015"],
+        "labelIds": ["dead0000-cafe-4000-8000-000000000022"]
+      },
+      {
+        "uuid": "dead0000-cafe-4000-8000-000000000105",
+        "title": "Beef Stir-Fry",
+        "description": "Tender strips of beef with colourful vegetables in a savory oyster sauce.",
+        "imageUrl": "https://images.chefai.app/recipes/beef-stir-fry.jpg",
+        "imageUrlThumbnail": "https://images.chefai.app/recipes/thumb/beef-stir-fry.jpg",
+        "prepTimeMinutes": 10,
+        "cookTimeMinutes": 15,
+        "servings": 2,
+        "creatorId": "dead0000-cafe-4000-8000-000000000001",
+        "privacy": "PUBLIC",
+        "updatedAt": 1773792000000,
+        "tagIds": ["dead0000-cafe-4000-8000-000000000012"],
+        "labelIds": []
+      },
+      {
+        "uuid": "dead0000-cafe-4000-8000-000000000106",
+        "title": "Spaghetti Carbonara",
+        "description": "Classic Roman pasta with guanciale, eggs, Pecorino and black pepper.",
+        "imageUrl": "https://images.chefai.app/recipes/spaghetti-carbonara.jpg",
+        "imageUrlThumbnail": "https://images.chefai.app/recipes/thumb/spaghetti-carbonara.jpg",
+        "prepTimeMinutes": 10,
+        "cookTimeMinutes": 20,
+        "servings": 2,
+        "creatorId": "dead0000-cafe-4000-8000-000000000001",
+        "privacy": "PUBLIC",
+        "updatedAt": 1773792000000,
+        "tagIds": ["dead0000-cafe-4000-8000-000000000010"],
+        "labelIds": ["dead0000-cafe-4000-8000-000000000020"]
+      },
+      {
+        "uuid": "dead0000-cafe-4000-8000-000000000107",
+        "title": "Margherita Pizza",
+        "description": "Neapolitan-style pizza with San Marzano tomatoes, fresh mozzarella and basil.",
+        "imageUrl": "https://images.chefai.app/recipes/margherita-pizza.jpg",
+        "imageUrlThumbnail": "https://images.chefai.app/recipes/thumb/margherita-pizza.jpg",
+        "prepTimeMinutes": 20,
+        "cookTimeMinutes": 12,
+        "servings": 2,
+        "creatorId": "dead0000-cafe-4000-8000-000000000001",
+        "privacy": "PUBLIC",
+        "updatedAt": 1773792000000,
+        "tagIds": ["dead0000-cafe-4000-8000-000000000010", "dead0000-cafe-4000-8000-000000000015"],
+        "labelIds": ["dead0000-cafe-4000-8000-000000000021"]
+      },
+      {
+        "uuid": "dead0000-cafe-4000-8000-000000000108",
+        "title": "Penne all'Arrabbiata",
+        "description": "Spicy tomato sauce with garlic and chilli over penne. Simple and punchy.",
+        "imageUrl": "https://images.chefai.app/recipes/penne-arrabbiata.jpg",
+        "imageUrlThumbnail": "https://images.chefai.app/recipes/thumb/penne-arrabbiata.jpg",
+        "prepTimeMinutes": 5,
+        "cookTimeMinutes": 20,
+        "servings": 2,
+        "creatorId": "dead0000-cafe-4000-8000-000000000001",
+        "privacy": "PUBLIC",
+        "updatedAt": 1773792000000,
+        "tagIds": ["dead0000-cafe-4000-8000-000000000010", "dead0000-cafe-4000-8000-000000000015"],
+        "labelIds": []
+      },
+      {
+        "uuid": "dead0000-cafe-4000-8000-000000000109",
+        "title": "Tiramisu",
+        "description": "Layers of espresso-soaked ladyfingers and mascarpone cream dusted with cocoa.",
+        "imageUrl": "https://images.chefai.app/recipes/tiramisu.jpg",
+        "imageUrlThumbnail": "https://images.chefai.app/recipes/thumb/tiramisu.jpg",
+        "prepTimeMinutes": 30,
+        "cookTimeMinutes": 0,
+        "servings": 8,
+        "creatorId": "dead0000-cafe-4000-8000-000000000001",
+        "privacy": "PUBLIC",
+        "updatedAt": 1773792000000,
+        "tagIds": ["dead0000-cafe-4000-8000-000000000010", "dead0000-cafe-4000-8000-000000000014"],
+        "labelIds": ["dead0000-cafe-4000-8000-000000000020"]
+      },
+      {
+        "uuid": "dead0000-cafe-4000-8000-00000000010a",
+        "title": "Quinoa Power Salad",
+        "description": "Protein-packed quinoa with roasted chickpeas, kale and lemon tahini dressing.",
+        "imageUrl": "https://images.chefai.app/recipes/quinoa-salad.jpg",
+        "imageUrlThumbnail": "https://images.chefai.app/recipes/thumb/quinoa-salad.jpg",
+        "prepTimeMinutes": 10,
+        "cookTimeMinutes": 15,
+        "servings": 2,
+        "creatorId": "dead0000-cafe-4000-8000-000000000001",
+        "privacy": "PUBLIC",
+        "updatedAt": 1773792000000,
+        "tagIds": ["dead0000-cafe-4000-8000-000000000013", "dead0000-cafe-4000-8000-000000000015"],
+        "labelIds": ["dead0000-cafe-4000-8000-000000000022"]
+      },
+      {
+        "uuid": "dead0000-cafe-4000-8000-00000000010b",
+        "title": "Grilled Salmon with Asparagus",
+        "description": "Pan-seared salmon fillet with lemon butter and seasonal asparagus.",
+        "imageUrl": "https://images.chefai.app/recipes/grilled-salmon.jpg",
+        "imageUrlThumbnail": "https://images.chefai.app/recipes/thumb/grilled-salmon.jpg",
+        "prepTimeMinutes": 5,
+        "cookTimeMinutes": 15,
+        "servings": 2,
+        "creatorId": "dead0000-cafe-4000-8000-000000000001",
+        "privacy": "PUBLIC",
+        "updatedAt": 1773792000000,
+        "tagIds": ["dead0000-cafe-4000-8000-000000000011", "dead0000-cafe-4000-8000-000000000013"],
+        "labelIds": ["dead0000-cafe-4000-8000-000000000020"]
+      },
+      {
+        "uuid": "dead0000-cafe-4000-8000-00000000010c",
+        "title": "Greek Yogurt Parfait",
+        "description": "Layered Greek yogurt with granola, honey and mixed berries.",
+        "imageUrl": "https://images.chefai.app/recipes/yogurt-parfait.jpg",
+        "imageUrlThumbnail": "https://images.chefai.app/recipes/thumb/yogurt-parfait.jpg",
+        "prepTimeMinutes": 5,
+        "cookTimeMinutes": 0,
+        "servings": 1,
+        "creatorId": "dead0000-cafe-4000-8000-000000000001",
+        "privacy": "PUBLIC",
+        "updatedAt": 1773792000000,
+        "tagIds": ["dead0000-cafe-4000-8000-000000000012", "dead0000-cafe-4000-8000-000000000013"],
+        "labelIds": []
+      },
+      {
+        "uuid": "dead0000-cafe-4000-8000-00000000010d",
+        "title": "Veggie Wrap with Hummus",
+        "description": "Whole-wheat wrap stuffed with hummus, roasted peppers, cucumber and spinach.",
+        "imageUrl": "https://images.chefai.app/recipes/veggie-wrap.jpg",
+        "imageUrlThumbnail": "https://images.chefai.app/recipes/thumb/veggie-wrap.jpg",
+        "prepTimeMinutes": 10,
+        "cookTimeMinutes": 0,
+        "servings": 1,
+        "creatorId": "dead0000-cafe-4000-8000-000000000001",
+        "privacy": "PUBLIC",
+        "updatedAt": 1773792000000,
+        "tagIds": ["dead0000-cafe-4000-8000-000000000012", "dead0000-cafe-4000-8000-000000000015"],
+        "labelIds": []
+      },
+      {
+        "uuid": "dead0000-cafe-4000-8000-00000000010e",
+        "title": "Garlic Butter Shrimp",
+        "description": "Succulent shrimp sautéed in garlic butter with a splash of white wine and parsley.",
+        "imageUrl": "https://images.chefai.app/recipes/garlic-shrimp.jpg",
+        "imageUrlThumbnail": "https://images.chefai.app/recipes/thumb/garlic-shrimp.jpg",
+        "prepTimeMinutes": 10,
+        "cookTimeMinutes": 10,
+        "servings": 2,
+        "creatorId": "dead0000-cafe-4000-8000-000000000001",
+        "privacy": "PUBLIC",
+        "updatedAt": 1773792000000,
+        "tagIds": ["dead0000-cafe-4000-8000-000000000011", "dead0000-cafe-4000-8000-000000000012"],
+        "labelIds": ["dead0000-cafe-4000-8000-000000000021"]
+      },
+      {
+        "uuid": "dead0000-cafe-4000-8000-00000000010f",
+        "title": "Baja Fish Tacos",
+        "description": "Crispy battered cod in warm corn tortillas with slaw and chipotle crema.",
+        "imageUrl": "https://images.chefai.app/recipes/fish-tacos.jpg",
+        "imageUrlThumbnail": "https://images.chefai.app/recipes/thumb/fish-tacos.jpg",
+        "prepTimeMinutes": 15,
+        "cookTimeMinutes": 15,
+        "servings": 4,
+        "creatorId": "dead0000-cafe-4000-8000-000000000001",
+        "privacy": "PUBLIC",
+        "updatedAt": 1773792000000,
+        "tagIds": ["dead0000-cafe-4000-8000-000000000011"],
+        "labelIds": ["dead0000-cafe-4000-8000-000000000022"]
+      },
+      {
+        "uuid": "dead0000-cafe-4000-8000-000000000110",
+        "title": "New England Clam Chowder",
+        "description": "Thick and creamy chowder loaded with clams, potatoes and smoky bacon.",
+        "imageUrl": "https://images.chefai.app/recipes/clam-chowder.jpg",
+        "imageUrlThumbnail": "https://images.chefai.app/recipes/thumb/clam-chowder.jpg",
+        "prepTimeMinutes": 20,
+        "cookTimeMinutes": 30,
+        "servings": 4,
+        "creatorId": "dead0000-cafe-4000-8000-000000000001",
+        "privacy": "PUBLIC",
+        "updatedAt": 1773792000000,
+        "tagIds": ["dead0000-cafe-4000-8000-000000000011"],
+        "labelIds": ["dead0000-cafe-4000-8000-000000000020"]
+      },
+      {
+        "uuid": "dead0000-cafe-4000-8000-000000000111",
+        "title": "Tuna Poke Bowl",
+        "description": "Sushi-grade tuna over sushi rice with edamame, avocado and sesame dressing.",
+        "imageUrl": "https://images.chefai.app/recipes/tuna-poke-bowl.jpg",
+        "imageUrlThumbnail": "https://images.chefai.app/recipes/thumb/tuna-poke-bowl.jpg",
+        "prepTimeMinutes": 15,
+        "cookTimeMinutes": 20,
+        "servings": 2,
+        "creatorId": "dead0000-cafe-4000-8000-000000000001",
+        "privacy": "PUBLIC",
+        "updatedAt": 1773792000000,
+        "tagIds": ["dead0000-cafe-4000-8000-000000000011", "dead0000-cafe-4000-8000-000000000013"],
+        "labelIds": ["dead0000-cafe-4000-8000-000000000021"]
+      },
+      {
+        "uuid": "dead0000-cafe-4000-8000-000000000112",
+        "title": "Chocolate Lava Cake",
+        "description": "Warm individual chocolate cakes with a molten center. Best served with vanilla ice cream.",
+        "imageUrl": "https://images.chefai.app/recipes/chocolate-lava-cake.jpg",
+        "imageUrlThumbnail": "https://images.chefai.app/recipes/thumb/chocolate-lava-cake.jpg",
+        "prepTimeMinutes": 15,
+        "cookTimeMinutes": 12,
+        "servings": 2,
+        "creatorId": "dead0000-cafe-4000-8000-000000000001",
+        "privacy": "PUBLIC",
+        "updatedAt": 1773792000000,
+        "tagIds": ["dead0000-cafe-4000-8000-000000000014"],
+        "labelIds": ["dead0000-cafe-4000-8000-000000000020"]
+      },
+      {
+        "uuid": "dead0000-cafe-4000-8000-000000000113",
+        "title": "Mixed Berry Cheesecake",
+        "description": "No-bake vanilla cheesecake on a buttery biscuit base, topped with fresh berry compote.",
+        "imageUrl": "https://images.chefai.app/recipes/berry-cheesecake.jpg",
+        "imageUrlThumbnail": "https://images.chefai.app/recipes/thumb/berry-cheesecake.jpg",
+        "prepTimeMinutes": 30,
+        "cookTimeMinutes": 0,
+        "servings": 8,
+        "creatorId": "dead0000-cafe-4000-8000-000000000001",
+        "privacy": "PUBLIC",
+        "updatedAt": 1773792000000,
+        "tagIds": ["dead0000-cafe-4000-8000-000000000014"],
+        "labelIds": ["dead0000-cafe-4000-8000-000000000021"]
+      },
+      {
+        "uuid": "dead0000-cafe-4000-8000-000000000114",
+        "title": "Crème Brûlée",
+        "description": "Silky vanilla custard with a perfectly caramelised sugar top. A French classic.",
+        "imageUrl": "https://images.chefai.app/recipes/creme-brulee.jpg",
+        "imageUrlThumbnail": "https://images.chefai.app/recipes/thumb/creme-brulee.jpg",
+        "prepTimeMinutes": 20,
+        "cookTimeMinutes": 40,
+        "servings": 4,
+        "creatorId": "dead0000-cafe-4000-8000-000000000001",
+        "privacy": "PUBLIC",
+        "updatedAt": 1773792000000,
+        "tagIds": ["dead0000-cafe-4000-8000-000000000014"],
+        "labelIds": ["dead0000-cafe-4000-8000-000000000022"]
+      }
+    ]
+  }
 }

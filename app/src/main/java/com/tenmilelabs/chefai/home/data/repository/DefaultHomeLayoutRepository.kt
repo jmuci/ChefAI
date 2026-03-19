@@ -2,48 +2,118 @@ package com.tenmilelabs.chefai.home.data.repository
 
 import com.tenmilelabs.chefai.core.di.IoDispatcher
 import com.tenmilelabs.chefai.home.data.cache.LayoutCacheDataSource
-import com.tenmilelabs.chefai.home.domain.repository.HomeLayoutRepository
+import com.tenmilelabs.chefai.home.data.model.ComponentModel
 import com.tenmilelabs.chefai.home.data.model.HomeLayoutModel
+import com.tenmilelabs.chefai.home.data.network.HomeLayoutNetworkResult
+import com.tenmilelabs.chefai.home.data.network.HomeNetworkDataSource
+import com.tenmilelabs.chefai.home.domain.repository.HomeLayoutRepository
+import com.tenmilelabs.chefai.home.domain.repository.HomeRecipeSidecarRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.serialization.json.Json
 import timber.log.Timber
 import javax.inject.Inject
 
 class DefaultHomeLayoutRepository @Inject constructor(
     private val cacheDataSource: LayoutCacheDataSource,
+    private val networkDataSource: HomeNetworkDataSource,
+    private val sidecarRepository: HomeRecipeSidecarRepository,
+    private val json: Json,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : HomeLayoutRepository {
 
     override fun getHomeLayout(): Flow<HomeLayoutModel> = flow {
         // 1. Try disk cache first (stale-while-revalidate)
-        // val cached = cacheDataSource.readCachedLayout() // TODO uncomment after network is implemented
-        val cached = cacheDataSource.readBundledLayout()    // TODO delete  after network is implemented
+        val cached = cacheDataSource.readCachedLayout()
+        var emittedFreshLayout = false
         if (cached != null) {
+            Timber.d("SDUI: Found cached layout. Checksum: ${cached.layoutChecksum} and ${cached.components.size} components.")
             emit(cached)
         }
 
-        // 2. Network fetch — revalidate against cached checksum
-        // TODO: Wire network data source when backend is ready
-        // val networkJson = networkDataSource.fetchLayout()
-        // if (networkJson != null) {
-        //     val networkLayout = json.decodeFromString<HomeLayoutModel>(networkJson)
-        //     if (networkLayout.layoutChecksum != cached?.layoutChecksum) {
-        //         cacheDataSource.writeCachedLayout(networkJson)
-        //         emit(networkLayout)
-        //     }
-        // }
+        // 2. Revalidate against backend checksum using If-None-Match/ETag
+        when (val networkResult = networkDataSource.fetchLayout(ifNoneMatch = cached?.layoutChecksum)) {
+            HomeLayoutNetworkResult.NotModified -> { // HTTP 304
+                Timber.d("SDUI: BE layout: NOT MODIFIED. BE Result ${networkResult} == Cached Checksum: ${cached?.layoutChecksum} and ${cached?.components?.size ?: 0} components.")
+                //Unit
+            }
+            is HomeLayoutNetworkResult.Modified -> { //HTTP 200
+                val networkLayout = json.decodeFromString<HomeLayoutModel>(networkResult.rawJson)
+                val networkChecksum = networkLayout.layoutChecksum ?: networkResult.eTag
+                // Normalization: It ensures the layoutChecksum is correctly set, using the ETag from the network header if the JSON body doesn't contain a checksum.
+                val normalizedLayout = if (networkChecksum != null && networkLayout.layoutChecksum != networkChecksum) {
+                    networkLayout.copy(layoutChecksum = networkChecksum)
+                } else {
+                    networkLayout
+                }
+                // Validation: It checks shouldUpdate. It updates if there was no cache, or if the new checksum is different from the old one.
+                val shouldUpdate = when {
+                    cached == null -> true
+                    networkChecksum != null -> networkChecksum != cached.layoutChecksum
+                    else -> normalizedLayout != cached
+                }
+                Timber.d("SDUI: shouldUpdate: $shouldUpdate .")
+                // Fresh Emission: It emits the new layout to the UI and sets emittedFreshLayout = true.
+                if (shouldUpdate) {
+                    // Seed Room with sidecar recipe data before emitting so cards can render immediately
+                    normalizedLayout.sidecar?.let { sidecar ->
+                        val written = sidecarRepository.upsertSidecar(sidecar)
+                        Timber.d("SDUI: Upserted $written sidecar recipes from network response")
+                    }
+                    // Strip sidecar before emitting and caching — UI only needs layout components
+                    val layoutToEmit = normalizedLayout.copy(sidecar = null)
+                    emit(layoutToEmit)
+                    emittedFreshLayout = true
+                    val knownCount = layoutToEmit.knownComponentCount()
+                    if (knownCount >= MIN_CACHEABLE_KNOWN_COMPONENTS) {
+                        Timber.d("SDUI: Update cache and emit refreshed value. Normalized Layout Checksum: ${layoutToEmit.layoutChecksum} and $knownCount known components.")
+                        cacheDataSource.writeCachedLayout(json.encodeToString(layoutToEmit))
+                    } else {
+                        Timber.w("SDUI: Skipping cache write — only $knownCount known components (threshold: $MIN_CACHEABLE_KNOWN_COMPONENTS). BE response may have unrecognized component types.")
+                    }
+                }
+            }
+        }
 
-        // 3. If no cache was found, fall back to the bundled asset
-        if (cached == null) {
-            emit(cacheDataSource.readBundledLayout())
+        // 3. If no cache was found and network had no fresh layout, fall back to bundled asset
+        if (cached == null && !emittedFreshLayout) {
+            Timber.w("SDUI: Falling back to bundled layout!!")
+            val bundled = cacheDataSource.readBundledLayout()
+            bundled.sidecar?.let { sidecar ->
+                val written = sidecarRepository.upsertSidecar(sidecar)
+                Timber.d("SDUI: Upserted $written sidecar recipes from bundled asset")
+            }
+            emit(bundled.copy(sidecar = null))
         }
     }.catch { e ->
         if (e is CancellationException) throw e
         Timber.e(e, "Error loading home layout, falling back to bundled asset")
-        emit(cacheDataSource.readBundledLayout())
+        val bundled = cacheDataSource.readBundledLayout()
+        bundled.sidecar?.let { sidecar ->
+            runCatching { sidecarRepository.upsertSidecar(sidecar) }
+                .onSuccess { written -> Timber.d("SDUI: Upserted $written sidecar recipes from bundled asset (catch)") }
+                .onFailure { err -> Timber.e(err, "SDUI: Failed to upsert bundled sidecar") }
+        }
+        emit(bundled.copy(sidecar = null))
     }.flowOn(ioDispatcher)
+
+    companion object {
+        private const val MIN_CACHEABLE_KNOWN_COMPONENTS = 5
+    }
+}
+
+/**
+ * Counts components that are NOT [ComponentModel.Unknown], including items inside carousels.
+ * Used to guard against caching a layout that the client can't render.
+ */
+private fun HomeLayoutModel.knownComponentCount(): Int = components.sumOf { component ->
+    when (component) {
+        is ComponentModel.Unknown -> 0
+        is ComponentModel.Carousel -> component.items.count { it !is ComponentModel.Unknown }
+        else -> 1
+    }
 }
