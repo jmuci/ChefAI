@@ -1,18 +1,27 @@
 package com.tenmilelabs.chefai.home.data.repository
 
+import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
+import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
+import com.tenmilelabs.chefai.core.data.local.room.RecipeStepEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
+import com.tenmilelabs.chefai.core.data.local.room.dao.IngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.LabelDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeLabelCrossRefDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.TagDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.UserDao
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.di.IoDispatcher
+import com.tenmilelabs.chefai.home.data.mapper.toIngredientEntity
 import com.tenmilelabs.chefai.home.data.mapper.toLabelEntity
 import com.tenmilelabs.chefai.home.data.mapper.toRecipeEntity
+import com.tenmilelabs.chefai.home.data.mapper.toRecipeIngredientEntity
+import com.tenmilelabs.chefai.home.data.mapper.toRecipeStepEntity
 import com.tenmilelabs.chefai.home.data.mapper.toTagEntity
 import com.tenmilelabs.chefai.home.data.mapper.toUserEntity
 import com.tenmilelabs.chefai.home.data.model.HomeSidecarDto
@@ -30,6 +39,9 @@ class DefaultHomeRecipeSidecarRepository @Inject constructor(
     private val userDao: UserDao,
     private val recipeTagCrossRefDao: RecipeTagCrossRefDao,
     private val recipeLabelCrossRefDao: RecipeLabelCrossRefDao,
+    private val ingredientDao: IngredientDao,
+    private val recipeIngredientDao: RecipeIngredientDao,
+    private val recipeStepDao: RecipeStepDao,
     private val transactionRunner: TransactionRunner,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : HomeRecipeSidecarRepository {
@@ -101,6 +113,26 @@ class DefaultHomeRecipeSidecarRepository @Inject constructor(
 
             if (tagCrossRefs.isNotEmpty()) recipeTagCrossRefDao.upsertAll(tagCrossRefs)
             if (labelCrossRefs.isNotEmpty()) recipeLabelCrossRefDao.upsertAll(labelCrossRefs)
+
+            // 4. Upsert ingredients and steps for written recipes
+            val allIngredients = mutableListOf<IngredientEntity>()
+            val allRecipeIngredients = mutableListOf<RecipeIngredientEntity>()
+            val allSteps = mutableListOf<RecipeStepEntity>()
+
+            for (dto in recipesToWrite) {
+                val recipeId = runCatching { UUID.fromString(dto.uuid) }.getOrNull() ?: continue
+                dto.ingredients.forEach { sidecarIngredient ->
+                    allIngredients.add(sidecarIngredient.toIngredientEntity(now))
+                    allRecipeIngredients.add(sidecarIngredient.toRecipeIngredientEntity(recipeId, now))
+                }
+                dto.steps.forEach { sidecarStep ->
+                    allSteps.add(sidecarStep.toRecipeStepEntity(recipeId, now))
+                }
+            }
+
+            if (allIngredients.isNotEmpty()) ingredientDao.upsertAll(allIngredients)
+            if (allRecipeIngredients.isNotEmpty()) recipeIngredientDao.upsertAll(allRecipeIngredients)
+            if (allSteps.isNotEmpty()) recipeStepDao.upsertAll(allSteps)
 
             Timber.d("Sidecar: wrote ${recipesToWrite.size} recipes (skipped ${skipIds.size})")
             recipesToWrite.size

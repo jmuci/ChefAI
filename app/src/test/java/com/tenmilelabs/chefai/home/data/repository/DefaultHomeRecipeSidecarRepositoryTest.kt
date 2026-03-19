@@ -2,12 +2,17 @@ package com.tenmilelabs.chefai.home.data.repository
 
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeLabelDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeTagDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
+import com.tenmilelabs.chefai.home.data.model.SidecarIngredient
+import com.tenmilelabs.chefai.home.data.model.SidecarStep
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.home.data.mapper.toRecipeEntity
 import com.tenmilelabs.chefai.home.data.model.HomeSidecarDto
@@ -29,6 +34,9 @@ class DefaultHomeRecipeSidecarRepositoryTest {
     private lateinit var userDao: FakeUserDao
     private lateinit var recipeTagDao: FakeRecipeTagCrossRefDao
     private lateinit var recipeLabelDao: FakeRecipeLabelCrossRefDao
+    private lateinit var ingredientDao: FakeIngredientDao
+    private lateinit var recipeIngredientDao: FakeRecipeIngredientDao
+    private lateinit var recipeStepDao: FakeRecipeStepDao
     private lateinit var repository: DefaultHomeRecipeSidecarRepository
 
     private val creatorId = "dead0000-cafe-4000-8000-000000000001"
@@ -83,6 +91,9 @@ class DefaultHomeRecipeSidecarRepositoryTest {
         userDao = FakeUserDao()
         recipeTagDao = FakeRecipeTagCrossRefDao()
         recipeLabelDao = FakeRecipeLabelCrossRefDao()
+        ingredientDao = FakeIngredientDao()
+        recipeIngredientDao = FakeRecipeIngredientDao()
+        recipeStepDao = FakeRecipeStepDao()
         repository = DefaultHomeRecipeSidecarRepository(
             recipeDao = recipeDao,
             tagDao = tagDao,
@@ -90,6 +101,9 @@ class DefaultHomeRecipeSidecarRepositoryTest {
             userDao = userDao,
             recipeTagCrossRefDao = recipeTagDao,
             recipeLabelCrossRefDao = recipeLabelDao,
+            ingredientDao = ingredientDao,
+            recipeIngredientDao = recipeIngredientDao,
+            recipeStepDao = recipeStepDao,
             transactionRunner = FakeTransactionRunner(),
             ioDispatcher = UnconfinedTestDispatcher(),
         )
@@ -195,5 +209,72 @@ class DefaultHomeRecipeSidecarRepositoryTest {
 
         val written = repository.upsertSidecar(sidecar)
         assertThat(written).isEqualTo(0)
+    }
+
+    @Test
+    fun `ingredients and recipe ingredient cross-refs are written for new recipes`() = runTest {
+        val sidecarWithIngredients = sidecar.copy(
+            recipes = listOf(
+                sidecar.recipes[0].copy(
+                    ingredients = listOf(
+                        SidecarIngredient(name = "Chicken breast", quantity = 500.0, unit = "g"),
+                        SidecarIngredient(name = "Olive oil", quantity = 2.0, unit = "tbsp"),
+                    ),
+                ),
+            ),
+        )
+
+        repository.upsertSidecar(sidecarWithIngredients)
+
+        val crossRefs = recipeIngredientDao.getIngredientsForRecipe(UUID.fromString(recipe1Id))
+        assertThat(crossRefs).hasSize(2)
+        assertThat(crossRefs.map { it.unit }).containsExactly("g", "tbsp")
+
+        val ingredients = ingredientDao.getAllIngredients()
+        assertThat(ingredients).hasSize(2)
+        assertThat(ingredients.map { it.displayName }).containsExactly("Chicken breast", "Olive oil")
+    }
+
+    @Test
+    fun `steps are written for new recipes`() = runTest {
+        val sidecarWithSteps = sidecar.copy(
+            recipes = listOf(
+                sidecar.recipes[0].copy(
+                    steps = listOf(
+                        SidecarStep(orderIndex = 0, instruction = "Preheat oven to 200°C."),
+                        SidecarStep(orderIndex = 1, instruction = "Coat chicken with herbs."),
+                    ),
+                ),
+            ),
+        )
+
+        repository.upsertSidecar(sidecarWithSteps)
+
+        val steps = recipeStepDao.getStepsForRecipe(UUID.fromString(recipe1Id))
+        assertThat(steps).hasSize(2)
+        assertThat(steps.map { it.orderIndex }).containsExactly(0, 1)
+        assertThat(steps.first { it.orderIndex == 0 }.instruction).isEqualTo("Preheat oven to 200°C.")
+    }
+
+    @Test
+    fun `ingredients and steps are not written for skipped recipes`() = runTest {
+        recipeDao.seed(recipes = listOf(
+            sidecar.recipes[0].toRecipeEntity().copy(syncState = SyncState.SYNCED)
+        ))
+
+        val sidecarWithData = sidecar.copy(
+            recipes = listOf(
+                sidecar.recipes[0].copy(
+                    ingredients = listOf(SidecarIngredient(name = "Salt", quantity = 1.0, unit = "tsp")),
+                    steps = listOf(SidecarStep(orderIndex = 0, instruction = "Season.")),
+                ),
+            ),
+        )
+
+        repository.upsertSidecar(sidecarWithData)
+
+        assertThat(ingredientDao.getAllIngredients()).isEmpty()
+        assertThat(recipeIngredientDao.getIngredientsForRecipe(UUID.fromString(recipe1Id))).isEmpty()
+        assertThat(recipeStepDao.getStepsForRecipe(UUID.fromString(recipe1Id))).isEmpty()
     }
 }
