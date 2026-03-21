@@ -19,16 +19,18 @@ import androidx.navigation.NavDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.NavType
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.createGraph
+import androidx.navigation.navArgument
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.ui.LoginScreen
 import com.tenmilelabs.chefai.auth.ui.RegisterScreen
 import com.tenmilelabs.chefai.home.ui.HomeScreen
 import com.tenmilelabs.chefai.mealplans.ui.MealPlansScreen
 import com.tenmilelabs.chefai.recipes.ui.RecipesScreen
-import com.tenmilelabs.chefai.recipes.ui.create.CreateRecipeScreen
 import com.tenmilelabs.chefai.recipes.ui.details.RecipeDetailsScreen
+import com.tenmilelabs.chefai.recipes.ui.editor.RecipeEditorScreen
 import timber.log.Timber
 
 @Composable
@@ -68,13 +70,26 @@ fun ChefAINavGraph(
         composable(
             route = AppDestinations.RECIPE_DETAILS.route,
         ) {
-            RecipeDetailsScreen(snackbarHostState = snackbarHostState)
+            RecipeDetailsScreen(
+                snackbarHostState = snackbarHostState,
+                onEditClick = { recipeId ->
+                    navActions.navigateToEditRecipe(recipeId)
+                },
+            )
         }
-        composable(route = AppDestinations.CREATE_RECIPE.route) {
-            CreateRecipeScreen(
+        composable(
+            route = AppDestinations.RECIPE_EDITOR.route,
+            arguments = listOf(
+                navArgument(AppDestinationArgs.RECIPE_ID_ARG) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            ),
+        ) {
+            RecipeEditorScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onRecipeCreated = { navController.popBackStack() },
-                snackbarHostState= snackbarHostState
+                snackbarHostState = snackbarHostState,
             )
         }
         composable(route = AppDestinations.LOGIN.route) {

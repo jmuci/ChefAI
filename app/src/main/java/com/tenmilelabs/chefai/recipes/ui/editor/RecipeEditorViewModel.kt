@@ -7,6 +7,10 @@ import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeDraftDao
 import com.tenmilelabs.chefai.core.di.IoDispatcher
+import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
+import com.tenmilelabs.chefai.core.domain.model.Label
+import com.tenmilelabs.chefai.core.domain.model.Tag
 import com.tenmilelabs.chefai.core.domain.model.User
 import com.tenmilelabs.chefai.core.domain.repository.MetadataRepository
 import com.tenmilelabs.chefai.recipes.data.mapper.toRecipe
@@ -15,11 +19,6 @@ import com.tenmilelabs.chefai.recipes.data.mapper.toRecipeDraftEntity
 import com.tenmilelabs.chefai.recipes.domain.model.EditorMode
 import com.tenmilelabs.chefai.recipes.domain.model.RecipeDraft
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
-import com.tenmilelabs.chefai.recipes.ui.create.IngredientsFields
-import com.tenmilelabs.chefai.recipes.ui.create.LabelsFields
-import com.tenmilelabs.chefai.recipes.ui.create.RecipeFields
-import com.tenmilelabs.chefai.recipes.ui.create.StepsFields
-import com.tenmilelabs.chefai.recipes.ui.create.TagsFields
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
@@ -51,7 +50,7 @@ class RecipeEditorViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
-    private val recipeIdArg: String? = savedStateHandle["recipeId"]
+    private val recipeIdArg: String? = savedStateHandle[AppDestinationArgs.RECIPE_ID_ARG]
     val mode: EditorMode = if (recipeIdArg != null) {
         EditorMode.Edit(UUID.fromString(recipeIdArg))
     } else {
@@ -199,6 +198,36 @@ class RecipeEditorViewModel @Inject constructor(
                 version = draft.version,
             )
         }
+    }
+
+    // --- UI Convenience Methods ---
+    // These resolve domain objects from string names before dispatching actions.
+    // The Reducer only works with fully-formed domain types.
+
+    fun selectIngredient(name: String) {
+        val existing = allIngredients.value.find {
+            it.displayName.equals(name, ignoreCase = true)
+        }
+        val ingredientId = existing?.uuid ?: UuidV7Generator.newId()
+        dispatch(EditorAction.IngredientSelected(name, ingredientId))
+    }
+
+    fun addTagByName(name: String) {
+        if (name.isBlank()) return
+        val existing = allTags.value.find {
+            it.displayName.equals(name, ignoreCase = true)
+        }
+        val tag = existing ?: Tag(uuid = UuidV7Generator.newId(), displayName = name)
+        dispatch(EditorAction.AddTag(tag))
+    }
+
+    fun addLabelByName(name: String) {
+        if (name.isBlank()) return
+        val existing = allLabels.value.find {
+            it.displayName.equals(name, ignoreCase = true)
+        }
+        val label = existing ?: Label(uuid = UuidV7Generator.newId(), displayName = name)
+        dispatch(EditorAction.AddLabel(label))
     }
 
     // --- Autocomplete Suggestions ---

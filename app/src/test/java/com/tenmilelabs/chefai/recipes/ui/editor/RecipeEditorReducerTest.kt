@@ -6,9 +6,6 @@ import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
 import com.tenmilelabs.chefai.recipes.domain.model.EditorMode
 import com.tenmilelabs.chefai.recipes.domain.model.RecipeDraft
-import com.tenmilelabs.chefai.recipes.ui.create.IngredientsFields
-import com.tenmilelabs.chefai.recipes.ui.create.RecipeFields
-import com.tenmilelabs.chefai.recipes.ui.create.StepsFields
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -262,7 +259,7 @@ class RecipeEditorReducerTest {
     fun `AddTag does not add duplicate tag`() {
         val tag = Tag(UUID.randomUUID(), "italian")
         val state = emptyState.copy(
-            tags = com.tenmilelabs.chefai.recipes.ui.create.TagsFields(selectedTags = listOf(tag))
+            tags = TagsFields(selectedTags = listOf(tag))
         )
         val duplicate = Tag(UUID.randomUUID(), "italian")
 
@@ -274,7 +271,7 @@ class RecipeEditorReducerTest {
     fun `RemoveTag removes specified tag`() {
         val tag = Tag(UUID.randomUUID(), "italian")
         val state = emptyState.copy(
-            tags = com.tenmilelabs.chefai.recipes.ui.create.TagsFields(selectedTags = listOf(tag))
+            tags = TagsFields(selectedTags = listOf(tag))
         )
         val result = RecipeEditorReducer.reduce(state, EditorAction.RemoveTag(tag))
         assertTrue(result.tags.selectedTags.isEmpty())
@@ -295,7 +292,7 @@ class RecipeEditorReducerTest {
     fun `AddLabel does not add duplicate label`() {
         val label = Label(UUID.randomUUID(), "Dinner")
         val state = emptyState.copy(
-            labels = com.tenmilelabs.chefai.recipes.ui.create.LabelsFields(selectedLabels = listOf(label))
+            labels = LabelsFields(selectedLabels = listOf(label))
         )
         val result = RecipeEditorReducer.reduce(state, EditorAction.AddLabel(Label(UUID.randomUUID(), "Dinner")))
         assertEquals(1, result.labels.selectedLabels.size)

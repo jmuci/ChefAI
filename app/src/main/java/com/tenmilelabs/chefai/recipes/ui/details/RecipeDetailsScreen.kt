@@ -4,6 +4,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,7 +18,11 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
@@ -61,13 +66,19 @@ import timber.log.Timber
 fun RecipeDetailsScreen(
     viewModel: RecipeDetailsViewModel = hiltViewModel(),
     snackbarHostState: SnackbarHostState,
+    onEditClick: ((java.util.UUID) -> Unit)? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     if (uiState.isLoading) {
         LoadingContent()
     } else {
         if (uiState.recipe != null) {
-            RecipeDetailsContent(uiState.recipe!!)
+            RecipeDetailsContent(
+                recipe = uiState.recipe!!,
+                onEditClick = onEditClick?.let { callback ->
+                    { callback(viewModel.recipeUuid) }
+                },
+            )
         } else {
             EmptyContent(
                 title = R.string.recipe_not_found_error,
@@ -95,11 +106,13 @@ fun RecipeDetailsScreen(
 @Composable
 fun RecipeDetailsContent(
     recipe: Recipe,
+    onEditClick: (() -> Unit)? = null,
 ) {
     val tabTitles = listOf(stringResource(R.string.ingredients), stringResource(R.string.steps))
     val pagerState = rememberPagerState { tabTitles.size }
     val coroutineScope = rememberCoroutineScope()
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -181,6 +194,21 @@ fun RecipeDetailsContent(
             }
         }
     }
+
+    if (onEditClick != null) {
+        FloatingActionButton(
+            onClick = onEditClick,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp),
+        ) {
+            Icon(
+                Icons.Default.Edit,
+                contentDescription = stringResource(R.string.edit_button),
+            )
+        }
+    }
+    } // Box
 }
 
 @Composable
