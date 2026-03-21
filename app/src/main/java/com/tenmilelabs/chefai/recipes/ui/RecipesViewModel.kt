@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import com.tenmilelabs.chefai.core.data.sync.SyncStatus
 import com.tenmilelabs.chefai.core.data.sync.SyncStatusHolder
@@ -12,6 +13,7 @@ import com.tenmilelabs.chefai.core.util.Async
 import com.tenmilelabs.chefai.core.util.WhileUiSubscribed
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -20,6 +22,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -43,9 +46,11 @@ sealed interface RecipesUiEvent {
     data class ShowSnackbar(val message: Int) : RecipesUiEvent
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class RecipesViewModel @Inject constructor(
     recipesRepository: RecipesRepository,
+    collectionsRepository: CollectionsRepository,
     sessionManager: SessionManager,
     private val syncScheduler: SyncScheduler,
     private val syncStatusHolder: SyncStatusHolder,
@@ -56,8 +61,10 @@ class RecipesViewModel @Inject constructor(
     val uiEvents: SharedFlow<RecipesUiEvent> = _uiEvent.asSharedFlow()
 
     private val _recipesAsync = (sessionManager.getCurrentUserId()?.let { userId ->
-        // TODO when user logs out, we should stop showing the last users recipes.
-        recipesRepository.getRecipesPreviewStreamForUser(userId)
+        collectionsRepository.observeBookmarkedRecipeIds(userId)
+            .flatMapLatest { bookmarkedIds ->
+                recipesRepository.getRecipePreviewsByIds(bookmarkedIds.toList())
+            }
     } ?: emptyFlow())
         .map { Async.Success(it) }
         .catch<Async<List<RecipePreview>>> { e ->

@@ -141,7 +141,7 @@ fun LargeCard(
                     Icon(
                         imageVector = if (isInCollection) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
                         contentDescription = stringResource(R.string.save_to_collection_content_description),
-                        tint = if (isInCollection) MaterialTheme.colorScheme.primary else Color.White
+                        tint = if (isInCollection) Color(0xFFFFD700) else Color.White
                     )
                 }
             }
