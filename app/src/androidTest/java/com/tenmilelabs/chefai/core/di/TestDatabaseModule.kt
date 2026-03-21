@@ -71,6 +71,9 @@ object TestDatabaseModule {
     fun provideSyncMetadataDao(database: ChefAIDataBase) = database.syncMetadataDao()
 
     @Provides
+    fun provideRecipeDraftDao(database: ChefAIDataBase) = database.recipeDraftDao()
+
+    @Provides
     @Singleton
     fun provideTransactionRunner(database: ChefAIDataBase): TransactionRunner =
         RoomTransactionRunner(database)

@@ -8,6 +8,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.tenmilelabs.chefai.core.data.local.room.AllergenEntity
 import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.LabelEntity
+import com.tenmilelabs.chefai.core.data.local.room.RecipeDraftEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
@@ -24,6 +25,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         AllergenEntity::class,
         IngredientEntity::class,
         LabelEntity::class,
+        RecipeDraftEntity::class,
         RecipeEntity::class,
         RecipeIngredientEntity::class,
         RecipeLabelCrossRef::class,
@@ -54,6 +56,7 @@ abstract class ChefAIDataBase : RoomDatabase() {
     abstract fun recipeTagCrossRefDao(): RecipeTagCrossRefDao
     abstract fun recipeLabelCrossRefDao(): RecipeLabelCrossRefDao
     abstract fun syncMetadataDao(): SyncMetadataDao
+    abstract fun recipeDraftDao(): RecipeDraftDao
 }
 
 val MIGRATION_2_3 = object : Migration(2, 3) {
@@ -72,6 +75,29 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
 val MIGRATION_3_4 = object : Migration(3, 4) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE recipes ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
+
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS recipe_drafts (
+                recipeId BLOB NOT NULL PRIMARY KEY,
+                isNewRecipe INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                imageUrl TEXT NOT NULL,
+                selectedImageUri TEXT,
+                prepTimeMinutes TEXT NOT NULL,
+                cookTimeMinutes TEXT NOT NULL,
+                servings TEXT NOT NULL,
+                externalUrl TEXT NOT NULL,
+                ingredientsJson TEXT NOT NULL,
+                stepsJson TEXT NOT NULL,
+                tagsJson TEXT NOT NULL,
+                labelsJson TEXT NOT NULL,
+                version INTEGER NOT NULL DEFAULT 1,
+                updatedAt INTEGER NOT NULL
+            )
+        """.trimIndent()
+        )
     }
 }
 

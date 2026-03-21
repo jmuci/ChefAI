@@ -24,6 +24,15 @@ class FakeRecipesRepository : RecipesRepository {
     private var shouldReturnErrorForGetRecipe = false
     private var exceptionForGetRecipe: Exception? = null
 
+    // Storage for getRecipe / createRecipe / updateRecipe
+    private val storedRecipes = mutableMapOf<UUID, Recipe>()
+    var lastCreatedRecipe: Recipe? = null
+        private set
+    var lastUpdatedRecipe: Recipe? = null
+        private set
+    var lastSoftDeletedId: UUID? = null
+        private set
+
     fun setRecipesToEmit(recipes: List<Recipe>) {
         recipesListFlow.tryEmit(recipes)
     }
@@ -94,8 +103,15 @@ class FakeRecipesRepository : RecipesRepository {
         return recipesListFlow
     }
 
+    fun addStoredRecipe(recipe: Recipe) {
+        storedRecipes[recipe.uuid] = recipe
+    }
+
     override suspend fun getRecipe(uuid: UUID): Recipe? {
-        TODO("Not yet implemented")
+        if (shouldReturnErrorForGetRecipe) {
+            throw (exceptionForGetRecipe ?: Exception("Configured repository error"))
+        }
+        return storedRecipes[uuid]
     }
 
     fun setRecipesForList(recipes: List<Recipe>) {
@@ -113,11 +129,13 @@ class FakeRecipesRepository : RecipesRepository {
     }
 
     override suspend fun createRecipe(recipe: Recipe) {
-        TODO("Not yet implemented")
+        lastCreatedRecipe = recipe
+        storedRecipes[recipe.uuid] = recipe
     }
 
     override suspend fun updateRecipe(recipe: Recipe) {
-        TODO("Not yet implemented")
+        lastUpdatedRecipe = recipe
+        storedRecipes[recipe.uuid] = recipe
     }
 
     override suspend fun deleteAllRecipes() {
@@ -129,7 +147,8 @@ class FakeRecipesRepository : RecipesRepository {
     }
 
     override suspend fun softDeleteRecipe(recipeId: UUID) {
-        // No-op
+        lastSoftDeletedId = recipeId
+        storedRecipes.remove(recipeId)
     }
 
     override fun getRecipePreviewsByIds(ids: List<UUID>): Flow<List<RecipePreview>> {
