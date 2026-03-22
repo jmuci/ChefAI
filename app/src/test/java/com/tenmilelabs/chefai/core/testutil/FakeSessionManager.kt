@@ -8,6 +8,7 @@ import com.tenmilelabs.chefai.auth.domain.usecase.AccountUpgradeUseCase
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeBookmarkedRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDao
@@ -27,6 +28,7 @@ import kotlinx.coroutines.runBlocking
 class FakeSyncScheduler : SyncScheduler {
     override fun requestImmediateSync() {}
     override fun requestMutationSync() {}
+    override fun requestBookmarkSync() {}
     override fun requestManualSync() {}
     override fun schedulePeriodicSync() {}
     override fun cancelAllSync() {}
@@ -65,7 +67,8 @@ fun createTestSessionManager(
                 FakeRecipeStepDao(),
                 FakeRecipeIngredientDao(),
                 FakeRecipeTagCrossRefDao(),
-                FakeRecipeLabelCrossRefDao()
+                FakeRecipeLabelCrossRefDao(),
+                FakeBookmarkedRecipeDao()
             )
         },
         syncSchedulerProvider = { FakeSyncScheduler() },
@@ -102,7 +105,8 @@ fun createRealSessionManagerWithFakes(
             AccountUpgradeUseCase(
                 FakeTransactionRunner(), fakeUserDao, FakeRecipeDao(),
                 FakeRecipeStepDao(), FakeRecipeIngredientDao(),
-                FakeRecipeTagCrossRefDao(), FakeRecipeLabelCrossRefDao()
+                FakeRecipeTagCrossRefDao(), FakeRecipeLabelCrossRefDao(),
+                FakeBookmarkedRecipeDao()
             )
         },
         syncSchedulerProvider = { FakeSyncManager() },

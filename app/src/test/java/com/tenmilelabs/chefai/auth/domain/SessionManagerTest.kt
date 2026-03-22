@@ -13,6 +13,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeBookmarkedRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
@@ -74,7 +75,8 @@ class SessionManagerTest {
                 recipeStepDao = fakeRecipeStepDao,
                 recipeIngredientDao = fakeRecipeIngredientDao,
                 recipeTagCrossRefDao = fakeRecipeTagCrossRefDao,
-                recipeLabelCrossRefDao = fakeRecipeLabelCrossRefDao
+                recipeLabelCrossRefDao = fakeRecipeLabelCrossRefDao,
+                bookmarkedRecipeDao = FakeBookmarkedRecipeDao()
             )
         }
 

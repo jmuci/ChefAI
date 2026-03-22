@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.auth.domain.usecase
 
 import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.UserEntity
+import com.tenmilelabs.chefai.core.data.local.room.dao.BookmarkedRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeLabelCrossRefDao
@@ -34,7 +35,8 @@ class AccountUpgradeUseCase @Inject constructor(
     private val recipeStepDao: RecipeStepDao,
     private val recipeIngredientDao: RecipeIngredientDao,
     private val recipeTagCrossRefDao: RecipeTagCrossRefDao,
-    private val recipeLabelCrossRefDao: RecipeLabelCrossRefDao
+    private val recipeLabelCrossRefDao: RecipeLabelCrossRefDao,
+    private val bookmarkedRecipeDao: BookmarkedRecipeDao
 ) {
 
     /**
@@ -84,6 +86,13 @@ class AccountUpgradeUseCase @Inject constructor(
                 recipeTagCrossRefDao.markPendingForRecipes(recipeIds, now)
                 recipeLabelCrossRefDao.markPendingForRecipes(recipeIds, now)
             }
+
+            // Step 4b: Reassign bookmarks from anonymous to authenticated user
+            bookmarkedRecipeDao.reassignUserAndMarkPending(
+                oldUserId = anonymousUserId,
+                newUserId = authenticatedUser.uuid,
+                updatedAt = now
+            )
 
             // Step 5: Delete the anonymous UserEntity (no recipes point to it anymore)
             userDao.deleteUser(anonymousUserId)

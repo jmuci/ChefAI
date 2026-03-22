@@ -28,11 +28,11 @@ class DefaultCollectionsRepository @Inject constructor(
                 deletedAt = null
             )
         )
-        syncScheduler.requestMutationSync()
+        syncScheduler.requestBookmarkSync()
     }
 
     override suspend fun removeBookmark(userId: UUID, recipeId: UUID) {
         dao.softDelete(userId, recipeId, System.currentTimeMillis())
-        syncScheduler.requestMutationSync()
+        syncScheduler.requestBookmarkSync()
     }
 }

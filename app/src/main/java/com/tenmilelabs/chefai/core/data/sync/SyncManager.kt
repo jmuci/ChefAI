@@ -18,6 +18,7 @@ import javax.inject.Singleton
 
 private const val PERIODIC_SYNC_INTERVAL = 1440L  // 24 hours in minutes
 private const val BACKOFF_DELAY_SECONDS = 30L
+private const val BOOKMARK_SYNC_DELAY_SECONDS = 5L
 
 @Singleton
 class SyncManager @Inject constructor(
@@ -70,6 +71,21 @@ class SyncManager @Inject constructor(
             .build()
         WorkManager.getInstance(context)
             .enqueueUniqueWork(SYNC_WORK_NAME, ExistingWorkPolicy.KEEP, request)
+    }
+
+    /**
+     * Enqueue a bookmark-specific sync with a short delay, using REPLACE policy.
+     * Each call resets the delay window — rapid bookmark events within the delay window
+     * are coalesced into a single sync. "Almost immediate" for the first action.
+     */
+    override fun requestBookmarkSync() {
+        val request = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setConstraints(connectedConstraints())
+            .setInitialDelay(BOOKMARK_SYNC_DELAY_SECONDS, TimeUnit.SECONDS)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_DELAY_SECONDS, TimeUnit.SECONDS)
+            .build()
+        WorkManager.getInstance(context)
+            .enqueueUniqueWork(SYNC_WORK_NAME, ExistingWorkPolicy.REPLACE, request)
     }
 
     /**

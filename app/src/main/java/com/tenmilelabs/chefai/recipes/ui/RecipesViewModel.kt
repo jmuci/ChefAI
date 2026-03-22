@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import com.tenmilelabs.chefai.core.data.sync.SyncStatus
@@ -60,12 +61,16 @@ class RecipesViewModel @Inject constructor(
     private val _uiEvent = MutableSharedFlow<RecipesUiEvent>(replay = 1)
     val uiEvents: SharedFlow<RecipesUiEvent> = _uiEvent.asSharedFlow()
 
-    private val _recipesAsync = (sessionManager.getCurrentUserId()?.let { userId ->
-        collectionsRepository.observeBookmarkedRecipeIds(userId)
-            .flatMapLatest { bookmarkedIds ->
+    private val _recipesAsync = sessionManager.userSession
+        .flatMapLatest { session ->
+            when (session) {
+                is UserSession.Loading -> emptyFlow()
+                is UserSession.Anonymous -> collectionsRepository.observeBookmarkedRecipeIds(session.localUserId)
+                is UserSession.Authenticated -> collectionsRepository.observeBookmarkedRecipeIds(session.user.uuid)
+            }.flatMapLatest { bookmarkedIds ->
                 recipesRepository.getRecipePreviewsByIds(bookmarkedIds.toList())
             }
-    } ?: emptyFlow())
+        }
         .map { Async.Success(it) }
         .catch<Async<List<RecipePreview>>> { e ->
             if (e is CancellationException) throw e

@@ -17,6 +17,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeBookmarkedRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeTagDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
@@ -110,7 +111,8 @@ class DefaultRecipeRepositoryTest {
                 AccountUpgradeUseCase(
                     FakeTransactionRunner(), fakeUserDao, accountSwitchRecipeDao,
                     FakeRecipeStepDao(), FakeRecipeIngredientDao(),
-                    FakeRecipeTagCrossRefDao(), FakeRecipeLabelCrossRefDao()
+                    FakeRecipeTagCrossRefDao(), FakeRecipeLabelCrossRefDao(),
+                    FakeBookmarkedRecipeDao()
                 )
             },
             syncSchedulerProvider = { FakeSyncManager() },

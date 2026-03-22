@@ -152,6 +152,11 @@ class FakeRecipesRepository : RecipesRepository {
     }
 
     override fun getRecipePreviewsByIds(ids: List<UUID>): Flow<List<RecipePreview>> {
+        if (shouldReturnErrorForGetRecipes) {
+            return flow {
+                throw (exceptionForGetRecipes ?: Exception("Configured repository error"))
+            }
+        }
         if (ids.isEmpty()) return flowOf(emptyList())
         val idSet = ids.toHashSet()
         return recipesPreviewListFlow.map { all -> all.filter { it.uuid in idSet } }

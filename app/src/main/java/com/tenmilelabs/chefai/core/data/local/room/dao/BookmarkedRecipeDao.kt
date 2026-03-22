@@ -31,4 +31,10 @@ interface BookmarkedRecipeDao {
         "WHERE userId = :userId AND recipeId = :recipeId"
     )
     suspend fun updateSyncState(userId: UUID, recipeId: UUID, state: SyncState, updatedAt: Long)
+
+    @Query(
+        "UPDATE bookmarked_recipes SET userId = :newUserId, syncState = 'PENDING', updatedAt = :updatedAt " +
+        "WHERE userId = :oldUserId"
+    )
+    suspend fun reassignUserAndMarkPending(oldUserId: UUID, newUserId: UUID, updatedAt: Long)
 }

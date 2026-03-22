@@ -316,13 +316,13 @@ class RecipesViewModelTest {
     }
 
     @Test
-    fun `initial loading state is shown when data not yet emitted`() = runTest {
+    fun `uiState updates from empty to loaded when bookmarks are added`() = runTest {
+        // Collections repo emits emptySet() immediately, so initial state is Success(empty)
         viewModel.uiState.test {
             val initialState = awaitItem()
-            assertThat(initialState.isLoading).isTrue()
             assertThat(initialState.items).isEmpty()
 
-            // Now emit data
+            // Add all recipes and bookmark them
             seedBookmarkedRecipes(
                 TEST_DOMAIN_RECIPE_PREVIEWS_LIST,
                 setOf(recipeId1, recipeId2, recipeId3)

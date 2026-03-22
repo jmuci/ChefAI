@@ -10,6 +10,7 @@ import com.tenmilelabs.chefai.core.data.local.room.RecipeStepEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeAllergenDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeBookmarkedRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeLabelDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
@@ -33,6 +34,9 @@ import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPushResponse
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeIngredientDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeStepDto
+import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -57,6 +61,8 @@ class SyncOrchestratorTest {
     private lateinit var recipeIngredientDao: FakeRecipeIngredientDao
     private lateinit var recipeTagCrossRefDao: FakeRecipeTagCrossRefDao
     private lateinit var recipeLabelCrossRefDao: FakeRecipeLabelCrossRefDao
+    private lateinit var bookmarkedRecipeDao: FakeBookmarkedRecipeDao
+    private lateinit var sessionManager: SessionManager
     private lateinit var userDao: FakeUserDao
     private lateinit var syncMetadataDao: FakeSyncMetadataDao
     private lateinit var syncNetworkDataSource: FakeSyncNetworkDataSource
@@ -88,6 +94,8 @@ class SyncOrchestratorTest {
         userDao = FakeUserDao()
         recipeTagCrossRefDao = FakeRecipeTagCrossRefDao()
         recipeLabelCrossRefDao = FakeRecipeLabelCrossRefDao()
+        bookmarkedRecipeDao = FakeBookmarkedRecipeDao()
+        sessionManager = createTestSessionManager(CoroutineScope(testDispatcher))
         syncMetadataDao = FakeSyncMetadataDao()
         syncNetworkDataSource = FakeSyncNetworkDataSource()
 
@@ -104,6 +112,8 @@ class SyncOrchestratorTest {
             recipeIngredientDao = recipeIngredientDao,
             recipeTagCrossRefDao = recipeTagCrossRefDao,
             recipeLabelCrossRefDao = recipeLabelCrossRefDao,
+            bookmarkedRecipeDao = bookmarkedRecipeDao,
+            sessionManager = sessionManager,
             syncMetadataDao = syncMetadataDao,
             transactionRunner = fakeTransactionRunner,
             ioDispatcher = testDispatcher
