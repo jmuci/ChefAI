@@ -15,9 +15,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
@@ -67,7 +72,11 @@ fun RecipeDetailsScreen(
         LoadingContent()
     } else {
         if (uiState.recipe != null) {
-            RecipeDetailsContent(uiState.recipe!!)
+            RecipeDetailsContent(
+                recipe = uiState.recipe!!,
+                isBookmarked = uiState.isBookmarked,
+                onToggleBookmark = viewModel::toggleBookmark,
+            )
         } else {
             EmptyContent(
                 title = R.string.recipe_not_found_error,
@@ -95,6 +104,8 @@ fun RecipeDetailsScreen(
 @Composable
 fun RecipeDetailsContent(
     recipe: Recipe,
+    isBookmarked: Boolean = false,
+    onToggleBookmark: () -> Unit = {},
 ) {
     val tabTitles = listOf(stringResource(R.string.ingredients), stringResource(R.string.steps))
     val pagerState = rememberPagerState { tabTitles.size }
@@ -105,12 +116,29 @@ fun RecipeDetailsContent(
             .fillMaxSize()
     ) {
         Column(modifier = Modifier.padding(horizontal = dimensionResource(id = R.dimen.padding_medium))) {
-            Text(
-                text = recipe.title,
-                style = MaterialTheme.typography.headlineLarge,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.padding(top = dimensionResource(id = R.dimen.padding_medium))
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = dimensionResource(id = R.dimen.padding_medium)),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = recipe.title,
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = onToggleBookmark) {
+                    Icon(
+                        imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                        contentDescription = stringResource(
+                            if (isBookmarked) R.string.remove_from_collection_content_description
+                            else R.string.save_to_collection_content_description
+                        ),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
 
             // Log image loading attempt
             Timber.tag("RecipeDetailsScreen").d(
@@ -252,6 +280,14 @@ fun StepsList(steps: List<RecipeStep>) {
 @Composable
 fun RecipeDetailsFullScreenPreview() {
     ChefAITheme {
-        RecipeDetailsContent(RecipeData.recipe)
+        RecipeDetailsContent(recipe = RecipeData.recipe, isBookmarked = false)
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun RecipeDetailsBookmarkedPreview() {
+    ChefAITheme {
+        RecipeDetailsContent(recipe = RecipeData.recipe, isBookmarked = true)
     }
 }
