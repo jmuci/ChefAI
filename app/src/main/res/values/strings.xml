@@ -118,4 +118,37 @@
     <string name="error_registration_failed">Registration failed. Please try again.</string>
     <string name="error_loading_home">Error Loading Home Screen</string>
 
+    <!-- Meal Plans -->
+    <string name="no_meal_plans_title">No meal plans yet</string>
+    <string name="no_meal_plans_subtitle">Tap + to create your first meal plan and let us help you eat well this week!</string>
+    <string name="meal_plan_error">Failed to load meal plans</string>
+    <string name="meal_plan_deleted">Meal plan deleted</string>
+    <string name="meal_plan_created">Meal plan created! 🎉</string>
+    <string name="meal_plan_save_error">Failed to save meal plan</string>
+    <string name="meal_plan_default_name">Week plan</string>
+
+    <!-- Meal Plan Wizard -->
+    <string name="app_dest_title_meal_plan_wizard">Create Meal Plan</string>
+    <string name="wizard_step_basics">📋 The Basics</string>
+    <string name="wizard_step_preferences">🎯 Preferences</string>
+    <string name="wizard_step_extras">✨ Final Touches</string>
+    <string name="wizard_plan_length_title">📅 How many days?</string>
+    <string name="wizard_meal_type_title">🍽️ Which meals?</string>
+    <string name="wizard_servings_title">👥 How many servings?</string>
+    <string name="wizard_dietary_title">🥗 Any dietary preferences?</string>
+    <string name="wizard_recipe_source_title">📖 Where should recipes come from?</string>
+    <string name="wizard_prep_time_title">⏱️ Max prep time per meal?</string>
+    <string name="wizard_batch_cooking_title">❄️ Batch cook &amp; freeze?</string>
+    <string name="wizard_batch_cooking_subtitle">Cook larger portions and freeze for later</string>
+    <string name="wizard_leftover_title">♻️ Use leftovers across days?</string>
+    <string name="wizard_leftover_subtitle">Repurpose leftovers into new meals</string>
+    <string name="wizard_variety_title">🎨 How much variety?</string>
+    <string name="wizard_next">Next</string>
+    <string name="wizard_back">Back</string>
+    <string name="wizard_create_plan">Create Plan 🎉</string>
+    <string name="wizard_no_limit">No limit</string>
+    <string name="wizard_minutes_format">%1$d min</string>
+    <string name="wizard_days_format">%1$d days</string>
+    <string name="wizard_day_format">%1$d day</string>
+
 </resources>
