@@ -4,11 +4,15 @@ import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.collections.data.repository.FakeCollectionsRepository
+import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
 import com.tenmilelabs.chefai.core.testutil.recipe1
 import com.tenmilelabs.chefai.core.testutil.recipeId1
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
+import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -23,19 +27,24 @@ class RecipeDetailsViewModelTest {
 
     private lateinit var viewModel: RecipeDetailsViewModel
     private lateinit var recipesRepository: FakeRecipesRepository
+    private lateinit var collectionsRepository: FakeCollectionsRepository
+    private lateinit var sessionManager: SessionManager
     private lateinit var savedStateHandle: SavedStateHandle
 
     @Before
     fun setup() {
         recipesRepository = FakeRecipesRepository()
+        collectionsRepository = FakeCollectionsRepository()
+        sessionManager = createTestSessionManager(
+            testScope = CoroutineScope(mainCoroutineRule.testDispatcher)
+        )
         savedStateHandle = SavedStateHandle().apply {
             set(AppDestinationArgs.RECIPE_ID_ARG, recipeId1.toString())
         }
-        // ViewModel is re-initialized for each test to ensure clean state
     }
 
     private fun initializeViewModel() {
-        viewModel = RecipeDetailsViewModel(recipesRepository, savedStateHandle)
+        viewModel = RecipeDetailsViewModel(recipesRepository, collectionsRepository, sessionManager, savedStateHandle)
     }
 
     @Test
@@ -128,28 +137,66 @@ class RecipeDetailsViewModelTest {
 
     @Test
     fun `loadRecipe - success - isLoading reflects _isLoading state`() = runTest {
-        // This test demonstrates how _isLoading (if it were mutable from outside)
-        // would interact, though current ViewModel doesn't expose _isLoading manipulation.
-        // For current ViewModel, _isLoading is always false initially.
-        // If we could set _isLoading = MutableStateFlow(true) from VM after init,
-        // this test would be more relevant. Given the current code, this is more
-        // of a sanity check on the combine logic for the isLoading part of Async.Success.
-
         initializeViewModel()
 
         viewModel.uiState.test {
-            // 1. Initial Loading state from stateIn initialValue
             assertThat(awaitItem().isLoading).isTrue()
 
-            // 2. Repository emits data. _isLoading is still its default (false)
             recipesRepository.emitRecipe(recipeId1, recipe1)
 
-            // 3. Success state
             val successState = awaitItem()
-            // In the Async.Success branch, isLoading = isLoading (which is _isLoading.value)
-            // Since _isLoading is private and defaults to false, this should be false.
             assertThat(successState.isLoading).isFalse()
             assertThat(successState.recipe).isEqualTo(recipe1)
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `initial bookmark state is false`() = runTest {
+        initializeViewModel()
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+
+            val successState = awaitItem()
+            assertThat(successState.isBookmarked).isFalse()
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `toggleBookmark - adds bookmark when not bookmarked`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+            assertThat(awaitItem().isBookmarked).isFalse()
+
+            viewModel.toggleBookmark()
+            assertThat(awaitItem().isBookmarked).isTrue()
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `toggleBookmark - removes bookmark when already bookmarked`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        collectionsRepository.addBookmark(userId, recipeId1)
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+            assertThat(awaitItem().isBookmarked).isTrue()
+
+            viewModel.toggleBookmark()
+            assertThat(awaitItem().isBookmarked).isFalse()
 
             cancelAndConsumeRemainingEvents()
         }
