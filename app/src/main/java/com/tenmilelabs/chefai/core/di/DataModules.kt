@@ -4,12 +4,15 @@ import android.content.Context
 import androidx.room.Room
 import com.tenmilelabs.chefai.auth.data.local.SecurePreferences
 import com.tenmilelabs.chefai.auth.data.local.SecurePreferencesInterface
+import com.tenmilelabs.chefai.collections.data.repository.DefaultCollectionsRepository
+import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.data.local.room.RoomTransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_1_2
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_2_3
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_3_4
+import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_4_5
 import com.tenmilelabs.chefai.core.data.repository.DefaultMetadataRepository
 import com.tenmilelabs.chefai.core.domain.repository.MetadataRepository
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeRepository
@@ -36,6 +39,10 @@ abstract class RepositoryModule {
     @Singleton
     @Binds
     abstract fun bindSecurePreferences(securePreferences: SecurePreferences): SecurePreferencesInterface
+
+    @Singleton
+    @Binds
+    abstract fun bindCollectionsRepository(repository: DefaultCollectionsRepository): CollectionsRepository
 }
 
 
@@ -52,9 +59,12 @@ object DatabaseModules {
             "ChefAI.db"
         )
             .createFromAsset("database/ChefAI.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .build()
     }
+
+    @Provides
+    fun provideBookmarkedRecipeDao(database: ChefAIDataBase) = database.bookmarkedRecipeDao()
 
     @Provides
     fun provideRecipeDao(database: ChefAIDataBase) = database.recipeDao()

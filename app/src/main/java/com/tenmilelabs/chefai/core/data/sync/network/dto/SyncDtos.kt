@@ -4,7 +4,16 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class SyncPushRequest(
-    val recipes: List<SyncRecipeDto>
+    val recipes: List<SyncRecipeDto>,
+    val bookmarkedRecipes: List<SyncBookmarkPushDto> = emptyList()
+)
+
+@Serializable
+data class SyncBookmarkPushDto(
+    val userId: String,
+    val recipeId: String,
+    val updatedAt: Long,
+    val deletedAt: Long?
 )
 
 @Serializable
@@ -48,7 +57,23 @@ data class SyncPushResponse(
     val accepted: List<AcceptedEntityDto>,
     val conflicts: List<ConflictEntityDto>,
     val errors: List<SyncErrorDto>,
-    val serverTimestamp: Long
+    val serverTimestamp: Long,
+    val bookmarkedRecipes: List<BookmarkAcceptedDto> = emptyList(),
+    val bookmarkErrors: List<BookmarkErrorDto> = emptyList()
+)
+
+@Serializable
+data class BookmarkAcceptedDto(
+    val userId: String,
+    val recipeId: String,
+    val serverUpdatedAt: Long
+)
+
+@Serializable
+data class BookmarkErrorDto(
+    val recipeId: String,
+    val reason: String,
+    val message: String
 )
 
 @Serializable
@@ -134,5 +159,14 @@ data class SyncPullResponse(
     val sourceClassifications: List<SyncSourceClassificationDto> = emptyList(),
     val ingredients: List<SyncIngredientDto> = emptyList(),
     val tags: List<SyncTagDto> = emptyList(),
-    val labels: List<SyncLabelDto> = emptyList()
+    val labels: List<SyncLabelDto> = emptyList(),
+    val bookmarkedRecipes: List<SyncBookmarkPullDto> = emptyList()
+)
+
+@Serializable
+data class SyncBookmarkPullDto(
+    val userId: String,
+    val recipeId: String,
+    val updatedAt: Long,
+    val deletedAt: Long?
 )

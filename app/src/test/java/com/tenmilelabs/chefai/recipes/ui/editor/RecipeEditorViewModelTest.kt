@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.recipes.ui.editor
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.tenmilelabs.chefai.collections.data.repository.FakeCollectionsRepository
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDraftDao
 import com.tenmilelabs.chefai.core.data.repository.FakeMetadataRepository
 import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
@@ -32,12 +33,14 @@ class RecipeEditorViewModelTest {
     val mainCoroutineRule = MainCoroutineRule()
 
     private lateinit var recipesRepository: FakeRecipesRepository
+    private lateinit var collectionsRepository: FakeCollectionsRepository
     private lateinit var metadataRepository: FakeMetadataRepository
     private lateinit var recipeDraftDao: FakeRecipeDraftDao
 
     @Before
     fun setup() {
         recipesRepository = FakeRecipesRepository()
+        collectionsRepository = FakeCollectionsRepository()
         metadataRepository = FakeMetadataRepository()
         recipeDraftDao = FakeRecipeDraftDao()
     }
@@ -50,6 +53,7 @@ class RecipeEditorViewModelTest {
         }
         return RecipeEditorViewModel(
             recipesRepository = recipesRepository,
+            collectionsRepository = collectionsRepository,
             metadataRepository = metadataRepository,
             sessionManager = createTestSessionManager(
                 testScope = TestScope(StandardTestDispatcher()),

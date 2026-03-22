@@ -16,6 +16,10 @@ class FakeSyncScheduler : SyncScheduler {
         Timber.d("FakeSyncScheduler: requestMutationSync (no-op)")
     }
 
+    override fun requestBookmarkSync() {
+        Timber.d("FakeSyncScheduler: requestBookmarkSync (no-op)")
+    }
+
     override fun requestManualSync() {
         Timber.d("FakeSyncScheduler: requestManualSync (no-op)")
     }

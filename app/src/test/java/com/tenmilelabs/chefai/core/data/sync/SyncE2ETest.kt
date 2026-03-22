@@ -12,6 +12,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeLabelDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeBookmarkedRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
@@ -30,6 +31,9 @@ import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPushResponse
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeIngredientDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeStepDto
+import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -63,6 +67,8 @@ class SyncE2ETest {
     private lateinit var tagDao: FakeTagDao
     private lateinit var userDao: FakeUserDao
     private lateinit var recipeLabelCrossRefDao: FakeRecipeLabelCrossRefDao
+    private lateinit var bookmarkedRecipeDao: FakeBookmarkedRecipeDao
+    private lateinit var sessionManager: SessionManager
     private lateinit var syncMetadataDao: FakeSyncMetadataDao
     private lateinit var syncNetworkDataSource: FakeSyncNetworkDataSource
     private val fakeTransactionRunner = FakeTransactionRunner()
@@ -90,6 +96,8 @@ class SyncE2ETest {
         labelDao = FakeLabelDao()
         tagDao = FakeTagDao()
         userDao = FakeUserDao()
+        bookmarkedRecipeDao = FakeBookmarkedRecipeDao()
+        sessionManager = createTestSessionManager(CoroutineScope(testDispatcher))
 
         // Seed server-known ingredients so push filtering passes for tests that use them
         runBlocking {
@@ -114,6 +122,8 @@ class SyncE2ETest {
             recipeIngredientDao = recipeIngredientDao,
             recipeTagCrossRefDao = recipeTagCrossRefDao,
             recipeLabelCrossRefDao = recipeLabelCrossRefDao,
+            bookmarkedRecipeDao = bookmarkedRecipeDao,
+            sessionManager = sessionManager,
             syncMetadataDao = syncMetadataDao,
             transactionRunner = fakeTransactionRunner,
             ioDispatcher = testDispatcher

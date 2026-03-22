@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.recipes.ui.create
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.core.di.IoDispatcher
@@ -30,6 +31,7 @@ import javax.inject.Inject
 @HiltViewModel
 class CreateRecipeViewModel @Inject constructor(
     private val recipesRepository: RecipesRepository,
+    private val collectionsRepository: CollectionsRepository,
     private val metadataRepository: MetadataRepository,
     private val sessionManager: SessionManager,
     @param:IoDispatcher private val dispatcher: CoroutineDispatcher
@@ -392,6 +394,7 @@ class CreateRecipeViewModel @Inject constructor(
 
                 withContext(dispatcher) {
                     recipesRepository.createRecipe(recipe)
+                    collectionsRepository.addBookmark(userId, recipe.uuid)
                 }
 
                 _uiState.update { it.copy(isSaving = false) }

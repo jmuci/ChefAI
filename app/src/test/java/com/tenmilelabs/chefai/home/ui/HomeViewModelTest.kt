@@ -4,6 +4,9 @@ import app.cash.turbine.test
 import coil3.ImageLoader
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.collections.data.repository.FakeCollectionsRepository
+import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
+import com.tenmilelabs.chefai.core.testutil.TEST_DOMAIN_RECIPE_PREVIEWS_LIST
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import com.tenmilelabs.chefai.home.data.model.ComponentModel
 import com.tenmilelabs.chefai.home.data.model.HomeLayoutModel
@@ -27,14 +30,19 @@ class HomeViewModelTest {
     private lateinit var recipesRepository: FakeRecipesRepository
     private val imageLoader: ImageLoader = mockk(relaxed = true)
     private val appContext: android.content.Context = mockk(relaxed = true)
+    private lateinit var collectionsRepository: FakeCollectionsRepository
 
     @Before
     fun setup() {
         homeLayoutRepository = FakeHomeLayoutRepository()
         recipesRepository = FakeRecipesRepository()
+        collectionsRepository = FakeCollectionsRepository()
+
         viewModel = HomeViewModel(
             homeLayoutRepository = homeLayoutRepository,
             recipesRepository = recipesRepository,
+            collectionsRepository = collectionsRepository,
+            sessionManager = createTestSessionManager(),
             imageLoader = imageLoader,
             appContext = appContext,
         )
@@ -123,6 +131,8 @@ class HomeViewModelTest {
         val errorViewModel = HomeViewModel(
             homeLayoutRepository = homeLayoutRepository,
             recipesRepository = recipesRepository,
+            collectionsRepository = FakeCollectionsRepository(),
+            sessionManager = createTestSessionManager(),
             imageLoader = imageLoader,
             appContext = appContext,
         )
@@ -199,6 +209,30 @@ class HomeViewModelTest {
             val components = (second as HomeUiState.Success).components
             assertThat(components).hasSize(1)
             assertThat(components[0]).isInstanceOf(ComponentModel.SectionHeader::class.java)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `bookmarkedRecipeIds reflects repository state`() = runTest {
+        val targetId = TEST_DOMAIN_RECIPE_PREVIEWS_LIST.first().uuid
+        collectionsRepository.setBookmarkedIds(setOf(targetId))
+
+        // Header-only layout — no recipe IDs → _bookmarkedIds.map branch fires immediately
+        homeLayoutRepository.emit(
+            HomeLayoutModel(
+                schemaVersion = "1.0.0",
+                components = listOf(ComponentModel.SectionHeader(id = "hdr", title = "Title")),
+            )
+        )
+
+        viewModel.uiState.test {
+            val state = awaitItem().let {
+                if (it is HomeUiState.Loading) awaitItem() else it
+            }
+            assertThat(state).isInstanceOf(HomeUiState.Success::class.java)
+            assertThat((state as HomeUiState.Success).bookmarkedRecipeIds).contains(targetId)
 
             cancelAndIgnoreRemainingEvents()
         }

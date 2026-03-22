@@ -16,12 +16,14 @@ import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.home.data.model.ComponentModel
 import com.tenmilelabs.chefai.home.ui.HomeAction
+import java.util.UUID
 
 @Composable
 fun SduiCarousel(
     carousel: ComponentModel.Carousel,
     recipes: Map<String, RecipePreview>,
     onAction: (HomeAction) -> Unit,
+    bookmarkedRecipeIds: Set<UUID> = emptySet(),
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
@@ -36,6 +38,7 @@ fun SduiCarousel(
                 ComponentRenderer(
                     component = item,
                     recipes = recipes,
+                    bookmarkedRecipeIds = bookmarkedRecipeIds,
                     onAction = onAction,
                 )
             }

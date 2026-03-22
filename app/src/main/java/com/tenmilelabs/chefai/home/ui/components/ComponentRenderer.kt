@@ -12,6 +12,7 @@ import com.tenmilelabs.chefai.core.ui.components.RecipeListCard
 import com.tenmilelabs.chefai.core.ui.components.SectionHeaderWithSubtitle
 import com.tenmilelabs.chefai.home.data.model.ComponentModel
 import com.tenmilelabs.chefai.home.ui.HomeAction
+import java.util.UUID
 
 /**
  * Routes a [ComponentModel] to its Compose representation.
@@ -25,6 +26,7 @@ fun ComponentRenderer(
     component: ComponentModel,
     recipes: Map<String, RecipePreview>,
     onAction: (HomeAction) -> Unit,
+    bookmarkedRecipeIds: Set<UUID> = emptySet(),
     modifier: Modifier = Modifier,
 ) {
     when (component) {
@@ -38,6 +40,7 @@ fun ComponentRenderer(
             SduiCarousel(
                 carousel = component,
                 recipes = recipes,
+                bookmarkedRecipeIds = bookmarkedRecipeIds,
                 onAction = onAction,
                 modifier = modifier,
             )
@@ -46,7 +49,9 @@ fun ComponentRenderer(
             val recipe = component.recipeId?.let { recipes[it] } ?: return
             LargeCard(
                 recipe = recipe,
+                isInCollection = recipe.uuid in bookmarkedRecipeIds,
                 onClick = { onAction(HomeAction.CardClicked(it.toString())) },
+                onSaveToCollection = { onAction(HomeAction.BookmarkToggled(it)) },
                 modifier = modifier.width(300.dp).height(220.dp),
             )
         }
@@ -54,7 +59,9 @@ fun ComponentRenderer(
             val recipe = component.recipeId?.let { recipes[it] } ?: return
             LargeCard(
                 recipe = recipe,
+                isInCollection = recipe.uuid in bookmarkedRecipeIds,
                 onClick = { onAction(HomeAction.CardClicked(it.toString())) },
+                onSaveToCollection = { onAction(HomeAction.BookmarkToggled(it)) },
                 modifier = modifier.size(180.dp),
             )
         }

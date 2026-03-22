@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeDraftDao
 import com.tenmilelabs.chefai.core.di.IoDispatcher
 import com.tenmilelabs.chefai.core.domain.model.User
@@ -42,6 +43,7 @@ import javax.inject.Inject
 @HiltViewModel
 class RecipeEditorViewModel @Inject constructor(
     private val recipesRepository: RecipesRepository,
+    private val collectionsRepository: CollectionsRepository,
     private val metadataRepository: MetadataRepository,
     private val sessionManager: SessionManager,
     private val recipeDraftDao: RecipeDraftDao,
@@ -290,7 +292,10 @@ class RecipeEditorViewModel @Inject constructor(
 
                 withContext(ioDispatcher) {
                     when (mode) {
-                        is EditorMode.Create -> recipesRepository.createRecipe(recipe)
+                        is EditorMode.Create -> {
+                            recipesRepository.createRecipe(recipe)
+                            collectionsRepository.addBookmark(userId, recipe.uuid)
+                        }
                         is EditorMode.Edit -> recipesRepository.updateRecipe(recipe)
                     }
                     // Clear draft on success
