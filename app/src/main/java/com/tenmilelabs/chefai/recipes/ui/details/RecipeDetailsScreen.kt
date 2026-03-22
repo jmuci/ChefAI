@@ -18,6 +18,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -135,7 +136,7 @@ fun RecipeDetailsContent(
                             if (isBookmarked) R.string.remove_from_collection_content_description
                             else R.string.save_to_collection_content_description
                         ),
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = if (isBookmarked) Color(0xFFFFD700) else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
