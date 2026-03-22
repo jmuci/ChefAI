@@ -74,6 +74,9 @@ object TestDatabaseModule {
     fun provideRecipeDraftDao(database: ChefAIDataBase) = database.recipeDraftDao()
 
     @Provides
+    fun provideBookmarkedRecipeDao(database: ChefAIDataBase) = database.bookmarkedRecipeDao()
+
+    @Provides
     @Singleton
     fun provideTransactionRunner(database: ChefAIDataBase): TransactionRunner =
         RoomTransactionRunner(database)
