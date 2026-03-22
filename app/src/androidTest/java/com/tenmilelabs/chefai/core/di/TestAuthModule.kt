@@ -6,6 +6,8 @@ import com.tenmilelabs.chefai.auth.data.network.AuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.TokenProvider
+import com.tenmilelabs.chefai.collections.data.repository.DefaultCollectionsRepository
+import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.data.repository.DefaultMetadataRepository
 import com.tenmilelabs.chefai.core.domain.repository.MetadataRepository
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeRepository
@@ -87,4 +89,11 @@ abstract class TestRepositoryModule {
     @Binds
     @Singleton
     abstract fun bindMetadataRepository(repository: DefaultMetadataRepository): MetadataRepository
+
+    /**
+     * Binds the collections repository (same as production).
+     */
+    @Binds
+    @Singleton
+    abstract fun bindCollectionsRepository(repository: DefaultCollectionsRepository): CollectionsRepository
 }
