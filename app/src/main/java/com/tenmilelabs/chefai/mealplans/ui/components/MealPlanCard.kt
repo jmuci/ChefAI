@@ -19,9 +19,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
+import com.tenmilelabs.chefai.mealplans.domain.model.DietaryRestriction
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
+import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
+import com.tenmilelabs.chefai.mealplans.domain.model.MealType
+import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
+import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
+import java.util.UUID
 
 @Composable
 fun MealPlanCard(
@@ -88,6 +96,90 @@ private fun StatusBadge(
         color = color,
         modifier = modifier.padding(end = 4.dp),
     )
+}
+
+private val previewPreferences = MealPlanPreferences(
+    planLengthDays = 5,
+    mealType = MealType.DINNER_AND_LUNCH,
+    dietaryRestrictions = setOf(DietaryRestriction.VEGAN),
+    recipeSource = RecipeSource.INCLUDE_PUBLIC,
+    maxPrepTimeMinutes = 30,
+    servingsPerMeal = 4,
+    batchCooking = true,
+    leftoverFriendly = false,
+    varietyPreference = VarietyPreference.HIGH,
+)
+
+@Preview(name = "Draft — Light", showBackground = true)
+@Composable
+private fun MealPlanCardDraftLightPreview() {
+    ChefAITheme(darkTheme = false) {
+        MealPlanCard(
+            mealPlan = MealPlan(
+                uuid = UUID.randomUUID(),
+                userId = UUID.randomUUID(),
+                name = "5-day meal plan",
+                status = MealPlanStatus.DRAFT,
+                preferences = previewPreferences,
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis(),
+                days = emptyList(),
+            ),
+            onDelete = {},
+        )
+    }
+}
+
+@Preview(name = "Ready — Dark", showBackground = true)
+@Composable
+private fun MealPlanCardReadyDarkPreview() {
+    ChefAITheme(darkTheme = true) {
+        MealPlanCard(
+            mealPlan = MealPlan(
+                uuid = UUID.randomUUID(),
+                userId = UUID.randomUUID(),
+                name = "7-day batch cook plan",
+                status = MealPlanStatus.READY,
+                preferences = previewPreferences.copy(
+                    planLengthDays = 7,
+                    mealType = MealType.DINNER,
+                    dietaryRestrictions = setOf(DietaryRestriction.LOW_CARB, DietaryRestriction.GLUTEN_FREE),
+                    batchCooking = true,
+                    leftoverFriendly = true,
+                ),
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis(),
+                days = emptyList(),
+            ),
+            onDelete = {},
+        )
+    }
+}
+
+@Preview(name = "Generating — Light", showBackground = true)
+@Composable
+private fun MealPlanCardGeneratingLightPreview() {
+    ChefAITheme(darkTheme = false) {
+        MealPlanCard(
+            mealPlan = MealPlan(
+                uuid = UUID.randomUUID(),
+                userId = UUID.randomUUID(),
+                name = "3-day quick plan",
+                status = MealPlanStatus.GENERATING,
+                preferences = previewPreferences.copy(
+                    planLengthDays = 3,
+                    mealType = MealType.DINNER,
+                    dietaryRestrictions = emptySet(),
+                    maxPrepTimeMinutes = 20,
+                    servingsPerMeal = 2,
+                ),
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis(),
+                days = emptyList(),
+            ),
+            onDelete = {},
+        )
+    }
 }
 
 private fun buildPreferenceSummary(mealPlan: MealPlan): String {
