@@ -9,6 +9,7 @@ import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeBookmarkedRecipeDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeMealPlanDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDao
@@ -68,7 +69,8 @@ fun createTestSessionManager(
                 FakeRecipeIngredientDao(),
                 FakeRecipeTagCrossRefDao(),
                 FakeRecipeLabelCrossRefDao(),
-                FakeBookmarkedRecipeDao()
+                FakeBookmarkedRecipeDao(),
+                FakeMealPlanDao(),
             )
         },
         syncSchedulerProvider = { FakeSyncScheduler() },
@@ -106,7 +108,7 @@ fun createRealSessionManagerWithFakes(
                 FakeTransactionRunner(), fakeUserDao, FakeRecipeDao(),
                 FakeRecipeStepDao(), FakeRecipeIngredientDao(),
                 FakeRecipeTagCrossRefDao(), FakeRecipeLabelCrossRefDao(),
-                FakeBookmarkedRecipeDao()
+                FakeBookmarkedRecipeDao(), FakeMealPlanDao(),
             )
         },
         syncSchedulerProvider = { FakeSyncManager() },

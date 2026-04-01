@@ -33,6 +33,12 @@ interface MealPlanDao {
     @Query("UPDATE meal_plans SET syncState = :syncState, updatedAt = :updatedAt WHERE uuid = :uuid")
     suspend fun updateSyncState(uuid: UUID, syncState: SyncState, updatedAt: Long)
 
+    @Query("UPDATE meal_plans SET userId = :newUserId, syncState = 'PENDING', updatedAt = :updatedAt WHERE userId = :oldUserId")
+    suspend fun reassignUserAndMarkPending(oldUserId: UUID, newUserId: UUID, updatedAt: Long)
+
+    @Query("SELECT COUNT(*) FROM meal_plans WHERE userId = :userId AND deletedAt IS NULL")
+    suspend fun countMealPlansForUser(userId: UUID): Int
+
     // Days
 
     @Query("SELECT * FROM meal_plan_days WHERE mealPlanId = :mealPlanId ORDER BY dayIndex ASC")

@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.auth.domain.usecase
 import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.UserEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.BookmarkedRecipeDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.MealPlanDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeLabelCrossRefDao
@@ -36,7 +37,8 @@ class AccountUpgradeUseCase @Inject constructor(
     private val recipeIngredientDao: RecipeIngredientDao,
     private val recipeTagCrossRefDao: RecipeTagCrossRefDao,
     private val recipeLabelCrossRefDao: RecipeLabelCrossRefDao,
-    private val bookmarkedRecipeDao: BookmarkedRecipeDao
+    private val bookmarkedRecipeDao: BookmarkedRecipeDao,
+    private val mealPlanDao: MealPlanDao,
 ) {
 
     /**
@@ -56,8 +58,10 @@ class AccountUpgradeUseCase @Inject constructor(
         }
 
         val recipeCount = recipeDao.countRecipesForUser(anonymousUserId)
-        if (recipeCount == 0) {
-            Timber.d("No anonymous recipes to upgrade (new device or empty). Creating auth user only.")
+        val mealPlanCount = mealPlanDao.countMealPlansForUser(anonymousUserId)
+
+        if (recipeCount == 0 && mealPlanCount == 0) {
+            Timber.d("No anonymous data to upgrade (new device or empty). Creating auth user only.")
             ensureAuthenticatedUserEntity(authenticatedUser)
             return 0
         }
@@ -69,35 +73,40 @@ class AccountUpgradeUseCase @Inject constructor(
             // Step 1: Create the authenticated UserEntity first (FK target must exist)
             ensureAuthenticatedUserEntity(authenticatedUser)
 
-            // Step 2: Get recipe IDs before reassignment (needed for child entity updates)
-            val recipeIds = recipeDao.getRecipeIdsForUser(anonymousUserId)
-
-            // Step 3: Reassign all recipes from anonymous to authenticated + mark PENDING
-            recipeDao.reassignCreatorAndMarkPending(
-                oldCreatorId = anonymousUserId,
-                newCreatorId = authenticatedUser.uuid,
-                updatedAt = now
-            )
-
-            // Step 4: Mark all child entities as PENDING for sync
-            if (recipeIds.isNotEmpty()) {
-                recipeStepDao.markPendingForRecipes(recipeIds, now)
-                recipeIngredientDao.markPendingForRecipes(recipeIds, now)
-                recipeTagCrossRefDao.markPendingForRecipes(recipeIds, now)
-                recipeLabelCrossRefDao.markPendingForRecipes(recipeIds, now)
+            // Step 2: Reassign recipes (and their child entities) if any exist
+            if (recipeCount > 0) {
+                val recipeIds = recipeDao.getRecipeIdsForUser(anonymousUserId)
+                recipeDao.reassignCreatorAndMarkPending(
+                    oldCreatorId = anonymousUserId,
+                    newCreatorId = authenticatedUser.uuid,
+                    updatedAt = now
+                )
+                if (recipeIds.isNotEmpty()) {
+                    recipeStepDao.markPendingForRecipes(recipeIds, now)
+                    recipeIngredientDao.markPendingForRecipes(recipeIds, now)
+                    recipeTagCrossRefDao.markPendingForRecipes(recipeIds, now)
+                    recipeLabelCrossRefDao.markPendingForRecipes(recipeIds, now)
+                }
             }
 
-            // Step 4b: Reassign bookmarks from anonymous to authenticated user
+            // Step 3: Reassign bookmarks from anonymous to authenticated user
             bookmarkedRecipeDao.reassignUserAndMarkPending(
                 oldUserId = anonymousUserId,
                 newUserId = authenticatedUser.uuid,
                 updatedAt = now
             )
 
-            // Step 5: Delete the anonymous UserEntity (no recipes point to it anymore)
+            // Step 4: Reassign meal plans from anonymous to authenticated user
+            mealPlanDao.reassignUserAndMarkPending(
+                oldUserId = anonymousUserId,
+                newUserId = authenticatedUser.uuid,
+                updatedAt = now
+            )
+
+            // Step 5: Delete the anonymous UserEntity (nothing points to it anymore)
             userDao.deleteUser(anonymousUserId)
 
-            Timber.d("Account upgrade complete: $recipeCount recipes reassigned")
+            Timber.d("Account upgrade complete: $recipeCount recipes, $mealPlanCount meal plans reassigned")
             recipeCount
         }
     }
