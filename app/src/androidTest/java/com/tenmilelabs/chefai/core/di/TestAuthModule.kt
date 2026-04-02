@@ -10,6 +10,8 @@ import com.tenmilelabs.chefai.collections.data.repository.DefaultCollectionsRepo
 import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.data.repository.DefaultMetadataRepository
 import com.tenmilelabs.chefai.core.domain.repository.MetadataRepository
+import com.tenmilelabs.chefai.mealplans.data.repository.DefaultMealPlanRepository
+import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeRepository
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.Binds
@@ -96,4 +98,11 @@ abstract class TestRepositoryModule {
     @Binds
     @Singleton
     abstract fun bindCollectionsRepository(repository: DefaultCollectionsRepository): CollectionsRepository
+
+    /**
+     * Binds the meal plan repository (same as production).
+     */
+    @Binds
+    @Singleton
+    abstract fun bindMealPlanRepository(repository: DefaultMealPlanRepository): MealPlanRepository
 }
