@@ -11,6 +11,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeBookmarkedRecipeDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeMealPlanDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
@@ -36,6 +37,7 @@ class AccountUpgradeUseCaseTest {
     private lateinit var fakeRecipeTagCrossRefDao: FakeRecipeTagCrossRefDao
     private lateinit var fakeRecipeLabelCrossRefDao: FakeRecipeLabelCrossRefDao
     private lateinit var bookmarkedRecipeDao: FakeBookmarkedRecipeDao
+    private lateinit var fakeMealPlanDao: FakeMealPlanDao
 
     private val anonymousId = UuidV7Generator.newId()
     private val authUser = User(
@@ -54,6 +56,7 @@ class AccountUpgradeUseCaseTest {
         fakeRecipeTagCrossRefDao = FakeRecipeTagCrossRefDao()
         fakeRecipeLabelCrossRefDao = FakeRecipeLabelCrossRefDao()
         bookmarkedRecipeDao = FakeBookmarkedRecipeDao()
+        fakeMealPlanDao = FakeMealPlanDao()
 
         useCase = AccountUpgradeUseCase(
             transactionRunner = FakeTransactionRunner(),
@@ -63,7 +66,8 @@ class AccountUpgradeUseCaseTest {
             recipeIngredientDao = fakeRecipeIngredientDao,
             recipeTagCrossRefDao = fakeRecipeTagCrossRefDao,
             recipeLabelCrossRefDao = fakeRecipeLabelCrossRefDao,
-            bookmarkedRecipeDao = bookmarkedRecipeDao
+            bookmarkedRecipeDao = bookmarkedRecipeDao,
+            mealPlanDao = fakeMealPlanDao,
         )
     }
 

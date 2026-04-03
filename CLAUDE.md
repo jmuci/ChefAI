@@ -156,12 +156,16 @@ After completing any code change (bug fix, feature, refactor), always run the un
 
 ---
 
-## Current Gaps (Feb 2026)
-| Area | Status                                            |
-|------|---------------------------------------------------|
-| HomeScreen | Static placeholder data, explore server driven UI |
-| Meal Plans | Stub only                                         |
-| Conflict resolution | SyncState.CONFLICT defined but unused             |
+## Current Gaps (Mar 2026)
+| Area | Status                                                                              |
+|------|-------------------------------------------------------------------------------------|
+| HomeScreen | Static placeholder data, explore server driven UI                             |
+| Meal Plans — Android UI | Done (wizard + list screen, local persistence as DRAFT)              |
+| Meal Plans — Backend sync | Not started — spec in `docs/prompts/meal-plans-backend-prompt.md`  |
+| Meal Plans — AI generation | Not started — blocked on `POST /meal-plans/{id}/generate` BE work  |
+| Meal Plans — Android sync wiring | Not started — extend `SyncOrchestrator` + `SyncDtos`         |
+| Conflict resolution | SyncState.CONFLICT defined but unused                                     |
+| RecipesViewModel user wiring | Hardcoded test UUID, needs real user from SessionManager           |
 
 **Next milestone**: Complete all tasks to prepare for Monstro Demo
 

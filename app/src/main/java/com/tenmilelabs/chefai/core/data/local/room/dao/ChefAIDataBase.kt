@@ -9,6 +9,8 @@ import com.tenmilelabs.chefai.core.data.local.room.AllergenEntity
 import com.tenmilelabs.chefai.core.data.local.room.BookmarkedRecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.LabelEntity
+import com.tenmilelabs.chefai.core.data.local.room.MealPlanDayEntity
+import com.tenmilelabs.chefai.core.data.local.room.MealPlanEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeDraftEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
@@ -27,6 +29,8 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         BookmarkedRecipeEntity::class,
         IngredientEntity::class,
         LabelEntity::class,
+        MealPlanEntity::class,
+        MealPlanDayEntity::class,
         RecipeDraftEntity::class,
         RecipeEntity::class,
         RecipeIngredientEntity::class,
@@ -38,7 +42,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         TagEntity::class,
         UserEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 @TypeConverters(
@@ -60,6 +64,7 @@ abstract class ChefAIDataBase : RoomDatabase() {
     abstract fun recipeLabelCrossRefDao(): RecipeLabelCrossRefDao
     abstract fun syncMetadataDao(): SyncMetadataDao
     abstract fun recipeDraftDao(): RecipeDraftDao
+    abstract fun mealPlanDao(): MealPlanDao
 }
 
 val MIGRATION_2_3 = object : Migration(2, 3) {
@@ -122,6 +127,43 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         )
         db.execSQL("CREATE INDEX index_bookmarked_recipes_recipeId ON bookmarked_recipes(recipeId)")
         db.execSQL("CREATE INDEX index_bookmarked_recipes_syncState_updatedAt ON bookmarked_recipes(syncState, updatedAt)")
+    }
+}
+
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS meal_plans (
+                uuid BLOB NOT NULL PRIMARY KEY,
+                userId BLOB NOT NULL,
+                name TEXT NOT NULL,
+                status TEXT NOT NULL,
+                preferencesJson TEXT NOT NULL,
+                createdAt INTEGER NOT NULL,
+                updatedAt INTEGER NOT NULL,
+                deletedAt INTEGER,
+                syncState TEXT NOT NULL,
+                FOREIGN KEY(userId) REFERENCES users(uuid) ON DELETE CASCADE
+            )
+        """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX index_meal_plans_userId ON meal_plans(userId)")
+        db.execSQL("CREATE INDEX index_meal_plans_syncState_updatedAt ON meal_plans(syncState, updatedAt)")
+
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS meal_plan_days (
+                uuid BLOB NOT NULL PRIMARY KEY,
+                mealPlanId BLOB NOT NULL,
+                dayIndex INTEGER NOT NULL,
+                dinnerRecipeId BLOB,
+                lunchRecipeId BLOB,
+                FOREIGN KEY(mealPlanId) REFERENCES meal_plans(uuid) ON DELETE CASCADE
+            )
+        """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX index_meal_plan_days_mealPlanId ON meal_plan_days(mealPlanId)")
     }
 }
 

@@ -17,8 +17,16 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavHostController
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.LaunchedEffect
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.createGraph
 import com.tenmilelabs.chefai.R
@@ -26,6 +34,11 @@ import com.tenmilelabs.chefai.auth.ui.LoginScreen
 import com.tenmilelabs.chefai.auth.ui.RegisterScreen
 import com.tenmilelabs.chefai.home.ui.HomeScreen
 import com.tenmilelabs.chefai.mealplans.ui.MealPlansScreen
+import com.tenmilelabs.chefai.mealplans.ui.create.CreateMealPlanEvent
+import com.tenmilelabs.chefai.mealplans.ui.create.CreateMealPlanViewModel
+import com.tenmilelabs.chefai.mealplans.ui.create.WizardAdvancedScreen
+import com.tenmilelabs.chefai.mealplans.ui.create.WizardBasicsScreen
+import com.tenmilelabs.chefai.mealplans.ui.create.WizardPreferencesScreen
 import com.tenmilelabs.chefai.recipes.ui.RecipesScreen
 import com.tenmilelabs.chefai.recipes.ui.create.CreateRecipeScreen
 import com.tenmilelabs.chefai.recipes.ui.details.RecipeDetailsScreen
@@ -63,7 +76,69 @@ fun ChefAINavGraph(
             )
         }
         composable(route = AppDestinations.MEAL_PLANS.route) {
-            MealPlansScreen()
+            MealPlansScreen(
+                onCreateMealPlan = { navActions.navigateToMealPlanWizard() },
+                snackbarHostState = snackbarHostState,
+            )
+        }
+        navigation(
+            startDestination = ScreenBaseRoutes.MEAL_PLAN_WIZARD_BASICS,
+            route = ScreenBaseRoutes.MEAL_PLAN_WIZARD,
+        ) {
+            composable(ScreenBaseRoutes.MEAL_PLAN_WIZARD_BASICS) { entry ->
+                val parentEntry = remember(entry) {
+                    navController.getBackStackEntry(ScreenBaseRoutes.MEAL_PLAN_WIZARD)
+                }
+                val wizardViewModel: CreateMealPlanViewModel = hiltViewModel(parentEntry)
+                WizardBasicsScreen(
+                    viewModel = wizardViewModel,
+                    onNext = {
+                        navController.navigate(ScreenBaseRoutes.MEAL_PLAN_WIZARD_PREFERENCES)
+                    },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(ScreenBaseRoutes.MEAL_PLAN_WIZARD_PREFERENCES) { entry ->
+                val parentEntry = remember(entry) {
+                    navController.getBackStackEntry(ScreenBaseRoutes.MEAL_PLAN_WIZARD)
+                }
+                val wizardViewModel: CreateMealPlanViewModel = hiltViewModel(parentEntry)
+                WizardPreferencesScreen(
+                    viewModel = wizardViewModel,
+                    onNext = {
+                        navController.navigate(ScreenBaseRoutes.MEAL_PLAN_WIZARD_ADVANCED)
+                    },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(ScreenBaseRoutes.MEAL_PLAN_WIZARD_ADVANCED) { entry ->
+                val parentEntry = remember(entry) {
+                    navController.getBackStackEntry(ScreenBaseRoutes.MEAL_PLAN_WIZARD)
+                }
+                val wizardViewModel: CreateMealPlanViewModel = hiltViewModel(parentEntry)
+
+                LaunchedEffect(Unit) {
+                    wizardViewModel.uiEvents.collect { event ->
+                        when (event) {
+                            is CreateMealPlanEvent.MealPlanCreated -> {
+                                navController.popBackStack(
+                                    route = AppDestinations.MEAL_PLANS.route,
+                                    inclusive = false,
+                                )
+                            }
+                            is CreateMealPlanEvent.ShowError -> {
+                                snackbarHostState.showSnackbar("Failed to create meal plan")
+                            }
+                        }
+                    }
+                }
+
+                WizardAdvancedScreen(
+                    viewModel = wizardViewModel,
+                    onDone = { /* handled by event collection above */ },
+                    onBack = { navController.popBackStack() },
+                )
+            }
         }
         composable(
             route = AppDestinations.RECIPE_DETAILS.route,
@@ -111,9 +186,18 @@ fun ChefAINavGraph(
             NavController.OnDestinationChangedListener { _: NavController, destination: NavDestination, _ ->
                 val newRoute = destination.route ?: AppDestinations.HOME.route
 
-                titleRes = AppDestinations.entries
-                    .filter { it.route == destination.route }
-                    .map { it.title }.firstOrNull() ?: R.string.app_name
+                val wizardRoutes = setOf(
+                    ScreenBaseRoutes.MEAL_PLAN_WIZARD_BASICS,
+                    ScreenBaseRoutes.MEAL_PLAN_WIZARD_PREFERENCES,
+                    ScreenBaseRoutes.MEAL_PLAN_WIZARD_ADVANCED,
+                )
+                titleRes = if (destination.route in wizardRoutes) {
+                    R.string.app_dest_title_meal_plan_wizard
+                } else {
+                    AppDestinations.entries
+                        .filter { it.route == destination.route }
+                        .map { it.title }.firstOrNull() ?: R.string.app_name
+                }
 
                 isTopLevelDestination =
                     TopLevelDestination.entries.any { it.appDestination.route == destination.route }
@@ -154,29 +238,48 @@ fun ChefAINavGraph(
             }
         },
         bottomBar = {
-            // Don't show bottom bar on login or register screens
-            if (currentRoute != AppDestinations.LOGIN.route && currentRoute != AppDestinations.REGISTER.route) {
+            val wizardRoutes = setOf(
+                ScreenBaseRoutes.MEAL_PLAN_WIZARD_BASICS,
+                ScreenBaseRoutes.MEAL_PLAN_WIZARD_PREFERENCES,
+                ScreenBaseRoutes.MEAL_PLAN_WIZARD_ADVANCED,
+            )
+            val hideBottomBar = currentRoute == AppDestinations.LOGIN.route ||
+                currentRoute == AppDestinations.REGISTER.route ||
+                currentRoute in wizardRoutes
+            if (!hideBottomBar) {
                 BottomNavigationBar(navController)
             }
         },
         floatingActionButton = {
-            // Only show FAB on Recipes screen
-            if (currentRoute == AppDestinations.RECIPES.route) {
-                FloatingActionButtonMenu(
-                    expanded = isFabMenuExpanded,
-                    onExpandedChange = {
-                        isFabMenuExpanded = !isFabMenuExpanded
-                    },
-                    onCreateRecipeClick = {
-                        isFabMenuExpanded = false
-                        navActions.navigateToCreateRecipe()
-                    },
-                    onImportRecipeClick = {
-                        isFabMenuExpanded = false
-                        // TODO: Navigate to import recipe screen
-                        // navActions.navigateToImportRecipe()
+            when (currentRoute) {
+                AppDestinations.RECIPES.route -> {
+                    FloatingActionButtonMenu(
+                        expanded = isFabMenuExpanded,
+                        onExpandedChange = {
+                            isFabMenuExpanded = !isFabMenuExpanded
+                        },
+                        onCreateRecipeClick = {
+                            isFabMenuExpanded = false
+                            navActions.navigateToCreateRecipe()
+                        },
+                        onImportRecipeClick = {
+                            isFabMenuExpanded = false
+                            // TODO: Navigate to import recipe screen
+                            // navActions.navigateToImportRecipe()
+                        }
+                    )
+                }
+                AppDestinations.MEAL_PLANS.route -> {
+                    FloatingActionButton(
+                        onClick = { navActions.navigateToMealPlanWizard() },
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Create meal plan",
+                        )
                     }
-                )
+                }
             }
         }
     ) { innerPadding ->

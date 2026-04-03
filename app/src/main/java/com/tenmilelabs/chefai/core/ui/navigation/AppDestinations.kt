@@ -10,7 +10,7 @@ import java.util.UUID
 /**
  * Screens used in [AppDestinations].
  */
-private object ScreenBaseRoutes {
+internal object ScreenBaseRoutes {
     const val HOME = "home_screen"
     const val MEAL_PLANS = "meal_plans_screen"
     const val RECIPES = "recipes_screen"
@@ -19,6 +19,10 @@ private object ScreenBaseRoutes {
     const val SETTINGS = "settings_screen"
     const val LOGIN = "login_screen"
     const val REGISTER = "register_screen"
+    const val MEAL_PLAN_WIZARD = "meal_plan_wizard"
+    const val MEAL_PLAN_WIZARD_BASICS = "meal_plan_wizard_basics"
+    const val MEAL_PLAN_WIZARD_PREFERENCES = "meal_plan_wizard_preferences"
+    const val MEAL_PLAN_WIZARD_ADVANCED = "meal_plan_wizard_advanced"
 }
 
 /**
@@ -43,6 +47,7 @@ enum class AppDestinations(
         "${ScreenBaseRoutes.RECIPE_DETAILS}/{$RECIPE_ID_ARG}"
     ),
     CREATE_RECIPE(R.string.app_dest_title_create_recipe, ScreenBaseRoutes.CREATE_RECIPE),
+    MEAL_PLAN_WIZARD(R.string.app_dest_title_meal_plan_wizard, ScreenBaseRoutes.MEAL_PLAN_WIZARD),
     SETTINGS(R.string.app_dest_title_settings, ScreenBaseRoutes.SETTINGS),
     LOGIN(R.string.app_dest_title_login, ScreenBaseRoutes.LOGIN),
     REGISTER(R.string.app_dest_title_register, ScreenBaseRoutes.REGISTER),
@@ -69,6 +74,10 @@ class NavigationActions(private val navController: NavHostController) {
 
     fun navigateToRegister() {
         navController.navigate(ScreenBaseRoutes.REGISTER)
+    }
+
+    fun navigateToMealPlanWizard() {
+        navController.navigate(ScreenBaseRoutes.MEAL_PLAN_WIZARD)
     }
 
     fun navigateToHome() {
