@@ -14,6 +14,12 @@ class FakeMealPlanRepository : MealPlanRepository {
     var shouldThrowOnCreate: Boolean = false
     var shouldThrowOnDelete: Boolean = false
     var shouldThrowOnObserve: Boolean = false
+    var shouldFailGeneration: Boolean = false
+    var generationRequestedIds: MutableList<UUID> = mutableListOf()
+
+    override fun observeMealPlan(uuid: UUID): Flow<MealPlan?> {
+        return plans.map { list -> list.find { it.uuid == uuid } }
+    }
 
     override fun observeMealPlansForUser(userId: UUID): Flow<List<MealPlan>> {
         if (shouldThrowOnObserve) throw RuntimeException("Fake observe error")
@@ -28,6 +34,15 @@ class FakeMealPlanRepository : MealPlanRepository {
     override suspend fun deleteMealPlan(uuid: UUID) {
         if (shouldThrowOnDelete) throw RuntimeException("Fake delete error")
         plans.value = plans.value.filter { it.uuid != uuid }
+    }
+
+    override suspend fun requestGeneration(planId: UUID): Result<Unit> {
+        generationRequestedIds.add(planId)
+        return if (shouldFailGeneration) {
+            Result.failure(RuntimeException("Fake generation error"))
+        } else {
+            Result.success(Unit)
+        }
     }
 
     fun emitPlans(vararg mealPlans: MealPlan) {

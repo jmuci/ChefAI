@@ -8,7 +8,11 @@ interface MealPlanRepository {
 
     fun observeMealPlansForUser(userId: UUID): Flow<List<MealPlan>>
 
+    fun observeMealPlan(uuid: UUID): Flow<MealPlan?>
+
     suspend fun createMealPlan(mealPlan: MealPlan)
 
     suspend fun deleteMealPlan(uuid: UUID)
+
+    suspend fun requestGeneration(planId: UUID): Result<Unit>
 }

@@ -4,10 +4,12 @@ import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.core.data.sync.FakeSyncExecutor
 import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import com.tenmilelabs.chefai.mealplans.data.repository.FakeMealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.DietaryRestriction
+import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
@@ -26,16 +28,30 @@ class CreateMealPlanViewModelTest {
     val mainCoroutineRule = MainCoroutineRule()
 
     private lateinit var repository: FakeMealPlanRepository
+    private lateinit var recipesRepository: FakeRecipesRepository
     private lateinit var sessionManager: SessionManager
+    private lateinit var syncExecutor: FakeSyncExecutor
     private lateinit var viewModel: CreateMealPlanViewModel
 
     @Before
     fun setup() {
         repository = FakeMealPlanRepository()
+        recipesRepository = FakeRecipesRepository()
+        recipesRepository.fakeRecipeCount = 50 // enough to allow COLLECTION_ONLY
         sessionManager = createTestSessionManager(CoroutineScope(mainCoroutineRule.testDispatcher))
-        viewModel = CreateMealPlanViewModel(
+        syncExecutor = FakeSyncExecutor()
+        viewModel = createViewModel()
+    }
+
+    private fun createViewModel(
+        recipeCount: Int = recipesRepository.fakeRecipeCount,
+    ): CreateMealPlanViewModel {
+        recipesRepository.fakeRecipeCount = recipeCount
+        return CreateMealPlanViewModel(
             mealPlanRepository = repository,
             sessionManager = sessionManager,
+            syncExecutor = syncExecutor,
+            recipesRepository = recipesRepository,
         )
     }
 
@@ -167,10 +183,31 @@ class CreateMealPlanViewModelTest {
     // --- Save ---
 
     @Test
-    fun `SaveMealPlan emits MealPlanCreated on success`() = runTest {
+    fun `SaveMealPlan emits MealPlanReady when sync and generation succeed`() = runTest {
         viewModel.uiEvents.test {
             viewModel.onAction(WizardAction.SaveMealPlan)
-            assertThat(awaitItem()).isEqualTo(CreateMealPlanEvent.MealPlanCreated)
+            val event = awaitItem()
+            assertThat(event).isInstanceOf(CreateMealPlanEvent.MealPlanReady::class.java)
+        }
+    }
+
+    @Test
+    fun `SaveMealPlan emits MealPlanSavedAsDraft when sync fails`() = runTest {
+        syncExecutor.shouldThrow = true
+        viewModel.uiEvents.test {
+            viewModel.onAction(WizardAction.SaveMealPlan)
+            val event = awaitItem()
+            assertThat(event).isInstanceOf(CreateMealPlanEvent.MealPlanSavedAsDraft::class.java)
+        }
+    }
+
+    @Test
+    fun `SaveMealPlan emits MealPlanSavedAsDraft when generation fails`() = runTest {
+        repository.shouldFailGeneration = true
+        viewModel.uiEvents.test {
+            viewModel.onAction(WizardAction.SaveMealPlan)
+            val event = awaitItem()
+            assertThat(event).isInstanceOf(CreateMealPlanEvent.MealPlanSavedAsDraft::class.java)
         }
     }
 
@@ -228,5 +265,30 @@ class CreateMealPlanViewModelTest {
             awaitItem()
         }
         assertThat(viewModel.uiState.value.isSaving).isFalse()
+    }
+
+    // --- Collection too small ---
+
+    @Test
+    fun `collectionTooSmall is true and recipeSource defaults to INCLUDE_PUBLIC when under 20 recipes`() = runTest {
+        val vm = createViewModel(recipeCount = 5)
+        val state = vm.uiState.value
+        assertThat(state.collectionTooSmall).isTrue()
+        assertThat(state.recipeSource).isEqualTo(RecipeSource.INCLUDE_PUBLIC)
+    }
+
+    @Test
+    fun `collectionTooSmall is false when user has 20 or more recipes`() = runTest {
+        val vm = createViewModel(recipeCount = 20)
+        val state = vm.uiState.value
+        assertThat(state.collectionTooSmall).isFalse()
+        assertThat(state.recipeSource).isEqualTo(RecipeSource.COLLECTION_ONLY)
+    }
+
+    @Test
+    fun `SetRecipeSource to COLLECTION_ONLY is ignored when collection is too small`() = runTest {
+        val vm = createViewModel(recipeCount = 5)
+        vm.onAction(WizardAction.SetRecipeSource(RecipeSource.COLLECTION_ONLY))
+        assertThat(vm.uiState.value.recipeSource).isEqualTo(RecipeSource.INCLUDE_PUBLIC)
     }
 }
