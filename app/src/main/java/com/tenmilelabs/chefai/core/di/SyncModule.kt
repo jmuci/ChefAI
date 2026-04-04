@@ -2,7 +2,9 @@ package com.tenmilelabs.chefai.core.di
 
 import com.tenmilelabs.chefai.core.data.sync.ConnectivityObserver
 import com.tenmilelabs.chefai.core.data.sync.NetworkMonitor
+import com.tenmilelabs.chefai.core.data.sync.SyncExecutor
 import com.tenmilelabs.chefai.core.data.sync.SyncManager
+import com.tenmilelabs.chefai.core.data.sync.SyncOrchestrator
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import com.tenmilelabs.chefai.core.data.sync.network.SyncApiService
 import com.tenmilelabs.chefai.core.data.sync.network.SyncNetworkDataSource
@@ -27,6 +29,12 @@ abstract class SyncNetworkDataSourceModule {
     abstract fun bindSyncScheduler(
         syncManager: SyncManager
     ): SyncScheduler
+
+    @Binds
+    @Singleton
+    abstract fun bindSyncExecutor(
+        syncOrchestrator: SyncOrchestrator
+    ): SyncExecutor
 
     @Binds
     @Singleton

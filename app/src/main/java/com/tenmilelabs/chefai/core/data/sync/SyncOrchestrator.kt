@@ -8,6 +8,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.AllergenDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.BookmarkedRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.IngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.LabelDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.MealPlanDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeLabelCrossRefDao
@@ -23,6 +24,8 @@ import com.tenmilelabs.chefai.core.data.sync.mapper.toIngredientEntities
 import com.tenmilelabs.chefai.core.data.sync.mapper.toIngredientEntity
 import com.tenmilelabs.chefai.core.data.sync.mapper.toLabelCrossRefs
 import com.tenmilelabs.chefai.core.data.sync.mapper.toLabelEntity
+import com.tenmilelabs.chefai.core.data.sync.mapper.toMealPlanDayEntity
+import com.tenmilelabs.chefai.core.data.sync.mapper.toMealPlanEntity
 import com.tenmilelabs.chefai.core.data.sync.mapper.toRecipeEntity
 import com.tenmilelabs.chefai.core.data.sync.mapper.toSourceClassificationEntity
 import com.tenmilelabs.chefai.core.data.sync.mapper.toStepEntities
@@ -32,6 +35,7 @@ import com.tenmilelabs.chefai.core.data.sync.mapper.toTagEntity
 import com.tenmilelabs.chefai.core.data.sync.mapper.toUserEntity
 import com.tenmilelabs.chefai.core.data.sync.network.SyncNetworkDataSource
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncBookmarkPushDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPushRequest
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPushResponse
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeDto
@@ -76,17 +80,18 @@ class SyncOrchestrator @Inject constructor(
     private val recipeTagCrossRefDao: RecipeTagCrossRefDao,
     private val recipeLabelCrossRefDao: RecipeLabelCrossRefDao,
     private val bookmarkedRecipeDao: BookmarkedRecipeDao,
+    private val mealPlanDao: MealPlanDao,
     private val sessionManager: SessionManager,
     private val syncMetadataDao: SyncMetadataDao,
     private val transactionRunner: TransactionRunner,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
-) {
+) : SyncExecutor {
     companion object {
         const val ENTITY_TYPE_RECIPES = "recipes"
         private const val PUSH_BATCH_SIZE = 50
     }
 
-    suspend fun sync(): SyncResult = withContext(ioDispatcher) {
+    override suspend fun sync(): SyncResult = withContext(ioDispatcher) {
         val pushResult = push()
         val pullResult = pull()
         SyncResult(pushResult, pullResult)
@@ -110,12 +115,18 @@ class SyncOrchestrator @Inject constructor(
             emptyList()
         }
 
-        if (dirtyRecipes.isEmpty() && dirtyBookmarks.isEmpty()) {
+        val dirtyMealPlans = mealPlanDao.getAllDirty()
+        val syncMealPlans = dirtyMealPlans.map { plan ->
+            val days = mealPlanDao.getDaysForMealPlan(plan.uuid)
+            plan.toSyncDto(days)
+        }
+
+        if (dirtyRecipes.isEmpty() && dirtyBookmarks.isEmpty() && dirtyMealPlans.isEmpty()) {
             Timber.d("Push: Nothing dirty to push")
             return PushResult(0, 0, 0)
         }
 
-        Timber.d("Push: Found ${dirtyRecipes.size} dirty recipes, ${dirtyBookmarks.size} dirty bookmarks")
+        Timber.d("Push: Found ${dirtyRecipes.size} dirty recipes, ${dirtyBookmarks.size} dirty bookmarks, ${dirtyMealPlans.size} dirty meal plans")
 
         val syncRecipes = dirtyRecipes.map { recipe -> buildSyncRecipeDto(recipe) }
         val syncBookmarks = dirtyBookmarks.map { it.toSyncPushDto() }
@@ -127,10 +138,12 @@ class SyncOrchestrator @Inject constructor(
         // Batch recipes; bookmarks ride along in every batch (or a final bookmark-only batch)
         val recipeBatches = syncRecipes.chunked(PUSH_BATCH_SIZE).ifEmpty { listOf(emptyList()) }
         recipeBatches.forEachIndexed { index, recipeBatch ->
-            // Only include bookmarks in the last batch to avoid duplicate processing
+            // Only include bookmarks and meal plans in the last batch to avoid duplicate processing
             val bookmarkBatch = if (index == recipeBatches.lastIndex) syncBookmarks else emptyList()
-            Timber.d("Push: Sending batch of ${recipeBatch.size} recipes, ${bookmarkBatch.size} bookmarks")
-            val response = syncNetworkDataSource.pushRecipes(SyncPushRequest(recipeBatch, bookmarkBatch))
+            val mealPlanBatch = if (index == recipeBatches.lastIndex) syncMealPlans else emptyList()
+            Timber.d("Push: Sending batch of ${recipeBatch.size} recipes, ${bookmarkBatch.size} bookmarks, ${mealPlanBatch.size} meal plans")
+            // TODO decouple synchronization of unrelated entities such a recipes and meal plans.
+            val response = syncNetworkDataSource.pushRecipes(SyncPushRequest(recipeBatch, bookmarkBatch, mealPlanBatch))
             processPushResponse(response)
             totalAccepted += response.accepted.size
             totalConflicts += response.conflicts.size
@@ -214,6 +227,22 @@ class SyncOrchestrator @Inject constructor(
         for (error in response.bookmarkErrors) {
             Timber.w("Bookmark push error for recipeId=${error.recipeId}: ${error.reason} - ${error.message}")
         }
+
+        // Process accepted meal plans
+        for (accepted in response.mealPlans.accepted) {
+            val uuid = UUID.fromString(accepted.uuid)
+            mealPlanDao.updateSyncState(uuid, SyncState.SYNCED, accepted.serverUpdatedAt)
+        }
+
+        // Meal plan conflicts: server wins — next pull will overwrite
+        if (response.mealPlans.conflicts.isNotEmpty()) {
+            Timber.w("MealPlan push conflicts: ${response.mealPlans.conflicts}")
+        }
+
+        // Meal plan errors: log, keep as PENDING for retry
+        for (error in response.mealPlans.errors) {
+            Timber.w("MealPlan push error for ${error.uuid}: ${error.reason} - ${error.message}")
+        }
     }
 
     private suspend fun pull(): PullResult {
@@ -222,11 +251,13 @@ class SyncOrchestrator @Inject constructor(
         var totalUpserted = 0
         var totalDeleted = 0
 
+        val authenticatedUserId = sessionManager.getCurrentUserId()
+
         Timber.d("Pull: starting from checkpoint=$since")
 
         do {
             val response = syncNetworkDataSource.pullRecipes(since = since, limit = 100)
-            Timber.d("Pull: received ${response.recipes.size} recipes, hasMore=${response.hasMore}")
+            Timber.d("Pull: received ${response.recipes.size} recipes, ${response.mealPlans.size} meal plans, hasMore=${response.hasMore}")
 
             transactionRunner {
                 // Upsert reference data in FK dependency order before recipes:
@@ -251,12 +282,21 @@ class SyncOrchestrator @Inject constructor(
                 for (bookmark in response.bookmarkedRecipes) {
                     applyPulledBookmark(bookmark)
                 }
+
+                // Meal plans require an authenticated user for the FK
+                if (authenticatedUserId != null && response.mealPlans.isNotEmpty()) {
+                    for (dto in response.mealPlans) {
+                        applyPulledMealPlan(dto, authenticatedUserId, response.serverTimestamp)
+                    }
+                } else if (response.mealPlans.isNotEmpty()) {
+                    Timber.w("Pull: Skipping ${response.mealPlans.size} meal plan(s) — no authenticated user")
+                }
             }
 
-            // Bookmark timestamps are independent of recipe timestamps — advance cursor
-            // to max of both so neither set of deltas is re-fetched on the next pull.
+            // Advance cursor to max of all entity timestamps so no deltas are re-fetched.
             val bookmarkMaxTs = response.bookmarkedRecipes.maxOfOrNull { it.updatedAt } ?: 0L
-            val newCursor = maxOf(response.serverTimestamp, bookmarkMaxTs)
+            val mealPlanMaxTs = response.mealPlans.maxOfOrNull { it.updatedAt } ?: 0L
+            val newCursor = maxOf(response.serverTimestamp, bookmarkMaxTs, mealPlanMaxTs)
             syncMetadataDao.upsert(SyncMetadataEntity(ENTITY_TYPE_RECIPES, newCursor))
 
             since = newCursor
@@ -371,6 +411,25 @@ class SyncOrchestrator @Inject constructor(
                     syncState = SyncState.SYNCED
                 )
             )
+        }
+    }
+
+    private suspend fun applyPulledMealPlan(dto: SyncMealPlanDto, userId: UUID, serverTimestamp: Long) {
+        val planUuid = UUID.fromString(dto.uuid)
+        val localPlan = mealPlanDao.getMealPlanById(planUuid)
+
+        // If local has unpushed changes and is newer, skip — push will send it next cycle
+        if (localPlan != null && localPlan.syncState == SyncState.PENDING && dto.updatedAt <= localPlan.updatedAt) {
+            return
+        }
+
+        val entity = dto.toMealPlanEntity(userId)
+        mealPlanDao.upsertMealPlan(entity)
+
+        // Always replace days — server is authoritative (especially after generation)
+        mealPlanDao.deleteDaysForMealPlan(planUuid)
+        if (dto.days.isNotEmpty()) {
+            mealPlanDao.upsertDays(dto.days.map { it.toMealPlanDayEntity(planUuid) })
         }
     }
 
