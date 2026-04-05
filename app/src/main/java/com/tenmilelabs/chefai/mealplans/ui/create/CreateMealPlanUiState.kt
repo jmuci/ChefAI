@@ -15,6 +15,8 @@ data class CreateMealPlanUiState(
     // Step 2: Preferences
     val dietaryRestrictions: Set<DietaryRestriction> = emptySet(),
     val recipeSource: RecipeSource = RecipeSource.COLLECTION_ONLY,
+    /** True when user has fewer than [MIN_COLLECTION_RECIPES] — COLLECTION_ONLY is disabled. */
+    val collectionTooSmall: Boolean = false,
     val maxPrepTimeMinutes: Int? = null,
     // Step 3: Advanced
     val batchCooking: Boolean = false,
@@ -38,6 +40,11 @@ sealed interface WizardAction {
 }
 
 sealed interface CreateMealPlanEvent {
-    data object MealPlanCreated : CreateMealPlanEvent
+    /** Plan created and generation completed — navigate to detail screen. */
+    data class MealPlanReady(val mealPlanId: java.util.UUID) : CreateMealPlanEvent
+
+    /** Plan saved locally but generation failed (offline/BE error) — navigate to detail as DRAFT. */
+    data class MealPlanSavedAsDraft(val mealPlanId: java.util.UUID) : CreateMealPlanEvent
+
     data class ShowError(val message: Int) : CreateMealPlanEvent
 }

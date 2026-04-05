@@ -23,6 +23,7 @@ import java.util.UUID
 @Composable
 fun MealPlansScreen(
     onCreateMealPlan: () -> Unit = {},
+    onMealPlanClick: (UUID) -> Unit = {},
     snackbarHostState: SnackbarHostState = SnackbarHostState(),
     viewModel: MealPlansViewModel = hiltViewModel(),
     modifier: Modifier = Modifier,
@@ -42,6 +43,7 @@ fun MealPlansScreen(
 
     MealPlansContent(
         uiState = uiState,
+        onMealPlanClick = onMealPlanClick,
         onDeleteMealPlan = viewModel::onDeleteMealPlan,
         modifier = modifier,
     )
@@ -50,6 +52,7 @@ fun MealPlansScreen(
 @Composable
 private fun MealPlansContent(
     uiState: MealPlansUiState,
+    onMealPlanClick: (UUID) -> Unit,
     onDeleteMealPlan: (UUID) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -87,6 +90,7 @@ private fun MealPlansContent(
                     ) { mealPlan ->
                         MealPlanCard(
                             mealPlan = mealPlan,
+                            onClick = { onMealPlanClick(mealPlan.uuid) },
                             onDelete = { onDeleteMealPlan(mealPlan.uuid) },
                         )
                     }

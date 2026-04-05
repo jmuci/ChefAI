@@ -34,10 +34,12 @@ import java.util.UUID
 @Composable
 fun MealPlanCard(
     mealPlan: MealPlan,
+    onClick: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(
+        onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -125,6 +127,7 @@ private fun MealPlanCardDraftLightPreview() {
                 updatedAt = System.currentTimeMillis(),
                 days = emptyList(),
             ),
+            onClick = {},
             onDelete = {},
         )
     }
@@ -151,6 +154,7 @@ private fun MealPlanCardReadyDarkPreview() {
                 updatedAt = System.currentTimeMillis(),
                 days = emptyList(),
             ),
+            onClick = {},
             onDelete = {},
         )
     }
@@ -177,6 +181,7 @@ private fun MealPlanCardGeneratingLightPreview() {
                 updatedAt = System.currentTimeMillis(),
                 days = emptyList(),
             ),
+            onClick = {},
             onDelete = {},
         )
     }

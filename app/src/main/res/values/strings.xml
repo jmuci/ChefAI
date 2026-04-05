@@ -127,6 +127,9 @@
     <string name="meal_plan_created">Meal plan created! 🎉</string>
     <string name="meal_plan_save_error">Failed to save meal plan</string>
     <string name="meal_plan_default_name">Week plan</string>
+    <string name="meal_plan_not_found">Meal plan not found</string>
+    <string name="meal_plan_not_found_subtitle">This meal plan may have been deleted.</string>
+    <string name="app_dest_title_meal_plan_detail">Meal Plan</string>
 
     <!-- Meal Plan Wizard -->
     <string name="app_dest_title_meal_plan_wizard">Create Meal Plan</string>
@@ -138,6 +141,7 @@
     <string name="wizard_servings_title">👥 How many servings?</string>
     <string name="wizard_dietary_title">🥗 Any dietary preferences?</string>
     <string name="wizard_recipe_source_title">📖 Where should recipes come from?</string>
+    <string name="wizard_recipe_source_collection_too_small">Add at least 20 recipes to your collection to use only recipes in your collection</string>
     <string name="wizard_prep_time_title">⏱️ Max prep time per meal?</string>
     <string name="wizard_batch_cooking_title">❄️ Batch cook &amp; freeze?</string>
     <string name="wizard_batch_cooking_subtitle">Cook larger portions and freeze for later</string>

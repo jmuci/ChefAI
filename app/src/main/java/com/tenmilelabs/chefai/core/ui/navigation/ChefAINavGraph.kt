@@ -34,6 +34,7 @@ import com.tenmilelabs.chefai.auth.ui.LoginScreen
 import com.tenmilelabs.chefai.auth.ui.RegisterScreen
 import com.tenmilelabs.chefai.home.ui.HomeScreen
 import com.tenmilelabs.chefai.mealplans.ui.MealPlansScreen
+import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailScreen
 import com.tenmilelabs.chefai.mealplans.ui.create.CreateMealPlanEvent
 import com.tenmilelabs.chefai.mealplans.ui.create.CreateMealPlanViewModel
 import com.tenmilelabs.chefai.mealplans.ui.create.WizardAdvancedScreen
@@ -78,8 +79,18 @@ fun ChefAINavGraph(
         composable(route = AppDestinations.MEAL_PLANS.route) {
             MealPlansScreen(
                 onCreateMealPlan = { navActions.navigateToMealPlanWizard() },
+                onMealPlanClick = { mealPlanId -> navActions.navigateToMealPlanDetail(mealPlanId) },
                 snackbarHostState = snackbarHostState,
             )
+        }
+        composable(route = AppDestinations.MEAL_PLAN_DETAIL.route) {
+            MealPlanDetailScreen(
+                onRecipeClick = { recipeId -> navActions.navigateToMealPlanRecipeDetail(recipeId) },
+                snackbarHostState = snackbarHostState,
+            )
+        }
+        composable(route = AppDestinations.MEAL_PLAN_RECIPE_DETAIL.route) {
+            RecipeDetailsScreen(snackbarHostState = snackbarHostState)
         }
         navigation(
             startDestination = ScreenBaseRoutes.MEAL_PLAN_WIZARD_BASICS,
@@ -120,11 +131,21 @@ fun ChefAINavGraph(
                 LaunchedEffect(Unit) {
                     wizardViewModel.uiEvents.collect { event ->
                         when (event) {
-                            is CreateMealPlanEvent.MealPlanCreated -> {
+                            is CreateMealPlanEvent.MealPlanReady -> {
+                                // Generation succeeded — go straight to the detail screen
                                 navController.popBackStack(
                                     route = AppDestinations.MEAL_PLANS.route,
                                     inclusive = false,
                                 )
+                                navActions.navigateToMealPlanDetail(event.mealPlanId)
+                            }
+                            is CreateMealPlanEvent.MealPlanSavedAsDraft -> {
+                                // Offline / BE error — show detail as DRAFT with Generate button
+                                navController.popBackStack(
+                                    route = AppDestinations.MEAL_PLANS.route,
+                                    inclusive = false,
+                                )
+                                navActions.navigateToMealPlanDetail(event.mealPlanId)
                             }
                             is CreateMealPlanEvent.ShowError -> {
                                 snackbarHostState.showSnackbar("Failed to create meal plan")
