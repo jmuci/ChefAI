@@ -266,6 +266,9 @@ class DefaultRecipeRepository @Inject constructor(
         syncManager.requestMutationSync()
     }
 
+    override suspend fun getRecipeCountForUser(userId: UUID): Int =
+        recipeDao.countRecipesForUser(userId)
+
     private suspend fun <T> FlowCollector<T>.logAndReThrow(
         e: Throwable,
         emptyObject: T? = null

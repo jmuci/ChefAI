@@ -80,6 +80,7 @@ private fun WizardPreferencesContent(
             RecipeSourceSelector(
                 selectedSource = uiState.recipeSource,
                 onSourceSelected = { onAction(WizardAction.SetRecipeSource(it)) },
+                collectionTooSmall = uiState.collectionTooSmall,
             )
 
             PrepTimeSelector(
