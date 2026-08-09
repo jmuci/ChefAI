@@ -23,6 +23,7 @@ import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 fun RecipeSourceSelector(
     selectedSource: RecipeSource,
     onSourceSelected: (RecipeSource) -> Unit,
+    collectionTooSmall: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -36,9 +37,11 @@ fun RecipeSourceSelector(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             RecipeSource.entries.forEach { source ->
+                val isDisabled = source == RecipeSource.COLLECTION_ONLY && collectionTooSmall
                 FilterChip(
                     selected = selectedSource == source,
                     onClick = { onSourceSelected(source) },
+                    enabled = !isDisabled,
                     label = { Text("${source.emoji} ${source.label}") },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -46,6 +49,14 @@ fun RecipeSourceSelector(
                     ),
                 )
             }
+        }
+        if (collectionTooSmall) {
+            Text(
+                text = stringResource(R.string.wizard_recipe_source_collection_too_small),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
         }
     }
 }

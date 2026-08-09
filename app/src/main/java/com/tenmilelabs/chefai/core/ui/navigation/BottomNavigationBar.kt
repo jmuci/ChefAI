@@ -56,7 +56,7 @@ fun BottomNavigationBar(
     ) {
         TopLevelDestination.entries.forEachIndexed { index, item ->
             NavigationBarItem(
-                selected = currentRoute == item.appDestination.route,
+                selected = isRouteInSection(currentRoute, item),
                 onClick = {
                     navController.navigate(item.appDestination.route) {
                         popUpTo(navController.graph.startDestinationId) { saveState = true }
@@ -83,6 +83,22 @@ fun BottomNavigationBar(
                 )
             )
         }
+    }
+}
+
+/**
+ * Determines if the current route belongs to a given top-level section.
+ * This allows child routes (e.g., meal plan detail, recipe opened from meal plans)
+ * to keep the parent tab highlighted in the bottom navigation bar.
+ */
+private fun isRouteInSection(currentRoute: String?, item: TopLevelDestination): Boolean {
+    if (currentRoute == null) return false
+    if (currentRoute == item.appDestination.route) return true
+    return when (item) {
+        TopLevelDestination.MEAL_PLANS -> currentRoute.startsWith(ScreenBaseRoutes.MEAL_PLAN_DETAIL) ||
+            currentRoute.startsWith(ScreenBaseRoutes.MEAL_PLAN_RECIPE_DETAIL)
+        TopLevelDestination.RECIPES -> currentRoute.startsWith(ScreenBaseRoutes.RECIPE_DETAILS)
+        else -> false
     }
 }
 

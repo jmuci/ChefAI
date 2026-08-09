@@ -27,6 +27,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
 import com.tenmilelabs.chefai.mealplans.ui.components.WizardProgressBar
+import com.tenmilelabs.chefai.mealplans.ui.create.components.PrepTimeSelector
 import com.tenmilelabs.chefai.mealplans.ui.create.components.ToggleOptionRow
 
 @Composable
@@ -87,6 +88,11 @@ private fun WizardAdvancedContent(
                 subtitle = stringResource(R.string.wizard_leftover_subtitle),
                 checked = uiState.leftoverFriendly,
                 onCheckedChange = { onAction(WizardAction.SetLeftoverFriendly(it)) },
+            )
+
+            PrepTimeSelector(
+                selectedMinutes = uiState.maxPrepTimeMinutes,
+                onMinutesSelected = { onAction(WizardAction.SetMaxPrepTime(it)) },
             )
 
             Column {

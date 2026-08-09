@@ -22,7 +22,6 @@ import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.ui.components.WizardProgressBar
 import com.tenmilelabs.chefai.mealplans.ui.create.components.DietaryChipGroup
-import com.tenmilelabs.chefai.mealplans.ui.create.components.PrepTimeSelector
 import com.tenmilelabs.chefai.mealplans.ui.create.components.RecipeSourceSelector
 
 @Composable
@@ -80,11 +79,7 @@ private fun WizardPreferencesContent(
             RecipeSourceSelector(
                 selectedSource = uiState.recipeSource,
                 onSourceSelected = { onAction(WizardAction.SetRecipeSource(it)) },
-            )
-
-            PrepTimeSelector(
-                selectedMinutes = uiState.maxPrepTimeMinutes,
-                onMinutesSelected = { onAction(WizardAction.SetMaxPrepTime(it)) },
+                collectionTooSmall = uiState.collectionTooSmall,
             )
         }
 

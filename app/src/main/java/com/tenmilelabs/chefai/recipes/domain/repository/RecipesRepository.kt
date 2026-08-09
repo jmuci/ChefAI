@@ -34,4 +34,7 @@ interface RecipesRepository {
      * Returns an empty flow immediately if [ids] is empty.
      */
     fun getRecipePreviewsByIds(ids: List<UUID>): Flow<List<RecipePreview>>
+
+    /** Returns the number of recipes created by (or belonging to) the given user. */
+    suspend fun getRecipeCountForUser(userId: UUID): Int
 }

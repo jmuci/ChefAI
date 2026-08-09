@@ -1,5 +1,7 @@
 package com.tenmilelabs.chefai.core.data.sync.mapper
 
+import com.tenmilelabs.chefai.core.data.local.room.MealPlanDayEntity
+import com.tenmilelabs.chefai.core.data.local.room.MealPlanEntity
 import com.tenmilelabs.chefai.core.data.local.room.AllergenEntity
 import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.LabelEntity
@@ -22,6 +24,8 @@ import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeStepDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncSourceClassificationDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncTagDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncCreatorDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDayDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDto
 import java.util.UUID
 
 // --- Push direction: Room entities → DTO ---
@@ -183,4 +187,46 @@ fun SyncCreatorDto.toUserEntity(): UserEntity = UserEntity(
     updatedAt = updatedAt,
     deletedAt = deletedAt,
     syncState = SyncState.SYNCED
+)
+
+// --- Meal Plan: Push direction (Entity → DTO) ---
+
+fun MealPlanEntity.toSyncDto(days: List<MealPlanDayEntity>): SyncMealPlanDto = SyncMealPlanDto(
+    uuid = uuid.toString(),
+    name = name,
+    status = status,
+    preferencesJson = preferencesJson,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    deletedAt = deletedAt,
+    days = days.map { it.toSyncDto() }
+)
+
+fun MealPlanDayEntity.toSyncDto(): SyncMealPlanDayDto = SyncMealPlanDayDto(
+    uuid = uuid.toString(),
+    dayIndex = dayIndex,
+    dinnerRecipeId = dinnerRecipeId?.toString(),
+    lunchRecipeId = lunchRecipeId?.toString()
+)
+
+// --- Meal Plan: Pull direction (DTO → Entity) ---
+
+fun SyncMealPlanDto.toMealPlanEntity(userId: UUID): MealPlanEntity = MealPlanEntity(
+    uuid = UUID.fromString(uuid),
+    userId = userId,
+    name = name,
+    status = status,
+    preferencesJson = preferencesJson,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    deletedAt = deletedAt,
+    syncState = SyncState.SYNCED
+)
+
+fun SyncMealPlanDayDto.toMealPlanDayEntity(mealPlanId: UUID): MealPlanDayEntity = MealPlanDayEntity(
+    uuid = UUID.fromString(uuid),
+    mealPlanId = mealPlanId,
+    dayIndex = dayIndex,
+    dinnerRecipeId = dinnerRecipeId?.let { UUID.fromString(it) },
+    lunchRecipeId = lunchRecipeId?.let { UUID.fromString(it) }
 )
