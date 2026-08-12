@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -45,6 +46,7 @@ fun RecipesScreen(
     val context = LocalContext.current
 
     PullToRefreshBox(
+        modifier = Modifier.testTag("RecipesScreen"),
         isRefreshing = uiState.isRefreshing,
         onRefresh = viewModel::onRefresh,
     ) {

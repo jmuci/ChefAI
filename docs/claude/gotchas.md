@@ -144,3 +144,25 @@ Gradle daemon / cache / heap theories — those were all dead ends here.
 3. `recipe-scraper/build.gradle.kts` targets JVM 11 bytecode via
    `jvm { compilerOptions { jvmTarget.set(JvmTarget.JVM_11) } }`, not `jvmToolchain(11)` — the latter
    requires an actual JDK 11 installation, which isn't guaranteed on every machine building this.
+
+### 21. `TestRepositoryModule` (androidTest) must bind every leaf dependency any `@HiltViewModel` needs
+Hilt builds **one shared test component** for the whole `androidTest` source set — every
+`@HiltAndroidTest` class and every `@HiltViewModel` in the app is aggregated into it, whether or not
+a given test actually uses them. `TestRepositoryModule` (`TestAuthModule.kt`) replaces production
+`RepositoryModule` wholesale, so it must independently provide *everything* production would have —
+missing even one binding (e.g. `MealPlanNetworkDataSource`, missed until a second `@HiltAndroidTest`
+class was added) fails `hiltJavaCompileDebugAndroidTest` for **every** instrumented test in the
+module, not just ones touching that dependency. When adding a new production `@Binds`/`@Provides` to
+a module a `Test*Module` replaces, add the equivalent there too — reusing the real implementation
+(as `bindMealPlanNetworkDataSource` does) is fine when nothing in the test suite actually invokes it;
+Dagger bindings are lazy.
+
+### 22. Compose `LaunchedEffect(Unit)` closures don't see later state changes — use `rememberUpdatedState`
+`ImportRecipeScreen`'s clipboard-prefill effect checked `state.url.isNotBlank()` once, before an
+`await`ed clipboard read, then unconditionally applied the clipboard text after. Since
+`LaunchedEffect(Unit)` runs its block once and the `state` parameter it closed over is whatever was
+current at that first composition, a user typing into the field *while* the clipboard read was still
+in flight had their input silently overwritten the moment it resolved — a real race, not
+hypothetical (it fired in an instrumented test run). Fix: wrap the read in `rememberUpdatedState` and
+re-check the *current* value immediately before acting on an awaited result, not just before starting
+the `await`.

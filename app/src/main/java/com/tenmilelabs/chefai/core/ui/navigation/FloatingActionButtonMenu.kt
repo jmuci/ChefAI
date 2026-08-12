@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -75,14 +76,16 @@ fun FloatingActionButtonMenu(
                     FabMenuItem(
                         onClick = onImportRecipeClick,
                         icon = Icons.Default.Download,
-                        label = stringResource(id = R.string.fab_import_recipe)
+                        label = stringResource(id = R.string.fab_import_recipe),
+                        buttonTestTag = "ImportRecipeFabItem"
                     )
 
                     // Create Recipe option
                     FabMenuItem(
                         onClick = onCreateRecipeClick,
                         icon = Icons.Default.Create,
-                        label = stringResource(id = R.string.fab_create_recipe)
+                        label = stringResource(id = R.string.fab_create_recipe),
+                        buttonTestTag = "CreateRecipeFabItem"
                     )
                 }
             }
@@ -92,6 +95,7 @@ fun FloatingActionButtonMenu(
                 onClick = {
                     onExpandedChange()
                 },
+                modifier = Modifier.testTag("RecipesFabToggle"),
                 containerColor = MaterialTheme.colorScheme.tertiary,
                 contentColor = MaterialTheme.colorScheme.onTertiary
             ) {
@@ -110,7 +114,8 @@ fun FabMenuItem(
     onClick: () -> Unit,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    buttonTestTag: String? = null
 ) {
     Row(
         modifier = modifier,
@@ -135,6 +140,7 @@ fun FabMenuItem(
         // Small FAB
         FloatingActionButton(
             onClick = onClick,
+            modifier = if (buttonTestTag != null) Modifier.testTag(buttonTestTag) else Modifier,
             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
             contentColor = MaterialTheme.colorScheme.onTertiaryContainer
         ) {
