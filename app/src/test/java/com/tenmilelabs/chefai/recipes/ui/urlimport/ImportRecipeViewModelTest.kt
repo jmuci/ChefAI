@@ -1,0 +1,127 @@
+package com.tenmilelabs.chefai.recipes.ui.urlimport
+
+import app.cash.turbine.test
+import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDraftDao
+import com.tenmilelabs.chefai.core.util.MainCoroutineRule
+import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipeImporter
+import com.tenmilelabs.chefai.recipes.domain.model.RecipeDraft
+import com.tenmilelabs.chefai.recipes.domain.model.RecipeImportResult
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import java.util.UUID
+
+@ExperimentalCoroutinesApi
+class ImportRecipeViewModelTest {
+
+    @get:Rule
+    val mainCoroutineRule = MainCoroutineRule()
+
+    private lateinit var recipeImporter: FakeRecipeImporter
+    private lateinit var recipeDraftDao: FakeRecipeDraftDao
+    private lateinit var viewModel: ImportRecipeViewModel
+
+    @Before
+    fun setup() {
+        recipeImporter = FakeRecipeImporter()
+        recipeDraftDao = FakeRecipeDraftDao()
+        viewModel = ImportRecipeViewModel(recipeImporter, recipeDraftDao, mainCoroutineRule.testDispatcher)
+    }
+
+    @Test
+    fun `success persists a draft and emits the nav effect with the matching id`() = runTest {
+        val draftId = UUID.randomUUID()
+        recipeImporter.result = RecipeImportResult.Success(
+            RecipeDraft(recipeId = draftId, isNewRecipe = true, title = "Mock Recipe"),
+        )
+
+        viewModel.effects.test {
+            viewModel.dispatch(ImportAction.UrlChanged("https://example.com/recipe"))
+            viewModel.dispatch(ImportAction.Import)
+
+            val effect = awaitItem()
+            assertThat(effect).isEqualTo(ImportEffect.NavigateToEditorWithDraft(draftId))
+        }
+
+        assertThat(recipeDraftDao.getDraft(draftId)).isNotNull()
+        assertThat(viewModel.state.value.isImporting).isFalse()
+    }
+
+    @Test
+    fun `invalid url sets an error and emits no nav effect`() = runTest {
+        recipeImporter.result = RecipeImportResult.InvalidUrl
+
+        viewModel.dispatch(ImportAction.UrlChanged("not a url"))
+        viewModel.dispatch(ImportAction.Import)
+
+        assertThat(viewModel.state.value.errorRes).isEqualTo(R.string.import_recipe_invalid_url)
+        assertThat(viewModel.state.value.isImporting).isFalse()
+    }
+
+    @Test
+    fun `no recipe found sets an error and offers manual entry`() = runTest {
+        recipeImporter.result = RecipeImportResult.NoRecipeFound
+
+        viewModel.dispatch(ImportAction.UrlChanged("https://example.com/blog"))
+        viewModel.dispatch(ImportAction.Import)
+
+        assertThat(viewModel.state.value.errorRes).isEqualTo(R.string.import_recipe_no_recipe_found)
+        assertThat(viewModel.state.value.showManualEntryOption).isTrue()
+    }
+
+    @Test
+    fun `network error sets an error message`() = runTest {
+        recipeImporter.result = RecipeImportResult.NetworkError("timeout")
+
+        viewModel.dispatch(ImportAction.UrlChanged("https://example.com/recipe"))
+        viewModel.dispatch(ImportAction.Import)
+
+        assertThat(viewModel.state.value.errorRes).isEqualTo(R.string.import_recipe_network_error)
+    }
+
+    @Test
+    fun `parse error sets an error message`() = runTest {
+        recipeImporter.result = RecipeImportResult.ParseError("boom")
+
+        viewModel.dispatch(ImportAction.UrlChanged("https://example.com/recipe"))
+        viewModel.dispatch(ImportAction.Import)
+
+        assertThat(viewModel.state.value.errorRes).isEqualTo(R.string.import_recipe_parse_error)
+    }
+
+    @Test
+    fun `EnterManually emits the manual editor nav effect`() = runTest {
+        viewModel.effects.test {
+            viewModel.dispatch(ImportAction.EnterManually)
+            assertThat(awaitItem()).isEqualTo(ImportEffect.NavigateToManualEditor)
+        }
+    }
+
+    @Test
+    fun `Import is a no-op while a previous import is still in flight`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        recipeImporter.gate = gate
+        recipeImporter.result = RecipeImportResult.InvalidUrl
+
+        viewModel.dispatch(ImportAction.UrlChanged("https://example.com/recipe"))
+        viewModel.dispatch(ImportAction.Import)
+        assertThat(viewModel.state.value.isImporting).isTrue()
+
+        viewModel.dispatch(ImportAction.Import)
+        assertThat(recipeImporter.callCount).isEqualTo(1)
+
+        gate.complete(Unit)
+    }
+
+    @Test
+    fun `Import does nothing when the url is blank`() = runTest {
+        viewModel.dispatch(ImportAction.Import)
+
+        assertThat(recipeImporter.callCount).isEqualTo(0)
+    }
+}

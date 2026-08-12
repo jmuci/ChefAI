@@ -1,4 +1,4 @@
-package com.tenmilelabs.chefai.recipes.ui.import
+package com.tenmilelabs.chefai.recipes.ui.urlimport
 
 import androidx.annotation.StringRes
 import java.util.UUID
