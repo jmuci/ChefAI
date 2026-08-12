@@ -18,8 +18,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -61,19 +63,30 @@ fun ImportRecipeScreen(
     modifier: Modifier = Modifier,
 ) {
     val clipboard = LocalClipboard.current
+    // Tracks the latest state inside the effect below — the clipboard read is async, so without
+    // re-checking against the current (not the initial) url, text the user types while it's still
+    // in flight would be silently overwritten once it resolves.
+    val currentState = rememberUpdatedState(state)
     LaunchedEffect(Unit) {
-        if (state.url.isNotBlank()) return@LaunchedEffect
+        if (currentState.value.url.isNotBlank()) return@LaunchedEffect
         val clipboardText = runCatching {
             clipboard.getClipEntry()?.clipData?.let { data ->
                 if (data.itemCount > 0) data.getItemAt(0).text?.toString() else null
             }
         }.getOrNull()
-        if (clipboardText != null && (clipboardText.startsWith("http://") || clipboardText.startsWith("https://"))) {
+        val isHttpUrl = clipboardText != null &&
+            (clipboardText.startsWith("http://") || clipboardText.startsWith("https://"))
+        if (isHttpUrl && currentState.value.url.isBlank()) {
             onAction(ImportAction.UrlChanged(clipboardText))
         }
     }
 
-    Column(modifier = modifier.fillMaxSize().padding(dimensionResource(R.dimen.padding_medium))) {
+    Column(
+        modifier = modifier
+            .testTag("ImportRecipeScreen")
+            .fillMaxSize()
+            .padding(dimensionResource(R.dimen.padding_medium)),
+    ) {
         Text(stringResource(R.string.import_recipe_title), style = MaterialTheme.typography.headlineSmall)
 
         Spacer(Modifier.height(dimensionResource(R.dimen.padding_large)))
@@ -88,7 +101,7 @@ fun ImportRecipeScreen(
             isError = state.errorRes != null,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
             keyboardActions = KeyboardActions(onGo = { if (state.canImport) onAction(ImportAction.Import) }),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag("ImportUrlField"),
         )
 
         Spacer(Modifier.height(dimensionResource(R.dimen.padding_medium)))
@@ -96,7 +109,7 @@ fun ImportRecipeScreen(
         Button(
             onClick = { onAction(ImportAction.Import) },
             enabled = state.canImport,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag("ImportButton"),
         ) {
             if (state.isImporting) {
                 CircularProgressIndicator(
