@@ -172,30 +172,32 @@ class RecipeEditorViewModel @Inject constructor(
 
     private fun populateFromDraft(draft: RecipeDraft) {
         _state.update {
-            it.copy(
-                recipeFields = RecipeFields(
-                    title = draft.title,
-                    description = draft.description,
-                    imageUrl = draft.imageUrl,
-                    selectedImageUri = draft.selectedImageUri,
-                    prepTimeMinutes = draft.prepTimeMinutes,
-                    cookTimeMinutes = draft.cookTimeMinutes,
-                    servings = draft.servings,
-                    externalUrl = draft.externalUrl,
-                ),
-                ingredients = IngredientsFields(
-                    selectedIngredients = draft.ingredients,
-                ),
-                steps = StepsFields(
-                    steps = draft.steps,
-                ),
-                tags = TagsFields(
-                    selectedTags = draft.tags,
-                ),
-                labels = LabelsFields(
-                    selectedLabels = draft.labels,
-                ),
-                version = draft.version,
+            RecipeEditorReducer.recomputeValidity(
+                it.copy(
+                    recipeFields = RecipeFields(
+                        title = draft.title,
+                        description = draft.description,
+                        imageUrl = draft.imageUrl,
+                        selectedImageUri = draft.selectedImageUri,
+                        prepTimeMinutes = draft.prepTimeMinutes,
+                        cookTimeMinutes = draft.cookTimeMinutes,
+                        servings = draft.servings,
+                        externalUrl = draft.externalUrl,
+                    ),
+                    ingredients = IngredientsFields(
+                        selectedIngredients = draft.ingredients,
+                    ),
+                    steps = StepsFields(
+                        steps = draft.steps,
+                    ),
+                    tags = TagsFields(
+                        selectedTags = draft.tags,
+                    ),
+                    labels = LabelsFields(
+                        selectedLabels = draft.labels,
+                    ),
+                    version = draft.version,
+                )
             )
         }
     }
