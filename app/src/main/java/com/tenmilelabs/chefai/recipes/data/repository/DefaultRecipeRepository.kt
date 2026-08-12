@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -124,7 +125,9 @@ class DefaultRecipeRepository @Inject constructor(
     }
 
     override suspend fun getRecipe(uuid: UUID): Recipe? {
-        return recipeDao.getRecipeWithDetails(uuid)?.toDomain()
+        val details = recipeDao.getRecipeWithDetails(uuid) ?: return null
+        val ingredients = recipeDao.observeIngredientsForRecipe(uuid).first()
+        return details.toDomain(ingredients)
     }
 
     @Transaction

@@ -1,6 +1,7 @@
-package com.tenmilelabs.chefai.recipes.ui.create
+package com.tenmilelabs.chefai.recipes.ui.editor
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,9 +36,13 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
@@ -44,7 +50,6 @@ import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -53,180 +58,260 @@ import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.core.domain.model.Label
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
-import com.tenmilelabs.chefai.core.ui.preview.SharedData.carbonaraIngredients
-import com.tenmilelabs.chefai.core.ui.preview.SharedData.carbonaraSteps
-import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
-import com.tenmilelabs.chefai.recipes.ui.create.components.AutocompleteInput
-import com.tenmilelabs.chefai.recipes.ui.create.components.ImageUploadContent
-import com.tenmilelabs.chefai.recipes.ui.create.components.IngredientInput
-import com.tenmilelabs.chefai.recipes.ui.create.components.StepCard
+import com.tenmilelabs.chefai.core.util.LoadingContent
+import com.tenmilelabs.chefai.recipes.domain.model.EditorMode
+import com.tenmilelabs.chefai.recipes.ui.editor.components.DeleteConfirmationDialog
+import com.tenmilelabs.chefai.recipes.ui.editor.components.UnsavedChangesDialog
+import com.tenmilelabs.chefai.recipes.ui.editor.components.AutocompleteInput
+import com.tenmilelabs.chefai.recipes.ui.editor.components.ImageUploadContent
+import com.tenmilelabs.chefai.recipes.ui.editor.components.IngredientInput
+import com.tenmilelabs.chefai.recipes.ui.editor.components.StepCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateRecipeScreen(
+fun RecipeEditorScreen(
     onNavigateBack: () -> Unit,
-    onRecipeCreated: () -> Unit,
     snackbarHostState: SnackbarHostState,
-    viewModel: CreateRecipeViewModel = hiltViewModel()
+    viewModel: RecipeEditorViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    var showUnsavedDialog by remember { mutableStateOf(false) }
 
-    // Image picker launcher
+    // Handle one-shot effects
+    LaunchedEffect(Unit) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                EditorEffect.RecipeSaved -> onNavigateBack()
+                EditorEffect.RecipeDeleted -> onNavigateBack()
+                is EditorEffect.ShowError -> {
+                    snackbarHostState.showSnackbar(
+                        message = effect.message,
+                        duration = SnackbarDuration.Short,
+                    )
+                }
+                EditorEffect.NavigateBack -> onNavigateBack()
+            }
+        }
+    }
+
+    // Back navigation with dirty check
+    BackHandler(enabled = true) {
+        if (state.isDirty) showUnsavedDialog = true
+        else onNavigateBack()
+    }
+
+    if (showUnsavedDialog) {
+        UnsavedChangesDialog(
+            onDiscard = onNavigateBack,
+            onKeepEditing = { showUnsavedDialog = false },
+        )
+    }
+
+    if (state.showDeleteConfirmation) {
+        DeleteConfirmationDialog(
+            onConfirm = { viewModel.dispatch(EditorAction.ConfirmDelete) },
+            onDismiss = { viewModel.dispatch(EditorAction.DismissDeleteDialog) },
+        )
+    }
+
+    // Image picker launcher — must be at composable scope
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        viewModel.onImageSelected(uri?.toString())
+        viewModel.dispatch(EditorAction.ImageSelected(uri?.toString()))
     }
 
-    // Check for user messages to display on the screen
-    uiState.saveError?.let { message ->
+    // Check for save errors
+    state.saveError?.let { message ->
         val snackBarText = stringResource(R.string.snackbar_save_error)
-        LaunchedEffect(snackbarHostState, viewModel, message, snackBarText) {
+        LaunchedEffect(snackbarHostState, message, snackBarText) {
             snackbarHostState.showSnackbar(
                 message = snackBarText,
-                duration = SnackbarDuration.Short
+                duration = SnackbarDuration.Short,
             )
-            viewModel.clearError()
+            viewModel.dispatch(EditorAction.ClearError)
         }
     }
+
     val focusManager = LocalFocusManager.current
 
-    Column() {
-        ActionBar(
-            saveButtonOnCLick = {
-                focusManager.clearFocus()
-                viewModel.saveRecipe(onRecipeCreated)
-            },
-            saveButtonEnabled = uiState.isFormValid && !uiState.isSaving,
-            savingState = uiState.isSaving
-        )
-
-        Column(
-            modifier = Modifier
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Spacer(modifier = Modifier.height(8.dp))
-
-            CoreRecipeForm(
-                recipeState = uiState.recipeFields,
-                onTitleChange = viewModel::onTitleChange,
-                onDescriptionChange = viewModel::onDescriptionChange,
-                onPrepTimeChange = viewModel::onPrepTimeChange,
-                onCookTimeChange = viewModel::onCookTimeChange,
-                onServingsChange = viewModel::onServingsChange,
-                onExternalUrlChange = viewModel::onExternalUrlChange
+    if (state.isLoading) {
+        LoadingContent()
+    } else {
+        Column {
+            EditorActionBar(
+                mode = state.mode,
+                onSave = {
+                    focusManager.clearFocus()
+                    viewModel.dispatch(EditorAction.Save)
+                },
+                saveEnabled = state.isFormValid && !state.isSaving,
+                isSaving = state.isSaving,
+                onDelete = if (state.mode is EditorMode.Edit) {
+                    { viewModel.dispatch(EditorAction.Delete) }
+                } else {
+                    null
+                },
+                isDeleting = state.isDeleting,
             )
 
-            ImageUploadSection(
-                recipeState = uiState.recipeFields,
-                onImageUrlChange = viewModel::onImageUrlChange,
-                onSelectImage = { imagePickerLauncher.launch("image/*") },
-                onClearImage = viewModel::clearSelectedImage
-            )
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Spacer(modifier = Modifier.height(8.dp))
 
-            IngredientsForm(
-                ingredientsState = uiState.ingredients,
-                onIngredientInputChange = viewModel::onIngredientInputChange,
-                onIngredientQuantityChange = viewModel::onIngredientQuantityChange,
-                onIngredientUnitChange = viewModel::onIngredientUnitChange,
-                onIngredientSelected = viewModel::onIngredientSelected,
-                onRemoveIngredient = viewModel::removeIngredient
-            )
+                CoreRecipeForm(
+                    recipeState = state.recipeFields,
+                    onTitleChange = { viewModel.dispatch(EditorAction.TitleChanged(it)) },
+                    onDescriptionChange = { viewModel.dispatch(EditorAction.DescriptionChanged(it)) },
+                    onPrepTimeChange = { viewModel.dispatch(EditorAction.PrepTimeChanged(it)) },
+                    onCookTimeChange = { viewModel.dispatch(EditorAction.CookTimeChanged(it)) },
+                    onServingsChange = { viewModel.dispatch(EditorAction.ServingsChanged(it)) },
+                    onExternalUrlChange = { viewModel.dispatch(EditorAction.ExternalUrlChanged(it)) },
+                )
 
-            StepsForm(
-                stepsState = uiState.steps,
-                onStepInputChange = viewModel::onStepInputChange,
-                onAddStep = viewModel::addStep,
-                onRemoveStep = viewModel::removeStep,
-                onMoveStepUp = viewModel::moveStepUp,
-                onMoveStepDown = viewModel::moveStepDown
-            )
+                ImageUploadSection(
+                    recipeState = state.recipeFields,
+                    onImageUrlChange = { viewModel.dispatch(EditorAction.ImageUrlChanged(it)) },
+                    onSelectImage = { imagePickerLauncher.launch("image/*") },
+                    onClearImage = { viewModel.dispatch(EditorAction.ClearImage) },
+                )
 
-            TagsForm(
-                tags = uiState.tags,
-                onTagInputChange = viewModel::onTagInputChange,
-                onAddTag = viewModel::addTag,
-                onRemoveTag = viewModel::removeTag
-            )
+                IngredientsForm(
+                    ingredientsState = state.ingredients,
+                    onIngredientInputChange = { viewModel.dispatch(EditorAction.IngredientInputChanged(it)) },
+                    onIngredientQuantityChange = { viewModel.dispatch(EditorAction.IngredientQuantityChanged(it)) },
+                    onIngredientUnitChange = { viewModel.dispatch(EditorAction.IngredientUnitChanged(it)) },
+                    onIngredientSelected = { viewModel.selectIngredient(it) },
+                    onRemoveIngredient = { viewModel.dispatch(EditorAction.RemoveIngredient(it)) },
+                )
 
-            LabelsForm(
-                labels = uiState.labels,
-                onLabelInputChange = viewModel::onLabelInputChange,
-                onAddLabel = viewModel::addLabel,
-                onRemoveLabel = viewModel::removeLabel
-            )
+                StepsForm(
+                    stepsState = state.steps,
+                    onStepInputChange = { viewModel.dispatch(EditorAction.StepInputChanged(it)) },
+                    onAddStep = { viewModel.dispatch(EditorAction.AddStep) },
+                    onRemoveStep = { viewModel.dispatch(EditorAction.RemoveStep(it)) },
+                    onMoveStepUp = { viewModel.dispatch(EditorAction.MoveStepUp(it)) },
+                    onMoveStepDown = { viewModel.dispatch(EditorAction.MoveStepDown(it)) },
+                )
 
-            Spacer(modifier = Modifier.height(16.dp))
+                TagsForm(
+                    tags = state.tags,
+                    onTagInputChange = { viewModel.dispatch(EditorAction.TagInputChanged(it)) },
+                    onAddTag = { viewModel.addTagByName(it) },
+                    onRemoveTag = { viewModel.dispatch(EditorAction.RemoveTag(it)) },
+                )
+
+                LabelsForm(
+                    labels = state.labels,
+                    onLabelInputChange = { viewModel.dispatch(EditorAction.LabelInputChanged(it)) },
+                    onAddLabel = { viewModel.addLabelByName(it) },
+                    onRemoveLabel = { viewModel.dispatch(EditorAction.RemoveLabel(it)) },
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
         }
     }
 }
 
 @Composable
-private fun ActionBar(
+private fun EditorActionBar(
+    mode: EditorMode,
+    onSave: () -> Unit,
+    saveEnabled: Boolean,
+    isSaving: Boolean,
+    onDelete: (() -> Unit)?,
+    isDeleting: Boolean,
     modifier: Modifier = Modifier,
-    saveButtonOnCLick: () -> Unit = {},
-    saveButtonEnabled: Boolean = false,
-    savingState: Boolean = false
 ) {
+    Row(
+        modifier = modifier
+            .height(dimensionResource(R.dimen.row_height_medium))
+            .padding(horizontal = dimensionResource(R.dimen.padding_small))
+            .fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(
+                if (mode is EditorMode.Edit) R.string.edit_recipe_header
+                else R.string.create_recipe_header
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+
         Row(
-            modifier = modifier
-                .height(dimensionResource(R.dimen.row_height_medium))
-                .padding(horizontal = dimensionResource(R.dimen.padding_small))
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                stringResource(id = R.string.create_recipe_header),
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            if (onDelete != null) {
+                TextButton(
+                    onClick = onDelete,
+                    enabled = !isDeleting && !isSaving,
+                ) {
+                    if (isDeleting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = stringResource(R.string.delete_recipe_button),
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+            }
+
             Button(
-                onClick = { saveButtonOnCLick() },
-                enabled = saveButtonEnabled,
+                onClick = onSave,
+                enabled = saveEnabled,
                 modifier = Modifier.padding(end = 8.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                )
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
             ) {
-                if (savingState) {
+                if (isSaving) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(20.dp),
                         strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary
+                        color = MaterialTheme.colorScheme.onPrimary,
                     )
                 } else {
                     Icon(
                         Icons.Default.Check,
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(18.dp),
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        stringResource(id = R.string.save_button),
-                        style = MaterialTheme.typography.labelLarge
+                        stringResource(R.string.save_button),
+                        style = MaterialTheme.typography.labelLarge,
                     )
                 }
             }
         }
+    }
 }
 
 @Composable
 private fun CoreRecipeForm(
     recipeState: RecipeFields,
-    onTitleChange: (String) -> Unit = {},
-    onDescriptionChange: (String) -> Unit = {},
-    onPrepTimeChange: (String) -> Unit = {},
-    onCookTimeChange: (String) -> Unit = {},
-    onServingsChange: (String) -> Unit = {},
-    onExternalUrlChange: (String) -> Unit = {},
+    onTitleChange: (String) -> Unit,
+    onDescriptionChange: (String) -> Unit,
+    onPrepTimeChange: (String) -> Unit,
+    onCookTimeChange: (String) -> Unit,
+    onServingsChange: (String) -> Unit,
+    onExternalUrlChange: (String) -> Unit,
 ) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Basic Information Section
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SectionHeader(title = stringResource(R.string.section_basic_information))
 
         OutlinedTextField(
@@ -236,7 +321,7 @@ private fun CoreRecipeForm(
             placeholder = { Text(stringResource(R.string.placeholder_recipe_title)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
         )
 
         OutlinedTextField(
@@ -246,12 +331,12 @@ private fun CoreRecipeForm(
             placeholder = { Text(stringResource(R.string.placeholder_description)) },
             modifier = Modifier.fillMaxWidth(),
             minLines = 3,
-            maxLines = 5
+            maxLines = 5,
         )
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             OutlinedTextField(
                 value = recipeState.prepTimeMinutes,
@@ -261,9 +346,9 @@ private fun CoreRecipeForm(
                 modifier = Modifier.weight(1f),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Number,
-                    imeAction = ImeAction.Next
+                    imeAction = ImeAction.Next,
                 ),
-                singleLine = true
+                singleLine = true,
             )
 
             OutlinedTextField(
@@ -274,9 +359,9 @@ private fun CoreRecipeForm(
                 modifier = Modifier.weight(1f),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Number,
-                    imeAction = ImeAction.Next
+                    imeAction = ImeAction.Next,
                 ),
-                singleLine = true
+                singleLine = true,
             )
 
             OutlinedTextField(
@@ -287,9 +372,9 @@ private fun CoreRecipeForm(
                 modifier = Modifier.weight(1f),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Number,
-                    imeAction = ImeAction.Next
+                    imeAction = ImeAction.Next,
                 ),
-                singleLine = true
+                singleLine = true,
             )
         }
 
@@ -300,7 +385,7 @@ private fun CoreRecipeForm(
             placeholder = { Text(stringResource(R.string.placeholder_external_url)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
         )
     }
 }
@@ -308,22 +393,18 @@ private fun CoreRecipeForm(
 @Composable
 private fun ImageUploadSection(
     recipeState: RecipeFields,
-    onImageUrlChange: (String) -> Unit = {},
-    onSelectImage: () -> Unit = {},
-    onClearImage: () -> Unit = {},
+    onImageUrlChange: (String) -> Unit,
+    onSelectImage: () -> Unit,
+    onClearImage: () -> Unit,
 ) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Image Section
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SectionHeader(title = stringResource(R.string.section_recipe_photo))
-
         ImageUploadContent(
             selectedImageUri = recipeState.selectedImageUri,
             imageUrl = recipeState.imageUrl,
             onImageUrlChange = onImageUrlChange,
             onSelectImage = onSelectImage,
-            onClearImage = onClearImage
+            onClearImage = onClearImage,
         )
     }
 }
@@ -331,16 +412,13 @@ private fun ImageUploadSection(
 @Composable
 private fun IngredientsForm(
     ingredientsState: IngredientsFields,
-    onIngredientInputChange: (String) -> Unit = {},
-    onIngredientQuantityChange: (String) -> Unit = {},
-    onIngredientUnitChange: (String) -> Unit = {},
-    onIngredientSelected: (String) -> Unit = {},
-    onRemoveIngredient: (RecipeIngredient) -> Unit = {},
+    onIngredientInputChange: (String) -> Unit,
+    onIngredientQuantityChange: (String) -> Unit,
+    onIngredientUnitChange: (String) -> Unit,
+    onIngredientSelected: (String) -> Unit,
+    onRemoveIngredient: (RecipeIngredient) -> Unit,
 ) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Ingredients Section
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SectionHeader(title = stringResource(R.string.section_ingredients))
 
         IngredientInput(
@@ -356,12 +434,12 @@ private fun IngredientsForm(
                 if (ingredientsState.input.isNotBlank()) {
                     onIngredientSelected(ingredientsState.input)
                 }
-            }
+            },
         )
 
         IngredientChips(
             ingredients = ingredientsState.selectedIngredients,
-            onRemove = onRemoveIngredient
+            onRemove = onRemoveIngredient,
         )
     }
 }
@@ -369,19 +447,15 @@ private fun IngredientsForm(
 @Composable
 private fun StepsForm(
     stepsState: StepsFields,
-    onStepInputChange: (String) -> Unit = {},
-    onAddStep: () -> Unit = {},
-    onRemoveStep: (RecipeStep) -> Unit = {},
-    onMoveStepUp: (RecipeStep) -> Unit = {},
-    onMoveStepDown: (RecipeStep) -> Unit = {},
+    onStepInputChange: (String) -> Unit,
+    onAddStep: () -> Unit,
+    onRemoveStep: (RecipeStep) -> Unit,
+    onMoveStepUp: (RecipeStep) -> Unit,
+    onMoveStepDown: (RecipeStep) -> Unit,
 ) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Steps Section
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SectionHeader(title = stringResource(R.string.section_instructions))
 
-        // Dynamic list of steps
         stepsState.steps.forEachIndexed { index, step ->
             StepCard(
                 stepNumber = index + 1,
@@ -392,7 +466,7 @@ private fun StepsForm(
                 } else null,
                 onMoveDown = if (index < stepsState.steps.size - 1) {
                     { onMoveStepDown(step) }
-                } else null
+                } else null,
             )
         }
 
@@ -407,18 +481,16 @@ private fun StepsForm(
             trailingIcon = {
                 IconButton(
                     onClick = onAddStep,
-                    enabled = stepsState.input.isNotBlank()
+                    enabled = stepsState.input.isNotBlank(),
                 ) {
                     Icon(
                         Icons.Default.Add,
-                        contentDescription = stringResource(R.string.content_description_add_step)
+                        contentDescription = stringResource(R.string.content_description_add_step),
                     )
                 }
             },
-            keyboardActions = KeyboardActions(
-                onDone = { onAddStep() }
-            ),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
+            keyboardActions = KeyboardActions(onDone = { onAddStep() }),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
         )
     }
 }
@@ -426,14 +498,11 @@ private fun StepsForm(
 @Composable
 private fun TagsForm(
     tags: TagsFields,
-    onTagInputChange: (String) -> Unit = {},
-    onAddTag: (String) -> Unit = {},
-    onRemoveTag: (Tag) -> Unit = {},
+    onTagInputChange: (String) -> Unit,
+    onAddTag: (String) -> Unit,
+    onRemoveTag: (Tag) -> Unit,
 ) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Tags Section
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SectionHeader(title = stringResource(R.string.section_tags))
 
         AutocompleteInput(
@@ -443,13 +512,13 @@ private fun TagsForm(
             onSuggestionClick = onAddTag,
             onEnterPressed = { onAddTag(tags.input) },
             label = stringResource(R.string.label_add_tags),
-            placeholder = stringResource(R.string.placeholder_add_tags)
+            placeholder = stringResource(R.string.placeholder_add_tags),
         )
 
         ChipGroup(
             items = tags.selectedTags,
             onRemove = onRemoveTag,
-            displayText = { it.displayName }
+            displayText = { it.displayName },
         )
     }
 }
@@ -457,14 +526,11 @@ private fun TagsForm(
 @Composable
 private fun LabelsForm(
     labels: LabelsFields,
-    onLabelInputChange: (String) -> Unit = {},
-    onAddLabel: (String) -> Unit = {},
-    onRemoveLabel: (Label) -> Unit = {},
+    onLabelInputChange: (String) -> Unit,
+    onAddLabel: (String) -> Unit,
+    onRemoveLabel: (Label) -> Unit,
 ) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Labels Section
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SectionHeader(title = stringResource(R.string.section_labels))
 
         AutocompleteInput(
@@ -474,13 +540,13 @@ private fun LabelsForm(
             onSuggestionClick = onAddLabel,
             onEnterPressed = { onAddLabel(labels.input) },
             label = stringResource(R.string.label_add_labels),
-            placeholder = stringResource(R.string.placeholder_add_labels)
+            placeholder = stringResource(R.string.placeholder_add_labels),
         )
 
         ChipGroup(
             items = labels.selectedLabels,
             onRemove = onRemoveLabel,
-            displayText = { it.displayName }
+            displayText = { it.displayName },
         )
     }
 }
@@ -490,20 +556,21 @@ private fun SectionHeader(title: String) {
     Text(
         text = title,
         style = MaterialTheme.typography.titleLarge,
-        color = MaterialTheme.colorScheme.primary
+        color = MaterialTheme.colorScheme.primary,
     )
 }
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun IngredientChips(
     ingredients: List<RecipeIngredient>,
-    onRemove: (RecipeIngredient) -> Unit = {}
+    onRemove: (RecipeIngredient) -> Unit,
 ) {
     if (ingredients.isEmpty()) return
 
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         ingredients.forEach { ingredient ->
             FilterChip(
@@ -515,22 +582,22 @@ private fun IngredientChips(
                             R.string.ingredient_display_format,
                             ingredient.quantity,
                             ingredient.unit,
-                            ingredient.ingredientDisplayName
+                            ingredient.ingredientDisplayName,
                         )
                     )
                 },
                 trailingIcon = {
                     IconButton(
                         onClick = { onRemove(ingredient) },
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(18.dp),
                     ) {
                         Icon(
                             Icons.Default.Close,
                             contentDescription = stringResource(R.string.content_description_remove),
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(16.dp),
                         )
                     }
-                }
+                },
             )
         }
     }
@@ -540,21 +607,21 @@ private fun IngredientChips(
 @Composable
 private fun <T> ChipGroup(
     items: List<T>,
-    onRemove: (T) -> Unit = {},
-    displayText: (T) -> String
+    onRemove: (T) -> Unit,
+    displayText: (T) -> String,
 ) {
     if (items.isEmpty()) {
         Text(
             text = stringResource(R.string.no_items_added),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         return
     }
 
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items.forEach { item ->
             FilterChip(
@@ -564,79 +631,16 @@ private fun <T> ChipGroup(
                 trailingIcon = {
                     IconButton(
                         onClick = { onRemove(item) },
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(18.dp),
                     ) {
                         Icon(
                             Icons.Default.Close,
                             contentDescription = stringResource(R.string.content_description_remove),
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(16.dp),
                         )
                     }
-                }
+                },
             )
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun CoreRecipeFormPreview() {
-    ChefAITheme {
-        CoreRecipeForm(
-            recipeState = RecipeFields(
-                title = "Delicious Pancakes",
-                description = "Fluffy and delicious pancakes, perfect for breakfast.",
-                prepTimeMinutes = "10",
-                cookTimeMinutes = "15",
-                servings = "4",
-                externalUrl = "http://example.com"
-            )
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun IngredientsFormPreview() {
-    ChefAITheme {
-        IngredientsForm(
-            ingredientsState = IngredientsFields(
-                input = "Salt",
-                quantity = "1",
-                unit = "tsp",
-                selectedIngredients = carbonaraIngredients,
-                suggestions = listOf("Salt", "Sea Salt", "Kosher Salt")
-            )
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun StepsFormPreview() {
-    ChefAITheme {
-        StepsForm(
-            stepsState = StepsFields(
-                input = "New step",
-                steps = carbonaraSteps
-            )
-        )
-    }
-}
-
-
-@Preview(showBackground = true)
-@Composable
-fun ActionBarWithSaveButtonDisabledPreview() {
-    ChefAITheme {
-        ActionBar()
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun ActionBarWithSaveButtonSavingPreview() {
-    ChefAITheme {
-        ActionBar(savingState = true)
     }
 }

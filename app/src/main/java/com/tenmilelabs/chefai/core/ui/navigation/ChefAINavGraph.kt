@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.core.ui.navigation
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Row
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -28,10 +29,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.NavType
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.createGraph
 import androidx.window.core.layout.WindowSizeClass
+import androidx.navigation.navArgument
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.ui.LoginScreen
 import com.tenmilelabs.chefai.auth.ui.RegisterScreen
@@ -44,8 +47,8 @@ import com.tenmilelabs.chefai.mealplans.ui.create.WizardAdvancedScreen
 import com.tenmilelabs.chefai.mealplans.ui.create.WizardBasicsScreen
 import com.tenmilelabs.chefai.mealplans.ui.create.WizardPreferencesScreen
 import com.tenmilelabs.chefai.recipes.ui.RecipesScreen
-import com.tenmilelabs.chefai.recipes.ui.create.CreateRecipeScreen
 import com.tenmilelabs.chefai.recipes.ui.details.RecipeDetailsScreen
+import com.tenmilelabs.chefai.recipes.ui.editor.RecipeEditorScreen
 import timber.log.Timber
 
 @Composable
@@ -57,6 +60,7 @@ fun ChefAINavGraph(
     }
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    val backPressedDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
 
     // Home is always the start destination (anonymous-first model).
     // Login/Register are available via profile menu or settings.
@@ -167,13 +171,26 @@ fun ChefAINavGraph(
         composable(
             route = AppDestinations.RECIPE_DETAILS.route,
         ) {
-            RecipeDetailsScreen(snackbarHostState = snackbarHostState)
+            RecipeDetailsScreen(
+                snackbarHostState = snackbarHostState,
+                onEditClick = { recipeId ->
+                    navActions.navigateToEditRecipe(recipeId)
+                },
+            )
         }
-        composable(route = AppDestinations.CREATE_RECIPE.route) {
-            CreateRecipeScreen(
+        composable(
+            route = AppDestinations.RECIPE_EDITOR.route,
+            arguments = listOf(
+                navArgument(AppDestinationArgs.RECIPE_ID_ARG) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            ),
+        ) {
+            RecipeEditorScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onRecipeCreated = { navController.popBackStack() },
-                snackbarHostState= snackbarHostState
+                snackbarHostState = snackbarHostState,
             )
         }
         composable(route = AppDestinations.LOGIN.route) {
@@ -253,7 +270,14 @@ fun ChefAINavGraph(
                 ChefAITopAppBar(
                     titleRes,
                     onNavigationClick = if (!isTopLevelDestination) {
-                        { navController.popBackStack() }
+                        {
+                            // Route through the system back dispatcher rather than
+                            // popping directly, so screens with their own BackHandler
+                            // (e.g. RecipeEditorScreen's unsaved-changes check) get a
+                            // chance to intercept before the back stack is popped.
+                            backPressedDispatcher?.onBackPressed()
+                                ?: navController.popBackStack()
+                        }
                     } else {
                         null
                     },

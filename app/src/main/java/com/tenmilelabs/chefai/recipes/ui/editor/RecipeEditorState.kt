@@ -6,11 +6,6 @@ import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
 import com.tenmilelabs.chefai.recipes.domain.model.EditorMode
 import com.tenmilelabs.chefai.recipes.domain.model.RecipeDraft
-import com.tenmilelabs.chefai.recipes.ui.create.IngredientsFields
-import com.tenmilelabs.chefai.recipes.ui.create.LabelsFields
-import com.tenmilelabs.chefai.recipes.ui.create.RecipeFields
-import com.tenmilelabs.chefai.recipes.ui.create.StepsFields
-import com.tenmilelabs.chefai.recipes.ui.create.TagsFields
 import java.util.UUID
 
 /**

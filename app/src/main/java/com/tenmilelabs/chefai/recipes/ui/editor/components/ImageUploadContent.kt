@@ -1,4 +1,4 @@
-package com.tenmilelabs.chefai.recipes.ui.create.components
+package com.tenmilelabs.chefai.recipes.ui.editor.components
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement

@@ -17,6 +17,7 @@ internal object ScreenBaseRoutes {
     const val RECIPES = "recipes_screen"
     const val RECIPE_DETAILS = "recipe_details_screen"
     const val CREATE_RECIPE = "create_recipe_screen"
+    const val RECIPE_EDITOR = "recipe_editor_screen"
     const val SETTINGS = "settings_screen"
     const val LOGIN = "login_screen"
     const val REGISTER = "register_screen"
@@ -51,6 +52,10 @@ enum class AppDestinations(
         "${ScreenBaseRoutes.RECIPE_DETAILS}/{$RECIPE_ID_ARG}"
     ),
     CREATE_RECIPE(R.string.app_dest_title_create_recipe, ScreenBaseRoutes.CREATE_RECIPE),
+    RECIPE_EDITOR(
+        R.string.app_dest_title_recipe_editor,
+        "${ScreenBaseRoutes.RECIPE_EDITOR}?${RECIPE_ID_ARG}={${RECIPE_ID_ARG}}"
+    ),
     MEAL_PLAN_DETAIL(
         R.string.app_dest_title_meal_plan_detail,
         "${ScreenBaseRoutes.MEAL_PLAN_DETAIL}/{$MEAL_PLAN_ID_ARG}"
@@ -75,7 +80,11 @@ class NavigationActions(private val navController: NavHostController) {
     }
 
     fun navigateToCreateRecipe() {
-        navController.navigate(ScreenBaseRoutes.CREATE_RECIPE)
+        navController.navigate(ScreenBaseRoutes.RECIPE_EDITOR)
+    }
+
+    fun navigateToEditRecipe(recipeId: UUID) {
+        navController.navigate("${ScreenBaseRoutes.RECIPE_EDITOR}?${RECIPE_ID_ARG}=$recipeId")
     }
 
     fun navigateToLogin() {
