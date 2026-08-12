@@ -61,7 +61,7 @@ import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
 import com.tenmilelabs.chefai.core.util.LoadingContent
 import com.tenmilelabs.chefai.recipes.domain.model.EditorMode
-import com.tenmilelabs.chefai.recipes.ui.editor.components.DeleteConfirmationDialog
+import com.tenmilelabs.chefai.recipes.ui.components.DeleteConfirmationDialog
 import com.tenmilelabs.chefai.recipes.ui.editor.components.UnsavedChangesDialog
 import com.tenmilelabs.chefai.recipes.ui.editor.components.AutocompleteInput
 import com.tenmilelabs.chefai.recipes.ui.editor.components.ImageUploadContent

@@ -14,6 +14,7 @@ import com.tenmilelabs.chefai.core.util.WhileUiSubscribed
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,8 +23,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import java.util.UUID
 import javax.inject.Inject
 
@@ -32,12 +35,24 @@ data class RecipesDetailsUiState(
     val isLoading: Boolean = false,
     val isBookmarked: Boolean = false,
     val userMessage: Int? = null,
+    val showDeleteConfirmation: Boolean = false,
+    val isDeleting: Boolean = false,
+)
+
+/** One-shot side effects emitted by [RecipeDetailsViewModel], consumed by the UI. */
+sealed interface RecipeDetailsEffect {
+    data object RecipeDeleted : RecipeDetailsEffect
+}
+
+private data class DeleteUiState(
+    val showConfirmation: Boolean = false,
+    val isDeleting: Boolean = false,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class RecipeDetailsViewModel @Inject constructor(
-    recipesRepository: RecipesRepository,
+    private val recipesRepository: RecipesRepository,
     private val collectionsRepository: CollectionsRepository,
     private val sessionManager: SessionManager,
     savedStateHandle: SavedStateHandle,
@@ -47,6 +62,20 @@ class RecipeDetailsViewModel @Inject constructor(
 
     private val _isLoading = MutableStateFlow(false)
     private val _userMessage: MutableStateFlow<Int?> = MutableStateFlow(null)
+    private val _deleteUi = MutableStateFlow(DeleteUiState())
+
+    /**
+     * Set right before the soft-delete write, ahead of the repository call completing. Once true,
+     * a null emission from [_recipeAsync] is our own delete taking effect (Room's `deletedAt IS
+     * NULL` filter dropping the row), not a load failure — the combine below reads this to avoid
+     * flashing the "recipe not found" error while [RecipeDetailsEffect.RecipeDeleted] navigates
+     * the screen away.
+     */
+    private val _isDeleted = MutableStateFlow(false)
+
+    private val _effects = Channel<RecipeDetailsEffect>(Channel.BUFFERED)
+    val effects: Flow<RecipeDetailsEffect> = _effects.receiveAsFlow()
+
     private val _recipeAsync: Flow<Async<Recipe>> = recipesRepository.getRecipeStream(recipeUuid)
         .map {
             if (it != null) {
@@ -68,15 +97,19 @@ class RecipeDetailsViewModel @Inject constructor(
         }
 
     val uiState: StateFlow<RecipesDetailsUiState> = combine(
-        _isLoading, _recipeAsync, _userMessage, _isBookmarked
-    ) { isLoading, recipeAsync, userMessage, isBookmarked ->
+        _isLoading, _recipeAsync, _userMessage, _isBookmarked, _deleteUi
+    ) { isLoading, recipeAsync, userMessage, isBookmarked, deleteUi ->
         when (recipeAsync) {
             Async.Loading -> {
                 RecipesDetailsUiState(isLoading = true)
             }
 
             is Async.Error -> {
-                RecipesDetailsUiState(userMessage = recipeAsync.errorMessage)
+                if (_isDeleted.value) {
+                    RecipesDetailsUiState(isLoading = true, isDeleting = deleteUi.isDeleting)
+                } else {
+                    RecipesDetailsUiState(userMessage = recipeAsync.errorMessage)
+                }
             }
 
             is Async.Success -> {
@@ -84,6 +117,9 @@ class RecipeDetailsViewModel @Inject constructor(
                     recipe = recipeAsync.data,
                     isLoading = isLoading,
                     isBookmarked = isBookmarked,
+                    userMessage = userMessage,
+                    showDeleteConfirmation = deleteUi.showConfirmation,
+                    isDeleting = deleteUi.isDeleting,
                 )
             }
         }
@@ -105,6 +141,29 @@ class RecipeDetailsViewModel @Inject constructor(
                 collectionsRepository.removeBookmark(userId, recipeUuid)
             } else {
                 collectionsRepository.addBookmark(userId, recipeUuid)
+            }
+        }
+    }
+
+    fun onDeleteClick() {
+        _deleteUi.value = _deleteUi.value.copy(showConfirmation = true)
+    }
+
+    fun dismissDeleteDialog() {
+        _deleteUi.value = _deleteUi.value.copy(showConfirmation = false)
+    }
+
+    fun confirmDelete() {
+        _isDeleted.value = true
+        _deleteUi.value = DeleteUiState(showConfirmation = false, isDeleting = true)
+        viewModelScope.launch {
+            try {
+                recipesRepository.softDeleteRecipe(recipeUuid)
+                _effects.send(RecipeDetailsEffect.RecipeDeleted)
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to delete recipe")
+                _deleteUi.value = DeleteUiState(isDeleting = false)
+                _userMessage.value = R.string.delete_recipe_error
             }
         }
     }

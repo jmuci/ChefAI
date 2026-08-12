@@ -130,6 +130,8 @@
     <string name="delete_recipe_button">Delete</string>
     <string name="delete_recipe_confirmation_title">Delete Recipe</string>
     <string name="delete_recipe_confirmation_message">Are you sure you want to delete this recipe? This action cannot be undone.</string>
+    <string name="recipe_deleted">Recipe deleted</string>
+    <string name="delete_recipe_error">Couldn\'t delete recipe</string>
     <string name="cancel_button">Cancel</string>
     <string name="edit_button">Edit</string>
 

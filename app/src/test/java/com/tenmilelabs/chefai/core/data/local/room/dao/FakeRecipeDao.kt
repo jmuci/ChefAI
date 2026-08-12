@@ -97,7 +97,7 @@ class FakeRecipeDao : RecipeDao {
     }
 
     override fun observeAllRecipesForUser(creatorId: UUID): Flow<List<RecipeEntity>> {
-        return trigger.map { recipes.values.filter { it.creatorId == creatorId } }
+        return trigger.map { recipes.values.filter { it.creatorId == creatorId && it.deletedAt == null } }
     }
 
     override fun observeIngredientsForRecipe(recipeId: UUID): Flow<List<RecipeIngredient>> {
@@ -127,34 +127,42 @@ class FakeRecipeDao : RecipeDao {
     override fun observeRecipeById(uuid: UUID): Flow<RecipeEntity?> = trigger.map { recipes[uuid] }
 
     override suspend fun getRecipeWithDetails(uuid: UUID): RecipeWithDetails? {
-        return recipes[uuid]?.let { assembleRecipeWithDetails(it) }
+        return recipes[uuid]?.takeIf { it.deletedAt == null }?.let { assembleRecipeWithDetails(it) }
     }
 
     override fun observeRecipeWithDetails(uuid: UUID): Flow<RecipeWithDetails?> {
-        return trigger.map { recipes[uuid]?.let { assembleRecipeWithDetails(it) } }
+        return trigger.map { recipes[uuid]?.takeIf { it.deletedAt == null }?.let { assembleRecipeWithDetails(it) } }
     }
 
     override fun observeRecipesWithDetails(): Flow<List<RecipeWithDetails>> {
-        return trigger.map { recipes.values.map { assembleRecipeWithDetails(it) } }
+        return trigger.map { recipes.values.filter { it.deletedAt == null }.map { assembleRecipeWithDetails(it) } }
     }
 
     override fun observeRecipesWithDetailsForUser(creatorId: UUID): Flow<List<RecipeWithDetails>> {
-        return trigger.map { recipes.values.filter { it.creatorId == creatorId }.map { assembleRecipeWithDetails(it) } }
+        return trigger.map {
+            recipes.values
+                .filter { it.creatorId == creatorId && it.deletedAt == null }
+                .map { assembleRecipeWithDetails(it) }
+        }
     }
 
     override fun observePublicRecipesWithDetails(): Flow<List<RecipeWithDetails>> {
-        return trigger.map { recipes.values.filter { it.privacy == RecipePrivacy.PUBLIC }.map { assembleRecipeWithDetails(it) } }
+        return trigger.map {
+            recipes.values
+                .filter { it.privacy == RecipePrivacy.PUBLIC && it.deletedAt == null }
+                .map { assembleRecipeWithDetails(it) }
+        }
     }
 
     override suspend fun getRecipeWithTags(uuid: UUID): RecipeWithTags? {
-        val recipe = recipes[uuid] ?: return null
+        val recipe = recipes[uuid]?.takeIf { it.deletedAt == null } ?: return null
         val tagIds = recipeTags.filter { it.recipeId == uuid }.map { it.tagId }
         return RecipeWithTags(recipe, tags.values.filter { it.uuid in tagIds })
     }
 
     override fun observeRecipesWithTags(): Flow<List<RecipeWithTags>> {
         return trigger.map {
-            recipes.values.map { recipe ->
+            recipes.values.filter { it.deletedAt == null }.map { recipe ->
                 val tagIds = recipeTags.filter { it.recipeId == recipe.uuid }.map { it.tagId }
                 RecipeWithTags(recipe, tags.values.filter { it.uuid in tagIds })
             }
@@ -162,14 +170,14 @@ class FakeRecipeDao : RecipeDao {
     }
 
     override suspend fun getRecipeWithLabels(uuid: UUID): RecipeWithLabels? {
-        val recipe = recipes[uuid] ?: return null
+        val recipe = recipes[uuid]?.takeIf { it.deletedAt == null } ?: return null
         val labelIds = recipeLabels.filter { it.recipeId == uuid }.map { it.labelId }
         return RecipeWithLabels(recipe, labels.values.filter { it.uuid in labelIds })
     }
 
     override fun observeRecipesWithLabels(): Flow<List<RecipeWithLabels>> {
         return trigger.map {
-            recipes.values.map { recipe ->
+            recipes.values.filter { it.deletedAt == null }.map { recipe ->
                 val labelIds = recipeLabels.filter { it.recipeId == recipe.uuid }.map { it.labelId }
                 RecipeWithLabels(recipe, labels.values.filter { it.uuid in labelIds })
             }
@@ -261,6 +269,6 @@ class FakeRecipeDao : RecipeDao {
     }
 
     override suspend fun countRecipesForUser(creatorId: UUID): Int {
-        return recipes.values.count { it.creatorId == creatorId }
+        return recipes.values.count { it.creatorId == creatorId && it.deletedAt == null }
     }
 }

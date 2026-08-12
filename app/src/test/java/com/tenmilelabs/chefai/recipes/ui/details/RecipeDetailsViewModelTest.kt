@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.recipes.ui.details
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import app.cash.turbine.turbineScope
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.collections.data.repository.FakeCollectionsRepository
@@ -199,6 +200,129 @@ class RecipeDetailsViewModelTest {
             assertThat(awaitItem().isBookmarked).isFalse()
 
             cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onDeleteClick - shows the confirmation dialog`() = runTest {
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+            assertThat(awaitItem().showDeleteConfirmation).isFalse()
+
+            viewModel.onDeleteClick()
+            assertThat(awaitItem().showDeleteConfirmation).isTrue()
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `dismissDeleteDialog - hides the dialog without deleting`() = runTest {
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+            awaitItem() // initial success state
+            viewModel.onDeleteClick()
+            assertThat(awaitItem().showDeleteConfirmation).isTrue()
+
+            viewModel.dismissDeleteDialog()
+            assertThat(awaitItem().showDeleteConfirmation).isFalse()
+
+            cancelAndConsumeRemainingEvents()
+        }
+        assertThat(recipesRepository.lastSoftDeletedId).isNull()
+    }
+
+    @Test
+    fun `confirmDelete - success - calls repository and emits RecipeDeleted`() = runTest {
+        initializeViewModel()
+
+        turbineScope {
+            val states = viewModel.uiState.testIn(backgroundScope)
+            val effects = viewModel.effects.testIn(backgroundScope)
+
+            assertThat(states.awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+            assertThat(states.awaitItem().recipe).isEqualTo(recipe1)
+
+            viewModel.confirmDelete()
+
+            val deletingState = states.awaitItem()
+            assertThat(deletingState.isDeleting).isTrue()
+            assertThat(deletingState.showDeleteConfirmation).isFalse()
+
+            // The recipe stream emits null once the delete lands (T1's filter); the T4 guard
+            // replaces that with a neutral loading state instead of the "not found" error.
+            val guardedState = states.awaitItem()
+            assertThat(guardedState.recipe).isNull()
+            assertThat(guardedState.userMessage).isNotEqualTo(R.string.loading_recipe_details_error)
+
+            assertThat(effects.awaitItem()).isEqualTo(RecipeDetailsEffect.RecipeDeleted)
+        }
+
+        assertThat(recipesRepository.lastSoftDeletedId).isEqualTo(recipeId1)
+    }
+
+    @Test
+    fun `confirmDelete - failure - no effect emitted, isDeleting cleared, error message shown`() = runTest {
+        recipesRepository.setShouldReturnErrorForSoftDelete(true)
+        initializeViewModel()
+
+        turbineScope {
+            val states = viewModel.uiState.testIn(backgroundScope)
+            val effects = viewModel.effects.testIn(backgroundScope)
+
+            assertThat(states.awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+            assertThat(states.awaitItem().recipe).isEqualTo(recipe1)
+
+            viewModel.confirmDelete()
+
+            // _deleteUi and _userMessage are separate StateFlows, both cleared in the catch
+            // block via two sequential assignments — that can surface as either one combined
+            // emission or two, so drain until both land rather than assuming an exact count.
+            var failedState = states.awaitItem()
+            while (failedState.isDeleting || failedState.userMessage != R.string.delete_recipe_error) {
+                failedState = states.awaitItem()
+            }
+            assertThat(failedState.recipe).isEqualTo(recipe1) // recipe still shown, delete failed
+
+            effects.expectNoEvents()
+        }
+    }
+
+    @Test
+    fun `confirmDelete - recipe stream emitting null afterward does not surface the load error`() = runTest {
+        initializeViewModel()
+
+        turbineScope {
+            val states = viewModel.uiState.testIn(backgroundScope)
+            val effects = viewModel.effects.testIn(backgroundScope)
+
+            assertThat(states.awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+            assertThat(states.awaitItem().recipe).isEqualTo(recipe1)
+
+            viewModel.confirmDelete() // FakeRecipesRepository emits null on this recipe's flow
+
+            // Every state observed from here on must never carry the generic load-failure message —
+            // this is the T4 race: getRecipeStream(recipeUuid) emitting null because *we* deleted it
+            // must not be confused with a genuine load failure. Drain until the null emission has
+            // actually landed (recipe == null), not just until isDeleting flips (that happens
+            // synchronously, before the race this test targets even occurs).
+            var sawNullRecipe = false
+            while (!sawNullRecipe) {
+                val state = states.awaitItem()
+                assertThat(state.userMessage).isNotEqualTo(R.string.loading_recipe_details_error)
+                sawNullRecipe = state.recipe == null
+            }
+
+            assertThat(effects.awaitItem()).isEqualTo(RecipeDetailsEffect.RecipeDeleted)
         }
     }
 }

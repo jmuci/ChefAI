@@ -9,8 +9,11 @@ import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.UserEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
+import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import junit.framework.TestCase.assertEquals
 import junit.framework.TestCase.assertNotNull
+import junit.framework.TestCase.assertNull
+import junit.framework.TestCase.assertTrue
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -150,5 +153,77 @@ class RecipeDaoTest {
         val recipeWithDetails = database.recipeDao().getRecipeWithDetails(recipe1.uuid)
         assertEquals(null, loadedRecipe)
         assertEquals(null, recipeWithDetails)
+    }
+
+    @Test
+    fun softDelete_removesRecipeFromObserveRecipesWithDetails() = runTest {
+        // GIVEN - two recipes exist
+        database.recipeDao().upsertRecipe(recipe1)
+        database.recipeDao().upsertRecipe(recipe2)
+
+        // WHEN - recipe1 is soft-deleted
+        database.recipeDao().softDelete(recipe1.uuid, System.currentTimeMillis())
+
+        // THEN - only recipe2 remains in the details stream
+        val recipes = database.recipeDao().observeRecipesWithDetails().first()
+        assertEquals(1, recipes.size)
+        assertEquals(recipe2.uuid, recipes.first().recipe.uuid)
+    }
+
+    @Test
+    fun softDelete_causesObserveRecipeWithDetailsToEmitNull() = runTest {
+        // GIVEN - a recipe exists
+        database.recipeDao().upsertRecipe(recipe1)
+
+        // WHEN - it is soft-deleted
+        database.recipeDao().softDelete(recipe1.uuid, System.currentTimeMillis())
+
+        // THEN - the single-recipe details stream now emits null, as if it doesn't exist
+        val details = database.recipeDao().observeRecipeWithDetails(recipe1.uuid).first()
+        assertNull(details)
+    }
+
+    @Test
+    fun softDelete_getRecipeByIdStillReturnsTheTombstone() = runTest {
+        // GIVEN - a recipe exists
+        database.recipeDao().upsertRecipe(recipe1)
+
+        // WHEN - it is soft-deleted
+        val deletedAt = System.currentTimeMillis()
+        database.recipeDao().softDelete(recipe1.uuid, deletedAt)
+
+        // THEN - getRecipeById (used by sync as an existence check) still returns the row,
+        // marked DELETED — sync must never treat a tombstone as "not found".
+        val entity = database.recipeDao().getRecipeById(recipe1.uuid)
+        assertNotNull(entity)
+        assertEquals(deletedAt, entity?.deletedAt)
+        assertEquals(SyncState.DELETED, entity?.syncState)
+    }
+
+    @Test
+    fun softDelete_recipeStillAppearsInGetAllDirty() = runTest {
+        // GIVEN - a recipe exists
+        database.recipeDao().upsertRecipe(recipe1)
+
+        // WHEN - it is soft-deleted
+        database.recipeDao().softDelete(recipe1.uuid, System.currentTimeMillis())
+
+        // THEN - it still appears in getAllDirty, which is how the delete gets pushed to the backend
+        val dirty = database.recipeDao().getAllDirty()
+        assertTrue(dirty.any { it.uuid == recipe1.uuid && it.syncState == SyncState.DELETED })
+    }
+
+    @Test
+    fun softDelete_decrementsCountRecipesForUser() = runTest {
+        // GIVEN - two recipes for the same user
+        database.recipeDao().upsertRecipe(recipe1)
+        database.recipeDao().upsertRecipe(recipe2)
+        assertEquals(2, database.recipeDao().countRecipesForUser(testUser.uuid))
+
+        // WHEN - one is soft-deleted
+        database.recipeDao().softDelete(recipe1.uuid, System.currentTimeMillis())
+
+        // THEN - the count drops by one
+        assertEquals(1, database.recipeDao().countRecipesForUser(testUser.uuid))
     }
 }

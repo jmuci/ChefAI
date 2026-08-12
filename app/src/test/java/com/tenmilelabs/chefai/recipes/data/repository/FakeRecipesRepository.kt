@@ -32,6 +32,13 @@ class FakeRecipesRepository : RecipesRepository {
         private set
     var lastSoftDeletedId: UUID? = null
         private set
+    private var shouldReturnErrorForSoftDelete = false
+    private var exceptionForSoftDelete: Exception? = null
+
+    fun setShouldReturnErrorForSoftDelete(value: Boolean, exception: Exception? = null) {
+        shouldReturnErrorForSoftDelete = value
+        this.exceptionForSoftDelete = exception ?: Exception("Test repository error for softDeleteRecipe")
+    }
 
     fun setRecipesToEmit(recipes: List<Recipe>) {
         recipesListFlow.tryEmit(recipes)
@@ -147,8 +154,14 @@ class FakeRecipesRepository : RecipesRepository {
     }
 
     override suspend fun softDeleteRecipe(recipeId: UUID) {
+        if (shouldReturnErrorForSoftDelete) {
+            throw (exceptionForSoftDelete ?: Exception("Configured repository error"))
+        }
         lastSoftDeletedId = recipeId
         storedRecipes.remove(recipeId)
+        // Mirror what Room does after the delete-filter change: the detail stream for this
+        // recipe now emits null, as if the row no longer exists.
+        getFlowForRecipe(recipeId).tryEmit(null)
     }
 
     override fun getRecipePreviewsByIds(ids: List<UUID>): Flow<List<RecipePreview>> {

@@ -19,7 +19,7 @@ import java.util.UUID
 @Dao
 interface RecipeDao {
 
-    @Query("SELECT * FROM recipes WHERE creatorId = :creatorId")
+    @Query("SELECT * FROM recipes WHERE creatorId = :creatorId AND deletedAt IS NULL")
     fun observeAllRecipesForUser(creatorId: UUID): Flow<List<RecipeEntity>>
 
     @Query("""
@@ -46,39 +46,39 @@ interface RecipeDao {
     fun observeRecipeById(uuid: UUID): Flow<RecipeEntity?>
 
     @Transaction
-    @Query("SELECT * FROM recipes WHERE uuid = :uuid")
+    @Query("SELECT * FROM recipes WHERE uuid = :uuid AND deletedAt IS NULL")
     suspend fun getRecipeWithDetails(uuid: UUID): RecipeWithDetails?
 
     @Transaction
-    @Query("SELECT * FROM recipes WHERE uuid = :uuid")
+    @Query("SELECT * FROM recipes WHERE uuid = :uuid AND deletedAt IS NULL")
     fun observeRecipeWithDetails(uuid: UUID): Flow<RecipeWithDetails?>
 
     @Transaction
-    @Query("SELECT * FROM recipes")
+    @Query("SELECT * FROM recipes WHERE deletedAt IS NULL")
     fun observeRecipesWithDetails(): Flow<List<RecipeWithDetails>>
 
     @Transaction
-    @Query("SELECT * FROM recipes WHERE creatorId = :creatorId")
+    @Query("SELECT * FROM recipes WHERE creatorId = :creatorId AND deletedAt IS NULL")
     fun observeRecipesWithDetailsForUser(creatorId: UUID): Flow<List<RecipeWithDetails>>
 
     @Transaction
-    @Query("SELECT * FROM recipes WHERE privacy = 'PUBLIC'")
+    @Query("SELECT * FROM recipes WHERE privacy = 'PUBLIC' AND deletedAt IS NULL")
     fun observePublicRecipesWithDetails(): Flow<List<RecipeWithDetails>>
 
     @Transaction
-    @Query("SELECT * FROM recipes WHERE uuid = :uuid")
+    @Query("SELECT * FROM recipes WHERE uuid = :uuid AND deletedAt IS NULL")
     suspend fun getRecipeWithTags(uuid: UUID): RecipeWithTags?
 
     @Transaction
-    @Query("SELECT * FROM recipes")
+    @Query("SELECT * FROM recipes WHERE deletedAt IS NULL")
     fun observeRecipesWithTags(): Flow<List<RecipeWithTags>>
 
     @Transaction
-    @Query("SELECT * FROM recipes WHERE uuid = :uuid")
+    @Query("SELECT * FROM recipes WHERE uuid = :uuid AND deletedAt IS NULL")
     suspend fun getRecipeWithLabels(uuid: UUID): RecipeWithLabels?
 
     @Transaction
-    @Query("SELECT * FROM recipes")
+    @Query("SELECT * FROM recipes WHERE deletedAt IS NULL")
     fun observeRecipesWithLabels(): Flow<List<RecipeWithLabels>>
 
     @Query("DELETE FROM recipes WHERE uuid = :uuid")
@@ -116,7 +116,7 @@ interface RecipeDao {
     @Query("SELECT uuid FROM recipes WHERE creatorId = :creatorId")
     suspend fun getRecipeIdsForUser(creatorId: UUID): List<UUID>
 
-    @Query("SELECT COUNT(*) FROM recipes WHERE creatorId = :creatorId")
+    @Query("SELECT COUNT(*) FROM recipes WHERE creatorId = :creatorId AND deletedAt IS NULL")
     suspend fun countRecipesForUser(creatorId: UUID): Int
 
 }

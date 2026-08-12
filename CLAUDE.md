@@ -174,7 +174,8 @@ After completing any code change (bug fix, feature, refactor), always run the un
 | Meal Plans — Android sync wiring | Not started — extend `SyncOrchestrator` + `SyncDtos`         |
 | Conflict resolution | SyncState.CONFLICT defined but unused                                     |
 | RecipesViewModel user wiring | Hardcoded test UUID, needs real user from SessionManager           |
-| Recipe URL import | Done — paste a URL, scrape via `:recipe-scraper` (JSON-LD/microdata), pre-fill the editor. No per-site scrapers, no nutrition data, no image download. Share-target intent (T14) not started — optional follow-up. |
+| Recipe URL import | Done — paste a URL, scrape via `:recipe-scraper` (JSON-LD/microdata), pre-fill the editor. No per-site scrapers, no nutrition data, no image download. Share-target intent (T14) done (#126). |
+| Recipe delete | Done — soft delete via a button on the recipe details screen. No undo, no list swipe-to-delete, no delete from the meal-plan recipe route. |
 
 **Next milestone**: Complete all tasks to prepare for Monstro Demo
 

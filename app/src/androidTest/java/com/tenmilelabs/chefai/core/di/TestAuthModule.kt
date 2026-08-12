@@ -14,6 +14,7 @@ import com.tenmilelabs.chefai.mealplans.data.network.MealPlanApiService
 import com.tenmilelabs.chefai.mealplans.data.network.MealPlanNetworkDataSource
 import com.tenmilelabs.chefai.mealplans.data.repository.DefaultMealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
+import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeImporter
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeRepository
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipeImporter
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipeImporter
@@ -121,10 +122,9 @@ abstract class TestRepositoryModule {
     abstract fun bindMealPlanRepository(repository: DefaultMealPlanRepository): MealPlanRepository
 
     /**
-     * Binds the meal plan network data source (same as production — real `MealPlanApiService`,
-     * lazily constructed by Dagger and never actually called unless a test exercises meal plan
-     * generation). Was missing from this module entirely, which broke the Hilt test component for
-     * *any* `@HiltAndroidTest` class, not just ones touching meal plans.
+     * Binds the meal plan network data source (same as production) — required for Hilt's shared
+     * test component to resolve MealPlansViewModel's graph, even though this DAO test never uses it.
+     * See docs/claude/gotchas.md #21.
      */
     @Binds
     @Singleton
