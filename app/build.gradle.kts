@@ -80,6 +80,9 @@ hilt {
 
 dependencies {
 
+    // Recipe URL scraping (pure Kotlin, no Android deps)
+    implementation(project(":recipe-scraper"))
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.core)
     implementation(libs.material)

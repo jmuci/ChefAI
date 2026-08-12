@@ -21,4 +21,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "ChefAI"
 include(":app")
+include(":recipe-scraper")
  

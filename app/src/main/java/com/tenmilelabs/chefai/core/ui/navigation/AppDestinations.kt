@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.core.ui.navigation
 import androidx.annotation.StringRes
 import androidx.navigation.NavHostController
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.DRAFT_ID_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.MEAL_PLAN_ID_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.RECIPE_ID_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.ScreenBaseRoutes.RECIPE_DETAILS
@@ -18,6 +19,7 @@ internal object ScreenBaseRoutes {
     const val RECIPE_DETAILS = "recipe_details_screen"
     const val CREATE_RECIPE = "create_recipe_screen"
     const val RECIPE_EDITOR = "recipe_editor_screen"
+    const val IMPORT_RECIPE = "import_recipe_screen"
     const val SETTINGS = "settings_screen"
     const val LOGIN = "login_screen"
     const val REGISTER = "register_screen"
@@ -35,6 +37,13 @@ internal object ScreenBaseRoutes {
 object AppDestinationArgs {
     const val RECIPE_ID_ARG = "recipeUuid"
     const val MEAL_PLAN_ID_ARG = "mealPlanId"
+
+    /**
+     * Id of a pre-seeded [com.tenmilelabs.chefai.core.data.local.room.RecipeDraftEntity] the editor
+     * should open in **create** mode, used by recipe URL import. Distinct from [RECIPE_ID_ARG],
+     * which puts the editor in edit mode against an already-saved recipe.
+     */
+    const val DRAFT_ID_ARG = "draftUuid"
 }
 
 /**
@@ -54,8 +63,11 @@ enum class AppDestinations(
     CREATE_RECIPE(R.string.app_dest_title_create_recipe, ScreenBaseRoutes.CREATE_RECIPE),
     RECIPE_EDITOR(
         R.string.app_dest_title_recipe_editor,
-        "${ScreenBaseRoutes.RECIPE_EDITOR}?${RECIPE_ID_ARG}={${RECIPE_ID_ARG}}"
+        "${ScreenBaseRoutes.RECIPE_EDITOR}" +
+            "?${RECIPE_ID_ARG}={${RECIPE_ID_ARG}}" +
+            "&${DRAFT_ID_ARG}={${DRAFT_ID_ARG}}"
     ),
+    IMPORT_RECIPE(R.string.app_dest_title_import_recipe, ScreenBaseRoutes.IMPORT_RECIPE),
     MEAL_PLAN_DETAIL(
         R.string.app_dest_title_meal_plan_detail,
         "${ScreenBaseRoutes.MEAL_PLAN_DETAIL}/{$MEAL_PLAN_ID_ARG}"
@@ -85,6 +97,21 @@ class NavigationActions(private val navController: NavHostController) {
 
     fun navigateToEditRecipe(recipeId: UUID) {
         navController.navigate("${ScreenBaseRoutes.RECIPE_EDITOR}?${RECIPE_ID_ARG}=$recipeId")
+    }
+
+    fun navigateToImportRecipe() {
+        navController.navigate(ScreenBaseRoutes.IMPORT_RECIPE)
+    }
+
+    /**
+     * Opens the editor in **create** mode against an already-persisted draft — the hand-off after a
+     * recipe has been scraped from a URL. The import screen is popped so that backing out of the
+     * editor returns to the recipe list rather than to a stale URL field.
+     */
+    fun navigateToEditorWithDraft(draftId: UUID) {
+        navController.navigate("${ScreenBaseRoutes.RECIPE_EDITOR}?${DRAFT_ID_ARG}=$draftId") {
+            popUpTo(ScreenBaseRoutes.IMPORT_RECIPE) { inclusive = true }
+        }
     }
 
     fun navigateToLogin() {

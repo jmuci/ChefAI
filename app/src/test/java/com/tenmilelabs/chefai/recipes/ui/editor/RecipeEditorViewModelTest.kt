@@ -3,7 +3,10 @@ package com.tenmilelabs.chefai.recipes.ui.editor
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.collections.data.repository.FakeCollectionsRepository
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDraftDao
+import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
+import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.core.data.repository.FakeMetadataRepository
 import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
@@ -48,9 +51,11 @@ class RecipeEditorViewModelTest {
 
     private fun createViewModel(
         recipeId: String? = null,
+        draftId: String? = null,
     ): RecipeEditorViewModel {
         val savedStateHandle = SavedStateHandle().apply {
             if (recipeId != null) set(AppDestinationArgs.RECIPE_ID_ARG, recipeId)
+            if (draftId != null) set(AppDestinationArgs.DRAFT_ID_ARG, draftId)
         }
         return RecipeEditorViewModel(
             recipesRepository = recipesRepository,
@@ -85,6 +90,109 @@ class RecipeEditorViewModelTest {
         assertEquals(recipe1.uuid, (vm.mode as EditorMode.Edit).recipeId)
         vm.viewModelScope.cancel()
     }
+
+    // --- Seeded Draft (recipe URL import hand-off) ---
+
+    @Test
+    fun `draftId arg stays in create mode and adopts the draft id`() = runTest {
+        val draftId = UuidV7Generator.newId()
+
+        val vm = createViewModel(draftId = draftId.toString())
+
+        assertEquals(EditorMode.Create, vm.mode)
+        assertEquals(draftId, vm.state.value.recipeId)
+        assertFalse(vm.state.value.isLoading)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `seeded draft populates editor state and is immediately valid`() = runTest {
+        val draftId = UuidV7Generator.newId()
+        recipeDraftDao.saveDraft(completeImportedDraft(draftId).toRecipeDraftEntity())
+
+        val vm = createViewModel(draftId = draftId.toString())
+
+        val state = vm.state.value
+        assertEquals("Scraped Pancakes", state.recipeFields.title)
+        assertEquals("From a food blog", state.recipeFields.description)
+        assertEquals("5", state.recipeFields.prepTimeMinutes)
+        assertEquals("15", state.recipeFields.cookTimeMinutes)
+        assertEquals("4", state.recipeFields.servings)
+        assertEquals("https://example.com/pancakes", state.recipeFields.externalUrl)
+        assertEquals(1, state.ingredients.selectedIngredients.size)
+        assertEquals(1, state.steps.steps.size)
+        // The whole point of the import hand-off: the user can save without touching anything.
+        assertTrue(state.isFormValid)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `saving a seeded draft takes the create path not update`() = runTest {
+        val draftId = UuidV7Generator.newId()
+        recipeDraftDao.saveDraft(completeImportedDraft(draftId).toRecipeDraftEntity())
+
+        val vm = createViewModel(draftId = draftId.toString())
+        vm.dispatch(EditorAction.Save)
+
+        assertEquals("Scraped Pancakes", recipesRepository.lastCreatedRecipe?.title)
+        assertNull(recipesRepository.lastUpdatedRecipe)
+        // Source URL survives the round trip into the saved recipe.
+        assertEquals(
+            "https://example.com/pancakes",
+            recipesRepository.lastCreatedRecipe?.recipeExternalUrl,
+        )
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `malformed recipeId arg falls back to create mode instead of crashing`() = runTest {
+        val vm = createViewModel(recipeId = "not-a-uuid")
+
+        assertEquals(EditorMode.Create, vm.mode)
+        assertFalse(vm.state.value.isLoading)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `malformed draftId arg falls back to a fresh recipe id`() = runTest {
+        val vm = createViewModel(draftId = "not-a-uuid")
+
+        assertEquals(EditorMode.Create, vm.mode)
+        assertNotNull(vm.state.value.recipeId)
+        assertTrue(vm.state.value.recipeFields.title.isEmpty())
+        vm.viewModelScope.cancel()
+    }
+
+    /** Mirrors what the recipe URL importer persists before handing off to the editor. */
+    private fun completeImportedDraft(draftId: java.util.UUID) = RecipeDraft(
+        recipeId = draftId,
+        isNewRecipe = true,
+        title = "Scraped Pancakes",
+        description = "From a food blog",
+        prepTimeMinutes = "5",
+        cookTimeMinutes = "15",
+        servings = "4",
+        externalUrl = "https://example.com/pancakes",
+        ingredients = listOf(
+            RecipeIngredient(
+                ingredientId = UuidV7Generator.newId(),
+                ingredientDisplayName = "flour",
+                quantity = 2.0,
+                unit = "cup",
+                allergenName = null,
+                srcCategory = null,
+                srcSubcategory = null,
+            )
+        ),
+        steps = listOf(
+            RecipeStep(
+                uuid = UuidV7Generator.newId(),
+                orderIndex = 0,
+                instruction = "Mix everything together.",
+            )
+        ),
+        updatedAt = 1L,
+    )
 
     // --- Edit Mode Loading ---
 
