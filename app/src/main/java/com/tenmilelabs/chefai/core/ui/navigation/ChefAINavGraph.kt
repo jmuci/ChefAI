@@ -182,7 +182,12 @@ fun ChefAINavGraph(
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null
-                }
+                },
+                navArgument(AppDestinationArgs.DRAFT_ID_ARG) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
             ),
         ) {
             RecipeEditorScreen(

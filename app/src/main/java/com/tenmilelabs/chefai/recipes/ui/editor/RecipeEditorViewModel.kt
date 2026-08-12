@@ -51,16 +51,24 @@ class RecipeEditorViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val recipeIdArg: String? = savedStateHandle[AppDestinationArgs.RECIPE_ID_ARG]
-    val mode: EditorMode = if (recipeIdArg != null) {
-        EditorMode.Edit(UUID.fromString(recipeIdArg))
-    } else {
-        EditorMode.Create
-    }
+
+    /**
+     * Id of a draft seeded by another screen (recipe URL import) for this editor to adopt.
+     * Stays in **create** mode: [restoreDraftIfExists] picks the draft up on init, and saving takes
+     * the create path rather than updating an existing recipe.
+     */
+    private val draftIdArg: String? = savedStateHandle[AppDestinationArgs.DRAFT_ID_ARG]
+
+    val mode: EditorMode = recipeIdArg?.toUuidOrNull()
+        ?.let { EditorMode.Edit(it) }
+        ?: EditorMode.Create
 
     private val _state = MutableStateFlow(
         RecipeEditorState(
             mode = mode,
-            recipeId = (mode as? EditorMode.Edit)?.recipeId ?: UuidV7Generator.newId(),
+            recipeId = (mode as? EditorMode.Edit)?.recipeId
+                ?: draftIdArg?.toUuidOrNull()
+                ?: UuidV7Generator.newId(),
             isLoading = mode is EditorMode.Edit,
         )
     )
@@ -405,4 +413,16 @@ class RecipeEditorViewModel @Inject constructor(
     companion object {
         const val AUTO_SAVE_INTERVAL_MS = 10_000L
     }
+}
+
+/**
+ * Parses a nav-argument string as a UUID, returning `null` rather than throwing on malformed input.
+ * Nav args arrive as untrusted strings (deep links included), and a bad one should degrade to a
+ * blank new recipe instead of crashing the ViewModel during construction.
+ */
+private fun String.toUuidOrNull(): UUID? = try {
+    UUID.fromString(this)
+} catch (e: IllegalArgumentException) {
+    Timber.w(e, "Malformed UUID nav argument: %s", this)
+    null
 }
