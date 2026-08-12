@@ -170,4 +170,14 @@
     <string name="wizard_days_format">%1$d days</string>
     <string name="wizard_day_format">%1$d day</string>
 
+    <string name="import_recipe_title">Import Recipe</string>
+    <string name="import_recipe_url_label">Recipe URL</string>
+    <string name="import_recipe_url_placeholder">Paste a recipe link…</string>
+    <string name="import_recipe_button">Import</string>
+    <string name="import_recipe_enter_manually">Enter it manually</string>
+    <string name="import_recipe_invalid_url">That doesn\'t look like a valid link</string>
+    <string name="import_recipe_no_recipe_found">We couldn\'t find a recipe on that page</string>
+    <string name="import_recipe_network_error">Couldn\'t reach that site — check your connection</string>
+    <string name="import_recipe_parse_error">Something went wrong reading that page</string>
+
 </resources>

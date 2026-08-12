@@ -4,6 +4,7 @@ import com.tenmilelabs.chefai.auth.data.network.AuthInterceptor
 import com.tenmilelabs.chefai.auth.domain.TokenProvider
 import com.tenmilelabs.chefai.recipes.data.network.ChefAIApiService
 import com.tenmilelabs.chefai.recipes.data.network.RecipeNetworkDataSource
+import com.tenmilelabs.recipescraper.RecipeHtmlParser
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -103,4 +104,9 @@ object NetworkModule {
             header(HttpHeaders.Accept, "text/html,application/xhtml+xml")
         }
     }
+
+    /** Stateless — [RecipeHtmlParser] lives in the dependency-free `:recipe-scraper` module. */
+    @Provides
+    @Singleton
+    fun provideRecipeHtmlParser(): RecipeHtmlParser = RecipeHtmlParser()
 }

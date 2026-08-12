@@ -99,3 +99,48 @@ Hilt uses KSP. Don't add `kapt` dependencies — they'll slow the build and may 
 
 ### 16. Ktor MockEngine for network tests
 Always use `MockEngine` for testing network calls. Don't mock the repository when you can test the actual Ktor client with a fake server response.
+
+---
+
+## Recipe Import / Scraping (`:recipe-scraper`)
+
+### 17. `RecipeDraft.toRecipe()` throws on blank numeric strings
+`prepTimeMinutes`, `cookTimeMinutes`, and `servings` are `String` on `RecipeDraft` (so partial or
+invalid form input survives auto-save), but `toRecipe()` (`DraftMapper.kt`) calls bare `.toInt()` on
+them — a blank string throws `NumberFormatException`. Any code that builds a `RecipeDraft` from a
+source other than the editor's own form (e.g. `ScrapedRecipeMapper`) **must emit `"0"`, never `""`,
+for an absent numeric value**. `RecipeEditorReducer.revalidate()` also requires these three fields
+plus `description` to be non-blank for `isFormValid`, so a draft seeded with `"0"` correctly leaves
+Save disabled until the user confirms real values — it doesn't silently save a zero.
+
+### 18. The unqualified `HttpClient` carries ChefAI auth headers
+`NetworkModule.provideHttpClient()` installs `AuthInterceptor` and is injected by five API services.
+**Never point it at a third-party host** — a scraper, webhook receiver, or any code fetching a
+user-supplied URL must use the separate `@ScraperHttpClient`-qualified client (no auth interceptor,
+no content negotiation, its own timeout/retry/logging config). Don't add a qualifier to the existing
+`provideHttpClient` to "fix" this — it would break all five services that inject it unqualified; add
+a new provider alongside it instead, as `ScraperHttpClient.kt` does.
+
+### 19. Never name a package or class after a Kotlin reserved word
+`import` is a reserved keyword. A package literally named `...ui.import` (as originally planned for
+the recipe-import screens) compiles fine with plain `kotlinc`, but crashes **KSP2's
+Analysis-API-based FIR resolver** with a deeply-nested, misleading `NoClassDefFoundError:
+kotlin/reflect/full/KClasses` — thrown while KSP tries to render a debug attachment for an *earlier*
+internal failure resolving a symbol's containing declaration. It's a real toolchain bug (reproduced
+on Kotlin 2.3.0 / KSP 2.3.2), not a code-correctness issue, and it's deterministic: an **empty**
+`@HiltViewModel class Foo @Inject constructor() : ViewModel()` alone, in that package, is enough to
+trigger it. Renamed to `recipes/ui/urlimport/` and the build succeeded immediately with no other
+changes. If this exact `NoClassDefFoundError` shows up again, check package/class names against
+Kotlin's reserved-word list (`import`, `object`, `when`, `is`, `as`, `package`, …) before chasing
+Gradle daemon / cache / heap theories — those were all dead ends here.
+
+### 20. Building `:recipe-scraper` in a new worktree
+1. `local.properties` is gitignored, so a fresh `git worktree add` doesn't carry it over — every
+   `:app` Gradle task fails with "SDK location not found" until it's recreated with
+   `sdk.dir=<path to your Android SDK>`.
+2. The root `build.gradle.kts` needs `alias(libs.plugins.kotlin.multiplatform) apply false` in its
+   `plugins {}` block (already on `main`) — without it, `:recipe-scraper` applying
+   `kotlin("multiplatform")` fails with "plugin is already on the classpath with an unknown version."
+3. `recipe-scraper/build.gradle.kts` targets JVM 11 bytecode via
+   `jvm { compilerOptions { jvmTarget.set(JvmTarget.JVM_11) } }`, not `jvmToolchain(11)` — the latter
+   requires an actual JDK 11 installation, which isn't guaranteed on every machine building this.

@@ -13,6 +13,7 @@ All ADRs live in [`docs/adrs/`](../adrs/). This file is a quick-reference index.
 | 005 | [Feature-Based Packages](../adrs/adr-0005-feature-based-package-structure.md) | Nov 2025 | Feature packages over layer packages. Start in feature, move to core/ when shared. |
 | 006 | [Anonymous-First Sync](../adrs/adr-006-sync-protocol.md) | Feb 2026 | App works without login. Anonymous → Authenticated upgrade merges data. |
 | 009 | [Navigation-Scoped ViewModel for Wizards](../adrs/adr-009-navigation-scoped-viewmodel-for-wizards.md) | Mar 2026 | Multi-screen wizard flows use a nested NavGraph-scoped ViewModel; state lives exactly as long as the flow. |
+| 010 | [Client-Side Recipe URL Scraping](../adrs/adr-010-client-side-recipe-scraping.md) | Aug 2026 | Paste-a-URL import scrapes JSON-LD/microdata on-device via a new pure-Kotlin `:recipe-scraper` module; no backend endpoint, no per-site scrapers, unauthenticated `@ScraperHttpClient` prevents auth-token leakage to third-party hosts. |
 
 ## RFCs
 

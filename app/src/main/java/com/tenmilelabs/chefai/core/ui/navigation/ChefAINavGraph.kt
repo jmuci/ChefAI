@@ -49,6 +49,7 @@ import com.tenmilelabs.chefai.mealplans.ui.create.WizardPreferencesScreen
 import com.tenmilelabs.chefai.recipes.ui.RecipesScreen
 import com.tenmilelabs.chefai.recipes.ui.details.RecipeDetailsScreen
 import com.tenmilelabs.chefai.recipes.ui.editor.RecipeEditorScreen
+import com.tenmilelabs.chefai.recipes.ui.urlimport.ImportRecipeRoute
 import timber.log.Timber
 
 @Composable
@@ -198,6 +199,13 @@ fun ChefAINavGraph(
                 snackbarHostState = snackbarHostState,
             )
         }
+        composable(route = AppDestinations.IMPORT_RECIPE.route) {
+            ImportRecipeRoute(
+                onNavigateToEditorWithDraft = { draftId -> navActions.navigateToEditorWithDraft(draftId) },
+                onNavigateToManualEditor = { navActions.navigateToCreateRecipe() },
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
         composable(route = AppDestinations.LOGIN.route) {
             LoginScreen(
                 snackbarHostState = snackbarHostState,
@@ -301,6 +309,7 @@ fun ChefAINavGraph(
             )
             val hideNav = currentRoute == AppDestinations.LOGIN.route ||
                 currentRoute == AppDestinations.REGISTER.route ||
+                currentRoute == AppDestinations.IMPORT_RECIPE.route ||
                 currentRoute in wizardRoutes
             if (!hideNav && !isExpanded) {
                 BottomNavigationBar(navController)
@@ -320,8 +329,7 @@ fun ChefAINavGraph(
                         },
                         onImportRecipeClick = {
                             isFabMenuExpanded = false
-                            // TODO: Navigate to import recipe screen
-                            // navActions.navigateToImportRecipe()
+                            navActions.navigateToImportRecipe()
                         }
                     )
                 }
@@ -346,6 +354,7 @@ fun ChefAINavGraph(
         )
         val hideNav = currentRoute == AppDestinations.LOGIN.route ||
             currentRoute == AppDestinations.REGISTER.route ||
+            currentRoute == AppDestinations.IMPORT_RECIPE.route ||
             currentRoute in wizardRoutes
 
         Row(modifier = Modifier.padding(innerPadding)) {

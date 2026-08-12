@@ -15,7 +15,9 @@ import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.repository.DefaultMetadataRepository
 import com.tenmilelabs.chefai.core.domain.repository.MetadataRepository
+import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeImporter
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeRepository
+import com.tenmilelabs.chefai.recipes.domain.repository.RecipeImporter
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.Binds
 import dagger.Module
@@ -51,6 +53,10 @@ abstract class RepositoryModule {
     @Singleton
     @Binds
     abstract fun bindMealPlanNetworkDataSource(service: MealPlanApiService): MealPlanNetworkDataSource
+
+    @Singleton
+    @Binds
+    abstract fun bindRecipeImporter(importer: DefaultRecipeImporter): RecipeImporter
 }
 
 

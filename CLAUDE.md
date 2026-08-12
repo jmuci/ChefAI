@@ -52,6 +52,14 @@ Rule: start in feature package, move to `core/` only when a second feature needs
 
 See [ADR-005](docs/adrs/adr-0005-feature-based-package-structure.md) for full guidelines.
 
+### Modules
+Besides `:app`, the project has `:recipe-scraper` — a pure-Kotlin (KMP, `jvm()`-only target today)
+module with no Android/Hilt/Room/Ktor dependencies. It parses HTML into a structured recipe
+(`RecipeHtmlParser`, JSON-LD + microdata) and does no network I/O; `:app` fetches pages and maps the
+result into a `RecipeDraft`. See [ADR-010](docs/adrs/adr-010-client-side-recipe-scraping.md) and
+`recipe-scraper/README.md`. **Never name a package/class after a Kotlin reserved word** (`import`,
+`object`, `when`, …) — see `docs/claude/gotchas.md` for why.
+
 ---
 
 ## Coding Rules
@@ -156,7 +164,7 @@ After completing any code change (bug fix, feature, refactor), always run the un
 
 ---
 
-## Current Gaps (Mar 2026)
+## Current Gaps (Aug 2026)
 | Area | Status                                                                              |
 |------|-------------------------------------------------------------------------------------|
 | HomeScreen | Static placeholder data, explore server driven UI                             |
@@ -166,6 +174,7 @@ After completing any code change (bug fix, feature, refactor), always run the un
 | Meal Plans — Android sync wiring | Not started — extend `SyncOrchestrator` + `SyncDtos`         |
 | Conflict resolution | SyncState.CONFLICT defined but unused                                     |
 | RecipesViewModel user wiring | Hardcoded test UUID, needs real user from SessionManager           |
+| Recipe URL import | Done — paste a URL, scrape via `:recipe-scraper` (JSON-LD/microdata), pre-fill the editor. No per-site scrapers, no nutrition data, no image download. Share-target intent (T14) not started — optional follow-up. |
 
 **Next milestone**: Complete all tasks to prepare for Monstro Demo
 
