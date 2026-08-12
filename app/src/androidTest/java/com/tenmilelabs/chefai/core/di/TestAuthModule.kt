@@ -16,6 +16,7 @@ import com.tenmilelabs.chefai.mealplans.data.repository.DefaultMealPlanRepositor
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeImporter
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeRepository
+import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipeImporter
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipeImporter
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.Binds
@@ -80,6 +81,16 @@ abstract class TestRepositoryModule {
         fun provideSecurePreferences(): SecurePreferencesInterface {
             return FakeSecurePreferences()
         }
+
+        /**
+         * Provides a singleton instance of FakeRecipeImporter — avoids real network calls to
+         * third-party recipe sites in instrumented tests.
+         */
+        @Provides
+        @Singleton
+        fun provideFakeRecipeImporter(): FakeRecipeImporter {
+            return FakeRecipeImporter()
+        }
     }
 
     /**
@@ -120,10 +131,11 @@ abstract class TestRepositoryModule {
     abstract fun bindMealPlanNetworkDataSource(service: MealPlanApiService): MealPlanNetworkDataSource
 
     /**
-     * Binds the recipe importer (same as production) — required for Hilt's shared test component
-     * to resolve ImportRecipeViewModel's graph. See docs/claude/gotchas.md #21.
+     * Binds the fake recipe importer — real fetch/parse is exercised by unit tests
+     * ([com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeImporterTest] with Ktor
+     * `MockEngine`); instrumented tests only need to exercise the UI/navigation/persistence wiring.
      */
     @Binds
     @Singleton
-    abstract fun bindRecipeImporter(importer: DefaultRecipeImporter): RecipeImporter
+    abstract fun bindRecipeImporter(fake: FakeRecipeImporter): RecipeImporter
 }
