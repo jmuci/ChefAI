@@ -1,9 +1,11 @@
 package com.tenmilelabs.chefai.recipes.ui.urlimport
 
+import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDraftDao
+import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipeImporter
 import com.tenmilelabs.chefai.recipes.domain.model.RecipeDraft
@@ -14,6 +16,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import java.net.URLEncoder
 import java.util.UUID
 
 @ExperimentalCoroutinesApi
@@ -30,7 +33,16 @@ class ImportRecipeViewModelTest {
     fun setup() {
         recipeImporter = FakeRecipeImporter()
         recipeDraftDao = FakeRecipeDraftDao()
-        viewModel = ImportRecipeViewModel(recipeImporter, recipeDraftDao, mainCoroutineRule.testDispatcher)
+        viewModel = createViewModel()
+    }
+
+    private fun createViewModel(prefillUrl: String? = null): ImportRecipeViewModel {
+        val savedStateHandle = SavedStateHandle().apply {
+            if (prefillUrl != null) {
+                set(AppDestinationArgs.PREFILL_URL_ARG, URLEncoder.encode(prefillUrl, "UTF-8"))
+            }
+        }
+        return ImportRecipeViewModel(recipeImporter, recipeDraftDao, mainCoroutineRule.testDispatcher, savedStateHandle)
     }
 
     @Test
@@ -123,5 +135,18 @@ class ImportRecipeViewModelTest {
         viewModel.dispatch(ImportAction.Import)
 
         assertThat(recipeImporter.callCount).isEqualTo(0)
+    }
+
+    @Test
+    fun `seeds the url field from a PREFILL_URL_ARG passed via SavedStateHandle`() = runTest {
+        val prefilled = createViewModel(prefillUrl = "https://example.com/shared-recipe")
+
+        assertThat(prefilled.state.value.url).isEqualTo("https://example.com/shared-recipe")
+        assertThat(prefilled.state.value.canImport).isTrue()
+    }
+
+    @Test
+    fun `starts with an empty url when there is no PREFILL_URL_ARG`() = runTest {
+        assertThat(viewModel.state.value.url).isEqualTo("")
     }
 }

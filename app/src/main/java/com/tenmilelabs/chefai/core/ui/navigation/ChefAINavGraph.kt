@@ -58,10 +58,21 @@ fun ChefAINavGraph(
     navController: NavHostController = rememberNavController(),
     navActions: NavigationActions = remember(navController) {
         NavigationActions(navController)
-    }
+    },
+    pendingSharedUrl: String? = null,
+    onPendingSharedUrlConsumed: () -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val backPressedDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+
+    // A URL shared into the app from another app (e.g. Chrome's share sheet) jumps straight to the
+    // import screen, prefilled — regardless of which screen is currently on top.
+    LaunchedEffect(pendingSharedUrl) {
+        if (pendingSharedUrl != null) {
+            navActions.navigateToImportRecipe(prefillUrl = pendingSharedUrl)
+            onPendingSharedUrlConsumed()
+        }
+    }
 
     // Home is always the start destination (anonymous-first model).
     // Login/Register are available via profile menu or settings.
@@ -199,7 +210,16 @@ fun ChefAINavGraph(
                 snackbarHostState = snackbarHostState,
             )
         }
-        composable(route = AppDestinations.IMPORT_RECIPE.route) {
+        composable(
+            route = AppDestinations.IMPORT_RECIPE.route,
+            arguments = listOf(
+                navArgument(AppDestinationArgs.PREFILL_URL_ARG) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+        ) {
             ImportRecipeRoute(
                 onNavigateToEditorWithDraft = { draftId -> navActions.navigateToEditorWithDraft(draftId) },
                 onNavigateToManualEditor = { navActions.navigateToCreateRecipe() },

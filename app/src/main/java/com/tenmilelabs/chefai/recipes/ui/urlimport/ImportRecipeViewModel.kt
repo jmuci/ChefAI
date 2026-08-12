@@ -1,11 +1,13 @@
 package com.tenmilelabs.chefai.recipes.ui.urlimport
 
 import androidx.annotation.StringRes
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeDraftDao
 import com.tenmilelabs.chefai.core.di.IoDispatcher
+import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.recipes.data.mapper.toRecipeDraftEntity
 import com.tenmilelabs.chefai.recipes.domain.model.RecipeImportResult
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipeImporter
@@ -20,6 +22,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.net.URLDecoder
 import javax.inject.Inject
 
 @HiltViewModel
@@ -27,9 +30,15 @@ class ImportRecipeViewModel @Inject constructor(
     private val recipeImporter: RecipeImporter,
     private val recipeDraftDao: RecipeDraftDao,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(ImportRecipeState())
+    /** Set when the screen was opened via the share sheet, e.g. Chrome's "Share" → Pocket Chef. */
+    private val prefillUrl: String? = savedStateHandle.get<String>(AppDestinationArgs.PREFILL_URL_ARG)
+        ?.let { runCatching { URLDecoder.decode(it, "UTF-8") }.getOrNull() }
+        ?.takeIf { it.isNotBlank() }
+
+    private val _state = MutableStateFlow(ImportRecipeState(url = prefillUrl.orEmpty()))
     val state: StateFlow<ImportRecipeState> = _state.asStateFlow()
 
     private val _effects = Channel<ImportEffect>(Channel.BUFFERED)

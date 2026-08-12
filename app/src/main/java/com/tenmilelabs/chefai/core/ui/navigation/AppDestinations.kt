@@ -5,8 +5,10 @@ import androidx.navigation.NavHostController
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.DRAFT_ID_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.MEAL_PLAN_ID_ARG
+import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.PREFILL_URL_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.RECIPE_ID_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.ScreenBaseRoutes.RECIPE_DETAILS
+import java.net.URLEncoder
 import java.util.UUID
 
 /**
@@ -44,6 +46,13 @@ object AppDestinationArgs {
      * which puts the editor in edit mode against an already-saved recipe.
      */
     const val DRAFT_ID_ARG = "draftUuid"
+
+    /**
+     * A URL to pre-fill the import screen's field with, used when the app is opened via the
+     * Android share sheet (see [MainActivity][com.tenmilelabs.chefai.MainActivity]). URL-encoded
+     * in the route, since the value itself is a URL containing reserved characters.
+     */
+    const val PREFILL_URL_ARG = "prefillUrl"
 }
 
 /**
@@ -67,7 +76,10 @@ enum class AppDestinations(
             "?${RECIPE_ID_ARG}={${RECIPE_ID_ARG}}" +
             "&${DRAFT_ID_ARG}={${DRAFT_ID_ARG}}"
     ),
-    IMPORT_RECIPE(R.string.app_dest_title_import_recipe, ScreenBaseRoutes.IMPORT_RECIPE),
+    IMPORT_RECIPE(
+        R.string.app_dest_title_import_recipe,
+        "${ScreenBaseRoutes.IMPORT_RECIPE}?${PREFILL_URL_ARG}={${PREFILL_URL_ARG}}"
+    ),
     MEAL_PLAN_DETAIL(
         R.string.app_dest_title_meal_plan_detail,
         "${ScreenBaseRoutes.MEAL_PLAN_DETAIL}/{$MEAL_PLAN_ID_ARG}"
@@ -99,8 +111,17 @@ class NavigationActions(private val navController: NavHostController) {
         navController.navigate("${ScreenBaseRoutes.RECIPE_EDITOR}?${RECIPE_ID_ARG}=$recipeId")
     }
 
-    fun navigateToImportRecipe() {
-        navController.navigate(ScreenBaseRoutes.IMPORT_RECIPE)
+    /**
+     * @param prefillUrl a URL to pre-fill the field with, e.g. from a share-sheet intent. `null`
+     *   for the normal FAB entry point, which starts with an empty field.
+     */
+    fun navigateToImportRecipe(prefillUrl: String? = null) {
+        if (prefillUrl == null) {
+            navController.navigate(ScreenBaseRoutes.IMPORT_RECIPE)
+        } else {
+            val encoded = URLEncoder.encode(prefillUrl, "UTF-8")
+            navController.navigate("${ScreenBaseRoutes.IMPORT_RECIPE}?${PREFILL_URL_ARG}=$encoded")
+        }
     }
 
     /**
