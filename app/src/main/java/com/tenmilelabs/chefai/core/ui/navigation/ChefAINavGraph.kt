@@ -1,10 +1,12 @@
 package com.tenmilelabs.chefai.core.ui.navigation
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -29,6 +31,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.createGraph
+import androidx.window.core.layout.WindowSizeClass
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.ui.LoginScreen
 import com.tenmilelabs.chefai.auth.ui.RegisterScreen
@@ -189,6 +192,9 @@ fun ChefAINavGraph(
         }
     }
 
+    val isExpanded = currentWindowAdaptiveInfo()
+        .windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
+
     var titleRes by rememberSaveable { mutableIntStateOf(R.string.app_name) }
     var isTopLevelDestination by rememberSaveable { mutableStateOf(false) }
     var currentRoute by rememberSaveable { mutableStateOf(startDestination) }
@@ -264,10 +270,10 @@ fun ChefAINavGraph(
                 ScreenBaseRoutes.MEAL_PLAN_WIZARD_PREFERENCES,
                 ScreenBaseRoutes.MEAL_PLAN_WIZARD_ADVANCED,
             )
-            val hideBottomBar = currentRoute == AppDestinations.LOGIN.route ||
+            val hideNav = currentRoute == AppDestinations.LOGIN.route ||
                 currentRoute == AppDestinations.REGISTER.route ||
                 currentRoute in wizardRoutes
-            if (!hideBottomBar) {
+            if (!hideNav && !isExpanded) {
                 BottomNavigationBar(navController)
             }
         },
@@ -304,11 +310,25 @@ fun ChefAINavGraph(
             }
         }
     ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            graph = graph,
-            modifier = Modifier.padding(innerPadding)
+        val wizardRoutes = setOf(
+            ScreenBaseRoutes.MEAL_PLAN_WIZARD_BASICS,
+            ScreenBaseRoutes.MEAL_PLAN_WIZARD_PREFERENCES,
+            ScreenBaseRoutes.MEAL_PLAN_WIZARD_ADVANCED,
         )
+        val hideNav = currentRoute == AppDestinations.LOGIN.route ||
+            currentRoute == AppDestinations.REGISTER.route ||
+            currentRoute in wizardRoutes
+
+        Row(modifier = Modifier.padding(innerPadding)) {
+            if (isExpanded && !hideNav) {
+                NavigationRailBar(navController)
+            }
+            NavHost(
+                navController = navController,
+                graph = graph,
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
 
 }

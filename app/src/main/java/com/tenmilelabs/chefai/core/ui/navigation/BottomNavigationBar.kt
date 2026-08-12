@@ -7,6 +7,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -81,6 +83,37 @@ fun BottomNavigationBar(
                     indicatorColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                     unselectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
+            )
+        }
+    }
+}
+
+@Composable
+fun NavigationRailBar(navController: NavController) {
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
+    NavigationRail(
+        containerColor = MaterialTheme.colorScheme.primaryContainer,
+    ) {
+        TopLevelDestination.entries.forEach { item ->
+            NavigationRailItem(
+                selected = isRouteInSection(currentRoute, item),
+                onClick = {
+                    navController.navigate(item.appDestination.route) {
+                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
+                icon = {
+                    Icon(
+                        imageVector = ImageVector.vectorResource(id = item.icon),
+                        contentDescription = stringResource(item.appDestination.title),
+                        modifier = Modifier.size(dimensionResource(R.dimen.nav_bar_icon_size))
+                    )
+                },
+                label = { Text(stringResource(item.appDestination.title)) },
             )
         }
     }
