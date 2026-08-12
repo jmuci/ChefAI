@@ -12,6 +12,7 @@ All ADRs live in [`docs/adrs/`](../adrs/). This file is a quick-reference index.
 | 004 | [Data Layer Composition](../adrs/adr-004-data-layer.md) | Nov 2025 | Dual-source repositories (Room + Ktor). Outbox = syncState field. |
 | 005 | [Feature-Based Packages](../adrs/adr-0005-feature-based-package-structure.md) | Nov 2025 | Feature packages over layer packages. Start in feature, move to core/ when shared. |
 | 006 | [Anonymous-First Sync](../adrs/adr-006-sync-protocol.md) | Feb 2026 | App works without login. Anonymous → Authenticated upgrade merges data. |
+| 009 | [Navigation-Scoped ViewModel for Wizards](../adrs/adr-009-navigation-scoped-viewmodel-for-wizards.md) | Mar 2026 | Multi-screen wizard flows use a nested NavGraph-scoped ViewModel; state lives exactly as long as the flow. |
 
 ## RFCs
 

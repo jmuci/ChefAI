@@ -161,4 +161,8 @@ class FakeRecipesRepository : RecipesRepository {
         val idSet = ids.toHashSet()
         return recipesPreviewListFlow.map { all -> all.filter { it.uuid in idSet } }
     }
+
+    var fakeRecipeCount: Int = 0
+
+    override suspend fun getRecipeCountForUser(userId: UUID): Int = fakeRecipeCount
 }

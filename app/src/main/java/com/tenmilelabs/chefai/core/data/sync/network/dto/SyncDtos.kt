@@ -5,7 +5,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class SyncPushRequest(
     val recipes: List<SyncRecipeDto>,
-    val bookmarkedRecipes: List<SyncBookmarkPushDto> = emptyList()
+    val bookmarkedRecipes: List<SyncBookmarkPushDto> = emptyList(),
+    val mealPlans: List<SyncMealPlanDto> = emptyList()
 )
 
 @Serializable
@@ -59,7 +60,8 @@ data class SyncPushResponse(
     val errors: List<SyncErrorDto>,
     val serverTimestamp: Long,
     val bookmarkedRecipes: List<BookmarkAcceptedDto> = emptyList(),
-    val bookmarkErrors: List<BookmarkErrorDto> = emptyList()
+    val bookmarkErrors: List<BookmarkErrorDto> = emptyList(),
+    val mealPlans: MealPlanPushResults = MealPlanPushResults()
 )
 
 @Serializable
@@ -160,7 +162,8 @@ data class SyncPullResponse(
     val ingredients: List<SyncIngredientDto> = emptyList(),
     val tags: List<SyncTagDto> = emptyList(),
     val labels: List<SyncLabelDto> = emptyList(),
-    val bookmarkedRecipes: List<SyncBookmarkPullDto> = emptyList()
+    val bookmarkedRecipes: List<SyncBookmarkPullDto> = emptyList(),
+    val mealPlans: List<SyncMealPlanDto> = emptyList()
 )
 
 @Serializable
@@ -169,4 +172,40 @@ data class SyncBookmarkPullDto(
     val recipeId: String,
     val updatedAt: Long,
     val deletedAt: Long?
+)
+
+// --- Meal Plan Sync DTOs ---
+
+@Serializable
+data class SyncMealPlanDto(
+    val uuid: String,
+    val name: String,
+    val status: String,
+    val preferencesJson: String,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val deletedAt: Long?,
+    val days: List<SyncMealPlanDayDto>
+)
+
+@Serializable
+data class SyncMealPlanDayDto(
+    val uuid: String,
+    val dayIndex: Int,
+    val dinnerRecipeId: String?,
+    val lunchRecipeId: String?
+)
+
+@Serializable
+data class MealPlanPushResults(
+    val accepted: List<AcceptedEntityDto> = emptyList(),
+    val conflicts: List<String> = emptyList(),
+    val errors: List<SyncErrorDto> = emptyList()
+)
+
+@Serializable
+data class GenerateMealPlanResponse(
+    val uuid: String,
+    val status: String,
+    val updatedAt: Long
 )

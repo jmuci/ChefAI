@@ -6,6 +6,11 @@ import com.tenmilelabs.chefai.auth.data.local.SecurePreferences
 import com.tenmilelabs.chefai.auth.data.local.SecurePreferencesInterface
 import com.tenmilelabs.chefai.collections.data.repository.DefaultCollectionsRepository
 import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
+import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_5_6
+import com.tenmilelabs.chefai.mealplans.data.network.MealPlanApiService
+import com.tenmilelabs.chefai.mealplans.data.network.MealPlanNetworkDataSource
+import com.tenmilelabs.chefai.mealplans.data.repository.DefaultMealPlanRepository
+import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.core.data.local.room.RoomTransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
@@ -43,6 +48,14 @@ abstract class RepositoryModule {
     @Singleton
     @Binds
     abstract fun bindCollectionsRepository(repository: DefaultCollectionsRepository): CollectionsRepository
+
+    @Singleton
+    @Binds
+    abstract fun bindMealPlanRepository(repository: DefaultMealPlanRepository): MealPlanRepository
+
+    @Singleton
+    @Binds
+    abstract fun bindMealPlanNetworkDataSource(service: MealPlanApiService): MealPlanNetworkDataSource
 }
 
 
@@ -59,7 +72,7 @@ object DatabaseModules {
             "ChefAI.db"
         )
             .createFromAsset("database/ChefAI.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
             .build()
     }
 
@@ -104,6 +117,9 @@ object DatabaseModules {
 
     @Provides
     fun provideRecipeDraftDao(database: ChefAIDataBase) = database.recipeDraftDao()
+
+    @Provides
+    fun provideMealPlanDao(database: ChefAIDataBase) = database.mealPlanDao()
 
     @Provides
     @Singleton

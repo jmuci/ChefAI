@@ -60,7 +60,7 @@ class RecipeEditorViewModel @Inject constructor(
     private val _state = MutableStateFlow(
         RecipeEditorState(
             mode = mode,
-            recipeId = (mode as? EditorMode.Edit)?.recipeId ?: UUID.randomUUID(),
+            recipeId = (mode as? EditorMode.Edit)?.recipeId ?: UuidV7Generator.newId(),
             isLoading = mode is EditorMode.Edit,
         )
     )

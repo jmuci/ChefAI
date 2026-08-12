@@ -5,6 +5,10 @@ import com.tenmilelabs.chefai.core.data.sync.ConnectivityObserver
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncNetworkDataSource
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncScheduler
 import com.tenmilelabs.chefai.core.data.sync.NetworkMonitor
+import com.tenmilelabs.chefai.core.data.sync.PullResult
+import com.tenmilelabs.chefai.core.data.sync.PushResult
+import com.tenmilelabs.chefai.core.data.sync.SyncExecutor
+import com.tenmilelabs.chefai.core.data.sync.SyncResult
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import com.tenmilelabs.chefai.core.data.sync.network.SyncNetworkDataSource
 import dagger.Module
@@ -35,6 +39,15 @@ object TestSyncModule {
     @Provides
     @Singleton
     fun provideFakeSyncScheduler(): SyncScheduler = FakeSyncScheduler()
+
+    @Provides
+    @Singleton
+    fun provideFakeSyncExecutor(): SyncExecutor = object : SyncExecutor {
+        override suspend fun sync(): SyncResult = SyncResult(
+            pushResult = PushResult(accepted = 0, conflicts = 0, errors = 0),
+            pullResult = PullResult(upserted = 0, deleted = 0, pages = 1),
+        )
+    }
 
     @Provides
     @Singleton

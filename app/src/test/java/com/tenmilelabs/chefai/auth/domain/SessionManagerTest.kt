@@ -14,6 +14,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeBookmarkedRecipeDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeMealPlanDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
@@ -76,7 +77,8 @@ class SessionManagerTest {
                 recipeIngredientDao = fakeRecipeIngredientDao,
                 recipeTagCrossRefDao = fakeRecipeTagCrossRefDao,
                 recipeLabelCrossRefDao = fakeRecipeLabelCrossRefDao,
-                bookmarkedRecipeDao = FakeBookmarkedRecipeDao()
+                bookmarkedRecipeDao = FakeBookmarkedRecipeDao(),
+                mealPlanDao = FakeMealPlanDao(),
             )
         }
 
@@ -646,7 +648,7 @@ class SessionManagerTest {
     }
 
     @Test
-    fun `login as different user after logout preserves new anonymous data but removes previous authenticated data`() = testScope.runTest {
+    fun `login as different user after logout preserves new anonymous data and removes previous authenticated recipes but keeps user entity`() = testScope.runTest {
         sessionManager.loadSession()
         val initialAnonymousSession = sessionManager.userSession.first() as UserSession.Anonymous
 
@@ -693,7 +695,10 @@ class SessionManagerTest {
         coVerify(exactly = 0) { mockDatabase.clearAllTables() }
         val authSession = sessionManager.userSession.first() as UserSession.Authenticated
         assertThat(fakeRecipeDao.getRecipeById(user1Recipe.uuid)).isNull()
-        assertThat(fakeUserDao.getUserById(user1Id)).isNull()
+        // User entity is preserved so their meal plans survive an account switch and are
+        // available again when they log back in. Queries already filter by userId so the
+        // entity is invisible to the current user.
+        assertThat(fakeUserDao.getUserById(user1Id)).isNotNull()
         assertThat(fakeRecipeDao.getRecipeById(anonymousRecipe.uuid)?.creatorId).isEqualTo(authSession.user.uuid)
     }
 

@@ -41,4 +41,5 @@ class FakeRecipesRepository : RecipesRepository {
     override suspend fun deleteAllRecipes() = error("Not used in home tests")
     override suspend fun deleteRecipe(recipeId: UUID) = error("Not used in home tests")
     override suspend fun softDeleteRecipe(recipeId: UUID) = error("Not used in home tests")
+    override suspend fun getRecipeCountForUser(userId: UUID): Int = error("Not used in home tests")
 }

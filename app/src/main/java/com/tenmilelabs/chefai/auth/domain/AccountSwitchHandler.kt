@@ -41,9 +41,12 @@ class AccountSwitchHandler @Inject constructor(
                 AccountSwitchOutcome.NO_CHANGE
             }
             anonymousUserId != null -> {
-                Timber.i("Authenticated account changed from $previousUserId to $newUserId while anonymous data exists, removing previous authenticated user data only")
+                Timber.i("Authenticated account changed from $previousUserId to $newUserId while anonymous data exists, removing previous authenticated user recipes only")
+                // Delete only recipes (server can restore them on next sync).
+                // We intentionally keep the UserEntity and its meal plans: all queries
+                // filter by userId so they're invisible to other users, and when the
+                // original user logs back in their local plans will still be there.
                 recipeDao.deleteRecipesForUser(previousUserId)
-                userDao.deleteUser(previousUserId)
                 AccountSwitchOutcome.PRESERVED_ANONYMOUS_DATA
             }
             else -> {
