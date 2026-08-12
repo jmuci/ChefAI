@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grocery API Landscape — Pocket Chef</title>
+<style>
+  :root {
+    --bg: #f7f6f3;
+    --surface: #ffffff;
+    --text: #1f2320;
+    --text-muted: #5b6058;
+    --border: #e3e0d8;
+    --accent: #2f6b4f;
+    --accent-soft: #e8f2ec;
+    --tier0: #2f6b4f;
+    --tier1: #b6791a;
+    --tier2: #1f5fa8;
+    --warn-bg: #fdecec;
+    --warn-border: #e0a3a3;
+    --warn-text: #7a2323;
+    --code-bg: #f0efe9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1b1d1b;
+      --surface: #24261f;
+      --text: #eceae3;
+      --text-muted: #a9ab9f;
+      --border: #3a3d34;
+      --accent: #6fcf9e;
+      --accent-soft: #223229;
+      --tier0: #6fcf9e;
+      --tier1: #e0ac53;
+      --tier2: #7fb2ec;
+      --warn-bg: #3a1f1f;
+      --warn-border: #6b3434;
+      --warn-text: #f0b4b4;
+      --code-bg: #2c2e26;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1b1d1b; --surface: #24261f; --text: #eceae3; --text-muted: #a9ab9f;
+    --border: #3a3d34; --accent: #6fcf9e; --accent-soft: #223229;
+    --tier0: #6fcf9e; --tier1: #e0ac53; --tier2: #7fb2ec;
+    --warn-bg: #3a1f1f; --warn-border: #6b3434; --warn-text: #f0b4b4; --code-bg: #2c2e26;
+  }
+  :root[data-theme="light"] {
+    --bg: #f7f6f3; --surface: #ffffff; --text: #1f2320; --text-muted: #5b6058;
+    --border: #e3e0d8; --accent: #2f6b4f; --accent-soft: #e8f2ec;
+    --tier0: #2f6b4f; --tier1: #b6791a; --tier2: #1f5fa8;
+    --warn-bg: #fdecec; --warn-border: #e0a3a3; --warn-text: #7a2323; --code-bg: #f0efe9;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+  }
+  main {
+    max-width: 840px;
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+  }
+  header.page-header {
+    margin-bottom: 40px;
+  }
+  .eyebrow {
+    color: var(--accent);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin: 0 0 8px;
+  }
+  h1 {
+    font-size: 1.9rem;
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+  }
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 1rem;
+    margin: 0;
+  }
+  .meta {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-top: 12px;
+  }
+
+  h2 {
+    font-size: 1.3rem;
+    margin: 48px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    font-size: 1.05rem;
+    margin: 0 0 6px;
+  }
+  p { margin: 0 0 12px; }
+  a { color: var(--accent); }
+  code {
+    background: var(--code-bg);
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+
+  .tldr {
+    background: var(--accent-soft);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .tldr p:last-child { margin-bottom: 0; }
+
+  .retailer-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 22px;
+    margin-bottom: 16px;
+  }
+  .retailer-card h3 { display: flex; align-items: center; gap: 8px; }
+  .status-pill {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 999px;
+  }
+  .status-blocked { background: var(--warn-bg); color: var(--warn-text); }
+  .status-partial { background: color-mix(in srgb, var(--tier1) 20%, transparent); color: var(--tier1); }
+  .status-open { background: color-mix(in srgb, var(--tier0) 20%, transparent); color: var(--tier0); }
+
+  ul { margin: 0 0 12px; padding-left: 22px; }
+  li { margin-bottom: 6px; }
+
+  .sources { font-size: 0.85rem; color: var(--text-muted); margin-top: 10px; }
+  .sources a { color: var(--text-muted); text-decoration: underline; }
+
+  .tier {
+    border-left: 4px solid var(--border);
+    padding: 4px 0 4px 18px;
+    margin-bottom: 22px;
+  }
+  .tier.tier-0 { border-left-color: var(--tier0); }
+  .tier.tier-1 { border-left-color: var(--tier1); }
+  .tier.tier-2 { border-left-color: var(--tier2); }
+  .tier-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .tier-0 .tier-label { color: var(--tier0); }
+  .tier-1 .tier-label { color: var(--tier1); }
+  .tier-2 .tier-label { color: var(--tier2); }
+
+  .warning {
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    color: var(--warn-text);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 0.95rem;
+  }
+  .warning strong { display: block; margin-bottom: 4px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+    margin: 8px 0 12px;
+  }
+  th, td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th { color: var(--text-muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+
+  .overflow-x { overflow-x: auto; }
+
+  footer.sources-list {
+    margin-top: 48px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    font-size: 0.9rem;
+  }
+  footer.sources-list ul { padding-left: 20px; }
+  footer.sources-list li { margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<main>
+
+<header class="page-header">
+  <p class="eyebrow">Pocket Chef — Product Research</p>
+  <h1>Grocery API Landscape</h1>
+  <p class="subtitle">Can Pocket Chef push a meal plan's grocery list directly into a supermarket cart, without routing through Instacart the way SideChef does?</p>
+  <p class="meta">Researched Aug 2026. Findings are point-in-time — retailer partner programs and API terms change; re-verify before committing engineering time.</p>
+</header>
+
+<section class="tldr">
+  <p><strong>TL;DR</strong> — Going direct to Safeway to avoid Instacart isn't achievable today: Safeway/Albertsons' own pickup and delivery fulfillment runs on Instacart's infrastructure under a 2024 nationwide partnership, so there's no separate "direct" rail to integrate with. Kroger — City Market's parent — is the one genuinely self-serve, contract-free starting point: their public Cart API supports adding items to a real user's cart today with no business agreement required.</p>
+</section>
+
+<h2>Per-retailer findings</h2>
+
+<div class="retailer-card">
+  <h3>Instacart Developer Platform / Connect <span class="status-pill status-blocked">Partner-gated</span></h3>
+  <p>A real, actively-developed API (Connect, plus 2026 AI-agent/MCP tooling and the OpenAI/ChatGPT shopping integration) — but not self-serve. Access requires a partner agreement, per-call pricing isn't published, and the revenue model is affiliate/commission-based (industry marketplace take rates run roughly 5–15%).</p>
+  <p>Building on Instacart's own API doesn't remove the "Instacart tax" — it likely makes Pocket Chef another affiliate inside the same commission structure SideChef presumably already uses.</p>
+  <div class="sources">
+    Sources:
+    <a href="https://www.instacart.com/company/business/developers" target="_blank" rel="noopener">Instacart Developer Platform</a> ·
+    <a href="https://docs.instacart.com/connect" target="_blank" rel="noopener">Connect APIs docs</a> ·
+    <a href="https://docs.instacart.com/developer_platform_api/guide/concepts/launch_activities/conversions_and_payments/" target="_blank" rel="noopener">Conversion &amp; affiliate payments</a>
+  </div>
+</div>
+
+<div class="retailer-card">
+  <h3>Albertsons / Safeway <span class="status-pill status-blocked">No public cart API</span></h3>
+  <p>No public developer or cart API exists for Albertsons banners. Safeway's pickup and delivery — including the newer "Rapid" 30-minute delivery — is <strong>powered by Instacart</strong> under a nationwide partnership expansion announced in 2024. There is no separate, direct Safeway fulfillment path to integrate with instead.</p>
+  <p>The only public Albertsons API is for their ad/retail-media network (Albertsons Media Collective) — campaign performance data, unrelated to shopping carts.</p>
+  <div class="sources">
+    Sources:
+    <a href="https://investors.instacart.com/news-releases/news-release-details/instacart-and-albertsons-companies-expand-partnership-nationwide" target="_blank" rel="noopener">Instacart/Albertsons partnership expansion (2024)</a> ·
+    <a href="https://chainstoreage.com/albertsons-opens-retail-media-network-data-api-partnership" target="_blank" rel="noopener">Albertsons Media Collective API (ad data, not carts)</a>
+  </div>
+</div>
+
+<div class="retailer-card">
+  <h3>Kroger <span class="status-pill status-open">Self-serve, partially open</span></h3>
+  <p><em>City Market's parent company.</em> Kroger runs a public developer portal with a real Cart API: product lookup plus <code>add_to_cart</code> (with PICKUP or DELIVERY modality), authenticated via per-user OAuth2, rate-limited to 5,000 calls/day. Adding items works today with no business contract.</p>
+  <p>The catch: the public tier can add items but <strong>cannot remove them</strong>. Full cart management requires Kroger's gated Partner API, which does require a business contract.</p>
+  <div class="sources">
+    Sources:
+    <a href="https://developer-ce.kroger.com/api-products/api/cart-api-public" target="_blank" rel="noopener">Kroger Cart API (public)</a>
+  </div>
+</div>
+
+<h2>Recommended rollout: three tiers</h2>
+
+<div class="tier tier-0">
+  <p class="tier-label">Tier 0 — Plain grocery list</p>
+  <h3>No store integration</h3>
+  <p>Aggregate and dedupe ingredients from a meal plan into a checklist the user shops with manually, at whichever store they choose. Zero external API dependency, ships against the existing meal-plan data model, matches the grocery-list feature already described in the README. Do this first — it's pure win, no new risk.</p>
+</div>
+
+<div class="tier tier-1">
+  <p class="tier-label">Tier 1 — Assisted, one item at a time</p>
+  <h3>Deep-link into the retailer's own app/site</h3>
+  <p>For each grocery item, open the retailer's own app or website pre-loaded with a search for that item, so the user taps "Add to cart" themselves inside their official app. This is legitimate — it's automating a search, not scraping or driving their UI — and needs no store partnership. Requires per-retailer research to confirm each app/site supports a query-param search deep link before committing to it.</p>
+</div>
+
+<div class="tier tier-2">
+  <p class="tier-label">Tier 2 — True one-tap cart add</p>
+  <h3>Where the public API allows it</h3>
+  <p>For City Market (Kroger), skip Tier 1 entirely: call the public <code>add_to_cart</code> API directly with the user's OAuth token. Real differentiator versus Safeway, where Tier 1 is the practical ceiling unless/until a formal Instacart or Albertsons partnership is pursued.</p>
+</div>
+
+<div class="warning">
+  <strong>Explicitly out of scope</strong>
+  Don't fake Tier 2 for Safeway via scraping or headless-browser automation of their checkout. That crosses into ToS-violation / bot-automation territory — fragile, and not something to build even as a stopgap.
+</div>
+
+<h2>Quick comparison</h2>
+<div class="overflow-x">
+<table>
+  <thead>
+    <tr><th>Retailer</th><th>Public API?</th><th>Cart write access</th><th>Contract required?</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Instacart</td><td>Yes (Connect / IDP)</td><td>Yes, via partner integration</td><td>Yes — partner agreement</td></tr>
+    <tr><td>Safeway / Albertsons</td><td>No (ads API only)</td><td>No direct path — routes through Instacart</td><td>N/A — no direct cart API exists</td></tr>
+    <tr><td>Kroger / City Market</td><td>Yes, self-serve</td><td>Add-only, public tier</td><td>Only for remove/full cart management</td></tr>
+  </tbody>
+</table>
+</div>
+
+<footer class="sources-list">
+  <p><strong>All sources</strong></p>
+  <ul>
+    <li><a href="https://www.instacart.com/company/business/developers" target="_blank" rel="noopener">Instacart Developer Platform</a></li>
+    <li><a href="https://docs.instacart.com/connect" target="_blank" rel="noopener">Instacart Connect APIs docs</a></li>
+    <li><a href="https://docs.instacart.com/developer_platform_api/guide/concepts/launch_activities/conversions_and_payments/" target="_blank" rel="noopener">Instacart conversion tracking &amp; affiliate payments</a></li>
+    <li><a href="https://investors.instacart.com/news-releases/news-release-details/instacart-and-albertsons-companies-expand-partnership-nationwide" target="_blank" rel="noopener">Instacart &amp; Albertsons Companies expand partnership nationwide (2024)</a></li>
+    <li><a href="https://chainstoreage.com/albertsons-opens-retail-media-network-data-api-partnership" target="_blank" rel="noopener">Albertsons retail media network API (Chain Store Age)</a></li>
+    <li><a href="https://developer-ce.kroger.com/api-products/api/cart-api-public" target="_blank" rel="noopener">Kroger Cart API (public)</a></li>
+  </ul>
+</footer>
+
+</main>
+</body>
+</html>
