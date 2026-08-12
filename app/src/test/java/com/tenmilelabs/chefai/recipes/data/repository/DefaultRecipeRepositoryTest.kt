@@ -73,6 +73,7 @@ class DefaultRecipeRepositoryTest {
     private lateinit var recipeLabelDao: FakeRecipeLabelCrossRefDao
     private lateinit var remoteDataSource: FakeApiService
     private lateinit var sessionManager: SessionManager
+    private lateinit var syncManager: FakeSyncManager
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var testScope: TestScope
 
@@ -133,6 +134,7 @@ class DefaultRecipeRepositoryTest {
         recipeTagDao = FakeRecipeTagCrossRefDao()
         recipeLabelDao = FakeRecipeLabelCrossRefDao()
         remoteDataSource = FakeApiService()
+        syncManager = FakeSyncManager()
 
         recipeRepository =
             DefaultRecipeRepository(
@@ -146,7 +148,7 @@ class DefaultRecipeRepositoryTest {
                 recipeLabelDao,
                 remoteDataSource,
                 sessionManager,
-                FakeSyncManager()
+                syncManager
             )
 
         // Seed the fake DAO with our test data.
@@ -440,5 +442,40 @@ class DefaultRecipeRepositoryTest {
         // And: It appears in getAllDirty (DELETED state)
         val dirtyRecipes = recipeDao.getAllDirty()
         assertThat(dirtyRecipes.any { it.uuid == recipeId1 && it.syncState == SyncState.DELETED }).isTrue()
+    }
+
+    @Test
+    fun `softDeleteRecipe() hides the recipe from getRecipesPreviewStream`() = runTest {
+        // Given: 3 recipes are visible
+        assertThat(recipeRepository.getRecipesPreviewStream().first()).hasSize(3)
+
+        // When: recipe1 is soft-deleted
+        recipeRepository.softDeleteRecipe(recipeId1)
+
+        // Then: only the other 2 remain in the preview stream
+        val previews = recipeRepository.getRecipesPreviewStream().first()
+        assertThat(previews).hasSize(2)
+        assertThat(previews.find { it.uuid == recipeId1 }).isNull()
+    }
+
+    @Test
+    fun `softDeleteRecipe() causes getRecipeStream to emit null`() = runTest {
+        // Given: the recipe loads normally
+        assertThat(recipeRepository.getRecipeStream(recipeId1).first()).isNotNull()
+
+        // When: it is soft-deleted
+        recipeRepository.softDeleteRecipe(recipeId1)
+
+        // Then: the detail stream now emits null, as if the recipe doesn't exist
+        assertThat(recipeRepository.getRecipeStream(recipeId1).first()).isNull()
+    }
+
+    @Test
+    fun `softDeleteRecipe() requests a mutation sync`() = runTest {
+        assertThat(syncManager.mutationSyncCount).isEqualTo(0)
+
+        recipeRepository.softDeleteRecipe(recipeId1)
+
+        assertThat(syncManager.mutationSyncCount).isEqualTo(1)
     }
 }

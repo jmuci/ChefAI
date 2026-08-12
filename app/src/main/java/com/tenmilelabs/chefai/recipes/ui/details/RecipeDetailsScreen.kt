@@ -12,16 +12,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -43,6 +46,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -62,6 +66,7 @@ import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.core.util.EmptyContent
 import com.tenmilelabs.chefai.core.util.LoadingContent
 import com.tenmilelabs.chefai.core.util.MathUtils
+import com.tenmilelabs.chefai.recipes.ui.components.DeleteConfirmationDialog
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -71,8 +76,25 @@ fun RecipeDetailsScreen(
     viewModel: RecipeDetailsViewModel = hiltViewModel(),
     snackbarHostState: SnackbarHostState,
     onEditClick: ((java.util.UUID) -> Unit)? = null,
+    onNavigateBack: (() -> Unit)? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    val recipeDeletedText = stringResource(R.string.recipe_deleted)
+    LaunchedEffect(viewModel, snackbarHostState, onNavigateBack, recipeDeletedText) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                RecipeDetailsEffect.RecipeDeleted -> {
+                    snackbarHostState.showSnackbar(
+                        message = recipeDeletedText,
+                        duration = SnackbarDuration.Short,
+                    )
+                    onNavigateBack?.invoke()
+                }
+            }
+        }
+    }
+
     if (uiState.isLoading) {
         LoadingContent()
     } else {
@@ -84,6 +106,11 @@ fun RecipeDetailsScreen(
                 },
                 isBookmarked = uiState.isBookmarked,
                 onToggleBookmark = viewModel::toggleBookmark,
+                onDeleteClick = onNavigateBack?.let { { viewModel.onDeleteClick() } },
+                showDeleteConfirmation = uiState.showDeleteConfirmation,
+                onConfirmDelete = viewModel::confirmDelete,
+                onDismissDeleteDialog = viewModel::dismissDeleteDialog,
+                isDeleting = uiState.isDeleting,
             )
         } else {
             EmptyContent(
@@ -115,7 +142,19 @@ fun RecipeDetailsContent(
     onEditClick: (() -> Unit)? = null,
     isBookmarked: Boolean = false,
     onToggleBookmark: () -> Unit = {},
+    onDeleteClick: (() -> Unit)? = null,
+    showDeleteConfirmation: Boolean = false,
+    onConfirmDelete: () -> Unit = {},
+    onDismissDeleteDialog: () -> Unit = {},
+    isDeleting: Boolean = false,
 ) {
+    if (showDeleteConfirmation) {
+        DeleteConfirmationDialog(
+            onConfirm = onConfirmDelete,
+            onDismiss = onDismissDeleteDialog,
+        )
+    }
+
     val tabTitles = listOf(stringResource(R.string.ingredients), stringResource(R.string.steps))
     val pagerState = rememberPagerState { tabTitles.size }
     val coroutineScope = rememberCoroutineScope()
@@ -147,6 +186,26 @@ fun RecipeDetailsContent(
                         ),
                         tint = if (isBookmarked) Color(0xFFFFD700) else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+                if (onDeleteClick != null) {
+                    IconButton(
+                        onClick = onDeleteClick,
+                        enabled = !isDeleting,
+                        modifier = Modifier.testTag("DeleteRecipeButton"),
+                    ) {
+                        if (isDeleting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = stringResource(R.string.delete_recipe_button),
+                                tint = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
                 }
             }
 
@@ -314,5 +373,17 @@ fun RecipeDetailsFullScreenPreview() {
 fun RecipeDetailsBookmarkedPreview() {
     ChefAITheme {
         RecipeDetailsContent(recipe = RecipeData.recipe, isBookmarked = true)
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun RecipeDetailsDeleteConfirmationPreview() {
+    ChefAITheme {
+        RecipeDetailsContent(
+            recipe = RecipeData.recipe,
+            onDeleteClick = {},
+            showDeleteConfirmation = true,
+        )
     }
 }

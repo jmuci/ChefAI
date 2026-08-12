@@ -188,6 +188,7 @@ fun ChefAINavGraph(
                 onEditClick = { recipeId ->
                     navActions.navigateToEditRecipe(recipeId)
                 },
+                onNavigateBack = { navController.popBackStack() },
             )
         }
         composable(

@@ -10,9 +10,13 @@ import com.tenmilelabs.chefai.collections.data.repository.DefaultCollectionsRepo
 import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.data.repository.DefaultMetadataRepository
 import com.tenmilelabs.chefai.core.domain.repository.MetadataRepository
+import com.tenmilelabs.chefai.mealplans.data.network.MealPlanApiService
+import com.tenmilelabs.chefai.mealplans.data.network.MealPlanNetworkDataSource
 import com.tenmilelabs.chefai.mealplans.data.repository.DefaultMealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
+import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeImporter
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeRepository
+import com.tenmilelabs.chefai.recipes.domain.repository.RecipeImporter
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.Binds
 import dagger.Module
@@ -105,4 +109,21 @@ abstract class TestRepositoryModule {
     @Binds
     @Singleton
     abstract fun bindMealPlanRepository(repository: DefaultMealPlanRepository): MealPlanRepository
+
+    /**
+     * Binds the meal plan network data source (same as production) — required for Hilt's shared
+     * test component to resolve MealPlansViewModel's graph, even though this DAO test never uses it.
+     * See docs/claude/gotchas.md #21.
+     */
+    @Binds
+    @Singleton
+    abstract fun bindMealPlanNetworkDataSource(service: MealPlanApiService): MealPlanNetworkDataSource
+
+    /**
+     * Binds the recipe importer (same as production) — required for Hilt's shared test component
+     * to resolve ImportRecipeViewModel's graph. See docs/claude/gotchas.md #21.
+     */
+    @Binds
+    @Singleton
+    abstract fun bindRecipeImporter(importer: DefaultRecipeImporter): RecipeImporter
 }
