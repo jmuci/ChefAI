@@ -230,7 +230,11 @@ object RecipeEditorReducer {
 
     /**
      * Recomputes [RecipeEditorState.isFormValid] based on required fields.
+     * Exposed for the ViewModel to call after populating state outside the
+     * reducer (e.g. loading an existing recipe or restoring a draft).
      */
+    fun recomputeValidity(state: RecipeEditorState): RecipeEditorState = state.revalidate()
+
     private fun RecipeEditorState.revalidate(): RecipeEditorState {
         val isValid = recipeFields.title.isNotBlank() &&
             recipeFields.description.isNotBlank() &&

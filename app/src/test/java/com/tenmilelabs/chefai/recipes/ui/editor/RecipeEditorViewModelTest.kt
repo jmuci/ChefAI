@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.collections.data.repository.FakeCollectionsRepository
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDraftDao
+import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.core.data.repository.FakeMetadataRepository
 import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
 import com.tenmilelabs.chefai.core.testutil.recipe1
@@ -49,7 +50,7 @@ class RecipeEditorViewModelTest {
         recipeId: String? = null,
     ): RecipeEditorViewModel {
         val savedStateHandle = SavedStateHandle().apply {
-            if (recipeId != null) set("recipeId", recipeId)
+            if (recipeId != null) set(AppDestinationArgs.RECIPE_ID_ARG, recipeId)
         }
         return RecipeEditorViewModel(
             recipesRepository = recipesRepository,
