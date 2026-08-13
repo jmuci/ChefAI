@@ -280,5 +280,6 @@ A second, adjacent bug surfaced by the same investigation was fixed alongside it
   editor's save flow.
 - Cached images (Decision 6) are per-device: a second device re-hits the same CDN wall on pull and
   has to re-run its own WebView tier, and a user-picked local photo can't be synced at all since it
-  never had a source URL. Tracked in [issue #132](https://github.com/jmuci/ChefAI/issues/132), not
-  solved by this ADR.
+  never had a source URL. **Resolved by [ADR-011](adr-011-cross-device-recipe-images.md)** (issue
+  #132): the second device now re-derives via a background backfill worker, and image bytes are
+  confirmed never to ride the sync payload. Uploading user-authored photos remains deferred.

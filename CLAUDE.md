@@ -174,7 +174,9 @@ After completing any code change (bug fix, feature, refactor), always run the un
 | Meal Plans — Android sync wiring | Not started — extend `SyncOrchestrator` + `SyncDtos`         |
 | Conflict resolution | SyncState.CONFLICT defined but unused                                     |
 | RecipesViewModel user wiring | Hardcoded test UUID, needs real user from SessionManager           |
-| Recipe URL import | Done — paste a URL, scrape via `:recipe-scraper` (JSON-LD/microdata), pre-fill the editor. Hero image is downloaded and cached on-device at import time (`CacheRecipeImage`, ADR-010 Decision 6) — same two-tier ladder as the HTML fetch, so it survives the CDNs that block plain HTTP. Cached path is device-local only, not synced (#132). No per-site scrapers, no nutrition data. Share-target intent (T14) done (#126). |
+| Recipe URL import | Done — paste a URL, scrape via `:recipe-scraper` (JSON-LD/microdata), pre-fill the editor. Hero image is downloaded and cached on-device at import time (`CacheRecipeImage`, ADR-010 Decision 6) — same two-tier ladder as the HTML fetch, so it survives the CDNs that block plain HTTP. No per-site scrapers, no nutrition data. Share-target intent (T14) done (#126). |
+| Recipe images — cross-device | Stage 1 done (ADR-011, #132). Bytes never ride the sync payload. Scraped images are re-derived per device by `RecipeImageBackfillWorker` (charging + unmetered); user-picked photos are copied into `RecipeImageStore` at pick time. **Invariant: blank `imageUrl` ⟺ the image is the user's own and cannot be re-derived.** Blob bookkeeping lives in `recipe_image_state`, never on `recipes`. |
+| Recipe images — upload (Stage 2) | Not started — blocked on a deployed backend. Uploading user-authored photos is the only planned upload; see ADR-011 "Stage 2". Until then, deleting a recipe destroys a user-picked photo irreversibly. |
 | Recipe delete | Done — soft delete via a button on the recipe details screen. No undo, no list swipe-to-delete, no delete from the meal-plan recipe route. |
 
 **Next milestone**: Complete all tasks to prepare for Monstro Demo
