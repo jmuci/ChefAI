@@ -11,6 +11,8 @@ class FakeRecipeImporter : RecipeImporter {
         private set
     var lastImportedUrl: String? = null
         private set
+    var lastImportedHtml: String? = null
+        private set
 
     /** When set, [import] suspends until this completes — lets tests assert in-flight behaviour. */
     var gate: CompletableDeferred<Unit>? = null
@@ -18,6 +20,14 @@ class FakeRecipeImporter : RecipeImporter {
     override suspend fun import(url: String): RecipeImportResult {
         callCount++
         lastImportedUrl = url
+        gate?.await()
+        return result
+    }
+
+    override suspend fun importFromHtml(html: String, url: String): RecipeImportResult {
+        callCount++
+        lastImportedUrl = url
+        lastImportedHtml = html
         gate?.await()
         return result
     }
