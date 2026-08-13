@@ -29,6 +29,7 @@ import com.tenmilelabs.chefai.core.data.sync.network.FakeSyncNetworkDataSource
 import com.tenmilelabs.chefai.core.data.sync.network.dto.AcceptedEntityDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.ConflictEntityDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncErrorDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncBookmarkPullDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncCreatorDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPullResponse
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPushResponse
@@ -39,6 +40,7 @@ import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -548,6 +550,65 @@ class SyncOrchestratorTest {
         assertThat(steps[0].instruction).isEqualTo("Step 1")
         assertThat(steps[0].syncState).isEqualTo(SyncState.SYNCED)
     }
+
+    @Test
+    fun `pull upserts a bookmark for a recipe that exists locally`() = runTest(testDispatcher) {
+        recipeDao.upsertRecipe(createDirtyRecipe(uuid = recipeId1, syncState = SyncState.SYNCED))
+        val userId = UuidV7Generator.newId()
+        syncNetworkDataSource.pullResponses.addLast(
+            SyncPullResponse(
+                recipes = emptyList(),
+                serverTimestamp = 5000L,
+                hasMore = false,
+                bookmarkedRecipes = listOf(
+                    SyncBookmarkPullDto(
+                        userId = userId.toString(),
+                        recipeId = recipeId1.toString(),
+                        updatedAt = 5000L,
+                        deletedAt = null,
+                    )
+                ),
+            )
+        )
+
+        syncOrchestrator.sync()
+
+        val bookmarked = bookmarkedRecipeDao.observeBookmarkedRecipeIds(userId).first()
+        assertThat(bookmarked).containsExactly(recipeId1)
+    }
+
+    @Test
+    fun `pull skips a bookmark referencing a recipe not known locally rather than failing the sync`() =
+        runTest(testDispatcher) {
+            // The real Room schema has a foreign key from bookmarked_recipes.recipeId to
+            // recipes.uuid — a bookmark for a recipe this device doesn't have (another user's
+            // recipe, or an out-of-order/partial pull) must not abort the whole pull transaction.
+            val userId = UuidV7Generator.newId()
+            val unknownRecipeId = UuidV7Generator.newId()
+            syncNetworkDataSource.pullResponses.addLast(
+                SyncPullResponse(
+                    recipes = emptyList(),
+                    serverTimestamp = 5000L,
+                    hasMore = false,
+                    bookmarkedRecipes = listOf(
+                        SyncBookmarkPullDto(
+                            userId = userId.toString(),
+                            recipeId = unknownRecipeId.toString(),
+                            updatedAt = 5000L,
+                            deletedAt = null,
+                        )
+                    ),
+                )
+            )
+
+            val result = syncOrchestrator.sync()
+
+            assertThat(bookmarkedRecipeDao.observeBookmarkedRecipeIds(userId).first()).isEmpty()
+            // The checkpoint still advances — one bad bookmark doesn't roll back everything else
+            // that arrived in the same page.
+            assertThat(syncMetadataDao.getLastSyncedAt(SyncOrchestrator.ENTITY_TYPE_RECIPES)).isEqualTo(5000L)
+            assertThat(result.pullResult.pages).isEqualTo(1)
+        }
 
     @Test
     fun `push filters out ingredient refs not known to server`() = runTest(testDispatcher) {
