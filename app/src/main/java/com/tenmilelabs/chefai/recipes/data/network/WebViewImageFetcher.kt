@@ -37,22 +37,34 @@ class WebViewImageFetcher @Inject constructor(
                 applyScraperHardening()
                 webViewClient = ScraperWebViewClient()
             }
+            // Hoisted out of the timeout block so the log after it can tell an explicit JS-side
+            // failure apart from simply running out of budget — both silently returned `null`
+            // before, which made this tier's failures invisible in the field.
+            var jsReportedError = false
 
             try {
-                withTimeoutOrNull(budget) {
+                val bytes = withTimeoutOrNull(budget) {
                     webView.loadUrl(imageUrl)
                     var result: ByteArray? = null
-                    var failed = false
-                    while (result == null && !failed) {
+                    while (result == null && !jsReportedError) {
                         delay(SNAPSHOT_INTERVAL)
                         when (val state = webView.awaitImageDataUrl()) {
                             null, "pending" -> Unit
-                            "error" -> failed = true
+                            "error" -> jsReportedError = true
                             else -> result = state.toImageBytesOrNull()
                         }
                     }
                     result
                 }
+                when {
+                    bytes != null ->
+                        Timber.d("Rendered image fetch succeeded for %s (%d bytes)", imageUrl, bytes.size)
+                    jsReportedError ->
+                        Timber.w("Rendered image fetch's in-page script reported failure for %s", imageUrl)
+                    else ->
+                        Timber.w("Rendered image fetch timed out after %s for %s", budget, imageUrl)
+                }
+                bytes
             } catch (e: Exception) {
                 Timber.w(e, "Rendered image fetch failed for %s", imageUrl)
                 null
