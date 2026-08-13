@@ -6,6 +6,7 @@ import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
+import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -21,6 +22,7 @@ class AccountSwitchHandlerTest {
     private lateinit var database: ChefAIDataBase
     private lateinit var recipeDao: FakeRecipeDao
     private lateinit var userDao: FakeUserDao
+    private lateinit var recipeImageStore: RecipeImageStore
     private lateinit var handler: AccountSwitchHandler
 
     @Before
@@ -29,11 +31,13 @@ class AccountSwitchHandlerTest {
         database = mockk(relaxed = true)
         recipeDao = FakeRecipeDao()
         userDao = FakeUserDao()
+        recipeImageStore = mockk(relaxed = true)
         handler = AccountSwitchHandler(
             securePreferences = securePreferences,
             database = database,
             recipeDao = recipeDao,
-            userDao = userDao
+            userDao = userDao,
+            recipeImageStore = recipeImageStore,
         )
     }
 
@@ -69,6 +73,7 @@ class AccountSwitchHandlerTest {
         assertThat(cleared).isEqualTo(AccountSwitchOutcome.CLEARED_DATABASE)
         assertThat(securePreferences.getStoredCurrentUserId().first()).isEqualTo(newUserId)
         coVerify(exactly = 1) { database.clearAllTables() }
+        coVerify(exactly = 1) { recipeImageStore.deleteAll() }
     }
 
     @Test
@@ -85,5 +90,6 @@ class AccountSwitchHandlerTest {
         assertThat(outcome).isEqualTo(AccountSwitchOutcome.PRESERVED_ANONYMOUS_DATA)
         assertThat(securePreferences.getStoredCurrentUserId().first()).isEqualTo(newUserId)
         coVerify(exactly = 0) { database.clearAllTables() }
+        coVerify(exactly = 0) { recipeImageStore.deleteAll() }
     }
 }

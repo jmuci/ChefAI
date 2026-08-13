@@ -187,6 +187,7 @@ class RecipeEditorViewModel @Inject constructor(
                         description = draft.description,
                         imageUrl = draft.imageUrl,
                         selectedImageUri = draft.selectedImageUri,
+                        localImagePath = draft.localImagePath,
                         prepTimeMinutes = draft.prepTimeMinutes,
                         cookTimeMinutes = draft.cookTimeMinutes,
                         servings = draft.servings,

@@ -53,16 +53,18 @@ object RecipeEditorReducer {
             recipeFields = state.recipeFields.copy(externalUrl = action.url)
         ).markDirty()
 
+        // localImagePath is cleared alongside the field it was cached for — otherwise the user
+        // keeps seeing the stale on-device copy from before their edit.
         is EditorAction.ImageUrlChanged -> state.copy(
-            recipeFields = state.recipeFields.copy(imageUrl = action.url)
+            recipeFields = state.recipeFields.copy(imageUrl = action.url, localImagePath = null)
         ).markDirty()
 
         is EditorAction.ImageSelected -> state.copy(
-            recipeFields = state.recipeFields.copy(selectedImageUri = action.uri)
+            recipeFields = state.recipeFields.copy(selectedImageUri = action.uri, localImagePath = null)
         ).markDirty()
 
         is EditorAction.ClearImage -> state.copy(
-            recipeFields = state.recipeFields.copy(selectedImageUri = null)
+            recipeFields = state.recipeFields.copy(selectedImageUri = null, localImagePath = null)
         ).markDirty()
 
         // --- Ingredients ---
@@ -277,6 +279,7 @@ fun RecipeEditorState.toRecipeDraft(): RecipeDraft = RecipeDraft(
     description = recipeFields.description,
     imageUrl = recipeFields.imageUrl,
     selectedImageUri = recipeFields.selectedImageUri,
+    localImagePath = recipeFields.localImagePath,
     prepTimeMinutes = recipeFields.prepTimeMinutes,
     cookTimeMinutes = recipeFields.cookTimeMinutes,
     servings = recipeFields.servings,

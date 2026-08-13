@@ -62,6 +62,7 @@ import com.tenmilelabs.chefai.core.ui.components.InfoChip
 import com.tenmilelabs.chefai.core.ui.components.InfoChipType
 import com.tenmilelabs.chefai.core.ui.components.RecipeTimeRow
 import com.tenmilelabs.chefai.core.ui.preview.RecipeData
+import com.tenmilelabs.chefai.core.ui.recipeImageModel
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.core.util.EmptyContent
 import com.tenmilelabs.chefai.core.util.LoadingContent
@@ -209,18 +210,8 @@ fun RecipeDetailsContent(
                 }
             }
 
-            // Log image loading attempt
-            Timber.tag("RecipeDetailsScreen").d(
-                "🖼️ RecipeDetailsScreen loading image:\n" +
-                "  Recipe: ${recipe.title}\n" +
-                "  Main Image URL: ${recipe.imageUrl}\n" +
-                "  Thumbnail URL: ${recipe.imageUrlThumbnail}\n" +
-                "  Main URL is null/empty: ${recipe.imageUrl.isEmpty()}\n" +
-                "  Thumbnail URL is null/empty: ${recipe.imageUrlThumbnail.isEmpty()}"
-            )
-
             AsyncImage(
-                model = recipe.imageUrl,
+                model = recipeImageModel(recipe.localImagePath, recipe.imageUrl),
                 placeholder = painterResource(R.drawable.ic_img_placeholder),
                 error = painterResource(R.drawable.ic_img_error),
                 contentDescription = stringResource(R.string.recipe_image_content_description),

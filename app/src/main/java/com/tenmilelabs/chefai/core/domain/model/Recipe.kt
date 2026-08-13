@@ -14,6 +14,12 @@ data class Recipe(
     val description: String,
     val imageUrl: String,
     val imageUrlThumbnail: String,
+    /**
+     * Absolute path to an on-device copy of [imageUrl], downloaded at import time for sources whose
+     * CDN 403s a plain HTTP client (see [com.tenmilelabs.chefai.recipes.domain.usecase.CacheRecipeImage]).
+     * Device-local, so it is never synced — see https://github.com/jmuci/ChefAI/issues/132.
+     */
+    val localImagePath: String? = null,
     val prepTimeMinutes: Int,
     val cookTimeMinutes: Int,
     val servings: Int,

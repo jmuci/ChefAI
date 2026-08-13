@@ -19,6 +19,7 @@ data class RecipeDraftEntity(
     val description: String,
     val imageUrl: String,
     val selectedImageUri: String?,
+    val localImagePath: String?,
     val prepTimeMinutes: String,
     val cookTimeMinutes: String,
     val servings: String,

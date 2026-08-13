@@ -9,6 +9,7 @@ import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
+import com.tenmilelabs.chefai.core.ui.recipeImageModel
 import com.tenmilelabs.chefai.core.util.WhileUiSubscribed
 import com.tenmilelabs.chefai.home.data.model.ComponentModel
 import com.tenmilelabs.chefai.home.domain.repository.HomeLayoutRepository
@@ -175,9 +176,8 @@ class HomeViewModel @Inject constructor(
      */
     private fun prefetchImages(recipes: List<RecipePreview>) {
         recipes.forEach { recipe ->
-            imageLoader.enqueue(
-                ImageRequest.Builder(appContext).data(recipe.imageUrlThumbnail).build()
-            )
+            val model = recipeImageModel(recipe.localImagePath, recipe.imageUrlThumbnail) ?: return@forEach
+            imageLoader.enqueue(ImageRequest.Builder(appContext).data(model).build())
         }
     }
 }

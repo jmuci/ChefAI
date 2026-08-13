@@ -183,6 +183,32 @@ class DraftMapperTest {
         assertEquals("content://media/images/99", restored.selectedImageUri)
     }
 
+    @Test
+    fun `draft entity preserves localImagePath when null`() {
+        val original = RecipeDraft(
+            recipeId = UUID.randomUUID(),
+            isNewRecipe = true,
+            localImagePath = null,
+            updatedAt = 1L,
+        )
+
+        val restored = original.toRecipeDraftEntity().toRecipeDraft()
+        assertNull(restored.localImagePath)
+    }
+
+    @Test
+    fun `draft entity preserves localImagePath when present`() {
+        val original = RecipeDraft(
+            recipeId = UUID.randomUUID(),
+            isNewRecipe = true,
+            localImagePath = "/data/data/com.tenmilelabs.chefai/files/recipe_images/99",
+            updatedAt = 1L,
+        )
+
+        val restored = original.toRecipeDraftEntity().toRecipeDraft()
+        assertEquals("/data/data/com.tenmilelabs.chefai/files/recipe_images/99", restored.localImagePath)
+    }
+
     // --- RecipeDraft → Recipe ---
 
     @Test
@@ -254,6 +280,24 @@ class DraftMapperTest {
         val recipe = draft.toRecipe(creator)
 
         assertEquals("https://example.com", recipe.recipeExternalUrl)
+    }
+
+    @Test
+    fun `draft toRecipe carries localImagePath through`() {
+        val draft = RecipeDraft(
+            recipeId = UUID.randomUUID(),
+            isNewRecipe = true,
+            localImagePath = "/files/recipe_images/abc",
+            prepTimeMinutes = "1",
+            cookTimeMinutes = "1",
+            servings = "1",
+            updatedAt = 1L,
+        )
+
+        val creator = User(UUID.randomUUID(), "Chef", "chef@example.com", "")
+        val recipe = draft.toRecipe(creator)
+
+        assertEquals("/files/recipe_images/abc", recipe.localImagePath)
     }
 
     @Test(expected = NumberFormatException::class)

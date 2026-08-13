@@ -38,6 +38,7 @@ class RecipeDraftDaoTest {
             description = "A description",
             imageUrl = "",
             selectedImageUri = null,
+            localImagePath = null,
             prepTimeMinutes = "10",
             cookTimeMinutes = "20",
             servings = "4",
@@ -99,6 +100,19 @@ class RecipeDraftDaoTest {
 
         assertNull(database.recipeDraftDao().getDraft(remove.recipeId))
         assertEquals(keep, database.recipeDraftDao().getDraft(keep.recipeId))
+    }
+
+    @Test
+    fun localImagePath_roundTripsThroughSaveAndGet() = runTest {
+        // Schema v2, MIGRATION_1_2 — the draft row must carry a cached image path too, since import
+        // writes a draft before the user ever reaches Save.
+        val recipeId = UuidV7Generator.newId()
+        val path = "/data/data/com.tenmilelabs.chefai/files/recipe_images/$recipeId"
+        database.recipeDraftDao().saveDraft(draft(recipeId).copy(localImagePath = path))
+
+        val loaded = database.recipeDraftDao().getDraft(recipeId)
+
+        assertEquals(path, loaded?.localImagePath)
     }
 
     @Test
