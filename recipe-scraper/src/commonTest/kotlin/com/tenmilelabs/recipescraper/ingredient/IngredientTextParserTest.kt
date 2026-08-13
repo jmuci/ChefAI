@@ -104,6 +104,42 @@ class IngredientTextParserTest {
         assertParsed("all-purpose flour", null, null, "all-purpose flour")
     }
 
+    // --- Fused amount and unit ---
+
+    @Test
+    fun `splits an amount fused to its unit`() {
+        // How metric sites overwhelmingly write it — directoalpaladar.com's cocido madrileño
+        // publishes every weighed ingredient this way.
+        assertParsed("300g Garbanzos", 300.0, "g", "Garbanzos")
+        assertParsed("250ml leche", 250.0, "ml", "leche")
+        assertParsed("2kg patatas", 2.0, "kg", "patatas")
+    }
+
+    @Test
+    fun `splits a fused decimal or fraction amount`() {
+        assertParsed("1.5kg harina", 1.5, "kg", "harina")
+        assertParsed("½kg tomates", 0.5, "kg", "tomates")
+    }
+
+    @Test
+    fun `takes the lower bound of a fused range`() {
+        assertParsed("300-400g morcillo", 300.0, "g", "morcillo")
+    }
+
+    @Test
+    fun `does not treat a non-unit suffix as a fused amount`() {
+        // Pan sizes, multipliers and product codes all lead with a digit but carry no unit.
+        assertParsed("9x13 inch pan", null, null, "9x13 inch pan")
+        assertParsed("1x large egg", null, null, "1x large egg")
+        assertParsed("1A vanilla pod", null, null, "1A vanilla pod")
+    }
+
+    @Test
+    fun `does not read a second unit after a fused one`() {
+        // "cup" here is part of the name, not a unit — the amount already carried "g".
+        assertParsed("200g cup mushrooms", 200.0, "g", "cup mushrooms")
+    }
+
     // --- Parentheticals ---
 
     @Test

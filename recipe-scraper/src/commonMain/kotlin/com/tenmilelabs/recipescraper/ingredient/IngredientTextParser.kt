@@ -18,8 +18,10 @@ internal fun parseIngredient(raw: String): ScrapedIngredient {
     val tokens = text.split(' ').filter { it.isNotEmpty() }
     var index = 0
     var quantity: Double? = null
+    var unit: String? = null
 
-    parseNumber(tokens[0])?.let { leading ->
+    val leading = parseNumber(tokens[0])
+    if (leading != null) {
         quantity = leading
         index = 1
 
@@ -41,12 +43,20 @@ internal fun parseIngredient(raw: String): ScrapedIngredient {
 
         // A parenthetical size qualifier often sits between amount and unit: "1 (14 oz) can".
         index = skipParenthetical(tokens, index)
+    } else {
+        // Metric sites — Spanish and French ones especially — routinely fuse the amount and the
+        // unit into a single token: "300g Garbanzos".
+        splitFusedAmountAndUnit(tokens[0])?.let { (amount, fusedUnit) ->
+            quantity = amount
+            unit = fusedUnit
+            index = skipParenthetical(tokens, 1)
+        }
     }
 
-    var unit: String? = null
     // Only look for a unit behind an amount; without one, a leading word is far more likely to be
-    // part of the name ("Salt to taste") than a unit.
-    if (quantity != null && index < tokens.size) {
+    // part of the name ("Salt to taste") than a unit. A fused token already supplied one, and
+    // re-running this would swallow the first word of the name as a second unit.
+    if (quantity != null && unit == null && index < tokens.size) {
         normalizeUnit(tokens[index])?.let { matched ->
             unit = matched
             index = skipParenthetical(tokens, index + 1)
@@ -62,6 +72,21 @@ internal fun parseIngredient(raw: String): ScrapedIngredient {
         .ifEmpty { text }
 
     return ScrapedIngredient(raw = raw, quantity = quantity, unit = unit, name = name)
+}
+
+/**
+ * Splits a token that fuses an amount and a unit — `"300g"`, `"1.5kg"`, `"½kg"`, `"300-400g"` —
+ * into the two, or returns `null` when it isn't one.
+ *
+ * Deliberately conservative: the trailing part must normalise to a *known* unit, so pan sizes
+ * (`"9x13"`), multipliers (`"1x"`) and product codes (`"1A"`) fall through untouched.
+ */
+private fun splitFusedAmountAndUnit(token: String): Pair<Double, String>? {
+    val splitAt = token.indexOfFirst { it.isLetter() }
+    if (splitAt <= 0) return null
+    val amount = parseNumber(token.substring(0, splitAt)) ?: return null
+    val unit = normalizeUnit(token.substring(splitAt)) ?: return null
+    return amount to unit
 }
 
 /** Advances past a `( … )` group starting at [index], leaving [index] untouched if none is there. */
