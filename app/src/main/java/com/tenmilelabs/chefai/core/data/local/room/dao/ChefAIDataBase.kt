@@ -3,6 +3,8 @@ package com.tenmilelabs.chefai.core.data.local.room.dao
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.tenmilelabs.chefai.core.data.local.room.AllergenEntity
 import com.tenmilelabs.chefai.core.data.local.room.BookmarkedRecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
@@ -40,7 +42,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         TagEntity::class,
         UserEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 @TypeConverters(UuidConverters::class)
@@ -60,4 +62,17 @@ abstract class ChefAIDataBase : RoomDatabase() {
     abstract fun syncMetadataDao(): SyncMetadataDao
     abstract fun recipeDraftDao(): RecipeDraftDao
     abstract fun mealPlanDao(): MealPlanDao
+}
+
+/**
+ * Adds [com.tenmilelabs.chefai.core.data.local.room.RecipeEntity.localImagePath] and
+ * [com.tenmilelabs.chefai.core.data.local.room.RecipeDraftEntity.localImagePath] — the on-device
+ * path to an image downloaded at import time, for sources whose CDN blocks a plain HTTP client. See
+ * ADR-010 Decision 6.
+ */
+val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE recipes ADD COLUMN localImagePath TEXT")
+        db.execSQL("ALTER TABLE recipe_drafts ADD COLUMN localImagePath TEXT")
+    }
 }

@@ -13,6 +13,7 @@ import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.core.data.local.room.RoomTransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
+import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_1_2
 import com.tenmilelabs.chefai.core.data.repository.DefaultMetadataRepository
 import com.tenmilelabs.chefai.core.domain.repository.MetadataRepository
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeImporter
@@ -84,6 +85,7 @@ object DatabaseModules {
             ChefAIDataBase::class.java,
             "ChefAI.db"
         )
+            .addMigrations(MIGRATION_1_2)
             .fallbackToDestructiveMigration()
             .build()
     }
