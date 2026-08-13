@@ -22,6 +22,9 @@ sealed interface EditorAction {
     data class ExternalUrlChanged(val url: String) : EditorAction
     data class ImageUrlChanged(val url: String) : EditorAction
     data class ImageSelected(val uri: String?) : EditorAction
+
+    /** Emitted by the ViewModel once a picked photo has been copied into app storage. */
+    data class PickedImageStored(val localImagePath: String?) : EditorAction
     data object ClearImage : EditorAction
 
     // Ingredients

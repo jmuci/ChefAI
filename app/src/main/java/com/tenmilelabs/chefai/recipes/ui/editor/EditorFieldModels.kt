@@ -9,7 +9,6 @@ data class RecipeFields(
     val title: String = "",
     val description: String = "",
     val imageUrl: String = "",
-    val selectedImageUri: String? = null,
     /** On-device copy of [imageUrl], if cached at import time; cleared when the user edits [imageUrl]. */
     val localImagePath: String? = null,
     val prepTimeMinutes: String = "",

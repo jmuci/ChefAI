@@ -25,7 +25,6 @@ class DraftMapperTest {
         assertEquals(recipe1.title, draft.title)
         assertEquals(recipe1.description, draft.description)
         assertEquals(recipe1.imageUrl, draft.imageUrl)
-        assertNull(draft.selectedImageUri)
         assertEquals(recipe1.prepTimeMinutes.toString(), draft.prepTimeMinutes)
         assertEquals(recipe1.cookTimeMinutes.toString(), draft.cookTimeMinutes)
         assertEquals(recipe1.servings.toString(), draft.servings)
@@ -99,7 +98,6 @@ class DraftMapperTest {
             title = "Pasta Carbonara",
             description = "Classic Italian pasta",
             imageUrl = "https://example.com/image.jpg",
-            selectedImageUri = "content://media/images/42",
             prepTimeMinutes = "10",
             cookTimeMinutes = "20",
             servings = "2",
@@ -155,32 +153,6 @@ class DraftMapperTest {
         assertNull(ingredient.allergenName)
         assertNull(ingredient.srcCategory)
         assertNull(ingredient.srcSubcategory)
-    }
-
-    @Test
-    fun `draft entity preserves selectedImageUri when null`() {
-        val original = RecipeDraft(
-            recipeId = UUID.randomUUID(),
-            isNewRecipe = true,
-            selectedImageUri = null,
-            updatedAt = 1L,
-        )
-
-        val restored = original.toRecipeDraftEntity().toRecipeDraft()
-        assertNull(restored.selectedImageUri)
-    }
-
-    @Test
-    fun `draft entity preserves selectedImageUri when present`() {
-        val original = RecipeDraft(
-            recipeId = UUID.randomUUID(),
-            isNewRecipe = true,
-            selectedImageUri = "content://media/images/99",
-            updatedAt = 1L,
-        )
-
-        val restored = original.toRecipeDraftEntity().toRecipeDraft()
-        assertEquals("content://media/images/99", restored.selectedImageUri)
     }
 
     @Test

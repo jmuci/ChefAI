@@ -13,6 +13,7 @@ import com.tenmilelabs.chefai.core.data.local.room.MealPlanDayEntity
 import com.tenmilelabs.chefai.core.data.local.room.MealPlanEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeDraftEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
+import com.tenmilelabs.chefai.core.data.local.room.RecipeImageStateEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.RecipeStepEntity
@@ -33,6 +34,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         MealPlanDayEntity::class,
         RecipeDraftEntity::class,
         RecipeEntity::class,
+        RecipeImageStateEntity::class,
         RecipeIngredientEntity::class,
         RecipeLabelCrossRef::class,
         RecipeStepEntity::class,
@@ -42,7 +44,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         TagEntity::class,
         UserEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 @TypeConverters(UuidConverters::class)
@@ -52,6 +54,7 @@ abstract class ChefAIDataBase : RoomDatabase() {
     abstract fun ingredientDao(): IngredientDao
     abstract fun labelDao(): LabelDao
     abstract fun recipeDao(): RecipeDao
+    abstract fun recipeImageStateDao(): RecipeImageStateDao
     abstract fun recipeIngredientDao(): RecipeIngredientDao
     abstract fun recipeStepDao(): RecipeStepDao
     abstract fun sourceClassificationDao(): SourceClassificationDao
@@ -74,5 +77,60 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE recipes ADD COLUMN localImagePath TEXT")
         db.execSQL("ALTER TABLE recipe_drafts ADD COLUMN localImagePath TEXT")
+    }
+}
+
+/**
+ * Retires `recipe_drafts.selectedImageUri` and adds
+ * [com.tenmilelabs.chefai.core.data.local.room.RecipeImageStateEntity]'s table.
+ *
+ * `selectedImageUri` held the raw `content://` string from the photo picker, which nothing ever read
+ * back — `RecipeDraft.toRecipe()` dropped it on save, and the picker's read grant did not survive
+ * process death anyway. A picked photo is now copied into `RecipeImageStore` at pick time and lives
+ * in `localImagePath` alongside a scraped one, so the column has no remaining job. See ADR-011.
+ *
+ * The column is removed by rebuilding the table rather than with `ALTER TABLE … DROP COLUMN`, which
+ * needs SQLite 3.35 — only guaranteed from API 34, below this module's `minSdk`.
+ */
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `recipe_drafts_new` (
+                `recipeId` BLOB NOT NULL, `isNewRecipe` INTEGER NOT NULL, `title` TEXT NOT NULL,
+                `description` TEXT NOT NULL, `imageUrl` TEXT NOT NULL, `localImagePath` TEXT,
+                `prepTimeMinutes` TEXT NOT NULL, `cookTimeMinutes` TEXT NOT NULL,
+                `servings` TEXT NOT NULL, `externalUrl` TEXT NOT NULL, `ingredientsJson` TEXT NOT NULL,
+                `stepsJson` TEXT NOT NULL, `tagsJson` TEXT NOT NULL, `labelsJson` TEXT NOT NULL,
+                `version` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`recipeId`)
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            INSERT INTO `recipe_drafts_new` (
+                `recipeId`, `isNewRecipe`, `title`, `description`, `imageUrl`, `localImagePath`,
+                `prepTimeMinutes`, `cookTimeMinutes`, `servings`, `externalUrl`, `ingredientsJson`,
+                `stepsJson`, `tagsJson`, `labelsJson`, `version`, `updatedAt`
+            )
+            SELECT
+                `recipeId`, `isNewRecipe`, `title`, `description`, `imageUrl`, `localImagePath`,
+                `prepTimeMinutes`, `cookTimeMinutes`, `servings`, `externalUrl`, `ingredientsJson`,
+                `stepsJson`, `tagsJson`, `labelsJson`, `version`, `updatedAt`
+            FROM `recipe_drafts`
+            """.trimIndent()
+        )
+        db.execSQL("DROP TABLE `recipe_drafts`")
+        db.execSQL("ALTER TABLE `recipe_drafts_new` RENAME TO `recipe_drafts`")
+
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `recipe_image_state` (
+                `recipeId` BLOB NOT NULL, `attempts` INTEGER NOT NULL, `lastAttemptAt` INTEGER NOT NULL,
+                PRIMARY KEY(`recipeId`),
+                FOREIGN KEY(`recipeId`) REFERENCES `recipes`(`uuid`) ON UPDATE NO ACTION ON DELETE CASCADE
+            )
+            """.trimIndent()
+        )
     }
 }

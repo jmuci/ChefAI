@@ -59,12 +59,22 @@ object RecipeEditorReducer {
             recipeFields = state.recipeFields.copy(imageUrl = action.url, localImagePath = null)
         ).markDirty()
 
-        is EditorAction.ImageSelected -> state.copy(
-            recipeFields = state.recipeFields.copy(selectedImageUri = action.uri, localImagePath = null)
+        // The ViewModel copies the picked photo into RecipeImageStore and reports back via
+        // PickedImageStored — there's nothing for the reducer to do with the raw content:// itself.
+        is EditorAction.ImageSelected -> state
+
+        // A stored photo and a remote URL are alternatives, never both: the editor offers them as an
+        // either/or, and everything downstream — the backfill worker most of all — reads a blank
+        // imageUrl as "this image is the user's own, don't try to re-derive it". See ADR-011.
+        is EditorAction.PickedImageStored -> state.copy(
+            recipeFields = state.recipeFields.copy(
+                imageUrl = "",
+                localImagePath = action.localImagePath
+            )
         ).markDirty()
 
         is EditorAction.ClearImage -> state.copy(
-            recipeFields = state.recipeFields.copy(selectedImageUri = null, localImagePath = null)
+            recipeFields = state.recipeFields.copy(imageUrl = "", localImagePath = null)
         ).markDirty()
 
         // --- Ingredients ---
@@ -278,7 +288,6 @@ fun RecipeEditorState.toRecipeDraft(): RecipeDraft = RecipeDraft(
     title = recipeFields.title,
     description = recipeFields.description,
     imageUrl = recipeFields.imageUrl,
-    selectedImageUri = recipeFields.selectedImageUri,
     localImagePath = recipeFields.localImagePath,
     prepTimeMinutes = recipeFields.prepTimeMinutes,
     cookTimeMinutes = recipeFields.cookTimeMinutes,

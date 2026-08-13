@@ -30,17 +30,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.core.ui.recipeImageModel
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 
 @Composable
 fun ImageUploadContent(
-    selectedImageUri: String? = null,
+    localImagePath: String? = null,
     imageUrl: String = "",
     onImageUrlChange: (String) -> Unit = {},
     onSelectImage: () -> Unit = {},
@@ -51,7 +54,8 @@ fun ImageUploadContent(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Image Preview
-        if (selectedImageUri != null || imageUrl.isNotBlank()) {
+        val previewModel = recipeImageModel(localImagePath, imageUrl)
+        if (previewModel != null) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -60,57 +64,14 @@ fun ImageUploadContent(
                 Box(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    // Display selected image or URL
-                    if (selectedImageUri != null) {
-                        // For local URI, we'd use AsyncImage with Coil
-                        // Since Coil is not available, show a placeholder
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                Icons.Default.Image,
-                                contentDescription = null,
-                                modifier = Modifier.size(64.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                stringResource(R.string.image_selected),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                stringResource(R.string.note_image_upload),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    } else if (imageUrl.isNotBlank()) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                Icons.Default.Image,
-                                contentDescription = null,
-                                modifier = Modifier.size(64.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                stringResource(R.string.image_url_set),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                    }
+                    AsyncImage(
+                        model = previewModel,
+                        contentDescription = stringResource(R.string.image_selected),
+                        contentScale = ContentScale.Crop,
+                        placeholder = painterResource(R.drawable.ic_img_placeholder),
+                        error = painterResource(R.drawable.ic_img_error),
+                        modifier = Modifier.fillMaxSize()
+                    )
 
                     // Remove button
                     IconButton(
@@ -202,7 +163,7 @@ fun ImageUploadContent(
 fun ImageUploaderPreview() {
     ChefAITheme {
         ImageUploadContent(
-            selectedImageUri = null,
+            localImagePath = null,
         )
     }
 }

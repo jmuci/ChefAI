@@ -74,6 +74,11 @@ room {
     schemaDirectory("$projectDir/schemas")
 }
 
+// MigrationTestHelper reads the exported schemas off the device, so they have to ship as test assets.
+android.sourceSets.getByName("androidTest") {
+    assets.srcDir("$projectDir/schemas")
+}
+
 hilt {
     enableAggregatingTask = true
 }
@@ -187,6 +192,9 @@ dependencies {
     // Dependencies for Android tests ====
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+
+    // MigrationTestHelper needs a real SQLite, so the Room test artifact is needed on device too.
+    androidTestImplementation(libs.androidx.room.testing)
     
     // Compose UI testing
     androidTestImplementation(libs.androidx.ui.test.junit4)
