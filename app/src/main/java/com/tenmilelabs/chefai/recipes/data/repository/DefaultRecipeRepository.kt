@@ -15,6 +15,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.TagDao
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import com.tenmilelabs.chefai.core.domain.model.Recipe
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
+import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import com.tenmilelabs.chefai.recipes.data.mapper.toCrossRef
 import com.tenmilelabs.chefai.recipes.data.mapper.toDomain
 import com.tenmilelabs.chefai.recipes.data.mapper.toRecipePreviewDomain
@@ -49,6 +50,7 @@ class DefaultRecipeRepository @Inject constructor(
     private val recipeLabelDao: RecipeLabelCrossRefDao,
     private val networkDataSource: RecipeNetworkDataSource,
     private val sessionManager: SessionManager,
+    private val recipeImageStore: RecipeImageStore,
     private val syncManager: SyncScheduler) : RecipesRepository {
 
     override fun getRecipesPreviewStream(): Flow<List<RecipePreview>> {
@@ -261,11 +263,26 @@ class DefaultRecipeRepository @Inject constructor(
 
     override suspend fun deleteRecipe(recipeId: UUID) {
         recipeDao.deleteRecipe(recipeId)
+        recipeImageStore.delete(recipeId)
         syncManager.requestMutationSync()
     }
 
+    /**
+     * Marks the recipe deleted and reclaims its cached image.
+     *
+     * The image goes now rather than on some later hard delete because there is no later hard delete:
+     * nothing in the app ever removes a soft-deleted row, so waiting would mean keeping up to
+     * `MAX_IMAGE_BYTES` per deleted recipe forever. Deletion has no undo (#129), and the row is gone
+     * from every query the moment `deletedAt` is set.
+     *
+     * For a scraped image this costs nothing — the backfill can re-derive it from `imageUrl` if the
+     * recipe ever comes back. For a user-picked photo it is irreversible, since there is no source to
+     * re-derive from. That asymmetry is the clearest argument for uploading user-authored images,
+     * which is Stage 2 of #132; see ADR-011.
+     */
     override suspend fun softDeleteRecipe(recipeId: UUID) {
         recipeDao.softDelete(recipeId, System.currentTimeMillis())
+        recipeImageStore.delete(recipeId)
         syncManager.requestMutationSync()
     }
 

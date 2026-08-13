@@ -48,7 +48,15 @@ class AccountSwitchHandler @Inject constructor(
                 // We intentionally keep the UserEntity and its meal plans: all queries
                 // filter by userId so they're invisible to other users, and when the
                 // original user logs back in their local plans will still be there.
+                //
+                // Ids are collected first because deleteRecipesForUser is a bulk SQL delete — after
+                // it runs there is no way to tell which images belonged to the departing account.
+                // Without this the previous user's photos stay readable on a shared device: the rows
+                // go but the files in recipe_images/ do not. deleteAll() would be wrong here, since
+                // this branch exists precisely to preserve the anonymous session's own images.
+                val departingRecipeIds = recipeDao.getRecipeIdsForUser(previousUserId)
                 recipeDao.deleteRecipesForUser(previousUserId)
+                departingRecipeIds.forEach { recipeImageStore.delete(it) }
                 AccountSwitchOutcome.PRESERVED_ANONYMOUS_DATA
             }
             else -> {
