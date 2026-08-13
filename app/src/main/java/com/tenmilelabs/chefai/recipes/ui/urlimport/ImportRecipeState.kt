@@ -12,6 +12,10 @@ sealed interface ImportAction {
 
 sealed interface ImportEffect {
     data class NavigateToEditorWithDraft(val draftId: UUID) : ImportEffect
+
+    /** Opens the in-app browser so the user can clear the site's bot check. */
+    data class NavigateToBrowserImport(val url: String) : ImportEffect
+
     data object NavigateToManualEditor : ImportEffect
     data object NavigateBack : ImportEffect
 }

@@ -37,6 +37,7 @@ import java.util.UUID
 @Composable
 fun ImportRecipeRoute(
     onNavigateToEditorWithDraft: (UUID) -> Unit,
+    onNavigateToBrowserImport: (String) -> Unit,
     onNavigateToManualEditor: () -> Unit,
     onNavigateBack: () -> Unit,
     viewModel: ImportRecipeViewModel = hiltViewModel(),
@@ -47,6 +48,7 @@ fun ImportRecipeRoute(
         viewModel.effects.collect { effect ->
             when (effect) {
                 is ImportEffect.NavigateToEditorWithDraft -> onNavigateToEditorWithDraft(effect.draftId)
+                is ImportEffect.NavigateToBrowserImport -> onNavigateToBrowserImport(effect.url)
                 ImportEffect.NavigateToManualEditor -> onNavigateToManualEditor()
                 ImportEffect.NavigateBack -> onNavigateBack()
             }
