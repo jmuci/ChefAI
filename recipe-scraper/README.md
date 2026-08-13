@@ -14,6 +14,12 @@ Recipe sites are SEO-driven, so they almost universally embed
 HTML for Google's rich-snippet search results. That's enough to extract a usable recipe from most
 sites without a headless browser or JS execution.
 
+A minority of sites won't hand that HTML to a plain HTTP client at all — bot protection scoring TLS
+and IP fingerprints, or markup only assembled once the page's own scripts have run. That's a
+*fetching* problem, not a parsing one: `:app` retries those through a `WebView` and feeds the
+rendered DOM back into this same parser. See
+[ADR-010 Decision 5](../docs/adrs/adr-010-client-side-recipe-scraping.md).
+
 ## Public API
 
 ```kotlin
