@@ -214,7 +214,7 @@ class SyncMapperTest {
 
     @Test
     fun `toRecipeEntity maps DTO fields correctly and sets syncState to SYNCED`() {
-        val entity = syncRecipeDto.toRecipeEntity()
+        val entity = syncRecipeDto.toRecipeEntity(localImagePath = null)
 
         assertThat(entity.uuid).isEqualTo(recipeId)
         assertThat(entity.title).isEqualTo("Server Recipe")
@@ -230,6 +230,13 @@ class SyncMapperTest {
         assertThat(entity.updatedAt).isEqualTo(2000000L)
         assertThat(entity.deletedAt).isNull()
         assertThat(entity.syncState).isEqualTo(SyncState.SYNCED)
+    }
+
+    @Test
+    fun `toRecipeEntity passes the given localImagePath through untouched`() {
+        val entity = syncRecipeDto.toRecipeEntity(localImagePath = "/data/user/0/com.tenmilelabs.chefai/files/recipe_images/abc")
+
+        assertThat(entity.localImagePath).isEqualTo("/data/user/0/com.tenmilelabs.chefai/files/recipe_images/abc")
     }
 
     @Test
@@ -292,7 +299,7 @@ class SyncMapperTest {
     fun `round-trip preserves recipe data`() {
         // Entity -> DTO -> Entity
         val dto = recipeEntity.toSyncDto(stepEntities, ingredientEntities, tagCrossRefs, labelCrossRefs)
-        val roundTrippedEntity = dto.toRecipeEntity()
+        val roundTrippedEntity = dto.toRecipeEntity(localImagePath = null)
 
         assertThat(roundTrippedEntity.uuid).isEqualTo(recipeEntity.uuid)
         assertThat(roundTrippedEntity.title).isEqualTo(recipeEntity.title)
@@ -340,7 +347,7 @@ class SyncMapperTest {
     @Test
     fun `toRecipeEntity with deletedAt preserves the value`() {
         val deletedDto = syncRecipeDto.copy(deletedAt = 3000000L)
-        val entity = deletedDto.toRecipeEntity()
+        val entity = deletedDto.toRecipeEntity(localImagePath = null)
 
         assertThat(entity.deletedAt).isEqualTo(3000000L)
     }
@@ -350,7 +357,7 @@ class SyncMapperTest {
         RecipePrivacy.entries.forEach { privacy ->
             val entityWithPrivacy = recipeEntity.copy(privacy = privacy)
             val dto = entityWithPrivacy.toSyncDto(emptyList(), emptyList(), emptyList(), emptyList())
-            val roundTripped = dto.toRecipeEntity()
+            val roundTripped = dto.toRecipeEntity(localImagePath = null)
 
             assertThat(dto.privacy).isEqualTo(privacy.name)
             assertThat(roundTripped.privacy).isEqualTo(privacy)

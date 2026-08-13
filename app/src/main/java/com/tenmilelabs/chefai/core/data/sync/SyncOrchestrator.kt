@@ -350,7 +350,10 @@ class SyncOrchestrator @Inject constructor(
     private suspend fun upsertRecipeAggregate(syncRecipe: SyncRecipeDto) {
         val recipeId = UUID.fromString(syncRecipe.uuid)
 
-        recipeDao.upsertRecipe(syncRecipe.toRecipeEntity())
+        // The DTO never carries the device-local cached-image path (see SyncMapper.toRecipeEntity) —
+        // read back whatever this device already has so this upsert doesn't wipe it.
+        val existingLocalImagePath = recipeDao.getRecipeById(recipeId)?.localImagePath
+        recipeDao.upsertRecipe(syncRecipe.toRecipeEntity(existingLocalImagePath))
 
         recipeStepDao.deleteAllForRecipe(recipeId)
         recipeStepDao.upsertAll(syncRecipe.toStepEntities())
