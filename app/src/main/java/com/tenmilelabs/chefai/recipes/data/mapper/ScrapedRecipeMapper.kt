@@ -8,6 +8,7 @@ import com.tenmilelabs.chefai.core.domain.model.Tag
 import com.tenmilelabs.chefai.recipes.domain.model.RecipeDraft
 import com.tenmilelabs.recipescraper.model.ScrapedIngredient
 import com.tenmilelabs.recipescraper.model.ScrapedRecipe
+import java.net.URI
 import java.util.UUID
 
 private const val MAX_KEYWORDS = 8
@@ -34,7 +35,7 @@ fun ScrapedRecipe.toRecipeDraft(
     isNewRecipe = true,
     title = title,
     description = description.orEmpty(),
-    imageUrl = imageUrl.orEmpty(),
+    imageUrl = resolvedImageUrl().orEmpty(),
     prepTimeMinutes = prepTimeMinutes?.toString() ?: "0",
     cookTimeMinutes = cookTimeMinutesOrFallback(),
     servings = servings?.toString() ?: "0",
@@ -45,6 +46,15 @@ fun ScrapedRecipe.toRecipeDraft(
     labels = emptyList(),
     version = 1,
 )
+
+/**
+ * Resolves [ScrapedRecipe.imageUrl] against [ScrapedRecipe.sourceUrl] — the scraper's own KDoc
+ * flags that the value "may be relative to sourceUrl", and resolution is documented as the caller's
+ * job (`:recipe-scraper` reports what a page published without fabricating or defaulting a value).
+ * Falls back to the raw value on any malformed input rather than dropping the image outright.
+ */
+private fun ScrapedRecipe.resolvedImageUrl(): String? =
+    imageUrl?.let { url -> runCatching { URI(sourceUrl).resolve(url).toString() }.getOrDefault(url) }
 
 /** Prefers [ScrapedRecipe.cookTimeMinutes]; falls back to total-minus-prep, then to `"0"`. */
 private fun ScrapedRecipe.cookTimeMinutesOrFallback(): String {

@@ -5,6 +5,7 @@ import com.tenmilelabs.chefai.core.di.IoDispatcher
 import com.tenmilelabs.chefai.core.di.ScraperHttpClient
 import com.tenmilelabs.chefai.core.domain.repository.MetadataRepository
 import com.tenmilelabs.chefai.recipes.data.mapper.toRecipeDraft
+import com.tenmilelabs.chefai.recipes.data.network.BOT_WALL_STATUSES
 import com.tenmilelabs.chefai.recipes.data.network.decodeHtml
 import com.tenmilelabs.chefai.recipes.domain.model.RecipeImportResult
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipeImporter
@@ -17,7 +18,6 @@ import io.ktor.client.plugins.ResponseException
 import io.ktor.client.request.get
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
-import io.ktor.http.HttpStatusCode
 import io.ktor.http.charset
 import io.ktor.http.contentType
 import io.ktor.utils.io.readAvailable
@@ -42,18 +42,6 @@ private const val MAX_BODY_BYTES = 3 * 1024 * 1024
  * which simply isn't a recipe doesn't leave the user watching a spinner. Tune from real use.
  */
 private val RENDER_BUDGET = 8.seconds
-
-/**
- * Statuses a bot manager returns to a client it doesn't like. Akamai and Cloudflare both answer
- * 403; 401, 429 and 503 cover the rate-limit and "under attack mode" variants. A 404 is
- * deliberately absent — that page really is missing, and a browser won't find it either.
- */
-private val BOT_WALL_STATUSES = setOf(
-    HttpStatusCode.Unauthorized,
-    HttpStatusCode.Forbidden,
-    HttpStatusCode.TooManyRequests,
-    HttpStatusCode.ServiceUnavailable,
-)
 
 @Singleton
 class DefaultRecipeImporter @Inject constructor(

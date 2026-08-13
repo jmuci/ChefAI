@@ -64,6 +64,42 @@ class ScrapedRecipeMapperTest {
     }
 
     @Test
+    fun `a root-relative imageUrl is resolved against the source origin`() {
+        val draft = minimalScrapedRecipe(imageUrl = "/img/x.jpg", sourceUrl = "https://example.com/recipes/pie")
+            .toRecipeDraft(UUID.randomUUID(), emptyList(), emptyList())
+
+        assertEquals("https://example.com/img/x.jpg", draft.imageUrl)
+    }
+
+    @Test
+    fun `a protocol-relative imageUrl inherits the source scheme`() {
+        val draft = minimalScrapedRecipe(imageUrl = "//cdn.example.com/x.jpg", sourceUrl = "https://example.com/recipe")
+            .toRecipeDraft(UUID.randomUUID(), emptyList(), emptyList())
+
+        assertEquals("https://cdn.example.com/x.jpg", draft.imageUrl)
+    }
+
+    @Test
+    fun `an already-absolute imageUrl is left as the caller published it`() {
+        val draft = minimalScrapedRecipe(
+            imageUrl = "https://cdn.other.com/y.jpg",
+            sourceUrl = "https://example.com/recipe",
+        ).toRecipeDraft(UUID.randomUUID(), emptyList(), emptyList())
+
+        assertEquals("https://cdn.other.com/y.jpg", draft.imageUrl)
+    }
+
+    @Test
+    fun `an imageUrl that cannot be resolved falls back to the raw scraped value`() {
+        // An unescaped space makes this an invalid URI reference; resolution must not throw or
+        // silently drop the value — the raw string is still better than nothing.
+        val draft = minimalScrapedRecipe(imageUrl = "/img/has space.jpg", sourceUrl = "https://example.com/recipe")
+            .toRecipeDraft(UUID.randomUUID(), emptyList(), emptyList())
+
+        assertEquals("/img/has space.jpg", draft.imageUrl)
+    }
+
+    @Test
     fun `null description and imageUrl become blank, not omitted`() {
         val draft = minimalScrapedRecipe(description = null, imageUrl = null)
             .toRecipeDraft(UUID.randomUUID(), emptyList(), emptyList())

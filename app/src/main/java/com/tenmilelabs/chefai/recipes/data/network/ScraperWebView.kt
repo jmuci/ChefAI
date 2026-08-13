@@ -15,6 +15,55 @@ private const val MAX_SNAPSHOT_CHARS = 4 * 1024 * 1024
 private const val OUTER_HTML_SCRIPT = "document.documentElement.outerHTML"
 
 /**
+ * Caps how large a downloaded recipe image is allowed to be — comfortably past any real hero
+ * image, while bounding how much a hostile response can inflate memory (twice over: once as raw
+ * bytes in the WebView's own fetch, again as the base64 string handed back across the JNI bridge).
+ */
+internal const val MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+/** Base64 inflates by ~4/3; a little headroom is left for the `data:<mime>;base64,` prefix. */
+private const val MAX_IMAGE_DATA_URL_CHARS = MAX_IMAGE_BYTES * 4 / 3 + 128
+
+/**
+ * JS that fetches the document's own URL and hands back its bytes as a `data:` URL.
+ *
+ * Navigating a WebView directly to an image URL loads it inside a synthetic image document whose
+ * origin *is* the image's origin — the only way to read the bytes back with `fetch()` without
+ * hitting CORS, and the reason this loads [WebView]'s own `location.href` rather than being handed
+ * a URL as an argument. `cache: 'force-cache'` reuses the bytes the navigation itself just
+ * downloaded rather than fetching twice.
+ *
+ * `fetch` is async and `evaluateJavascript` is not, so the outcome is stashed on a `window` global
+ * and each call to this script just reads whatever state is current — polled the same way
+ * [readRenderedHtml] polls for parseable markup. This is a plain `fetch`, not a bridge into app
+ * code: there is deliberately no `addJavascriptInterface` anywhere in this feature (see
+ * [applyScraperHardening]'s KDoc).
+ */
+private val IMAGE_FETCH_SCRIPT = """
+    (function () {
+      var s = window.__chefaiImg;
+      if (!s) {
+        window.__chefaiImg = { state: 'pending' };
+        fetch(location.href, { cache: 'force-cache' })
+          .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.blob(); })
+          .then(function (b) {
+            if (b.size > $MAX_IMAGE_BYTES) throw new Error('too large: ' + b.size);
+            return new Promise(function (res, rej) {
+              var fr = new FileReader();
+              fr.onload = function () { res(fr.result); };
+              fr.onerror = function () { rej(fr.error); };
+              fr.readAsDataURL(b);
+            });
+          })
+          .then(function (d) { window.__chefaiImg = { state: 'ok', data: d }; })
+          .catch(function (e) { window.__chefaiImg = { state: 'error', message: String(e) }; });
+        return 'pending';
+      }
+      return s.state === 'ok' ? s.data : s.state;
+    })()
+""".trimIndent()
+
+/**
  * Applies the settings shared by both recipe-scraping WebViews — the off-screen one in
  * [WebViewHtmlFetcher] and the visible one on the browser-import screen.
  *
@@ -90,5 +139,18 @@ internal fun WebView.readRenderedHtml(onResult: (String?) -> Unit) {
             ?.takeIf { it.isNotBlank() && it != "null" && it.length <= MAX_SNAPSHOT_CHARS }
             ?.let { runCatching { Json.decodeFromString<String>(it) }.getOrNull() }
         onResult(html)
+    }
+}
+
+/**
+ * Reads the current state of [IMAGE_FETCH_SCRIPT]'s in-page fetch — `"pending"`, `"error"`, a
+ * `data:` URL on success, or `null` if the bridge call itself couldn't be decoded.
+ */
+internal fun WebView.readImageDataUrl(onResult: (String?) -> Unit) {
+    evaluateJavascript(IMAGE_FETCH_SCRIPT) { encoded ->
+        val result = encoded
+            ?.takeIf { it.isNotBlank() && it != "null" && it.length <= MAX_IMAGE_DATA_URL_CHARS }
+            ?.let { runCatching { Json.decodeFromString<String>(it) }.getOrNull() }
+        onResult(result)
     }
 }

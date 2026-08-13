@@ -18,8 +18,10 @@ import com.tenmilelabs.chefai.core.domain.repository.MetadataRepository
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeImporter
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeRepository
 import com.tenmilelabs.chefai.recipes.data.network.WebViewHtmlFetcher
+import com.tenmilelabs.chefai.recipes.data.network.WebViewImageFetcher
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipeImporter
 import com.tenmilelabs.chefai.recipes.domain.repository.RenderedHtmlFetcher
+import com.tenmilelabs.chefai.recipes.domain.repository.RenderedImageFetcher
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.Binds
 import dagger.Module
@@ -63,6 +65,10 @@ abstract class RepositoryModule {
     @Singleton
     @Binds
     abstract fun bindRenderedHtmlFetcher(fetcher: WebViewHtmlFetcher): RenderedHtmlFetcher
+
+    @Singleton
+    @Binds
+    abstract fun bindRenderedImageFetcher(fetcher: WebViewImageFetcher): RenderedImageFetcher
 }
 
 

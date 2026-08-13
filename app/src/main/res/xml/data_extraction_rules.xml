@@ -9,6 +9,8 @@
         <include .../>
         <exclude .../>
         -->
+        <!-- Re-downloadable recipe images cached from third-party CDNs — no reason to back these up. -->
+        <exclude domain="file" path="recipe_images/"/>
     </cloud-backup>
     <!--
     <device-transfer>
