@@ -16,6 +16,8 @@ import com.tenmilelabs.chefai.recipes.data.mapper.toRecipeDraftEntity
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
 import com.tenmilelabs.chefai.recipes.domain.model.EditorMode
 import com.tenmilelabs.chefai.recipes.domain.model.RecipeDraft
+import com.tenmilelabs.chefai.recipes.domain.usecase.CachePickedImage
+import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -40,6 +42,7 @@ class RecipeEditorViewModelTest {
     private lateinit var collectionsRepository: FakeCollectionsRepository
     private lateinit var metadataRepository: FakeMetadataRepository
     private lateinit var recipeDraftDao: FakeRecipeDraftDao
+    private lateinit var cachePickedImage: CachePickedImage
 
     @Before
     fun setup() {
@@ -47,6 +50,10 @@ class RecipeEditorViewModelTest {
         collectionsRepository = FakeCollectionsRepository()
         metadataRepository = FakeMetadataRepository()
         recipeDraftDao = FakeRecipeDraftDao()
+        cachePickedImage = CachePickedImage(
+            recipeImageStore = mockk(relaxed = true),
+            ioDispatcher = mainCoroutineRule.testDispatcher,
+        )
     }
 
     private fun createViewModel(
@@ -65,6 +72,7 @@ class RecipeEditorViewModelTest {
                 testScope = TestScope(StandardTestDispatcher()),
             ),
             recipeDraftDao = recipeDraftDao,
+            cachePickedImage = cachePickedImage,
             ioDispatcher = mainCoroutineRule.testDispatcher,
             savedStateHandle = savedStateHandle,
         )

@@ -19,6 +19,7 @@ import com.tenmilelabs.chefai.recipes.data.mapper.toRecipeDraftEntity
 import com.tenmilelabs.chefai.recipes.domain.model.EditorMode
 import com.tenmilelabs.chefai.recipes.domain.model.RecipeDraft
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
+import com.tenmilelabs.chefai.recipes.domain.usecase.CachePickedImage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
@@ -46,6 +47,7 @@ class RecipeEditorViewModel @Inject constructor(
     private val metadataRepository: MetadataRepository,
     private val sessionManager: SessionManager,
     private val recipeDraftDao: RecipeDraftDao,
+    private val cachePickedImage: CachePickedImage,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
@@ -110,6 +112,7 @@ class RecipeEditorViewModel @Inject constructor(
         when (action) {
             is EditorAction.Save -> save()
             is EditorAction.ConfirmDelete -> delete()
+            is EditorAction.ImageSelected -> storePickedImage(action.uri)
             is EditorAction.IngredientInputChanged -> updateIngredientSuggestions(action.input)
             is EditorAction.TagInputChanged -> updateTagSuggestions(action.input)
             is EditorAction.LabelInputChanged -> updateLabelSuggestions(action.input)
@@ -186,7 +189,6 @@ class RecipeEditorViewModel @Inject constructor(
                         title = draft.title,
                         description = draft.description,
                         imageUrl = draft.imageUrl,
-                        selectedImageUri = draft.selectedImageUri,
                         localImagePath = draft.localImagePath,
                         prepTimeMinutes = draft.prepTimeMinutes,
                         cookTimeMinutes = draft.cookTimeMinutes,
@@ -239,6 +241,28 @@ class RecipeEditorViewModel @Inject constructor(
         }
         val label = existing ?: Label(uuid = UuidV7Generator.newId(), displayName = name)
         dispatch(EditorAction.AddLabel(label))
+    }
+
+    // --- Image ---
+
+    /**
+     * Takes ownership of a photo the user picked, then reports the stored path back through the
+     * reducer.
+     *
+     * Copied now rather than at save time on purpose: the picker hands back a `content://` whose read
+     * grant is scoped to the Activity, so a URI merely held in state is unreadable once the process
+     * is restarted — which is exactly how a picked photo used to vanish. The draft's recipeId is
+     * already stable here, so the bytes land at the path the saved recipe will read from.
+     */
+    private fun storePickedImage(uri: String?) {
+        if (uri == null) return
+        viewModelScope.launch {
+            val storedPath = cachePickedImage(_state.value.recipeId, uri)
+            if (storedPath == null) {
+                Timber.w("Could not store picked image for %s", _state.value.recipeId)
+            }
+            dispatch(EditorAction.PickedImageStored(storedPath))
+        }
     }
 
     // --- Autocomplete Suggestions ---

@@ -74,16 +74,43 @@ class RecipeEditorReducerTest {
     // --- Image ---
 
     @Test
-    fun `ImageSelected updates selectedImageUri`() {
+    fun `ImageSelected leaves state untouched — the ViewModel stores the bytes first`() {
         val result = RecipeEditorReducer.reduce(emptyState, EditorAction.ImageSelected("content://img"))
-        assertEquals("content://img", result.recipeFields.selectedImageUri)
+        assertEquals(emptyState, result)
     }
 
     @Test
-    fun `ClearImage sets selectedImageUri to null`() {
-        val state = emptyState.copy(recipeFields = RecipeFields(selectedImageUri = "uri"))
+    fun `PickedImageStored records the stored path`() {
+        val result = RecipeEditorReducer.reduce(
+            emptyState,
+            EditorAction.PickedImageStored("/data/recipe_images/abc")
+        )
+        assertEquals("/data/recipe_images/abc", result.recipeFields.localImagePath)
+    }
+
+    @Test
+    fun `PickedImageStored clears imageUrl so the image reads as user-authored`() {
+        val state = emptyState.copy(
+            recipeFields = RecipeFields(imageUrl = "https://example.com/scraped.jpg")
+        )
+        val result = RecipeEditorReducer.reduce(
+            state,
+            EditorAction.PickedImageStored("/data/recipe_images/abc")
+        )
+        assertEquals("", result.recipeFields.imageUrl)
+    }
+
+    @Test
+    fun `ClearImage clears both the stored path and the url`() {
+        val state = emptyState.copy(
+            recipeFields = RecipeFields(
+                imageUrl = "https://example.com/x.jpg",
+                localImagePath = "/data/recipe_images/abc"
+            )
+        )
         val result = RecipeEditorReducer.reduce(state, EditorAction.ClearImage)
-        assertEquals(null, result.recipeFields.selectedImageUri)
+        assertEquals(null, result.recipeFields.localImagePath)
+        assertEquals("", result.recipeFields.imageUrl)
     }
 
     // --- Ingredients ---

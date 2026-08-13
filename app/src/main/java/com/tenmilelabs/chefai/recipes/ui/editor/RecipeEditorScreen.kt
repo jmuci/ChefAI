@@ -401,7 +401,7 @@ private fun ImageUploadSection(
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SectionHeader(title = stringResource(R.string.section_recipe_photo))
         ImageUploadContent(
-            selectedImageUri = recipeState.selectedImageUri,
+            localImagePath = recipeState.localImagePath,
             imageUrl = recipeState.imageUrl,
             onImageUrlChange = onImageUrlChange,
             onSelectImage = onSelectImage,

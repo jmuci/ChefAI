@@ -37,7 +37,6 @@ class RecipeDraftDaoTest {
             title = title,
             description = "A description",
             imageUrl = "",
-            selectedImageUri = null,
             localImagePath = null,
             prepTimeMinutes = "10",
             cookTimeMinutes = "20",

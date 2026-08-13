@@ -20,7 +20,6 @@ class FakeRecipeDraftDaoTest {
         title = "Test Recipe",
         description = "Test description",
         imageUrl = "",
-        selectedImageUri = null,
         localImagePath = null,
         prepTimeMinutes = "10",
         cookTimeMinutes = "20",

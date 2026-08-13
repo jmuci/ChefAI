@@ -32,7 +32,6 @@
     <string name="home_recipe_suggestions_title">For You</string>
     <string name="home_screen_title">Home</string>
     <string name="image_selected">Image selected</string>
-    <string name="image_url_set">Image URL set</string>
     <string name="import_recipe_action_label">Recipe import coming soon</string>
     <string name="ingredient_display_format">%1$s %2$s %3$s</string>
     <string name="ingredient_quantity_format">%1$s %2$s</string>
@@ -57,7 +56,6 @@
     <string name="no_items_added">No items added yet</string>
     <string name="no_recipes_subtitle">Start browsing recipes and bookmark the ones you like to populate your collection.</string>
     <string name="no_recipes_title">No recipes in your collection</string>
-    <string name="note_image_upload">Note: Image upload needs backend implementation</string>
     <string name="placeholder_add_labels">Type and press Enter…</string>
     <string name="placeholder_add_step">Describe the next step…</string>
     <string name="placeholder_add_tags">Type and press Enter…</string>
