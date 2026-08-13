@@ -11,6 +11,7 @@ import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.SourceClassificationEntity
 import com.tenmilelabs.chefai.core.data.local.room.TagEntity
 import com.tenmilelabs.chefai.core.data.local.room.UserEntity
+import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeImageCandidate
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeWithDetails
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeWithLabels
@@ -248,6 +249,22 @@ class FakeRecipeDao : RecipeDao {
                 updatedAt = deletedAt
             )
         }
+        triggerUpdate()
+    }
+
+    // --- Image backfill ---
+
+    override suspend fun getImageBackfillCandidates(
+        maxAttempts: Int,
+        scanLimit: Int
+    ): List<RecipeImageCandidate> = recipes.values
+        .filter { it.deletedAt == null && it.imageUrl.isNotEmpty() }
+        .sortedByDescending { it.updatedAt }
+        .take(scanLimit)
+        .map { RecipeImageCandidate(it.uuid, it.imageUrl, it.localImagePath) }
+
+    override suspend fun updateLocalImagePath(uuid: UUID, localImagePath: String?) {
+        recipes[uuid]?.let { recipes[uuid] = it.copy(localImagePath = localImagePath) }
         triggerUpdate()
     }
 

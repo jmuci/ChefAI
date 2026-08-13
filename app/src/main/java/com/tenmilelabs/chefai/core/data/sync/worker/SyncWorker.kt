@@ -8,6 +8,7 @@ import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.core.data.sync.SyncOrchestrator
 import com.tenmilelabs.chefai.core.data.sync.SyncStatus
+import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import com.tenmilelabs.chefai.core.data.sync.SyncStatusHolder
 import com.tenmilelabs.chefai.core.data.sync.network.SyncHttpException
 import dagger.assisted.Assisted
@@ -20,7 +21,8 @@ class SyncWorker @AssistedInject constructor(
     @Assisted workerParams: WorkerParameters,
     private val syncOrchestrator: SyncOrchestrator,
     private val sessionManager: SessionManager,
-    private val syncStatusHolder: SyncStatusHolder
+    private val syncStatusHolder: SyncStatusHolder,
+    private val syncScheduler: SyncScheduler
 ) : CoroutineWorker(appContext, workerParams) {
 
     companion object {
@@ -41,6 +43,10 @@ class SyncWorker @AssistedInject constructor(
             val result = syncOrchestrator.sync()
             Timber.d("SyncWorker: Sync completed — $result")
             syncStatusHolder.emitStatus(SyncStatus.Synced(System.currentTimeMillis()))
+            // A pull can bring in recipes whose image only exists on the device that imported them.
+            // Enqueued rather than chained: backfill waits for a charger and unmetered data, and a
+            // chain would hold this sync's slot until those were satisfied.
+            syncScheduler.scheduleImageBackfill()
             Result.success()
         } catch (e: SyncHttpException) {
             if (e.statusCode == 401) {

@@ -10,6 +10,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.tenmilelabs.chefai.core.data.sync.worker.SyncWorker
+import com.tenmilelabs.chefai.recipes.data.worker.RecipeImageBackfillWorker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.StateFlow
 import java.util.concurrent.TimeUnit
@@ -28,6 +29,7 @@ class SyncManager @Inject constructor(
     companion object {
         const val SYNC_WORK_NAME = "recipe_sync"
         const val PERIODIC_SYNC_WORK_NAME = "recipe_periodic_sync"
+        const val IMAGE_BACKFILL_WORK_NAME = "recipe_image_backfill"
     }
 
     val syncStatus: StateFlow<SyncStatus> get() = syncStatusHolder.syncStatus
@@ -106,12 +108,26 @@ class SyncManager @Inject constructor(
     }
 
     /**
+     * Enqueue a sweep for recipe images missing on this device.
+     * KEEP, so a sync finishing while a sweep is already queued doesn't stack requests.
+     */
+    override fun scheduleImageBackfill() {
+        val request = OneTimeWorkRequestBuilder<RecipeImageBackfillWorker>()
+            .setConstraints(imageBackfillConstraints())
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_DELAY_SECONDS, TimeUnit.SECONDS)
+            .build()
+        WorkManager.getInstance(context)
+            .enqueueUniqueWork(IMAGE_BACKFILL_WORK_NAME, ExistingWorkPolicy.KEEP, request)
+    }
+
+    /**
      * Cancel all sync work (e.g., on logout).
      */
     override fun cancelAllSync() {
         val wm = WorkManager.getInstance(context)
         wm.cancelUniqueWork(SYNC_WORK_NAME)
         wm.cancelUniqueWork(PERIODIC_SYNC_WORK_NAME)
+        wm.cancelUniqueWork(IMAGE_BACKFILL_WORK_NAME)
     }
 
     private fun connectedConstraints() = Constraints.Builder()
@@ -120,6 +136,16 @@ class SyncManager @Inject constructor(
 
     private fun periodicSyncConstraints() = Constraints.Builder()
         .setRequiredNetworkType(NetworkType.CONNECTED)
+        .setRequiresCharging(true)
+        .build()
+
+    /**
+     * Stricter than every other constraint here. Backfill downloads whole images — up to
+     * `MAX_IMAGE_BYTES` each — and escalates to a `WebView` for the bot-walled ones, so it waits for
+     * a charger and a network the user isn't paying by the megabyte for.
+     */
+    private fun imageBackfillConstraints() = Constraints.Builder()
+        .setRequiredNetworkType(NetworkType.UNMETERED)
         .setRequiresCharging(true)
         .build()
 }

@@ -17,5 +17,14 @@ interface SyncScheduler {
     /** Cancels any queued sync and enqueues a new one immediately (user-initiated). */
     fun requestManualSync()
     fun schedulePeriodicSync()
+
+    /**
+     * Enqueues a sweep for recipe images this device is missing but a synced-from device already had.
+     *
+     * Constrained to a charger and unmetered network, unlike every other request here: the work is a
+     * burst of image downloads with an off-screen `WebView` behind some of them, and nobody is
+     * waiting on it.
+     */
+    fun scheduleImageBackfill()
     fun cancelAllSync()
 }
