@@ -21,6 +21,7 @@ import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import io.mockk.coVerify
+import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -88,7 +89,8 @@ class SessionManagerTest {
             securePreferences = fakeSecurePreferences,
             database = mockDatabase,
             recipeDao = fakeRecipeDao,
-            userDao = fakeUserDao
+            userDao = fakeUserDao,
+            recipeImageStore = mockk<RecipeImageStore>(relaxed = true),
         )
 
         // Create SessionManager with test scope

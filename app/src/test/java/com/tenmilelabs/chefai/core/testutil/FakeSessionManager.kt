@@ -18,6 +18,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
+import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -58,7 +59,8 @@ fun createTestSessionManager(
             securePreferences = fakeSecurePreferences,
             database = mockk<ChefAIDataBase>(relaxed = true),
             recipeDao = FakeRecipeDao(),
-            userDao = fakeUserDao
+            userDao = fakeUserDao,
+            recipeImageStore = mockk<RecipeImageStore>(relaxed = true),
         ),
         accountUpgradeUseCaseProvider = {
             AccountUpgradeUseCase(
@@ -101,7 +103,8 @@ fun createRealSessionManagerWithFakes(
             securePreferences = fakeSecurePreferences,
             database = mockk<ChefAIDataBase>(relaxed = true),
             recipeDao = FakeRecipeDao(),
-            userDao = fakeUserDao
+            userDao = fakeUserDao,
+            recipeImageStore = mockk<RecipeImageStore>(relaxed = true),
         ),
         accountUpgradeUseCaseProvider = {
             AccountUpgradeUseCase(

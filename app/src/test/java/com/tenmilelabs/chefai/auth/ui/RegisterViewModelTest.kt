@@ -21,6 +21,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
+import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -63,7 +64,8 @@ class RegisterViewModelTest {
                 securePreferences = fakeSecurePreferences,
                 database = mockk<ChefAIDataBase>(relaxed = true),
                 recipeDao = fakeRecipeDao,
-                userDao = fakeUserDao
+                userDao = fakeUserDao,
+                recipeImageStore = mockk<RecipeImageStore>(relaxed = true),
             ),
             accountUpgradeUseCaseProvider = {
                 AccountUpgradeUseCase(
