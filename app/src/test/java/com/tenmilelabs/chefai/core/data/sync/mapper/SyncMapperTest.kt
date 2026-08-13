@@ -12,6 +12,8 @@ import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeIngredientDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeStepDto
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.junit.Test
 import java.util.UUID
 
@@ -118,6 +120,17 @@ class SyncMapperTest {
         assertThat(dto.privacy).isEqualTo("PUBLIC")
         assertThat(dto.updatedAt).isEqualTo(updatedAt)
         assertThat(dto.deletedAt).isNull()
+    }
+
+    @Test
+    fun `toSyncDto never leaks localImagePath — it is device-local, see issue 132`() {
+        val entityWithLocalImage = recipeEntity.copy(localImagePath = "/files/recipe_images/$recipeId")
+
+        val dto = entityWithLocalImage.toSyncDto(stepEntities, ingredientEntities, tagCrossRefs, labelCrossRefs)
+        val json = Json.encodeToString(dto)
+
+        assertThat(json).doesNotContain("localImagePath")
+        assertThat(json).doesNotContain("recipe_images")
     }
 
     @Test

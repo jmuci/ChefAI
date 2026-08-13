@@ -45,6 +45,7 @@ import com.tenmilelabs.chefai.core.testutil.testSteps3
 import com.tenmilelabs.chefai.core.testutil.testTags
 import com.tenmilelabs.chefai.core.testutil.testUser
 import com.tenmilelabs.chefai.recipes.data.network.FakeApiService
+import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -107,7 +108,8 @@ class DefaultRecipeRepositoryTest {
                 securePreferences = fakeSecurePreferences,
                 database = mockk<ChefAIDataBase>(relaxed = true),
                 recipeDao = accountSwitchRecipeDao,
-                userDao = fakeUserDao
+                userDao = fakeUserDao,
+                recipeImageStore = mockk<RecipeImageStore>(relaxed = true),
             ),
             accountUpgradeUseCaseProvider = {
                 AccountUpgradeUseCase(

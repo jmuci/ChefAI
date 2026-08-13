@@ -46,6 +46,7 @@ import coil3.request.crossfade
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.ui.preview.PreviewData
+import com.tenmilelabs.chefai.core.ui.recipeImageModel
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import java.util.UUID
 
@@ -70,7 +71,6 @@ fun LargeCard(
     onClick: (UUID) -> Unit = {},
     onSaveToCollection: (UUID) -> Unit = {}
 ) {
-    timber.log.Timber.d("LargeCard composing for recipe: ${recipe.title}, imageUrl: ${recipe.imageUrlThumbnail}")
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
@@ -83,20 +83,9 @@ fun LargeCard(
             modifier = Modifier.fillMaxSize()
         ) {
             // Background Image
-            timber.log.Timber.tag("LargeCard").d(
-                "🖼️ LargeCard building ImageRequest:\n" +
-                "  Recipe: ${recipe.title}\n" +
-                "  Image URL: ${recipe.imageUrlThumbnail}\n" +
-                "  URL is null/empty: ${recipe.imageUrlThumbnail.isEmpty()}"
-            )
             val imageRequest = ImageRequest.Builder(LocalContext.current)
-                .data(recipe.imageUrlThumbnail)
+                .data(recipeImageModel(recipe.localImagePath, recipe.imageUrlThumbnail))
                 .crossfade(true)
-                .listener(
-                    onSuccess = { _, result -> timber.log.Timber.tag("LargeCard").d("✅ Image loading SUCCESS: ${recipe.imageUrlThumbnail}") },
-                    onError = { _, result -> timber.log.Timber.tag("LargeCard").e("❌ Image loading ERROR: ${recipe.imageUrlThumbnail}, error: ${result.throwable}") },
-                    onCancel = { timber.log.Timber.tag("LargeCard").d("⏸️ Image loading CANCELLED: ${recipe.imageUrlThumbnail}") }
-                )
                 .build()
 
             AsyncImage(

@@ -214,6 +214,28 @@ class RecipeDaoTest {
     }
 
     @Test
+    fun localImagePath_roundTripsThroughUpsertAndGet() = runTest {
+        // GIVEN - a recipe with an on-device cached image (schema v2, MIGRATION_1_2)
+        val path = "/data/data/com.tenmilelabs.chefai/files/recipe_images/${recipe1.uuid}"
+        database.recipeDao().upsertRecipe(recipe1.copy(localImagePath = path))
+
+        // WHEN - loading it back
+        val loaded = database.recipeDao().getRecipeById(recipe1.uuid)
+
+        // THEN - the path round-trips unchanged
+        assertEquals(path, loaded?.localImagePath)
+    }
+
+    @Test
+    fun localImagePath_defaultsToNullWhenNotCached() = runTest {
+        database.recipeDao().upsertRecipe(recipe1)
+
+        val loaded = database.recipeDao().getRecipeById(recipe1.uuid)
+
+        assertNull(loaded?.localImagePath)
+    }
+
+    @Test
     fun softDelete_decrementsCountRecipesForUser() = runTest {
         // GIVEN - two recipes for the same user
         database.recipeDao().upsertRecipe(recipe1)
