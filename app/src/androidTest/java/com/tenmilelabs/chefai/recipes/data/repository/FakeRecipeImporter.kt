@@ -14,14 +14,23 @@ class FakeRecipeImporter : RecipeImporter {
     var result: RecipeImportResult = RecipeImportResult.InvalidUrl
     var lastImportedUrl: String? = null
         private set
+    var lastImportedHtml: String? = null
+        private set
 
     override suspend fun import(url: String): RecipeImportResult {
         lastImportedUrl = url
         return result
     }
 
+    override suspend fun importFromHtml(html: String, url: String): RecipeImportResult {
+        lastImportedUrl = url
+        lastImportedHtml = html
+        return result
+    }
+
     fun reset() {
         result = RecipeImportResult.InvalidUrl
         lastImportedUrl = null
+        lastImportedHtml = null
     }
 }

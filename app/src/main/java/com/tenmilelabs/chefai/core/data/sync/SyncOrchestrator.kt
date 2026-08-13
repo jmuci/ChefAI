@@ -402,6 +402,16 @@ class SyncOrchestrator @Inject constructor(
         if (dto.deletedAt != null) {
             bookmarkedRecipeDao.softDelete(userId, recipeId, dto.deletedAt)
         } else {
+            // bookmarked_recipes.recipeId is a foreign key into recipes.uuid. A bookmark can
+            // reference a recipe this device hasn't (or no longer has) locally — a pull for a
+            // recipe from another user, or an out-of-order/partial sync — and upserting it
+            // unconditionally throws SQLiteConstraintException, aborting the whole pull
+            // transaction inside a single bad row. Skip it instead, mirroring how tag/label
+            // cross-refs are validated against their local catalog above.
+            if (recipeDao.getRecipeById(recipeId) == null) {
+                Timber.w("applyPulledBookmark: bookmark references unknown recipe %s, skipping", recipeId)
+                return
+            }
             bookmarkedRecipeDao.upsert(
                 BookmarkedRecipeEntity(
                     userId = userId,

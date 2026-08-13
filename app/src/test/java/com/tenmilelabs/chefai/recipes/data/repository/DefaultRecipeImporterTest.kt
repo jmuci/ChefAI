@@ -34,9 +34,13 @@ private const val NO_RECIPE_HTML = "<html><body><h1>Just a blog post</h1></body>
 
 class DefaultRecipeImporterTest {
 
-    private fun importer(engine: MockEngine): DefaultRecipeImporter = DefaultRecipeImporter(
+    private fun importer(
+        engine: MockEngine,
+        renderedHtmlFetcher: FakeRenderedHtmlFetcher = FakeRenderedHtmlFetcher(),
+    ): DefaultRecipeImporter = DefaultRecipeImporter(
         httpClient = HttpClient(engine) { expectSuccess = true },
         recipeHtmlParser = RecipeHtmlParser(),
+        renderedHtmlFetcher = renderedHtmlFetcher,
         metadataRepository = FakeMetadataRepository(),
         ioDispatcher = Dispatchers.Unconfined,
     )
@@ -104,5 +108,71 @@ class DefaultRecipeImporterTest {
         val result = importer(htmlEngine(JSON_LD_RECIPE_HTML)).import("http://192.168.1.5/x")
 
         assertThat(result).isEqualTo(RecipeImportResult.InvalidUrl)
+    }
+
+    // --- Rendered fallback ---
+
+    @Test
+    fun `does not render when the http fetch already produced a recipe`() = runTest {
+        val fetcher = FakeRenderedHtmlFetcher(JSON_LD_RECIPE_HTML)
+
+        val result = importer(htmlEngine(JSON_LD_RECIPE_HTML), fetcher).import("https://example.com/recipe")
+
+        assertThat(result).isInstanceOf(RecipeImportResult.Success::class.java)
+        assertThat(fetcher.callCount).isEqualTo(0)
+    }
+
+    @Test
+    fun `renders in a browser engine when the site refuses the http client`() = runTest {
+        val engine = MockEngine { respondError(HttpStatusCode.Forbidden) }
+        val fetcher = FakeRenderedHtmlFetcher(JSON_LD_RECIPE_HTML)
+
+        val result = importer(engine, fetcher).import("https://blocked.example.com/recipe")
+
+        val success = result as? RecipeImportResult.Success
+        assertThat(success).isNotNull()
+        assertThat(success!!.draft.title).isEqualTo("Mock Recipe")
+        assertThat(fetcher.lastUrl).isEqualTo("https://blocked.example.com/recipe")
+    }
+
+    @Test
+    fun `asks for a visible browser when rendering cannot get past the refusal either`() = runTest {
+        val engine = MockEngine { respondError(HttpStatusCode.Forbidden) }
+        // The bot check is still up, so the rendered DOM has no recipe on it.
+        val fetcher = FakeRenderedHtmlFetcher(NO_RECIPE_HTML)
+
+        val result = importer(engine, fetcher).import("https://blocked.example.com/recipe")
+
+        assertThat(result).isEqualTo(RecipeImportResult.NeedsBrowser("https://blocked.example.com/recipe"))
+    }
+
+    @Test
+    fun `renders when the page loaded but carried no recipe markup`() = runTest {
+        // A JS-rendered site: the shell arrives empty and the markup only exists after scripts run.
+        val fetcher = FakeRenderedHtmlFetcher(JSON_LD_RECIPE_HTML)
+
+        val result = importer(htmlEngine(NO_RECIPE_HTML), fetcher).import("https://spa.example.com/recipe")
+
+        assertThat(result).isInstanceOf(RecipeImportResult.Success::class.java)
+    }
+
+    @Test
+    fun `stays NoRecipeFound rather than sending the user to a browser for a page with no recipe`() = runTest {
+        val fetcher = FakeRenderedHtmlFetcher(NO_RECIPE_HTML)
+
+        val result = importer(htmlEngine(NO_RECIPE_HTML), fetcher).import("https://example.com/blog")
+
+        assertThat(result).isEqualTo(RecipeImportResult.NoRecipeFound)
+    }
+
+    @Test
+    fun `does not render a 404 — a browser would not find the page either`() = runTest {
+        val engine = MockEngine { respondError(HttpStatusCode.NotFound) }
+        val fetcher = FakeRenderedHtmlFetcher(JSON_LD_RECIPE_HTML)
+
+        val result = importer(engine, fetcher).import("https://example.com/missing")
+
+        assertThat(result).isInstanceOf(RecipeImportResult.NetworkError::class.java)
+        assertThat(fetcher.callCount).isEqualTo(0)
     }
 }

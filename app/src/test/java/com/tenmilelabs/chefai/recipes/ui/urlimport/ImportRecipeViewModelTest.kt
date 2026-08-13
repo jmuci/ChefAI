@@ -10,6 +10,7 @@ import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipeImporter
 import com.tenmilelabs.chefai.recipes.domain.model.RecipeDraft
 import com.tenmilelabs.chefai.recipes.domain.model.RecipeImportResult
+import com.tenmilelabs.chefai.recipes.domain.usecase.SaveImportedDraft
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -42,7 +43,11 @@ class ImportRecipeViewModelTest {
                 set(AppDestinationArgs.PREFILL_URL_ARG, URLEncoder.encode(prefillUrl, "UTF-8"))
             }
         }
-        return ImportRecipeViewModel(recipeImporter, recipeDraftDao, mainCoroutineRule.testDispatcher, savedStateHandle)
+        return ImportRecipeViewModel(
+            recipeImporter = recipeImporter,
+            saveImportedDraft = SaveImportedDraft(recipeDraftDao, mainCoroutineRule.testDispatcher),
+            savedStateHandle = savedStateHandle,
+        )
     }
 
     @Test
@@ -104,6 +109,23 @@ class ImportRecipeViewModelTest {
         viewModel.dispatch(ImportAction.Import)
 
         assertThat(viewModel.state.value.errorRes).isEqualTo(R.string.import_recipe_parse_error)
+    }
+
+    @Test
+    fun `NeedsBrowser hands the url to the in-app browser instead of showing an error`() = runTest {
+        recipeImporter.result = RecipeImportResult.NeedsBrowser("https://blocked.example.com/recipe")
+
+        viewModel.effects.test {
+            viewModel.dispatch(ImportAction.UrlChanged("https://blocked.example.com/recipe"))
+            viewModel.dispatch(ImportAction.Import)
+
+            val effect = awaitItem()
+            assertThat(effect)
+                .isEqualTo(ImportEffect.NavigateToBrowserImport("https://blocked.example.com/recipe"))
+        }
+
+        assertThat(viewModel.state.value.errorRes).isNull()
+        assertThat(viewModel.state.value.isImporting).isFalse()
     }
 
     @Test

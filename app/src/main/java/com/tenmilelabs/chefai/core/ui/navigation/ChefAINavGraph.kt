@@ -50,6 +50,7 @@ import com.tenmilelabs.chefai.recipes.ui.RecipesScreen
 import com.tenmilelabs.chefai.recipes.ui.details.RecipeDetailsScreen
 import com.tenmilelabs.chefai.recipes.ui.editor.RecipeEditorScreen
 import com.tenmilelabs.chefai.recipes.ui.urlimport.ImportRecipeRoute
+import com.tenmilelabs.chefai.recipes.ui.urlimport.browser.BrowserImportRoute
 import timber.log.Timber
 
 @Composable
@@ -222,6 +223,17 @@ fun ChefAINavGraph(
             ),
         ) {
             ImportRecipeRoute(
+                onNavigateToEditorWithDraft = { draftId -> navActions.navigateToEditorWithDraft(draftId) },
+                onNavigateToBrowserImport = { url -> navActions.navigateToBrowserImport(url) },
+                onNavigateToManualEditor = { navActions.navigateToCreateRecipe() },
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+        composable(
+            route = AppDestinations.IMPORT_RECIPE_BROWSER.route,
+            arguments = listOf(navArgument(AppDestinationArgs.IMPORT_URL_ARG) { type = NavType.StringType }),
+        ) {
+            BrowserImportRoute(
                 onNavigateToEditorWithDraft = { draftId -> navActions.navigateToEditorWithDraft(draftId) },
                 onNavigateToManualEditor = { navActions.navigateToCreateRecipe() },
                 onNavigateBack = { navController.popBackStack() },

@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import androidx.navigation.NavHostController
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.DRAFT_ID_ARG
+import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.IMPORT_URL_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.MEAL_PLAN_ID_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.PREFILL_URL_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.RECIPE_ID_ARG
@@ -22,6 +23,7 @@ internal object ScreenBaseRoutes {
     const val CREATE_RECIPE = "create_recipe_screen"
     const val RECIPE_EDITOR = "recipe_editor_screen"
     const val IMPORT_RECIPE = "import_recipe_screen"
+    const val IMPORT_RECIPE_BROWSER = "import_recipe_browser_screen"
     const val SETTINGS = "settings_screen"
     const val LOGIN = "login_screen"
     const val REGISTER = "register_screen"
@@ -53,6 +55,12 @@ object AppDestinationArgs {
      * in the route, since the value itself is a URL containing reserved characters.
      */
     const val PREFILL_URL_ARG = "prefillUrl"
+
+    /**
+     * The URL the browser-import screen should load so the user can clear a site's bot check.
+     * URL-encoded in the route for the same reason as [PREFILL_URL_ARG].
+     */
+    const val IMPORT_URL_ARG = "importUrl"
 }
 
 /**
@@ -79,6 +87,10 @@ enum class AppDestinations(
     IMPORT_RECIPE(
         R.string.app_dest_title_import_recipe,
         "${ScreenBaseRoutes.IMPORT_RECIPE}?${PREFILL_URL_ARG}={${PREFILL_URL_ARG}}"
+    ),
+    IMPORT_RECIPE_BROWSER(
+        R.string.app_dest_title_import_recipe_browser,
+        "${ScreenBaseRoutes.IMPORT_RECIPE_BROWSER}/{$IMPORT_URL_ARG}"
     ),
     MEAL_PLAN_DETAIL(
         R.string.app_dest_title_meal_plan_detail,
@@ -125,9 +137,20 @@ class NavigationActions(private val navController: NavHostController) {
     }
 
     /**
+     * Opens the in-app browser on [url] so the user can clear a site's bot check, after both the
+     * HTTP fetch and the off-screen browser were refused.
+     */
+    fun navigateToBrowserImport(url: String) {
+        val encoded = URLEncoder.encode(url, "UTF-8")
+        navController.navigate("${ScreenBaseRoutes.IMPORT_RECIPE_BROWSER}/$encoded")
+    }
+
+    /**
      * Opens the editor in **create** mode against an already-persisted draft — the hand-off after a
      * recipe has been scraped from a URL. The import screen is popped so that backing out of the
-     * editor returns to the recipe list rather than to a stale URL field.
+     * editor returns to the recipe list rather than to a stale URL field. That also takes the
+     * browser-import screen with it when the draft came via the fallback, since it sits on top of
+     * the import screen.
      */
     fun navigateToEditorWithDraft(draftId: UUID) {
         navController.navigate("${ScreenBaseRoutes.RECIPE_EDITOR}?${DRAFT_ID_ARG}=$draftId") {

@@ -112,6 +112,71 @@ handing the body to the parser.
 
 ---
 
+## Decision 5: A rendered-DOM fallback for sites that refuse HTTP clients
+
+**Added August 2026, amending Decision 1.**
+
+Decision 1 claimed "no headless browser or JS execution is needed — an HTTP GET plus an HTML parse
+is enough". That holds for the large majority of recipe sites, and stays the default. It does not
+hold for all of them. Measured against three reported failures:
+
+| Site | Response to the Ktor client | Cause |
+|---|---|---|
+| `foodnetwork.com` | 403, a 426-byte Akamai "Access Denied" page | Akamai Bot Manager scoring TLS/IP fingerprints. Sending a full set of real Chrome headers does not help. |
+| `seriouseats.com` | 403, a 680 KB JS interstitial | Cloudflare Turnstile — an **interactive** check that does not resolve on its own. |
+| `directoalpaladar.com` | 200, parses correctly | Not a scraping failure at all; see the ingredient-parser note below. |
+
+Both blocked pages carry perfectly ordinary schema.org `Recipe` JSON-LD once loaded in a real
+browser. The extraction tier was never the problem — the fetch tier is.
+
+Two tiers were added below the HTTP fetch, both reusing `RecipeHtmlParser` unchanged:
+
+1. **Off-screen `WebView`** (`WebViewHtmlFetcher`, behind the `RenderedHtmlFetcher` port). A real
+   browser engine on the user's own connection, unattached to any window, polling
+   `document.documentElement.outerHTML` every 500ms for up to 8s and stopping at the first snapshot
+   the parser accepts. This clears Food Network with no UI at all, and also rescues sites whose
+   markup only exists after their own scripts run.
+2. **Visible in-app browser** (`BrowserImportScreen`). For an interactive check, the user clears it
+   themselves — the same thing they would do in Chrome. Nothing here attempts to defeat a CAPTCHA;
+   the screen just keeps polling and gets out of the way the moment a recipe appears.
+
+**Escalation is narrow on purpose.** Only a `401`/`403`/`429`/`503` — a server *refusing* us —
+escalates to the visible browser. A `404`, a DNS failure or a timeout returns immediately: a
+browser would fail the same way, eight seconds later. A page that loaded fine but simply has no
+recipe on it gets the rendered retry (for the JS-rendered case) but never sends the user to a
+browser, because there would be nothing there for them to do.
+
+**Why not a backend endpoint.** Delegating the fetch to the Ktor backend was the obvious
+alternative and is *worse* for exactly the two sites that motivated this: it concentrates requests
+on one datacenter IP, which Akamai and Cloudflare score far more harshly than the residential
+mobile IPs Decision 1 deliberately chose. A backend endpoint would need its own headless browser or
+a paid unblocking service to beat what a `WebView` on the device does for free. The
+cache-by-normalized-URL layer Decision 1 anticipated remains the right *additive* next step, and is
+unaffected by this.
+
+**Cost accepted.** This runs a third party's JavaScript in our process. Both WebViews share one
+hardening config (`applyScraperHardening`): no file or content-provider access, no cross-origin
+escape from `file://`, no geolocation, no autoplay, no window popups, and a `WebViewClient` that
+refuses any non-`http(s)` navigation. There is deliberately **no `addJavascriptInterface`** anywhere
+in this feature — it would hand the page a bridge into app code, and nothing here needs one. The
+stock WebView user agent is left alone rather than reusing Decision 4's desktop string: pairing a
+Windows Chrome UA with Android's TLS and JS fingerprint is the exact mismatch bot detection looks
+for. Cookies are left to the process-wide `CookieManager` on purpose, so a clearance cookie earned
+on the visible screen carries over and the next import of that site usually resolves off-screen.
+
+Two parser bugs surfaced by the same investigation were fixed alongside it:
+
+- **Fused metric amounts.** `"300g Garbanzos"` parsed to a null quantity *and* null unit, so
+  `ScrapedRecipeMapper` substituted `1.0`/`"unit"` and the editor showed *"1 unit of 300g
+  Garbanzos"* — 8 of the 14 ingredients on the cocido madrileño page. `IngredientTextParser` now
+  splits a token that fuses the two, but only when the suffix normalises to a known unit, so pan
+  sizes (`"9x13"`) and multipliers (`"1x"`) are untouched.
+- **Response charset.** The body was decoded as UTF-8 unconditionally, turning every accented
+  character on an ISO-8859-1 site into a replacement glyph. `decodeHtml` now honours the
+  `Content-Type` charset, falls back to a sniffed `<meta>` declaration, and only then to UTF-8.
+
+---
+
 ## Consequences
 
 **Positive:**
@@ -128,6 +193,9 @@ handing the body to the parser.
 - Per-user, per-request scraping cost (no shared cache) — see Decision 1.
 - No per-site scrapers — some sites with non-schema.org markup will simply fail to import in v1 and
   fall back to `NoRecipeFound` with a manual-entry offramp.
+- A URL that loads fine but isn't a recipe now costs the extra 8s render budget (Decision 5) before
+  reporting `NoRecipeFound`, up from roughly a second. `RENDER_BUDGET` is a single constant; tune it
+  once there is real usage to tune against.
 - `RecipeDraft.toRecipe()` still throws `NumberFormatException` on a blank numeric string, a
   pre-existing contract the mapper works around by emitting `"0"` rather than `""` for absent
   numerics — see `docs/claude/gotchas.md`. Hardening that contract (`toIntOrNull() ?: 0`) is a good

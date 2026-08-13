@@ -5,14 +5,11 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.R
-import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeDraftDao
-import com.tenmilelabs.chefai.core.di.IoDispatcher
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
-import com.tenmilelabs.chefai.recipes.data.mapper.toRecipeDraftEntity
 import com.tenmilelabs.chefai.recipes.domain.model.RecipeImportResult
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipeImporter
+import com.tenmilelabs.chefai.recipes.domain.usecase.SaveImportedDraft
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,15 +18,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.net.URLDecoder
 import javax.inject.Inject
 
 @HiltViewModel
 class ImportRecipeViewModel @Inject constructor(
     private val recipeImporter: RecipeImporter,
-    private val recipeDraftDao: RecipeDraftDao,
-    @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val saveImportedDraft: SaveImportedDraft,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -65,11 +60,16 @@ class ImportRecipeViewModel @Inject constructor(
 
             when (val result = recipeImporter.import(url)) {
                 is RecipeImportResult.Success -> {
-                    withContext(ioDispatcher) {
-                        recipeDraftDao.saveDraft(result.draft.toRecipeDraftEntity())
-                    }
+                    saveImportedDraft(result.draft)
                     _state.update { it.copy(isImporting = false) }
                     _effects.send(ImportEffect.NavigateToEditorWithDraft(result.draft.recipeId))
+                }
+
+                // The site refused every automated fetch — hand it to a browser the user can see
+                // and interact with, which is the only thing that gets past an interactive check.
+                is RecipeImportResult.NeedsBrowser -> {
+                    _state.update { it.copy(isImporting = false) }
+                    _effects.send(ImportEffect.NavigateToBrowserImport(result.url))
                 }
 
                 RecipeImportResult.InvalidUrl -> failWith(R.string.import_recipe_invalid_url)
