@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.auth.domain
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
+import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
+import java.util.UUID
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AccountSwitchHandlerTest {
@@ -92,4 +94,40 @@ class AccountSwitchHandlerTest {
         coVerify(exactly = 0) { database.clearAllTables() }
         coVerify(exactly = 0) { recipeImageStore.deleteAll() }
     }
+
+    @Test
+    fun `switching away deletes the departing account's images but not the anonymous ones`() = runTest {
+        val previousUserId = UuidV7Generator.newId()
+        val anonymousUserId = UuidV7Generator.newId()
+        val newUserId = UuidV7Generator.newId()
+        securePreferences.setCurrentUserId(previousUserId)
+
+        val departingRecipe = recipeFor(previousUserId)
+        val anonymousRecipe = recipeFor(anonymousUserId)
+        recipeDao.upsertRecipe(departingRecipe)
+        recipeDao.upsertRecipe(anonymousRecipe)
+
+        handler.handleLogin(newUserId = newUserId, anonymousUserId = anonymousUserId)
+
+        // The rows going away must take their image files with them, or the previous account's
+        // photos stay readable on a shared device.
+        coVerify(exactly = 1) { recipeImageStore.delete(departingRecipe.uuid) }
+        coVerify(exactly = 0) { recipeImageStore.delete(anonymousRecipe.uuid) }
+        coVerify(exactly = 0) { recipeImageStore.deleteAll() }
+    }
+
+    private fun recipeFor(creatorId: UUID) = RecipeEntity(
+        uuid = UuidV7Generator.newId(),
+        title = "Recipe",
+        description = "",
+        imageUrl = "",
+        imageUrlThumbnail = "",
+        prepTimeMinutes = 1,
+        cookTimeMinutes = 1,
+        servings = 1,
+        creatorId = creatorId,
+        recipeExternalUrl = null,
+        updatedAt = 1L,
+        deletedAt = null,
+    )
 }

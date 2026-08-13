@@ -46,6 +46,7 @@ import com.tenmilelabs.chefai.core.testutil.testTags
 import com.tenmilelabs.chefai.core.testutil.testUser
 import com.tenmilelabs.chefai.recipes.data.network.FakeApiService
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -75,6 +76,7 @@ class DefaultRecipeRepositoryTest {
     private lateinit var remoteDataSource: FakeApiService
     private lateinit var sessionManager: SessionManager
     private lateinit var syncManager: FakeSyncManager
+    private lateinit var recipeImageStore: RecipeImageStore
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var testScope: TestScope
 
@@ -137,6 +139,7 @@ class DefaultRecipeRepositoryTest {
         recipeLabelDao = FakeRecipeLabelCrossRefDao()
         remoteDataSource = FakeApiService()
         syncManager = FakeSyncManager()
+        recipeImageStore = mockk(relaxed = true)
 
         recipeRepository =
             DefaultRecipeRepository(
@@ -150,6 +153,7 @@ class DefaultRecipeRepositoryTest {
                 recipeLabelDao,
                 remoteDataSource,
                 sessionManager,
+                recipeImageStore,
                 syncManager
             )
 
@@ -408,6 +412,22 @@ class DefaultRecipeRepositoryTest {
         // Then: version is preserved
         val savedEntity = recipeDao.getRecipeById(recipeId1)
         assertThat(savedEntity?.version).isEqualTo(1)
+    }
+
+    @Test
+    fun `softDeleteRecipe() reclaims the cached image`() = runTest {
+        // Nothing ever hard-deletes a soft-deleted row, so if the file isn't reclaimed here it never
+        // is — up to MAX_IMAGE_BYTES retained per deleted recipe, forever.
+        recipeRepository.softDeleteRecipe(recipeId1)
+
+        coVerify(exactly = 1) { recipeImageStore.delete(recipeId1) }
+    }
+
+    @Test
+    fun `deleteRecipe() reclaims the cached image`() = runTest {
+        recipeRepository.deleteRecipe(recipeId1)
+
+        coVerify(exactly = 1) { recipeImageStore.delete(recipeId1) }
     }
 
     @Test
