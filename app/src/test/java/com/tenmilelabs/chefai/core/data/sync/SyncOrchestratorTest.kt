@@ -424,6 +424,27 @@ class SyncOrchestratorTest {
     }
 
     @Test
+    fun `pull preserves the device-local cached image path, which the server never sends`() = runTest(testDispatcher) {
+        val existingRecipe = createDirtyRecipe(uuid = recipeId1, syncState = SyncState.SYNCED)
+            .copy(localImagePath = "/data/user/0/com.tenmilelabs.chefai/files/recipe_images/$recipeId1")
+        recipeDao.upsertRecipe(existingRecipe)
+
+        // The DTO has no localImagePath field at all — this is what the server sends back for
+        // every recipe, cached or not.
+        val serverRecipe = createSyncRecipeDto(uuid = recipeId1, title = "Updated Title", updatedAt = 5000L)
+        syncNetworkDataSource.pullResponses.addLast(
+            SyncPullResponse(recipes = listOf(serverRecipe), serverTimestamp = 5000L, hasMore = false)
+        )
+
+        syncOrchestrator.sync()
+
+        val updatedRecipe = recipeDao.getRecipeById(recipeId1)!!
+        assertThat(updatedRecipe.title).isEqualTo("Updated Title")
+        assertThat(updatedRecipe.localImagePath)
+            .isEqualTo("/data/user/0/com.tenmilelabs.chefai/files/recipe_images/$recipeId1")
+    }
+
+    @Test
     fun `pull server wins when local is PENDING and server is newer`() = runTest(testDispatcher) {
         val localRecipe = createDirtyRecipe(uuid = recipeId1, title = "Local Edit", updatedAt = 1000L)
         recipeDao.upsertRecipe(localRecipe)

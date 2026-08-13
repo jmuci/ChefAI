@@ -97,12 +97,19 @@ fun SyncIngredientDto.toIngredientEntity(): IngredientEntity = IngredientEntity(
     syncState = SyncState.SYNCED
 )
 
-fun SyncRecipeDto.toRecipeEntity(): RecipeEntity = RecipeEntity(
+/**
+ * [localImagePath] isn't part of [SyncRecipeDto] — it's device-local and never travels through
+ * sync (see ADR-010 Decision 6) — so the caller must pass through whatever this device already had
+ * for the row, or a pull immediately after caching an image (e.g. the post-mutation push/pull that
+ * follows every import) overwrites it back to null via this entity's full-row upsert.
+ */
+fun SyncRecipeDto.toRecipeEntity(localImagePath: String?): RecipeEntity = RecipeEntity(
     uuid = UUID.fromString(uuid),
     title = title,
     description = description,
     imageUrl = imageUrl,
     imageUrlThumbnail = imageUrlThumbnail,
+    localImagePath = localImagePath,
     prepTimeMinutes = prepTimeMinutes,
     cookTimeMinutes = cookTimeMinutes,
     servings = servings,
