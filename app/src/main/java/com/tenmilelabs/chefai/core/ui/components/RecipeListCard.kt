@@ -37,8 +37,8 @@ import coil3.request.crossfade
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.ui.preview.RecipePreviewProvider
+import com.tenmilelabs.chefai.core.ui.recipeImageModel
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
-import timber.log.Timber
 import java.util.UUID
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -62,17 +62,9 @@ fun RecipeListCard(
             modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_small)),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Log image loading attempt
-            Timber.tag("RecipeListCard").d(
-                "🖼️ RecipeListCard loading image:\n" +
-                "  Recipe: ${recipe.title}\n" +
-                "  Image URL: ${recipe.imageUrlThumbnail}\n" +
-                "  URL is null: ${recipe.imageUrlThumbnail.isEmpty()}"
-            )
-
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
-                    .data(recipe.imageUrlThumbnail)
+                    .data(recipeImageModel(recipe.localImagePath, recipe.imageUrlThumbnail))
                     .crossfade(true)
                     .build(),
                 placeholder = painterResource(R.drawable.ic_img_placeholder),

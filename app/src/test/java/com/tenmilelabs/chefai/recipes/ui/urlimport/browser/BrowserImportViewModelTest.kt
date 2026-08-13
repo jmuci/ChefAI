@@ -10,7 +10,9 @@ import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipeImporter
 import com.tenmilelabs.chefai.recipes.domain.model.RecipeDraft
 import com.tenmilelabs.chefai.recipes.domain.model.RecipeImportResult
+import com.tenmilelabs.chefai.recipes.domain.usecase.CacheRecipeImage
 import com.tenmilelabs.chefai.recipes.domain.usecase.SaveImportedDraft
+import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -44,7 +46,11 @@ class BrowserImportViewModelTest {
         }
         return BrowserImportViewModel(
             recipeImporter = recipeImporter,
-            saveImportedDraft = SaveImportedDraft(recipeDraftDao, mainCoroutineRule.testDispatcher),
+            saveImportedDraft = SaveImportedDraft(
+                recipeDraftDao,
+                mockk<CacheRecipeImage>(relaxed = true),
+                mainCoroutineRule.testDispatcher,
+            ),
             savedStateHandle = savedStateHandle,
         )
     }

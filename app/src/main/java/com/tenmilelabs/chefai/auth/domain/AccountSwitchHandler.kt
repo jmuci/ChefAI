@@ -4,6 +4,7 @@ import com.tenmilelabs.chefai.auth.data.local.SecurePreferencesInterface
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.UserDao
+import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import kotlinx.coroutines.flow.first
 import timber.log.Timber
 import java.util.UUID
@@ -24,7 +25,8 @@ class AccountSwitchHandler @Inject constructor(
     private val securePreferences: SecurePreferencesInterface,
     private val database: ChefAIDataBase,
     private val recipeDao: RecipeDao,
-    private val userDao: UserDao
+    private val userDao: UserDao,
+    private val recipeImageStore: RecipeImageStore,
 ) {
 
     /**
@@ -52,6 +54,7 @@ class AccountSwitchHandler @Inject constructor(
             else -> {
             Timber.i("Authenticated account changed from $previousUserId to $newUserId, clearing local database")
             database.clearAllTables()
+                recipeImageStore.deleteAll()
                 AccountSwitchOutcome.CLEARED_DATABASE
             }
         }
