@@ -166,3 +166,22 @@ in flight had their input silently overwritten the moment it resolved — a real
 hypothetical (it fired in an instrumented test run). Fix: wrap the read in `rememberUpdatedState` and
 re-check the *current* value immediately before acting on an awaited result, not just before starting
 the `await`.
+
+### 23. `ImageDecoder` returns a hardware bitmap, which cannot be `compress()`ed
+`RecipeImageStore.writeFromUri` decodes a picked photo and re-encodes it as JPEG. By default
+`ImageDecoder.decodeBitmap` allocates a `Config.HARDWARE` bitmap — GPU-backed, with no CPU-readable
+pixel data — and `Bitmap.compress` on one throws. Set `decoder.allocator =
+ImageDecoder.ALLOCATOR_SOFTWARE` inside the `OnHeaderDecodedListener` whenever the bitmap will be
+read back rather than just drawn. (The upside of `ImageDecoder` over `BitmapFactory` is that it
+applies EXIF orientation for free, which is why it's worth the extra line — `BitmapFactory` would
+need `androidx.exifinterface` and manual rotation.)
+
+### 24. A device-local column on a synced table is wiped by the next pull
+`RecipeDao.upsertRecipe` is a full-row `@Upsert`, and `SyncRecipeDto.toRecipeEntity` constructs a
+fresh `RecipeEntity`. Any column the DTO doesn't carry silently reverts to its default on every pull
+that touches the row — and because sync runs on a 5s post-mutation debounce, that happens seconds
+after the local write, not at some distant future sync. This cost a full debugging session on
+`localImagePath` (fixed in #139 by threading the existing value through explicitly). For state that is
+purely local and has nothing to do with the server, prefer a **sibling table** keyed to the recipe
+(`recipe_image_state`) — structurally immune, and it can't be forgotten by the next person adding a
+field to the mapper. See ADR-011 Decision 5.

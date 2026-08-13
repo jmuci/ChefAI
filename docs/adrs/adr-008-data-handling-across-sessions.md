@@ -29,6 +29,21 @@ When a user logs in:
 
 The account-switch handling happens **after successful authentication but before synchronization begins**.
 
+### Amendment (Aug 2026): these rules cover on-disk files, not just Room tables
+
+The rules above were written purely in terms of the database, which left cached recipe images
+(`filesDir/recipe_images/`, added by [ADR-010](adr-010-client-side-recipe-scraping.md) Decision 6)
+outside them. Two consequences, both since fixed — see
+[ADR-011](adr-011-cross-device-recipe-images.md) Decision 7:
+
+- **"Removes stale data belonging to the previous authenticated user" includes their images.** Only
+  the recipe rows were being deleted, so on a shared device the previous account's photos stayed
+  readable after someone else logged in. The departing recipe ids must be collected *before* the bulk
+  delete, since afterwards there is no way to tell which files belonged to whom. A blanket
+  `deleteAll()` is wrong in this branch — it exists to preserve the anonymous session's own images.
+- **A soft-deleted recipe releases its image immediately.** Nothing in the app ever hard-deletes a
+  soft-deleted row, so deferring would retain the bytes permanently.
+
 ---
 
 ## Rationale
