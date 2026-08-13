@@ -5,6 +5,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
+import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeImageCandidate
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeWithDetails
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeWithLabels
@@ -107,6 +108,36 @@ interface RecipeDao {
 
     @Query("UPDATE recipes SET deletedAt = :deletedAt, syncState = 'DELETED', updatedAt = :deletedAt WHERE uuid = :uuid")
     suspend fun softDelete(uuid: UUID, deletedAt: Long)
+
+    // --- Image backfill ---
+
+    /**
+     * Recipes that could still be missing their on-device image, newest first.
+     *
+     * `imageUrl != ''` is what keeps a user's own photo out of the sweep: a picked image has no
+     * source URL and so can never be re-derived, and the editor clears `imageUrl` when one is stored
+     * precisely so this predicate can tell the two apart (see ADR-011). Recipes that have already
+     * failed [maxAttempts] times are excluded so a permanently dead URL stops costing work.
+     *
+     * Whether the file is actually *present* isn't expressible in SQL, so this deliberately
+     * over-selects and the caller filters — see `RecipeImageBackfillWorker`.
+     */
+    @Query(
+        """
+        SELECT r.uuid AS recipeId, r.imageUrl AS imageUrl, r.localImagePath AS localImagePath
+        FROM recipes r
+        LEFT JOIN recipe_image_state s ON s.recipeId = r.uuid
+        WHERE r.deletedAt IS NULL
+          AND r.imageUrl != ''
+          AND COALESCE(s.attempts, 0) < :maxAttempts
+        ORDER BY r.updatedAt DESC
+        LIMIT :scanLimit
+        """
+    )
+    suspend fun getImageBackfillCandidates(maxAttempts: Int, scanLimit: Int): List<RecipeImageCandidate>
+
+    @Query("UPDATE recipes SET localImagePath = :localImagePath WHERE uuid = :uuid")
+    suspend fun updateLocalImagePath(uuid: UUID, localImagePath: String?)
 
     // --- Account upgrade queries ---
 

@@ -74,6 +74,9 @@ object TestDatabaseModule {
     fun provideRecipeDraftDao(database: ChefAIDataBase) = database.recipeDraftDao()
 
     @Provides
+    fun provideRecipeImageStateDao(database: ChefAIDataBase) = database.recipeImageStateDao()
+
+    @Provides
     fun provideBookmarkedRecipeDao(database: ChefAIDataBase) = database.bookmarkedRecipeDao()
 
     @Provides
