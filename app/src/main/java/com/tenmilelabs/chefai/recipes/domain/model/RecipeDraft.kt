@@ -21,6 +21,8 @@ data class RecipeDraft(
     val description: String = "",
     val imageUrl: String = "",
     val selectedImageUri: String? = null,
+    /** On-device copy of [imageUrl], if cached at import time. See [com.tenmilelabs.chefai.core.domain.model.Recipe.localImagePath]. */
+    val localImagePath: String? = null,
     val prepTimeMinutes: String = "",
     val cookTimeMinutes: String = "",
     val servings: String = "",

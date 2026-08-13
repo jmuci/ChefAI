@@ -31,6 +31,8 @@ data class RecipeEntity(
     val description: String,
     val imageUrl: String,
     val imageUrlThumbnail: String,
+    /** Device-local only — deliberately absent from [com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeDto]. */
+    val localImagePath: String? = null,
     val prepTimeMinutes: Int,
     val cookTimeMinutes: Int,
     val servings: Int,

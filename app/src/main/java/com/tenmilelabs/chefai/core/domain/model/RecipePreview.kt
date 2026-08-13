@@ -12,6 +12,8 @@ data class RecipePreview(
     val title: String,
     val description: String,
     val imageUrlThumbnail: String,
+    /** On-device copy of the thumbnail, if cached at import time. See [Recipe.localImagePath]. */
+    val localImagePath: String? = null,
     val prepTimeMinutes: Int,
     val cookTimeMinutes: Int,
     val servings: Int,
