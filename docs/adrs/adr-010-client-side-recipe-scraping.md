@@ -177,6 +177,83 @@ Two parser bugs surfaced by the same investigation were fixed alongside it:
 
 ---
 
+## Decision 6: Caching imported images on-device
+
+**Added August 2026, amending Decision 1.**
+
+Recipes imported from the two sites Decision 5 measured saved with a correct `imageUrl` but
+rendered nothing. Coil's plain `OkHttpNetworkFetcherFactory` is refused by the image CDNs exactly
+the way the plain Ktor client was refused before Decision 5 — the same bot-wall class, one layer
+further down:
+
+| Probe against `food.fnr.sndimg.com/…QK0103_Grilled-Peach-Crumble…webp` | Result |
+|---|---|
+| `okhttp/4.12.0` UA | 403 |
+| No headers | 403 |
+| Full Chrome header set — UA, Accept, Accept-Language, Referer, all four `Sec-Fetch-*`, `sec-ch-ua*` | 403 |
+| Desktop Chrome UA + Referer | 403 |
+| Forced HTTP/1.1 (different ALPN) | 403 |
+| Base image URL, no `.rend` transform; smaller `.rend` variant | 403 |
+| A control site (`budgetbytes.com`) with a plain `okhttp/4.12.0` UA | 200 |
+
+The block page is Akamai's (`errors.edgesuite.net`, `server-timing: ak_p`) — headers cannot fix
+this, it is the same TLS/IP fingerprinting Decision 5 documented for the page itself.
+
+**The fix mirrors Decision 5's ladder one tier lower.** `CacheRecipeImage` tries a plain GET through
+the existing `@ScraperHttpClient` first, escalating to an off-screen `WebView` only on the same
+`BOT_WALL_STATUSES` (401/403/429/503) Decision 5 already escalates on. On success, the bytes are
+written to `filesDir/recipe_images/<recipeId>` (`RecipeImageStore`) and the path is recorded on a
+new `localImagePath: String?` column — added on `recipes` and `recipe_drafts` via `MIGRATION_1_2`,
+the first real migration since #119 collapsed the schema to v1. `imageUrl` keeps the real remote
+URL; the UI prefers `localImagePath` when present and falls back to `imageUrl` otherwise (see
+`recipeImageModel`), so a recipe whose image can't be cached degrades to exactly today's hotlink
+behaviour rather than losing the image reference entirely.
+
+**Why not the in-page `fetch()` the issue first proposed.** The obvious shape — reuse the WebView
+already loading the page, `fetch()` the image from inside it — doesn't hold for the site that
+motivated this: Food Network serves images from `food.fnr.sndimg.com`, a different origin than
+`www.foodnetwork.com`, so that fetch would be cross-origin and CORS-blocked. (Serious Eats happens
+to be same-origin, which is likely why the shape looked general.) `WebViewImageFetcher` instead
+navigates a **fresh** off-screen WebView directly to the image URL — Chromium loads it as a
+synthetic image document whose origin *is* the image's own origin, so an in-page
+`fetch(location.href, {cache: 'force-cache'})` is same-origin and reuses the bytes the navigation
+itself already downloaded. The result is handed back through the same `evaluateJavascript` + poll
+pattern as `readRenderedHtml`, stashed on a `window` global between polls since `fetch` is async and
+`evaluateJavascript` is not — still with **no `addJavascriptInterface`**, unchanged from Decision 5.
+
+**Why not a backend proxy.** Rejected for the same reason Decision 5 gives: a datacenter IP is
+scored *harder* than a residential mobile IP by exactly these two bot managers, so a backend fetch
+would fail where the on-device WebView succeeds. Backend involvement is not rejected forever,
+though — see the sync question below.
+
+**Local-only, not synced — for now.** `localImagePath` is a device path and is deliberately absent
+from `SyncRecipeDto`: a `file://…` string has no meaning on the backend or on another device, and
+shipping it would leak a local filesystem path into the sync payload. This means a second device
+still hits the same bot wall on pull and has to re-run its own WebView tier — an accepted gap, not
+an oversight. Whether and how to synchronize cached image bytes across devices (upload the bytes?
+re-derive per device? only for user-picked photos, which have no source URL to re-derive from?) is
+tracked separately as [issue #132](https://github.com/jmuci/ChefAI/issues/132), deliberately not
+decided here.
+
+**Cost accepted.** One more GET (or WebView round-trip) per import, and up to 5MB of on-device
+storage per cached image (`MAX_IMAGE_BYTES`), excluded from Auto Backup / cloud device transfer
+since the bytes are trivially re-downloadable. No sweeper reclaims an orphaned file left behind by
+an import that's never saved past the draft stage — matching the pre-existing behaviour for
+abandoned draft rows themselves.
+
+A second, adjacent bug surfaced by the same investigation was fixed alongside it:
+
+- **Unresolved relative image URLs.** `ScrapedRecipe.imageUrl`'s own KDoc flagged that the value
+  "may be relative to `sourceUrl`", but nothing ever resolved it — `RecipeHtmlParser` parses without
+  a base URI, and the mapper stored the literal scraped string. A microdata page with
+  `<img itemprop="image" src="/img/x.jpg">` saved the literal `/img/x.jpg`, which fails in Coil and
+  in `CacheRecipeImage` alike, regardless of any CDN protection. Fixed in `:app` — `ScrapedRecipeMapper`
+  now resolves `imageUrl` against `sourceUrl` with `java.net.URI.resolve`, falling back to the raw
+  value if that throws — not in `:recipe-scraper`, whose README documents that it "reports what the
+  page actually published" and leaves resolution to the caller.
+
+---
+
 ## Consequences
 
 **Positive:**
@@ -201,3 +278,7 @@ Two parser bugs surfaced by the same investigation were fixed alongside it:
   numerics — see `docs/claude/gotchas.md`. Hardening that contract (`toIntOrNull() ?: 0`) is a good
   separate change, kept out of this diff since it touches a documented, tested path used by the
   editor's save flow.
+- Cached images (Decision 6) are per-device: a second device re-hits the same CDN wall on pull and
+  has to re-run its own WebView tier, and a user-picked local photo can't be synced at all since it
+  never had a source URL. Tracked in [issue #132](https://github.com/jmuci/ChefAI/issues/132), not
+  solved by this ADR.
