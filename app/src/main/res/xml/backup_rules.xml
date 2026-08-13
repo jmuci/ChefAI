@@ -10,4 +10,6 @@
    <include domain="sharedpref" path="."/>
    <exclude domain="sharedpref" path="device.xml"/>
 -->
+    <!-- Re-downloadable recipe images cached from third-party CDNs — no reason to back these up. -->
+    <exclude domain="file" path="recipe_images/"/>
 </full-backup-content>

@@ -14,11 +14,13 @@ import com.tenmilelabs.chefai.mealplans.data.network.MealPlanApiService
 import com.tenmilelabs.chefai.mealplans.data.network.MealPlanNetworkDataSource
 import com.tenmilelabs.chefai.mealplans.data.repository.DefaultMealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
+import com.tenmilelabs.chefai.recipes.data.network.WebViewImageFetcher
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeImporter
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeRepository
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipeImporter
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipeImporter
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
+import com.tenmilelabs.chefai.recipes.domain.repository.RenderedImageFetcher
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -138,4 +140,14 @@ abstract class TestRepositoryModule {
     @Binds
     @Singleton
     abstract fun bindRecipeImporter(fake: FakeRecipeImporter): RecipeImporter
+
+    /**
+     * Binds the real [WebViewImageFetcher] (same as production) — required for Hilt's shared test
+     * component to resolve `SaveImportedDraft`'s graph (see docs/claude/gotchas.md #21), even though
+     * every instrumented test's fake-importer drafts use a blank `imageUrl`, so `CacheRecipeImage`
+     * never actually reaches it at runtime.
+     */
+    @Binds
+    @Singleton
+    abstract fun bindRenderedImageFetcher(fetcher: WebViewImageFetcher): RenderedImageFetcher
 }
