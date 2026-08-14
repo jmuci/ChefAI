@@ -11,6 +11,12 @@ data class RecipeImageCandidate(
     val recipeId: UUID,
     val imageUrl: String,
     val localImagePath: String?,
+    /**
+     * Non-null when the backend holds these bytes, in which case fetching them from there beats
+     * re-deriving from [imageUrl] — and is the *only* option when [imageUrl] is blank, because a
+     * user's own photo has no source to re-derive from.
+     */
+    val imageBlobId: String?,
 )
 
 /**

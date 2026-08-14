@@ -259,10 +259,10 @@ class FakeRecipeDao : RecipeDao {
         maxAttempts: Int,
         scanLimit: Int
     ): List<RecipeImageCandidate> = recipes.values
-        .filter { it.deletedAt == null && it.imageUrl.isNotEmpty() }
+        .filter { it.deletedAt == null && (it.imageUrl.isNotEmpty() || it.imageBlobId != null) }
         .sortedByDescending { it.updatedAt }
         .take(scanLimit)
-        .map { RecipeImageCandidate(it.uuid, it.imageUrl, it.localImagePath) }
+        .map { RecipeImageCandidate(it.uuid, it.imageUrl, it.localImagePath, it.imageBlobId) }
 
     override suspend fun updateLocalImagePath(uuid: UUID, localImagePath: String?) {
         recipes[uuid]?.let { recipes[uuid] = it.copy(localImagePath = localImagePath) }

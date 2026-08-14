@@ -4,12 +4,12 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.tenmilelabs.chefai.core.data.local.room.RecipeImageStateEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeImageStateDao
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeImageCandidate
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import com.tenmilelabs.chefai.recipes.domain.usecase.CacheRecipeImage
+import com.tenmilelabs.chefai.recipes.domain.usecase.FetchRecipeImageFromBackend
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import timber.log.Timber
@@ -27,12 +27,17 @@ internal const val IMAGE_BACKFILL_BATCH = 10
 /**
  * Fetches recipe images this device is missing but another one already has.
  *
- * A recipe arriving over sync carries only its remote `imageUrl`, never the importing device's
- * cached copy — a local file path is meaningless on the wire (ADR-011). For most sources the URL is
- * enough and the UI just hotlinks it, but the CDNs that made on-device caching necessary in the
- * first place (Akamai on Food Network, Cloudflare on Serious Eats) refuse a plain HTTP client
- * wherever it runs. So the second device re-derives the image the same way the first one did, with
- * [CacheRecipeImage]'s HTTP-then-WebView ladder.
+ * A recipe arriving over sync never carries the importing device's cached copy — a local file path
+ * is meaningless on the wire (ADR-011). What it may carry is an `imageBlobId`, and the sweep prefers
+ * that: a plain authenticated GET against our own backend, which will not bot-wall us. For a photo
+ * the user took themselves that is the only possibility at all, since `imageUrl` is blank and there
+ * is nothing to re-derive from.
+ *
+ * Failing that, the image is re-derived from its source the same way the first device got it, with
+ * [CacheRecipeImage]'s HTTP-then-WebView ladder. That path still earns its place: a blob only exists
+ * once some device has uploaded one, and the CDNs that made on-device caching necessary in the first
+ * place (Akamai on Food Network, Cloudflare on Serious Eats) refuse a plain HTTP client wherever it
+ * runs — including the app's own image loader, so hotlinking is not a working fallback for them.
  *
  * Deliberately not on the pull path: spinning up a `WebView` inside the sync transaction would
  * stretch every sync by seconds for something no one is waiting on. Deliberately not on the render
@@ -47,6 +52,7 @@ class RecipeImageBackfillWorker @AssistedInject constructor(
     private val recipeDao: RecipeDao,
     private val recipeImageStateDao: RecipeImageStateDao,
     private val cacheRecipeImage: CacheRecipeImage,
+    private val fetchRecipeImageFromBackend: FetchRecipeImageFromBackend,
     private val syncScheduler: SyncScheduler,
 ) : CoroutineWorker(appContext, workerParams) {
 
@@ -68,9 +74,11 @@ class RecipeImageBackfillWorker @AssistedInject constructor(
             // Recorded before the fetch, not after: a run killed mid-WebView (the budget expiring,
             // the charger unplugged, the process dying) must still count, or a URL that reliably
             // hangs would be retried forever.
-            recordAttempt(candidate)
+            recipeImageStateDao.recordDownloadAttempt(
+                candidate.recipeId, System.currentTimeMillis()
+            )
 
-            val storedPath = cacheRecipeImage(candidate.recipeId, candidate.imageUrl)
+            val storedPath = fetchImage(candidate)
             if (storedPath != null) {
                 recipeDao.updateLocalImagePath(candidate.recipeId, storedPath)
                 recipeImageStateDao.delete(candidate.recipeId)
@@ -88,16 +96,27 @@ class RecipeImageBackfillWorker @AssistedInject constructor(
         return Result.success()
     }
 
-    private suspend fun recordAttempt(candidate: RecipeImageCandidate) {
-        val previous = recipeImageStateDao.getByRecipeId(candidate.recipeId)
-        recipeImageStateDao.upsert(
-            RecipeImageStateEntity(
-                recipeId = candidate.recipeId,
-                attempts = (previous?.attempts ?: 0) + 1,
-                lastAttemptAt = System.currentTimeMillis(),
-            )
-        )
+    /**
+     * Our own backend first, the source CDN second.
+     *
+     * The backend copy is preferred whenever it exists: it is a plain authenticated GET against a
+     * host that will not bot-wall us, where the scrape ladder may have to spin up a `WebView` and
+     * still fail. For a user's own photo it is not merely preferred but the only possibility —
+     * `imageUrl` is blank and there is nothing to re-derive from.
+     *
+     * The fallback still matters, though. A blob is only there once *some* device has uploaded it,
+     * so in the window before that, or if the upload was refused, re-deriving from the source is
+     * what keeps the image appearing at all.
+     */
+    private suspend fun fetchImage(candidate: RecipeImageCandidate): String? {
+        if (candidate.imageBlobId != null) {
+            fetchRecipeImageFromBackend(candidate.recipeId)?.let { return it }
+            Timber.d("Backend image unavailable for %s, falling back", candidate.recipeId)
+        }
+        if (candidate.imageUrl.isEmpty()) return null
+        return cacheRecipeImage(candidate.recipeId, candidate.imageUrl)
     }
+
 }
 
 /**

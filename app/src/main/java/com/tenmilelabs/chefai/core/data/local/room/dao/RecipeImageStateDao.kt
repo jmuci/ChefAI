@@ -18,6 +18,28 @@ interface RecipeImageStateDao {
     @Query("DELETE FROM recipe_image_state WHERE recipeId = :recipeId")
     suspend fun delete(recipeId: UUID)
 
+    /**
+     * Counts a download attempt, before it is made.
+     *
+     * A targeted upsert rather than [upsert], which writes the whole row: now that this table also
+     * carries upload bookkeeping, a full-row write from the download sweep would reset
+     * `uploadAttempts` and `uploadedFileModifiedAt` to their defaults. That would silently
+     * resurrect an upload the backend had permanently rejected, and make an already-uploaded image
+     * look like it needed sending again — the same full-row-write hazard as gotcha #24, one table
+     * further in.
+     */
+    @Query(
+        """
+        INSERT INTO recipe_image_state
+            (recipeId, attempts, lastAttemptAt, uploadAttempts, lastUploadAttemptAt, uploadedFileModifiedAt)
+        VALUES (:recipeId, 1, :at, 0, 0, NULL)
+        ON CONFLICT(recipeId) DO UPDATE SET
+            attempts = attempts + 1,
+            lastAttemptAt = :at
+        """
+    )
+    suspend fun recordDownloadAttempt(recipeId: UUID, at: Long)
+
     // --- Upload half of the ladder ---
     //
     // Upserts rather than read-modify-write, because the bookkeeping row may not exist: the download

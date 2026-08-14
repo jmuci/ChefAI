@@ -10,6 +10,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.IngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.LabelDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.MealPlanDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeImageStateDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeLabelCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeStepDao
@@ -75,6 +76,7 @@ class SyncOrchestrator @Inject constructor(
     private val labelDao: LabelDao,
     private val userDao: UserDao,
     private val recipeDao: RecipeDao,
+    private val recipeImageStateDao: RecipeImageStateDao,
     private val recipeStepDao: RecipeStepDao,
     private val recipeIngredientDao: RecipeIngredientDao,
     private val recipeTagCrossRefDao: RecipeTagCrossRefDao,
@@ -352,8 +354,16 @@ class SyncOrchestrator @Inject constructor(
 
         // The DTO never carries the device-local cached-image path (see SyncMapper.toRecipeEntity) —
         // read back whatever this device already has so this upsert doesn't wipe it.
-        val existingLocalImagePath = recipeDao.getRecipeById(recipeId)?.localImagePath
-        recipeDao.upsertRecipe(syncRecipe.toRecipeEntity(existingLocalImagePath))
+        val existing = recipeDao.getRecipeById(recipeId)
+        recipeDao.upsertRecipe(syncRecipe.toRecipeEntity(existing?.localImagePath))
+
+        // A recipe whose image blob changed — most often from null, when another device finally
+        // uploaded one — deserves a fresh set of download attempts. Without this, three failures
+        // collected while the image was unobtainable would permanently blind this device to the
+        // copy that has since appeared.
+        if (existing != null && existing.imageBlobId != syncRecipe.imageBlobId) {
+            recipeImageStateDao.delete(recipeId)
+        }
 
         recipeStepDao.deleteAllForRecipe(recipeId)
         recipeStepDao.upsertAll(syncRecipe.toStepEntities())

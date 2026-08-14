@@ -4,19 +4,15 @@ import com.tenmilelabs.chefai.core.di.IoDispatcher
 import com.tenmilelabs.chefai.core.di.ScraperHttpClient
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import com.tenmilelabs.chefai.recipes.data.network.BOT_WALL_STATUSES
-import com.tenmilelabs.chefai.recipes.data.network.MAX_IMAGE_BYTES
+import com.tenmilelabs.chefai.recipes.data.network.readImageBodyCapped
 import com.tenmilelabs.chefai.recipes.data.repository.normalizeAndValidateUrl
 import com.tenmilelabs.chefai.recipes.domain.repository.RenderedImageFetcher
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.ResponseException
 import io.ktor.client.request.get
 import io.ktor.client.request.headers
-import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.HttpHeaders
-import io.ktor.http.contentLength
 import io.ktor.http.contentType
-import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -106,27 +102,4 @@ class CacheRecipeImage @Inject constructor(
         data class Bytes(val bytes: ByteArray) : FetchOutcome
         data class Failure(val looksLikeBotWall: Boolean) : FetchOutcome
     }
-}
-
-/**
- * Reads at most [MAX_IMAGE_BYTES], returning `null` — rather than a truncated image — if the body
- * is larger, whether or not a (possibly absent or wrong) `Content-Length` header said so.
- */
-private suspend fun HttpResponse.readImageBodyCapped(): ByteArray? {
-    val declaredLength = contentLength()
-    if (declaredLength != null && declaredLength > MAX_IMAGE_BYTES) return null
-
-    val channel = bodyAsChannel()
-    val buffer = ByteArray(MAX_IMAGE_BYTES)
-    var offset = 0
-    while (offset < buffer.size) {
-        val read = channel.readAvailable(buffer, offset, buffer.size - offset)
-        if (read == -1) break
-        offset += read
-    }
-    if (offset == buffer.size) {
-        val probe = ByteArray(1)
-        if (channel.readAvailable(probe, 0, 1) > 0) return null
-    }
-    return buffer.copyOf(offset)
 }

@@ -17,10 +17,12 @@ class RecipeImageBackfillTest {
     private fun candidate(
         localImagePath: String? = null,
         imageUrl: String = REMOTE_URL,
+        imageBlobId: String? = null,
     ) = RecipeImageCandidate(
         recipeId = UUID.randomUUID(),
         imageUrl = imageUrl,
         localImagePath = localImagePath,
+        imageBlobId = imageBlobId,
     )
 
     /** Stands in for the filesystem: every listed path exists, nothing else does. */
@@ -70,6 +72,29 @@ class RecipeImageBackfillTest {
     @Test
     fun `an empty candidate list yields no work`() {
         assertThat(emptyList<RecipeImageCandidate>().needingBackfill(existing())).isEmpty()
+    }
+
+    @Test
+    fun `a user photo with an uploaded blob is now a candidate — it was not in Stage 1`() {
+        // Blank imageUrl means the image can't be re-derived from anywhere, so before Stage 2 this
+        // row was deliberately excluded from the sweep entirely. Once the bytes are on the backend
+        // there *is* somewhere to fetch them from, which is the whole point of the upload.
+        val candidates = listOf(candidate(imageUrl = "", imageBlobId = "abc"))
+
+        val result = candidates.needingBackfill(existing())
+
+        assertThat(result).isEqualTo(candidates)
+    }
+
+    @Test
+    fun `a user photo already on disk is still left alone`() {
+        val candidates = listOf(
+            candidate(imageUrl = "", imageBlobId = "abc", localImagePath = "/files/recipe_images/a")
+        )
+
+        val result = candidates.needingBackfill(existing("/files/recipe_images/a"))
+
+        assertThat(result).isEmpty()
     }
 
     @Test

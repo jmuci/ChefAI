@@ -15,6 +15,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeMealPlanDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeLabelDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeImageStateDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
@@ -105,6 +106,7 @@ class SyncOrchestratorTest {
         syncOrchestrator = SyncOrchestrator(
             syncNetworkDataSource = syncNetworkDataSource,
             recipeDao = recipeDao,
+            recipeImageStateDao = FakeRecipeImageStateDao(),
             recipeStepDao = recipeStepDao,
             allergenDao = allergenDao,
             sourceClassificationDao = sourceClassificationDao,
