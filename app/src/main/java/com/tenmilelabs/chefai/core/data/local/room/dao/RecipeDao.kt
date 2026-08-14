@@ -115,21 +115,30 @@ interface RecipeDao {
     /**
      * Recipes that could still be missing their on-device image, newest first.
      *
-     * `imageUrl != ''` is what keeps a user's own photo out of the sweep: a picked image has no
-     * source URL and so can never be re-derived, and the editor clears `imageUrl` when one is stored
-     * precisely so this predicate can tell the two apart (see ADR-011). Recipes that have already
-     * failed [maxAttempts] times are excluded so a permanently dead URL stops costing work.
+     * A recipe qualifies if its image can be obtained from *somewhere*: a source URL to re-derive
+     * from, or a blob the backend already holds.
+     *
+     * `imageUrl != ''` alone used to be the whole predicate, and it deliberately excluded a user's
+     * own photo — a picked image has no source URL, so re-deriving it is impossible and the editor
+     * clears `imageUrl` precisely so this predicate can tell the two apart (ADR-011 Decision 3).
+     * `OR imageBlobId IS NOT NULL` is what finally lets those photos be restored on a second device:
+     * once they are uploaded there *is* somewhere to fetch them from. This is the whole point of
+     * Stage 2.
+     *
+     * Recipes that have already failed [maxAttempts] times are excluded so a permanently dead URL
+     * stops costing work.
      *
      * Whether the file is actually *present* isn't expressible in SQL, so this deliberately
      * over-selects and the caller filters — see `RecipeImageBackfillWorker`.
      */
     @Query(
         """
-        SELECT r.uuid AS recipeId, r.imageUrl AS imageUrl, r.localImagePath AS localImagePath
+        SELECT r.uuid AS recipeId, r.imageUrl AS imageUrl, r.localImagePath AS localImagePath,
+               r.imageBlobId AS imageBlobId
         FROM recipes r
         LEFT JOIN recipe_image_state s ON s.recipeId = r.uuid
         WHERE r.deletedAt IS NULL
-          AND r.imageUrl != ''
+          AND (r.imageUrl != '' OR r.imageBlobId IS NOT NULL)
           AND COALESCE(s.attempts, 0) < :maxAttempts
         ORDER BY r.updatedAt DESC
         LIMIT :scanLimit
