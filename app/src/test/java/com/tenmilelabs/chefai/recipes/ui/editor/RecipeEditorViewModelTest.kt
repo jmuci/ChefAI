@@ -354,6 +354,25 @@ class RecipeEditorViewModelTest {
     }
 
     @Test
+    fun `changing only privacy on a valid existing recipe keeps save enabled and persists it`() = runTest {
+        // recipe1 already has ingredients and steps, so isFormValid is true the moment it loads —
+        // PrivacyChanged doesn't call revalidate() (privacy isn't a required field), but it must not
+        // regress an already-valid form either.
+        recipesRepository.addStoredRecipe(recipe1.copy(privacy = RecipePrivacy.PRIVATE))
+
+        val vm = createViewModel(recipeId = recipe1.uuid.toString())
+        assertTrue(vm.state.value.isFormValid)
+
+        vm.dispatch(EditorAction.PrivacyChanged(RecipePrivacy.PUBLIC))
+        assertTrue(vm.state.value.isFormValid)
+
+        vm.dispatch(EditorAction.Save)
+
+        assertEquals(RecipePrivacy.PUBLIC, recipesRepository.lastUpdatedRecipe?.privacy)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
     fun `save clears draft from Room`() = runTest {
         val vm = createViewModel()
 
