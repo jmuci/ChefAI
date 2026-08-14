@@ -28,6 +28,10 @@ class FakeSyncScheduler : SyncScheduler {
         Timber.d("FakeSyncScheduler: schedulePeriodicSync (no-op)")
     }
 
+    override fun scheduleImageUpload() {
+        Timber.d("FakeSyncScheduler: scheduleImageUpload (no-op)")
+    }
+
     override fun scheduleImageBackfill() {
         Timber.d("FakeSyncScheduler: scheduleImageBackfill (no-op)")
     }

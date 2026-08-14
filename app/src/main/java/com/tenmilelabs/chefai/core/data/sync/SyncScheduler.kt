@@ -26,5 +26,13 @@ interface SyncScheduler {
      * waiting on it.
      */
     fun scheduleImageBackfill()
+
+    /**
+     * Enqueues a sweep sending recipe images this device holds and the backend does not.
+     *
+     * Unmetered like the backfill, but without its charging requirement: an upload is one small
+     * request, and until it lands a user-taken photo exists nowhere but this device.
+     */
+    fun scheduleImageUpload()
     fun cancelAllSync()
 }

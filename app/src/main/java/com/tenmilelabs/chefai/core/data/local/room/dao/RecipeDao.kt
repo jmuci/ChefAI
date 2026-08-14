@@ -6,6 +6,7 @@ import androidx.room.Transaction
 import androidx.room.Upsert
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeImageCandidate
+import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeImageUploadCandidate
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeWithDetails
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeWithLabels
@@ -138,6 +139,50 @@ interface RecipeDao {
 
     @Query("UPDATE recipes SET localImagePath = :localImagePath WHERE uuid = :uuid")
     suspend fun updateLocalImagePath(uuid: UUID, localImagePath: String?)
+
+    /**
+     * Recipes whose cached image may not be on the backend yet.
+     *
+     * `syncState = 'SYNCED'` is doing real work: the recipe row has to exist server-side before its
+     * image can be attached to it, so this is what makes the upload unable to 404 and removes any
+     * ordering question between the two.
+     *
+     * User photos are ordered first because they are the only images that cannot be re-derived from
+     * anywhere — a blank `imageUrl` means exactly that (ADR-011 Decision 3). If a sweep only gets
+     * through part of its batch, the irreplaceable bytes are the ones that made it.
+     *
+     * Deliberately over-selects rows that already have an `imageBlobId`: whether the file on disk is
+     * still the one that was uploaded isn't expressible in SQL. The caller narrows — see
+     * `RecipeImageUploadWorker`.
+     */
+    @Query(
+        """
+        SELECT r.uuid AS recipeId, r.localImagePath AS localImagePath,
+               r.imageBlobId AS imageBlobId, s.uploadedFileModifiedAt AS uploadedFileModifiedAt
+        FROM recipes r
+        LEFT JOIN recipe_image_state s ON s.recipeId = r.uuid
+        WHERE r.deletedAt IS NULL
+          AND r.localImagePath IS NOT NULL
+          AND r.syncState = 'SYNCED'
+          AND COALESCE(s.uploadAttempts, 0) < :maxAttempts
+        ORDER BY (r.imageUrl = '') DESC, r.updatedAt DESC
+        LIMIT :scanLimit
+        """
+    )
+    suspend fun getImageUploadCandidates(
+        maxAttempts: Int,
+        scanLimit: Int,
+    ): List<RecipeImageUploadCandidate>
+
+    /**
+     * Records the blob the backend stored for this recipe.
+     *
+     * A targeted UPDATE, not a row write: the value came *from* the server, so it must not mark the
+     * row PENDING or move `updatedAt` — doing either would push a change the server already has and
+     * churn the pull delta forever.
+     */
+    @Query("UPDATE recipes SET imageBlobId = :imageBlobId WHERE uuid = :uuid")
+    suspend fun updateImageBlobId(uuid: UUID, imageBlobId: String?)
 
     // --- Account upgrade queries ---
 

@@ -11,6 +11,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.tenmilelabs.chefai.core.data.sync.worker.SyncWorker
 import com.tenmilelabs.chefai.recipes.data.worker.RecipeImageBackfillWorker
+import com.tenmilelabs.chefai.recipes.data.worker.RecipeImageUploadWorker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.StateFlow
 import java.util.concurrent.TimeUnit
@@ -30,6 +31,7 @@ class SyncManager @Inject constructor(
         const val SYNC_WORK_NAME = "recipe_sync"
         const val PERIODIC_SYNC_WORK_NAME = "recipe_periodic_sync"
         const val IMAGE_BACKFILL_WORK_NAME = "recipe_image_backfill"
+        const val IMAGE_UPLOAD_WORK_NAME = "recipe_image_upload"
     }
 
     val syncStatus: StateFlow<SyncStatus> get() = syncStatusHolder.syncStatus
@@ -121,6 +123,19 @@ class SyncManager @Inject constructor(
     }
 
     /**
+     * Enqueue a sweep sending recipe images the backend doesn't have yet.
+     * KEEP, so a sync finishing while a sweep is already queued doesn't stack requests.
+     */
+    override fun scheduleImageUpload() {
+        val request = OneTimeWorkRequestBuilder<RecipeImageUploadWorker>()
+            .setConstraints(imageUploadConstraints())
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_DELAY_SECONDS, TimeUnit.SECONDS)
+            .build()
+        WorkManager.getInstance(context)
+            .enqueueUniqueWork(IMAGE_UPLOAD_WORK_NAME, ExistingWorkPolicy.KEEP, request)
+    }
+
+    /**
      * Cancel all sync work (e.g., on logout).
      */
     override fun cancelAllSync() {
@@ -128,6 +143,7 @@ class SyncManager @Inject constructor(
         wm.cancelUniqueWork(SYNC_WORK_NAME)
         wm.cancelUniqueWork(PERIODIC_SYNC_WORK_NAME)
         wm.cancelUniqueWork(IMAGE_BACKFILL_WORK_NAME)
+        wm.cancelUniqueWork(IMAGE_UPLOAD_WORK_NAME)
     }
 
     private fun connectedConstraints() = Constraints.Builder()
@@ -147,5 +163,17 @@ class SyncManager @Inject constructor(
     private fun imageBackfillConstraints() = Constraints.Builder()
         .setRequiredNetworkType(NetworkType.UNMETERED)
         .setRequiresCharging(true)
+        .build()
+
+    /**
+     * Unmetered like the backfill, but deliberately *not* charging-only.
+     *
+     * Backfill can afford to wait for a charger — it re-derives images that already exist elsewhere,
+     * some of them behind a `WebView`. An upload is a single request of a few hundred kilobytes, and
+     * a user-taken photo has no copy anywhere until it completes, so making it wait for a charger
+     * would extend exactly the window this feature exists to close.
+     */
+    private fun imageUploadConstraints() = Constraints.Builder()
+        .setRequiredNetworkType(NetworkType.UNMETERED)
         .build()
 }
