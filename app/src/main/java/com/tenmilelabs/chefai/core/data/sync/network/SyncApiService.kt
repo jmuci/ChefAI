@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.core.data.sync.network
 
+import com.tenmilelabs.chefai.BuildConfig
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPullResponse
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPushRequest
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPushResponse
@@ -22,9 +23,9 @@ class SyncApiService @Inject constructor(
 ) : SyncNetworkDataSource {
 
     companion object {
-        private const val SYNC_BASE_URL = "http://10.0.2.2:8080"
-        private const val PUSH_ENDPOINT = "$SYNC_BASE_URL/sync/push"
-        private const val PULL_ENDPOINT = "$SYNC_BASE_URL/sync/pull"
+        private val SYNC_BASE_URL = BuildConfig.API_BASE_URL
+        private val PUSH_ENDPOINT = "$SYNC_BASE_URL/sync/push"
+        private val PULL_ENDPOINT = "$SYNC_BASE_URL/sync/pull"
     }
 
     override suspend fun pushRecipes(request: SyncPushRequest): SyncPushResponse {
