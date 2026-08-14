@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.auth.data.network
 
+import com.tenmilelabs.chefai.BuildConfig
 import com.tenmilelabs.chefai.auth.data.network.dto.ApiErrorResponse
 import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
 import com.tenmilelabs.chefai.auth.data.network.dto.LoginRequest
@@ -16,10 +17,12 @@ import io.ktor.http.isSuccess
 import javax.inject.Inject
 import javax.inject.Singleton
 
-const val AUTH_BASE_URL = "http://10.0.2.2:8080" // Use 10.0.2.2 for Android emulator to access localhost
-const val REGISTER_ENDPOINT = "$AUTH_BASE_URL/auth/register"
-const val LOGIN_ENDPOINT = "$AUTH_BASE_URL/auth/login"
-const val REFRESH_ENDPOINT = "$AUTH_BASE_URL/auth/refresh"
+// `val`, not `const val`: BuildConfig fields are Java statics, which Kotlin won't accept as
+// compile-time constants. Every usage here is a plain string reference, so nothing needs one.
+val AUTH_BASE_URL: String = BuildConfig.API_BASE_URL
+val REGISTER_ENDPOINT = "$AUTH_BASE_URL/auth/register"
+val LOGIN_ENDPOINT = "$AUTH_BASE_URL/auth/login"
+val REFRESH_ENDPOINT = "$AUTH_BASE_URL/auth/refresh"
 
 /**
  * Implementation of AuthNetworkDataSource using Ktor HTTP client.

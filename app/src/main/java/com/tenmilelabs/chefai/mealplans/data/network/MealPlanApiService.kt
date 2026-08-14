@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.mealplans.data.network
 
+import com.tenmilelabs.chefai.BuildConfig
 import com.tenmilelabs.chefai.core.data.sync.network.dto.GenerateMealPlanResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -17,7 +18,7 @@ class MealPlanApiService @Inject constructor(
 ) : MealPlanNetworkDataSource {
 
     companion object {
-        private const val BASE_URL = "http://10.0.2.2:8080"
+        private val BASE_URL = BuildConfig.API_BASE_URL
     }
 
     override suspend fun generateMealPlan(mealPlanId: String): GenerateMealPlanResponse {

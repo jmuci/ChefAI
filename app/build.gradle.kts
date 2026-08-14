@@ -11,6 +11,16 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+/**
+ * Base URL the release build talks to. Supply the deployed host via `-PchefaiApiBaseUrl=https://…`
+ * or a `chefaiApiBaseUrl` entry in `~/.gradle/gradle.properties`.
+ *
+ * The placeholder default is intentional: a release build that silently pointed at a stale or
+ * someone else's host would be worse than one that fails its first request loudly.
+ */
+val releaseApiBaseUrl: String =
+    (project.findProperty("chefaiApiBaseUrl") as String?) ?: "https://api.invalid"
+
 android {
     namespace = "com.tenmilelabs.chefai"
     compileSdk = 36
@@ -31,10 +41,15 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Overridable from ~/.gradle/gradle.properties or -PchefaiApiBaseUrl=... so the deployed
+            // host never has to be committed. Must be https: the release build permits no cleartext.
+            buildConfigField("String", "API_BASE_URL", "\"${releaseApiBaseUrl}\"")
         }
         debug {
             isMinifyEnabled = false
             isDebuggable = true
+            // 10.0.2.2 is the host loopback as seen from the Android emulator.
+            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8080\"")
         }
     }
     compileOptions {

@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.home.data.network
 
+import com.tenmilelabs.chefai.BuildConfig
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.expectSuccess
 import io.ktor.client.request.get
@@ -11,8 +12,7 @@ import io.ktor.http.isSuccess
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private const val HOME_BASE_URL = "http://10.0.2.2:8080"
-private const val HOME_LAYOUT_ENDPOINT = "$HOME_BASE_URL/api/v1/home/layout"
+private val HOME_LAYOUT_ENDPOINT = "${BuildConfig.API_BASE_URL}/api/v1/home/layout"
 
 @Singleton
 class HomeLayoutApiService @Inject constructor(
