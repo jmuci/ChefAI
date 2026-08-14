@@ -12,6 +12,7 @@ import com.tenmilelabs.chefai.core.data.local.room.SourceClassificationEntity
 import com.tenmilelabs.chefai.core.data.local.room.TagEntity
 import com.tenmilelabs.chefai.core.data.local.room.UserEntity
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeImageCandidate
+import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeImageUploadCandidate
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeWithDetails
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeWithLabels
@@ -265,6 +266,31 @@ class FakeRecipeDao : RecipeDao {
 
     override suspend fun updateLocalImagePath(uuid: UUID, localImagePath: String?) {
         recipes[uuid]?.let { recipes[uuid] = it.copy(localImagePath = localImagePath) }
+        triggerUpdate()
+    }
+
+    /**
+     * Mirrors the real query minus the `recipe_image_state` join — the attempt cap isn't modelled
+     * here, so tests that care about it use the in-memory DAO test in androidTest instead.
+     */
+    override suspend fun getImageUploadCandidates(
+        maxAttempts: Int,
+        scanLimit: Int
+    ): List<RecipeImageUploadCandidate> = recipes.values
+        .filter { it.deletedAt == null && it.localImagePath != null && it.syncState == SyncState.SYNCED }
+        .sortedWith(compareByDescending<RecipeEntity> { it.imageUrl.isEmpty() }.thenByDescending { it.updatedAt })
+        .take(scanLimit)
+        .map {
+            RecipeImageUploadCandidate(
+                recipeId = it.uuid,
+                localImagePath = requireNotNull(it.localImagePath),
+                imageBlobId = it.imageBlobId,
+                uploadedFileModifiedAt = null,
+            )
+        }
+
+    override suspend fun updateImageBlobId(uuid: UUID, imageBlobId: String?) {
+        recipes[uuid]?.let { recipes[uuid] = it.copy(imageBlobId = imageBlobId) }
         triggerUpdate()
     }
 

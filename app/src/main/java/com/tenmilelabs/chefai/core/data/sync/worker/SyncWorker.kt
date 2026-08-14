@@ -47,6 +47,10 @@ class SyncWorker @AssistedInject constructor(
             // Enqueued rather than chained: backfill waits for a charger and unmetered data, and a
             // chain would hold this sync's slot until those were satisfied.
             syncScheduler.scheduleImageBackfill()
+            // The mirror of that: images this device holds that the backend doesn't. Enqueued after
+            // the push specifically, since a recipe row must exist server-side before its image can
+            // attach to it — which is why the upload sweep only considers SYNCED rows.
+            syncScheduler.scheduleImageUpload()
             Result.success()
         } catch (e: SyncHttpException) {
             if (e.statusCode == 401) {

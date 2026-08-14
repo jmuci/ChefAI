@@ -122,6 +122,34 @@ class RecipeImageStore @Inject constructor(
         write(recipeId, bytes)
     }
 
+    /**
+     * Reads the stored image for [recipeId], or `null` if there isn't one.
+     *
+     * Returns the whole file in memory, which is fine here and only here: everything this store
+     * holds has already been bounded — a network fetch by
+     * [com.tenmilelabs.chefai.recipes.data.network.MAX_IMAGE_BYTES], a picked photo by
+     * [PICKED_IMAGE_MAX_EDGE] and JPEG re-encoding.
+     */
+    suspend fun read(recipeId: UUID): ByteArray? = withContext(ioDispatcher) {
+        try {
+            fileFor(recipeId).takeIf { it.exists() }?.readBytes()
+        } catch (e: Exception) {
+            Timber.w(e, "Failed to read recipe image for %s", recipeId)
+            null
+        }
+    }
+
+    /**
+     * Last-modified timestamp of the stored image, or `null` if there isn't one.
+     *
+     * The upload sweep uses this to notice a photo that was *replaced*: files are keyed by recipe
+     * id, so a new pick overwrites the same path and every other signal stays identical. [write]
+     * renames a temp file into place, so this always moves when the bytes do.
+     */
+    suspend fun lastModified(recipeId: UUID): Long? = withContext(ioDispatcher) {
+        fileFor(recipeId).takeIf { it.exists() }?.lastModified()
+    }
+
     /** Removes the stored image for [recipeId], if any. */
     suspend fun delete(recipeId: UUID): Unit = withContext(ioDispatcher) {
         fileFor(recipeId).delete()

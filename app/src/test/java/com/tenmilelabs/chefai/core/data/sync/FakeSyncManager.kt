@@ -25,6 +25,9 @@ class FakeSyncManager : SyncScheduler {
     var imageBackfillCount = 0
         private set
 
+    var imageUploadCount = 0
+        private set
+
     var cancelAllCount = 0
         private set
 
@@ -52,6 +55,10 @@ class FakeSyncManager : SyncScheduler {
         imageBackfillCount++
     }
 
+    override fun scheduleImageUpload() {
+        imageUploadCount++
+    }
+
     override fun cancelAllSync() {
         cancelAllCount++
     }
@@ -63,6 +70,7 @@ class FakeSyncManager : SyncScheduler {
         manualSyncCount = 0
         periodicSyncCount = 0
         imageBackfillCount = 0
+        imageUploadCount = 0
         cancelAllCount = 0
     }
 }

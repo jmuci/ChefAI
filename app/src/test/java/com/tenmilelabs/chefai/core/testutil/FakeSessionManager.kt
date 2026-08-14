@@ -34,6 +34,7 @@ class FakeSyncScheduler : SyncScheduler {
     override fun requestManualSync() {}
     override fun schedulePeriodicSync() {}
     override fun scheduleImageBackfill() {}
+    override fun scheduleImageUpload() {}
     override fun cancelAllSync() {}
 }
 
