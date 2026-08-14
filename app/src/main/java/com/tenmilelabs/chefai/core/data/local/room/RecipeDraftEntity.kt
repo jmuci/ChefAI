@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.core.data.local.room
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import java.util.UUID
 
 /**
@@ -23,6 +24,7 @@ data class RecipeDraftEntity(
     val cookTimeMinutes: String,
     val servings: String,
     val externalUrl: String,
+    val privacy: RecipePrivacy,
     val ingredientsJson: String,
     val stepsJson: String,
     val tagsJson: String,

@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.recipes.ui.editor
 
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.Label
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
@@ -20,6 +21,7 @@ sealed interface EditorAction {
     data class CookTimeChanged(val time: String) : EditorAction
     data class ServingsChanged(val servings: String) : EditorAction
     data class ExternalUrlChanged(val url: String) : EditorAction
+    data class PrivacyChanged(val privacy: RecipePrivacy) : EditorAction
     data class ImageUrlChanged(val url: String) : EditorAction
     data class ImageSelected(val uri: String?) : EditorAction
 

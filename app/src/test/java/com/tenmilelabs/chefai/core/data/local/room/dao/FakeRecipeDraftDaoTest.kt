@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.core.data.local.room.dao
 
 import com.tenmilelabs.chefai.core.data.local.room.RecipeDraftEntity
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -25,6 +26,7 @@ class FakeRecipeDraftDaoTest {
         cookTimeMinutes = "20",
         servings = "4",
         externalUrl = "",
+        privacy = RecipePrivacy.PRIVATE,
         ingredientsJson = "[]",
         stepsJson = "[]",
         tagsJson = "[]",

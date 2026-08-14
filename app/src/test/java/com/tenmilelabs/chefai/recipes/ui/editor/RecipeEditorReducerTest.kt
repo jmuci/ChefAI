@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.recipes.ui.editor
 
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.Label
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
@@ -111,6 +112,58 @@ class RecipeEditorReducerTest {
         val result = RecipeEditorReducer.reduce(state, EditorAction.ClearImage)
         assertEquals(null, result.recipeFields.localImagePath)
         assertEquals("", result.recipeFields.imageUrl)
+    }
+
+    // --- Privacy ---
+
+    @Test
+    fun `RecipeFields defaults to PRIVATE`() {
+        assertEquals(RecipePrivacy.PRIVATE, emptyState.recipeFields.privacy)
+    }
+
+    @Test
+    fun `PrivacyChanged updates privacy`() {
+        val result = RecipeEditorReducer.reduce(emptyState, EditorAction.PrivacyChanged(RecipePrivacy.PUBLIC))
+        assertEquals(RecipePrivacy.PUBLIC, result.recipeFields.privacy)
+    }
+
+    @Test
+    fun `PrivacyChanged alone does not mark dirty in create mode`() {
+        // Create-mode dirty tracking only looks at title/description/ingredients/steps — the same
+        // as ExternalUrlChanged and ImageUrlChanged, neither of which marks dirty alone either. An
+        // otherwise-empty draft isn't form-valid regardless, so there's nothing worth a discard
+        // warning over.
+        val result = RecipeEditorReducer.reduce(emptyState, EditorAction.PrivacyChanged(RecipePrivacy.PUBLIC))
+        assertFalse(result.isDirty)
+    }
+
+    @Test
+    fun `PrivacyChanged marks dirty in edit mode when it differs from the original`() {
+        val recipeId = UUID.randomUUID()
+        val originalDraft = RecipeDraft(
+            recipeId = recipeId,
+            isNewRecipe = false,
+            title = "Pasta",
+            privacy = RecipePrivacy.PRIVATE,
+            updatedAt = 1000L,
+        )
+        val state = RecipeEditorState(
+            mode = EditorMode.Edit(recipeId),
+            recipeId = recipeId,
+            recipeFields = RecipeFields(title = "Pasta", privacy = RecipePrivacy.PRIVATE),
+            originalDraft = originalDraft,
+        )
+
+        val result = RecipeEditorReducer.reduce(state, EditorAction.PrivacyChanged(RecipePrivacy.PUBLIC))
+        assertTrue(result.isDirty)
+    }
+
+    @Test
+    fun `toRecipeDraft carries the current privacy`() {
+        val state = emptyState.copy(
+            recipeFields = RecipeFields(privacy = RecipePrivacy.PUBLIC)
+        )
+        assertEquals(RecipePrivacy.PUBLIC, state.toRecipeDraft().privacy)
     }
 
     // --- Ingredients ---

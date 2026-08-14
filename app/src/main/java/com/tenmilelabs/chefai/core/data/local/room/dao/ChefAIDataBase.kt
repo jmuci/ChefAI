@@ -44,7 +44,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         TagEntity::class,
         UserEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 @TypeConverters(UuidConverters::class)
@@ -155,5 +155,18 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
         db.execSQL("ALTER TABLE recipe_image_state ADD COLUMN uploadAttempts INTEGER NOT NULL DEFAULT 0")
         db.execSQL("ALTER TABLE recipe_image_state ADD COLUMN lastUploadAttemptAt INTEGER NOT NULL DEFAULT 0")
         db.execSQL("ALTER TABLE recipe_image_state ADD COLUMN uploadedFileModifiedAt INTEGER")
+    }
+}
+
+/**
+ * Adds [com.tenmilelabs.chefai.core.data.local.room.RecipeDraftEntity.privacy].
+ *
+ * Existing rows are backfilled to 'PUBLIC' rather than to the new Kotlin default of PRIVATE:
+ * before this change `RecipeDraft.toRecipe()` hardcoded PUBLIC, so a draft already in flight was
+ * going to save as public, and a migration should preserve that rather than silently change it.
+ */
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE recipe_drafts ADD COLUMN privacy TEXT NOT NULL DEFAULT 'PUBLIC'")
     }
 }

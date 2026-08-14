@@ -53,6 +53,10 @@ object RecipeEditorReducer {
             recipeFields = state.recipeFields.copy(externalUrl = action.url)
         ).markDirty()
 
+        is EditorAction.PrivacyChanged -> state.copy(
+            recipeFields = state.recipeFields.copy(privacy = action.privacy)
+        ).markDirty()
+
         // localImagePath is cleared alongside the field it was cached for — otherwise the user
         // keeps seeing the stale on-device copy from before their edit.
         is EditorAction.ImageUrlChanged -> state.copy(
@@ -293,6 +297,7 @@ fun RecipeEditorState.toRecipeDraft(): RecipeDraft = RecipeDraft(
     cookTimeMinutes = recipeFields.cookTimeMinutes,
     servings = recipeFields.servings,
     externalUrl = recipeFields.externalUrl,
+    privacy = recipeFields.privacy,
     ingredients = ingredients.selectedIngredients,
     steps = steps.steps,
     tags = tags.selectedTags,

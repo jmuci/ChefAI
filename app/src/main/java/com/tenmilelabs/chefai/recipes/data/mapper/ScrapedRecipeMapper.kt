@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.recipes.data.mapper
 
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.Ingredient
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
@@ -24,7 +25,9 @@ private const val DEFAULT_UNIT = "unit"
  * stays disabled until the user fills in what's missing. Ingredients and tags are matched by name
  * (case-insensitively) against the app's existing catalogs before minting a new id, mirroring
  * [com.tenmilelabs.chefai.recipes.ui.editor.RecipeEditorViewModel.selectIngredient] and
- * `addTagByName` — otherwise every import would duplicate catalog rows.
+ * `addTagByName` — otherwise every import would duplicate catalog rows. Privacy defaults to
+ * `PUBLIC`: a scraped recipe is someone else's already-published page, unlike a recipe the user
+ * writes from scratch, which starts `PRIVATE` (see [RecipeDraft.privacy]).
  */
 fun ScrapedRecipe.toRecipeDraft(
     recipeId: UUID,
@@ -40,6 +43,7 @@ fun ScrapedRecipe.toRecipeDraft(
     cookTimeMinutes = cookTimeMinutesOrFallback(),
     servings = servings?.toString() ?: "0",
     externalUrl = sourceUrl,
+    privacy = RecipePrivacy.PUBLIC,
     ingredients = ingredients.toRecipeIngredients(knownIngredients),
     steps = instructions.toRecipeSteps(),
     tags = keywords.toTags(knownTags),

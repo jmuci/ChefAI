@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.core.ui.preview
 
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.Label
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.domain.model.Tag
@@ -57,6 +58,7 @@ object PreviewData {
         cookTimeMinutes = 180,
         servings = 8,
         creatorId = SharedData.user.uuid,
+        privacy = RecipePrivacy.PRIVATE, // exercises RecipePrivacyBadge in previews
         tags = listOf(Tag(UuidV7Generator.newId(), "Slow Cook"), Tag(UuidV7Generator.newId(), "Beef")),
         labels = listOf(Label(UuidV7Generator.newId(), "Batch Cook")),
     )

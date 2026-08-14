@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.recipes.data.mapper
 
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.Ingredient
 import com.tenmilelabs.chefai.core.domain.model.Tag
 import com.tenmilelabs.chefai.core.domain.model.User
@@ -61,6 +62,15 @@ class ScrapedRecipeMapperTest {
         assertEquals("https://example.com/recipe", draft.externalUrl)
         assertEquals(1, draft.version)
         assertEquals(emptyList<Any>(), draft.labels)
+    }
+
+    @Test
+    fun `a scraped recipe always starts PUBLIC`() {
+        // Unlike a recipe written from scratch (RecipeDraft's own default is PRIVATE), a scraped
+        // recipe is someone else's already-published page.
+        val draft = minimalScrapedRecipe().toRecipeDraft(UUID.randomUUID(), emptyList(), emptyList())
+
+        assertEquals(RecipePrivacy.PUBLIC, draft.privacy)
     }
 
     @Test

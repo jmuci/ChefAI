@@ -120,6 +120,7 @@ fun RecipeListCard(
                         verticalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_extra_small)),
                         maxLines = 1
                     ) {
+                        RecipePrivacyBadge(privacy = recipe.privacy)
                         recipe.labels.take(3).forEach { label ->
                             InfoChip(text = label.displayName, type = InfoChipType.LABEL)
                         }

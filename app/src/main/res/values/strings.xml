@@ -133,6 +133,12 @@
     <string name="delete_recipe_error">Couldn\'t delete recipe</string>
     <string name="cancel_button">Cancel</string>
     <string name="edit_button">Edit</string>
+    <string name="section_visibility">Visibility</string>
+    <string name="privacy_public">Public</string>
+    <string name="privacy_private">Private</string>
+    <string name="visibility_public_description">Anyone can find and view this recipe.</string>
+    <string name="visibility_private_description">Only you can see this recipe.</string>
+    <string name="privacy_private_badge_content_description">Private recipe</string>
 
     <!-- Meal Plans -->
     <string name="no_meal_plans_title">No meal plans yet</string>

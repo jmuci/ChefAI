@@ -7,6 +7,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_1_2
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_2_3
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_3_4
+import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_4_5
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -130,11 +131,44 @@ class ChefAIDatabaseMigrationTest {
     }
 
     @Test
-    fun migrateAll1To4_succeeds() {
+    fun migrate4To5_addsPrivacyColumnBackfilledToPublic() {
+        val draftId = UUID.randomUUID()
+
+        helper.createDatabase(TEST_DB, 4).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO recipe_drafts (
+                    recipeId, isNewRecipe, title, description, imageUrl, localImagePath,
+                    prepTimeMinutes, cookTimeMinutes, servings, externalUrl,
+                    ingredientsJson, stepsJson, tagsJson, labelsJson, version, updatedAt
+                ) VALUES (?, 1, 'Carbonara', 'Classic', 'https://example.com/x.jpg', NULL,
+                    '10', '20', '2', '', '[]', '[]', '[]', '[]', 1, 555)
+                """.trimIndent(),
+                arrayOf(draftId.toBlob())
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 5, true, MIGRATION_4_5)
+
+        db.query("SELECT title, privacy FROM recipe_drafts").use { cursor ->
+            assertTrue("the pre-existing draft row should survive the migration", cursor.moveToFirst())
+            assertEquals("Carbonara", cursor.getString(0))
+            assertEquals(
+                "a draft in flight before this migration was going to save as PUBLIC — " +
+                    "RecipeDraft.toRecipe() hardcoded it — so the backfill preserves that",
+                "PUBLIC",
+                cursor.getString(1)
+            )
+            assertEquals(1, cursor.count)
+        }
+    }
+
+    @Test
+    fun migrateAll1To5_succeeds() {
         helper.createDatabase(TEST_DB, 1).close()
 
         helper.runMigrationsAndValidate(
-            TEST_DB, 4, true, MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4
+            TEST_DB, 5, true, MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5
         )
     }
 }
