@@ -33,18 +33,3 @@ data class RecipeImageUploadCandidate(
     val imageBlobId: String?,
     val uploadedFileModifiedAt: Long?,
 )
-
-/**
- * What the image *upload* sweep needs to decide whether a recipe's cached bytes are already on the
- * backend, and to notice when they have been replaced since.
- *
- * [imageBlobId] non-null means something was uploaded once; whether it is still the *current* image
- * is a question about the file on disk, which SQL cannot answer — see
- * [com.tenmilelabs.chefai.recipes.data.worker.RecipeImageUploadWorker].
- */
-data class RecipeImageUploadCandidate(
-    val recipeId: UUID,
-    val localImagePath: String,
-    val imageBlobId: String?,
-    val uploadedFileModifiedAt: Long?,
-)
