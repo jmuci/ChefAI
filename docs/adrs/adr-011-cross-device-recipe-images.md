@@ -197,10 +197,19 @@ branch, which exists precisely to preserve the anonymous session's own images.
 - Anonymous users get no backfill at all, since they never sync. Correct by construction — they have
   nothing pulled to backfill — but it means the feature is invisible until a user has an account.
 
-## Stage 2 (not decided here, deliberately)
+## Stage 2 — decided in [ADR-012](adr-012-recipe-image-upload.md)
 
-Blocked on a deployed backend. When it happens, the open questions #132 raised that Stage 1 does not
-answer: transport (a sibling endpoint, resumability for ≤5MB one-shots), access control for `PRIVATE`
-recipes (signed URLs vs. an authenticated proxy), what happens to blobs created while anonymous
-(ADR-007), server-side blob reclamation against #129's *soft* delete, and how a pulling device learns
-that an image it was promised has finally been uploaded.
+Stage 2 shipped once a backend existed to upload to. It **supersedes Decision 1 above**: every image
+is now stored server-side, not only user-authored ones, and served to anyone who can see the recipe.
+The rest of this ADR stands unchanged — bytes still never ride the sync payload, a blank `imageUrl`
+still means "user's own image", and blob state still lives in `recipe_image_state`.
+
+The open questions this ADR left for Stage 2 are answered there: a `imageBlobId` pointer that syncs
+while the bytes do not (Decision 3), an authenticated per-recipe route rather than signed URLs
+(Decision 2), anonymous blobs resolving for free at account upgrade and a 30-day server-side
+retention window against #129's soft delete (Decision 7), and a pulling device learning about a new
+blob through the same pull that carries the pointer, with its attempt counter reset (Decision 4).
+
+The Consequences bullet above — *"deleting a recipe destroys a user-picked photo irreversibly"* — is
+now narrower: the local bytes still go immediately and deletion is still not undoable, but the
+server-side copy survives 30 days, so reinstall, second-device and lost-phone losses are closed.
