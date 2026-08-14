@@ -35,6 +35,7 @@ fun RecipeWithDetails.toDomain(ingredients: List<RecipeIngredient> = emptyList()
         imageUrl = recipe.imageUrl,
         imageUrlThumbnail = recipe.imageUrlThumbnail,
         localImagePath = recipe.localImagePath,
+        imageBlobId = recipe.imageBlobId,
         prepTimeMinutes = recipe.prepTimeMinutes,
         cookTimeMinutes = recipe.cookTimeMinutes,
         servings = recipe.servings,
@@ -140,6 +141,10 @@ fun Recipe.toRoomEntity(): RecipeEntity = RecipeEntity(
     imageUrl = imageUrl,
     imageUrlThumbnail = imageUrlThumbnail,
     localImagePath = localImagePath,
+    // Threaded, not defaulted. This is a full-row write, so a field left out here is silently reset
+    // on every save that goes through the domain model — the same class of bug as #128's
+    // hardcoded `deletedAt` two lines below.
+    imageBlobId = imageBlobId,
     prepTimeMinutes = prepTimeMinutes,
     cookTimeMinutes = cookTimeMinutes,
     servings = servings,

@@ -44,7 +44,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         TagEntity::class,
         UserEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 @TypeConverters(UuidConverters::class)
@@ -132,5 +132,28 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
             )
             """.trimIndent()
         )
+    }
+}
+
+/**
+ * Adds the columns Stage 2 of #132 needs to upload a recipe's image to the backend and fetch it back
+ * on another device.
+ *
+ * `recipes.imageBlobId` is the content hash of the uploaded image, and is the one image-related
+ * field that *does* travel through sync — it is the pointer a second device needs for bytes it
+ * cannot re-derive. It is server-owned; see ADR-011 and the Stage 2 plan.
+ *
+ * The three `recipe_image_state` columns track the upload half of the ladder, deliberately separate
+ * from the existing download counters so a recipe stuck on one cannot block the other.
+ *
+ * Plain `ADD COLUMN` throughout — unlike [MIGRATION_2_3] nothing is being removed, so none of the
+ * table-rebuild dance is needed.
+ */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE recipes ADD COLUMN imageBlobId TEXT")
+        db.execSQL("ALTER TABLE recipe_image_state ADD COLUMN uploadAttempts INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE recipe_image_state ADD COLUMN lastUploadAttemptAt INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE recipe_image_state ADD COLUMN uploadedFileModifiedAt INTEGER")
     }
 }
