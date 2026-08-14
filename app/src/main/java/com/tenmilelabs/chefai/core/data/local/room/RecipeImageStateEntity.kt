@@ -31,6 +31,25 @@ import java.util.UUID
 )
 data class RecipeImageStateEntity(
     @PrimaryKey val recipeId: UUID,
+    /** Download attempts, by [com.tenmilelabs.chefai.recipes.data.worker.RecipeImageBackfillWorker]. */
     val attempts: Int,
     val lastAttemptAt: Long,
+    /**
+     * Upload attempts, by [com.tenmilelabs.chefai.recipes.data.worker.RecipeImageUploadWorker].
+     *
+     * Counted separately from [attempts] so the two ladders cannot starve one another: a recipe
+     * whose upload keeps failing must still be eligible for a download, and vice versa.
+     */
+    val uploadAttempts: Int = 0,
+    val lastUploadAttemptAt: Long = 0,
+    /**
+     * `lastModified()` of the local image file at the moment it was last uploaded successfully.
+     *
+     * This is how a *replaced* photo is noticed. Files are keyed by recipe id, so picking a new
+     * photo overwrites the same path in place and `imageBlobId` stays non-null — without this the
+     * upload sweep would skip a recipe whose bytes had changed. Comparing mtime is what avoids
+     * hashing every candidate file on every sweep; `RecipeImageStore.write` renames a temp file into
+     * place, so the timestamp always moves.
+     */
+    val uploadedFileModifiedAt: Long? = null,
 )

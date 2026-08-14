@@ -134,6 +134,40 @@ class SyncMapperTest {
     }
 
     @Test
+    fun `toSyncDto carries imageBlobId — the pointer does travel, unlike the bytes`() {
+        val uploaded = recipeEntity.copy(
+            localImagePath = "/files/recipe_images/$recipeId",
+            imageBlobId = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+        )
+
+        val dto = uploaded.toSyncDto(stepEntities, ingredientEntities, tagCrossRefs, labelCrossRefs)
+
+        assertThat(dto.imageBlobId)
+            .isEqualTo("9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08")
+        // Still no bytes and no device-local path — ADR-011 Decision 2 holds.
+        assertThat(Json.encodeToString(dto)).doesNotContain("recipe_images")
+    }
+
+    @Test
+    fun `toRecipeEntity takes imageBlobId from the wire — the server owns it`() {
+        val entity = syncRecipeDto
+            .copy(imageBlobId = "abc123")
+            .toRecipeEntity(localImagePath = "/files/recipe_images/$recipeId")
+
+        assertThat(entity.imageBlobId).isEqualTo("abc123")
+        assertThat(entity.localImagePath).isEqualTo("/files/recipe_images/$recipeId")
+    }
+
+    @Test
+    fun `a pull that clears imageBlobId clears it locally too`() {
+        // The server dropping the pointer (the image was deleted, or a blob was reclaimed) has to
+        // reach the client, or the download tier keeps chasing bytes that are no longer there.
+        val entity = syncRecipeDto.copy(imageBlobId = null).toRecipeEntity(localImagePath = null)
+
+        assertThat(entity.imageBlobId).isNull()
+    }
+
+    @Test
     fun `toSyncDto maps steps correctly`() {
         val dto = recipeEntity.toSyncDto(stepEntities, ingredientEntities, tagCrossRefs, labelCrossRefs)
 

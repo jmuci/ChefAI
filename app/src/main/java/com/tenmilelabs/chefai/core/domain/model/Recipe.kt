@@ -20,6 +20,14 @@ data class Recipe(
      * Device-local, so it is never synced — see https://github.com/jmuci/ChefAI/issues/132.
      */
     val localImagePath: String? = null,
+    /**
+     * Content hash of this recipe's image on the backend, or `null` if it was never uploaded.
+     *
+     * Carried on the domain model only so it survives a round trip through
+     * [com.tenmilelabs.chefai.recipes.data.mapper.toRoomEntity], whose full-row write would
+     * otherwise reset it. Nothing in the UI reads it.
+     */
+    val imageBlobId: String? = null,
     val prepTimeMinutes: Int,
     val cookTimeMinutes: Int,
     val servings: Int,

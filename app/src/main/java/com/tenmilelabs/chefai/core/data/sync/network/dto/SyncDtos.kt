@@ -24,6 +24,14 @@ data class SyncRecipeDto(
     val description: String,
     val imageUrl: String,
     val imageUrlThumbnail: String,
+    /**
+     * Content hash of the recipe's image on the backend, or `null` if none was ever uploaded.
+     *
+     * Server-owned. The server ignores whatever a push carries here and echoes its own value, so a
+     * client cannot point a recipe at a blob it did not upload, and the field takes no part in
+     * last-writer-wins. Defaulted so a server that predates image upload still deserialises.
+     */
+    val imageBlobId: String? = null,
     val prepTimeMinutes: Int,
     val cookTimeMinutes: Int,
     val servings: Int,

@@ -41,6 +41,7 @@ fun RecipeEntity.toSyncDto(
     description = description,
     imageUrl = imageUrl,
     imageUrlThumbnail = imageUrlThumbnail,
+    imageBlobId = imageBlobId,
     prepTimeMinutes = prepTimeMinutes,
     cookTimeMinutes = cookTimeMinutes,
     servings = servings,
@@ -102,6 +103,9 @@ fun SyncIngredientDto.toIngredientEntity(): IngredientEntity = IngredientEntity(
  * sync (see ADR-010 Decision 6) — so the caller must pass through whatever this device already had
  * for the row, or a pull immediately after caching an image (e.g. the post-mutation push/pull that
  * follows every import) overwrites it back to null via this entity's full-row upsert.
+ *
+ * `imageBlobId` needs no such threading: it is server-owned, so the DTO's value is by definition
+ * the authoritative one (ADR-011 / Stage 2 D1).
  */
 fun SyncRecipeDto.toRecipeEntity(localImagePath: String?): RecipeEntity = RecipeEntity(
     uuid = UUID.fromString(uuid),
@@ -110,6 +114,7 @@ fun SyncRecipeDto.toRecipeEntity(localImagePath: String?): RecipeEntity = Recipe
     imageUrl = imageUrl,
     imageUrlThumbnail = imageUrlThumbnail,
     localImagePath = localImagePath,
+    imageBlobId = imageBlobId,
     prepTimeMinutes = prepTimeMinutes,
     cookTimeMinutes = cookTimeMinutes,
     servings = servings,
