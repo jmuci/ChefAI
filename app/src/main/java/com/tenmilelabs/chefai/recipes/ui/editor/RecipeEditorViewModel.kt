@@ -194,6 +194,7 @@ class RecipeEditorViewModel @Inject constructor(
                         cookTimeMinutes = draft.cookTimeMinutes,
                         servings = draft.servings,
                         externalUrl = draft.externalUrl,
+                        privacy = draft.privacy,
                     ),
                     ingredients = IngredientsFields(
                         selectedIngredients = draft.ingredients,

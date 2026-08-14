@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.recipes.domain.model
 
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.Label
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
@@ -26,6 +27,12 @@ data class RecipeDraft(
     val cookTimeMinutes: String = "",
     val servings: String = "",
     val externalUrl: String = "",
+    /**
+     * Defaults to [RecipePrivacy.PRIVATE]: a recipe the user writes stays theirs until they say
+     * otherwise. The import path overrides this to `PUBLIC` — see
+     * [com.tenmilelabs.chefai.recipes.data.mapper.toRecipeDraft].
+     */
+    val privacy: RecipePrivacy = RecipePrivacy.PRIVATE,
     val ingredients: List<RecipeIngredient> = emptyList(),
     val steps: List<RecipeStep> = emptyList(),
     val tags: List<Tag> = emptyList(),

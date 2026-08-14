@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.recipes.ui.editor
 
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.Label
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
@@ -15,6 +16,7 @@ data class RecipeFields(
     val cookTimeMinutes: String = "",
     val servings: String = "",
     val externalUrl: String = "",
+    val privacy: RecipePrivacy = RecipePrivacy.PRIVATE,
 )
 
 data class IngredientsFields(

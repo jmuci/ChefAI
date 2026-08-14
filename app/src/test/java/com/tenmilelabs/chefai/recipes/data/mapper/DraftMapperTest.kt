@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.recipes.data.mapper
 
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.Label
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
@@ -31,6 +32,13 @@ class DraftMapperTest {
         assertEquals(recipe1.recipeExternalUrl.orEmpty(), draft.externalUrl)
         assertEquals(recipe1.version, draft.version)
         assertEquals(recipe1.updatedAt, draft.updatedAt)
+    }
+
+    @Test
+    fun `Recipe toDraft carries privacy`() {
+        val draft = recipe1.toRecipeDraft()
+
+        assertEquals(recipe1.privacy, draft.privacy)
     }
 
     @Test
@@ -129,6 +137,22 @@ class DraftMapperTest {
     }
 
     @Test
+    fun `draft privacy round-trips through entity for every enum value`() {
+        RecipePrivacy.entries.forEach { privacy ->
+            val original = RecipeDraft(
+                recipeId = UUID.randomUUID(),
+                isNewRecipe = true,
+                privacy = privacy,
+                updatedAt = 1L,
+            )
+
+            val restored = original.toRecipeDraftEntity().toRecipeDraft()
+
+            assertEquals(privacy, restored.privacy)
+        }
+    }
+
+    @Test
     fun `draft entity JSON preserves null optional fields on ingredient`() {
         val original = RecipeDraft(
             recipeId = UUID.randomUUID(),
@@ -216,6 +240,25 @@ class DraftMapperTest {
         assertEquals(creator, recipe.creator)
         assertEquals(2, recipe.version)
         assertEquals(5000L, recipe.updatedAt)
+    }
+
+    @Test
+    fun `draft toRecipe honours the draft's privacy for every enum value`() {
+        val creator = User(UUID.randomUUID(), "Chef", "chef@example.com", "")
+
+        RecipePrivacy.entries.forEach { privacy ->
+            val draft = RecipeDraft(
+                recipeId = UUID.randomUUID(),
+                isNewRecipe = true,
+                privacy = privacy,
+                prepTimeMinutes = "1",
+                cookTimeMinutes = "1",
+                servings = "1",
+                updatedAt = 1L,
+            )
+
+            assertEquals(privacy, draft.toRecipe(creator).privacy)
+        }
     }
 
     @Test

@@ -6,6 +6,7 @@ import com.tenmilelabs.chefai.collections.data.repository.FakeCollectionsReposit
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDraftDao
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.core.data.repository.FakeMetadataRepository
@@ -135,6 +136,19 @@ class RecipeEditorViewModelTest {
     }
 
     @Test
+    fun `seeded PUBLIC draft leaves the privacy toggle PUBLIC`() = runTest {
+        // Regression guard: populateFromDraft must copy draft.privacy into RecipeFields, or every
+        // imported draft would silently reset to the RecipeFields default of PRIVATE on open.
+        val draftId = UuidV7Generator.newId()
+        recipeDraftDao.saveDraft(completeImportedDraft(draftId).toRecipeDraftEntity())
+
+        val vm = createViewModel(draftId = draftId.toString())
+
+        assertEquals(RecipePrivacy.PUBLIC, vm.state.value.recipeFields.privacy)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
     fun `saving a seeded draft takes the create path not update`() = runTest {
         val draftId = UuidV7Generator.newId()
         recipeDraftDao.saveDraft(completeImportedDraft(draftId).toRecipeDraftEntity())
@@ -171,7 +185,11 @@ class RecipeEditorViewModelTest {
         vm.viewModelScope.cancel()
     }
 
-    /** Mirrors what the recipe URL importer persists before handing off to the editor. */
+    /**
+     * Mirrors what the recipe URL importer persists before handing off to the editor — including
+     * `privacy = PUBLIC`, which is what [com.tenmilelabs.chefai.recipes.data.mapper.toRecipeDraft]
+     * (the scraper mapper) always sets.
+     */
     private fun completeImportedDraft(draftId: java.util.UUID) = RecipeDraft(
         recipeId = draftId,
         isNewRecipe = true,
@@ -181,6 +199,7 @@ class RecipeEditorViewModelTest {
         cookTimeMinutes = "15",
         servings = "4",
         externalUrl = "https://example.com/pancakes",
+        privacy = RecipePrivacy.PUBLIC,
         ingredients = listOf(
             RecipeIngredient(
                 ingredientId = UuidV7Generator.newId(),
@@ -271,6 +290,48 @@ class RecipeEditorViewModelTest {
         assertNotNull(recipesRepository.lastCreatedRecipe)
         assertEquals("New Recipe", recipesRepository.lastCreatedRecipe?.title)
         assertFalse(vm.state.value.isSaving)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `a from-scratch create saves as PRIVATE by default`() = runTest {
+        val vm = createViewModel()
+
+        vm.dispatch(EditorAction.TitleChanged("New Recipe"))
+        vm.dispatch(EditorAction.DescriptionChanged("Description"))
+        vm.dispatch(EditorAction.PrepTimeChanged("10"))
+        vm.dispatch(EditorAction.CookTimeChanged("20"))
+        vm.dispatch(EditorAction.ServingsChanged("4"))
+        vm.dispatch(EditorAction.IngredientQuantityChanged("200"))
+        vm.dispatch(EditorAction.IngredientSelected("Flour", java.util.UUID.randomUUID()))
+        vm.dispatch(EditorAction.StepInputChanged("Mix"))
+        vm.dispatch(EditorAction.AddStep)
+        // Privacy left untouched — the user never opened the toggle.
+
+        vm.dispatch(EditorAction.Save)
+
+        assertEquals(RecipePrivacy.PRIVATE, recipesRepository.lastCreatedRecipe?.privacy)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `toggling to PUBLIC before save persists PUBLIC`() = runTest {
+        val vm = createViewModel()
+
+        vm.dispatch(EditorAction.TitleChanged("New Recipe"))
+        vm.dispatch(EditorAction.DescriptionChanged("Description"))
+        vm.dispatch(EditorAction.PrepTimeChanged("10"))
+        vm.dispatch(EditorAction.CookTimeChanged("20"))
+        vm.dispatch(EditorAction.ServingsChanged("4"))
+        vm.dispatch(EditorAction.IngredientQuantityChanged("200"))
+        vm.dispatch(EditorAction.IngredientSelected("Flour", java.util.UUID.randomUUID()))
+        vm.dispatch(EditorAction.StepInputChanged("Mix"))
+        vm.dispatch(EditorAction.AddStep)
+        vm.dispatch(EditorAction.PrivacyChanged(RecipePrivacy.PUBLIC))
+
+        vm.dispatch(EditorAction.Save)
+
+        assertEquals(RecipePrivacy.PUBLIC, recipesRepository.lastCreatedRecipe?.privacy)
         vm.viewModelScope.cancel()
     }
 

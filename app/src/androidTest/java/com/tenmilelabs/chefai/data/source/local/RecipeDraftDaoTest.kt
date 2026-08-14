@@ -7,6 +7,7 @@ import androidx.test.filters.SmallTest
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.RecipeDraftEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import junit.framework.TestCase.assertEquals
 import junit.framework.TestCase.assertNull
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -42,6 +43,7 @@ class RecipeDraftDaoTest {
             cookTimeMinutes = "20",
             servings = "4",
             externalUrl = "https://example.com/recipe",
+            privacy = RecipePrivacy.PRIVATE,
             ingredientsJson = "[]",
             stepsJson = "[]",
             tagsJson = "[]",

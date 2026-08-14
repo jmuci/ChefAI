@@ -24,6 +24,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -33,6 +35,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -56,6 +61,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.Label
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
@@ -172,6 +178,11 @@ fun RecipeEditorScreen(
                     onCookTimeChange = { viewModel.dispatch(EditorAction.CookTimeChanged(it)) },
                     onServingsChange = { viewModel.dispatch(EditorAction.ServingsChanged(it)) },
                     onExternalUrlChange = { viewModel.dispatch(EditorAction.ExternalUrlChanged(it)) },
+                )
+
+                VisibilitySection(
+                    privacy = state.recipeFields.privacy,
+                    onPrivacyChange = { viewModel.dispatch(EditorAction.PrivacyChanged(it)) },
                 )
 
                 ImageUploadSection(
@@ -387,6 +398,55 @@ private fun CoreRecipeForm(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+        )
+    }
+}
+
+/** Left-to-right order is deliberate: Private first, so the more restrictive option reads as the
+ *  default rather than an afterthought — [RecipeFields.privacy] defaults to PRIVATE for the same
+ *  reason. [RecipePrivacy.entries] declares PUBLIC first, so this iterates an explicit local order
+ *  rather than the enum's declaration order. */
+private val PRIVACY_OPTIONS = listOf(RecipePrivacy.PRIVATE, RecipePrivacy.PUBLIC)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VisibilitySection(
+    privacy: RecipePrivacy,
+    onPrivacyChange: (RecipePrivacy) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionHeader(title = stringResource(R.string.section_visibility))
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            PRIVACY_OPTIONS.forEachIndexed { index, option ->
+                SegmentedButton(
+                    selected = privacy == option,
+                    onClick = { onPrivacyChange(option) },
+                    shape = SegmentedButtonDefaults.itemShape(index, PRIVACY_OPTIONS.size),
+                    icon = {
+                        Icon(
+                            imageVector = if (option == RecipePrivacy.PRIVATE) Icons.Default.Lock else Icons.Default.Public,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                    modifier = Modifier.testTag("PrivacyOption_${option.name}"),
+                ) {
+                    Text(
+                        stringResource(
+                            if (option == RecipePrivacy.PRIVATE) R.string.privacy_private
+                            else R.string.privacy_public
+                        )
+                    )
+                }
+            }
+        }
+        Text(
+            text = stringResource(
+                if (privacy == RecipePrivacy.PRIVATE) R.string.visibility_private_description
+                else R.string.visibility_public_description
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

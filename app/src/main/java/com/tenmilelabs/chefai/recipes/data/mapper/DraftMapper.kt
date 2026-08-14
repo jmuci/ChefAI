@@ -2,7 +2,6 @@ package com.tenmilelabs.chefai.recipes.data.mapper
 
 import com.tenmilelabs.chefai.core.data.local.room.RecipeDraftEntity
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
-import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.Label
 import com.tenmilelabs.chefai.core.domain.model.Recipe
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
@@ -119,6 +118,7 @@ fun Recipe.toRecipeDraft(): RecipeDraft = RecipeDraft(
     cookTimeMinutes = cookTimeMinutes.toString(),
     servings = servings.toString(),
     externalUrl = recipeExternalUrl.orEmpty(),
+    privacy = privacy,
     ingredients = ingredients,
     steps = steps,
     tags = tags,
@@ -142,6 +142,7 @@ fun RecipeDraft.toRecipeDraftEntity(): RecipeDraftEntity = RecipeDraftEntity(
     cookTimeMinutes = cookTimeMinutes,
     servings = servings,
     externalUrl = externalUrl,
+    privacy = privacy,
     ingredientsJson = draftJson.encodeToString(ingredients.map { it.toDto() }),
     stepsJson = draftJson.encodeToString(steps.map { it.toDto() }),
     tagsJson = draftJson.encodeToString(tags.map { it.toDto() }),
@@ -165,6 +166,7 @@ fun RecipeDraftEntity.toRecipeDraft(): RecipeDraft = RecipeDraft(
     cookTimeMinutes = cookTimeMinutes,
     servings = servings,
     externalUrl = externalUrl,
+    privacy = privacy,
     ingredients = draftJson.decodeFromString<List<DraftIngredientDto>>(ingredientsJson).map { it.toDomain() },
     steps = draftJson.decodeFromString<List<DraftStepDto>>(stepsJson).map { it.toDomain() },
     tags = draftJson.decodeFromString<List<DraftTagDto>>(tagsJson).map { it.toDomain() },
@@ -191,7 +193,7 @@ fun RecipeDraft.toRecipe(creator: User): Recipe = Recipe(
     servings = servings.toInt(),
     creator = creator,
     recipeExternalUrl = externalUrl.ifBlank { null },
-    privacy = RecipePrivacy.PUBLIC,
+    privacy = privacy,
     version = version,
     ingredients = ingredients,
     steps = steps,

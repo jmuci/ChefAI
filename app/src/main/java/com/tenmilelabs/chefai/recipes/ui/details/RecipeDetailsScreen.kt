@@ -56,10 +56,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.Recipe
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.ui.components.InfoChip
 import com.tenmilelabs.chefai.core.ui.components.InfoChipType
+import com.tenmilelabs.chefai.core.ui.components.RecipePrivacyBadge
 import com.tenmilelabs.chefai.core.ui.components.RecipeTimeRow
 import com.tenmilelabs.chefai.core.ui.preview.RecipeData
 import com.tenmilelabs.chefai.core.ui.recipeImageModel
@@ -230,6 +232,7 @@ fun RecipeDetailsContent(
                 horizontalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_extra_small)),
                 verticalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_extra_small))
             ) {
+                RecipePrivacyBadge(privacy = recipe.privacy)
                 recipe.labels.forEach { label ->
                     InfoChip(text = label.displayName, type = InfoChipType.LABEL)
                 }
@@ -375,6 +378,17 @@ fun RecipeDetailsDeleteConfirmationPreview() {
             recipe = RecipeData.recipe,
             onDeleteClick = {},
             showDeleteConfirmation = true,
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun RecipeDetailsPrivatePreview() {
+    ChefAITheme {
+        RecipeDetailsContent(
+            recipe = RecipeData.recipe.copy(privacy = RecipePrivacy.PRIVATE),
+            isBookmarked = false,
         )
     }
 }
