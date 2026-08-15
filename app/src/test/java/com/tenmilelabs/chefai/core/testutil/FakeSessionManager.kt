@@ -92,6 +92,58 @@ fun createTestSessionManager(
     return sessionManager
 }
 
+/**
+ * Like [createTestSessionManager], but also returns the [FakeAuthNetworkDataSource] backing it —
+ * for tests that need to drive a *real* [SessionManager.refreshToken] failure (e.g. by setting
+ * [FakeAuthNetworkDataSource.shouldThrowError]) rather than mocking the `Result`-returning suspend
+ * function directly. MockK's suspend-function stubbing does not reliably preserve `Result.failure`
+ * across its proxy for a function whose return type is itself `kotlin.Result` (a known MockK/Kotlin
+ * inline-class interaction limitation, not specific to this codebase) — going through the real
+ * object sidesteps it entirely.
+ */
+fun createTestSessionManagerWithAuthSource(
+    testScope: CoroutineScope = CoroutineScope(Dispatchers.Main)
+): Pair<SessionManager, FakeAuthNetworkDataSource> {
+    val fakeAuthNetworkDataSource = FakeAuthNetworkDataSource()
+    val fakeUserDao = FakeUserDao()
+    val fakeSecurePreferences = FakeSecurePreferences()
+    val sessionManager = SessionManager(
+        securePreferences = fakeSecurePreferences,
+        authNetworkDataSource = { fakeAuthNetworkDataSource },
+        userDao = fakeUserDao,
+        accountSwitchHandler = AccountSwitchHandler(
+            securePreferences = fakeSecurePreferences,
+            database = mockk<ChefAIDataBase>(relaxed = true),
+            recipeDao = FakeRecipeDao(),
+            userDao = fakeUserDao,
+            recipeImageStore = mockk<RecipeImageStore>(relaxed = true),
+        ),
+        accountUpgradeUseCaseProvider = {
+            AccountUpgradeUseCase(
+                FakeTransactionRunner(),
+                fakeUserDao,
+                FakeRecipeDao(),
+                FakeRecipeStepDao(),
+                FakeRecipeIngredientDao(),
+                FakeRecipeTagCrossRefDao(),
+                FakeRecipeLabelCrossRefDao(),
+                FakeBookmarkedRecipeDao(),
+                FakeMealPlanDao(),
+            )
+        },
+        syncSchedulerProvider = { FakeSyncScheduler() },
+        applicationScope = testScope
+    ).apply {
+        uuidGenerator = { UuidV7Generator.newId() }
+    }
+
+    runBlocking {
+        sessionManager.loadSession()
+    }
+
+    return sessionManager to fakeAuthNetworkDataSource
+}
+
 fun createRealSessionManagerWithFakes(
     testScope: CoroutineScope = CoroutineScope(Dispatchers.Main)
 ): SessionManager {
