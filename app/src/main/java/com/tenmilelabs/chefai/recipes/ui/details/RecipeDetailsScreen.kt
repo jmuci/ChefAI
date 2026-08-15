@@ -1,11 +1,9 @@
 package com.tenmilelabs.chefai.recipes.ui.details
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,10 +11,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Delete
@@ -39,7 +35,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -70,7 +68,6 @@ import com.tenmilelabs.chefai.core.util.EmptyContent
 import com.tenmilelabs.chefai.core.util.LoadingContent
 import com.tenmilelabs.chefai.core.util.MathUtils
 import com.tenmilelabs.chefai.recipes.ui.components.DeleteConfirmationDialog
-import kotlinx.coroutines.launch
 import timber.log.Timber
 
 
@@ -138,7 +135,6 @@ fun RecipeDetailsScreen(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun RecipeDetailsContent(
     recipe: Recipe,
@@ -159,13 +155,13 @@ fun RecipeDetailsContent(
     }
 
     val tabTitles = listOf(stringResource(R.string.ingredients), stringResource(R.string.steps))
-    val pagerState = rememberPagerState { tabTitles.size }
-    val coroutineScope = rememberCoroutineScope()
+    var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
 
     Box(modifier = Modifier.fillMaxSize()) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
     ) {
         Column(modifier = Modifier.padding(horizontal = dimensionResource(id = R.dimen.padding_medium))) {
             Row(
@@ -247,29 +243,22 @@ fun RecipeDetailsContent(
             }
         }
 
-        TabRow(selectedTabIndex = pagerState.currentPage) {
+        TabRow(selectedTabIndex = selectedTabIndex) {
             tabTitles.forEachIndexed { index, title ->
                 Tab(
-                    selected = pagerState.currentPage == index,
-                    onClick = {
-                        coroutineScope.launch {
-                            pagerState.animateScrollToPage(index)
-                        }
-                    },
+                    selected = selectedTabIndex == index,
+                    onClick = { selectedTabIndex = index },
                     text = { Text(text = title) }
                 )
             }
         }
 
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-            verticalAlignment = Alignment.Top
-        ) { page ->
-            when (page) {
-                0 -> IngredientsList(ingredients = recipe.ingredients)
-                1 -> StepsList(steps = recipe.steps)
-            }
+        // Plain content, not its own scrollable — it's part of the single scroll on the outer
+        // Column above so the whole screen (header + tab content) scrolls as one, rather than the
+        // tab section being squeezed into whatever space is left and scrolling independently.
+        when (selectedTabIndex) {
+            0 -> IngredientsList(ingredients = recipe.ingredients)
+            1 -> StepsList(steps = recipe.steps)
         }
     }
 
@@ -308,19 +297,19 @@ private fun RecipeDescription(description: String) {
 
 @Composable
 fun IngredientsList(ingredients: List<RecipeIngredient>) {
-    LazyColumn(contentPadding = PaddingValues(all = dimensionResource(id = R.dimen.padding_medium))) {
-        items(ingredients) { ingredient ->
-            Row() {
+    Column(modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_medium))) {
+        ingredients.forEach { ingredient ->
+            Row {
                 Text(
                     text = ingredient.ingredientDisplayName,
                     modifier = Modifier
+                        .weight(1f)
                         .padding(vertical = dimensionResource(id = R.dimen.padding_small)),
                     style = MaterialTheme.typography.bodyLarge
                 )
                 Text(
                     text = MathUtils.removeTrailingZeros(ingredient.quantity.toString()) + " " + ingredient.unit,
                     modifier = Modifier
-                        .fillMaxWidth()
                         .padding(vertical = dimensionResource(id = R.dimen.padding_small)),
                     textAlign = TextAlign.End,
                     style = MaterialTheme.typography.bodyLarge
@@ -333,8 +322,8 @@ fun IngredientsList(ingredients: List<RecipeIngredient>) {
 
 @Composable
 fun StepsList(steps: List<RecipeStep>) {
-    LazyColumn(contentPadding = PaddingValues(all = dimensionResource(id = R.dimen.padding_medium))) {
-        items(steps.sortedBy { it.orderIndex }) { step ->
+    Column(modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_medium))) {
+        steps.sortedBy { it.orderIndex }.forEach { step ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
