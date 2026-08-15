@@ -10,10 +10,17 @@ class FakeCollectionsRepository : CollectionsRepository {
 
     private val _bookmarkedIds = MutableStateFlow<Set<UUID>>(emptySet())
 
+    /** When set, the next [addBookmark] call throws this instead of succeeding, then resets to null. */
+    var exceptionToThrowOnAddBookmark: Throwable? = null
+
     override fun observeBookmarkedRecipeIds(userId: UUID): Flow<Set<UUID>> =
         _bookmarkedIds
 
     override suspend fun addBookmark(userId: UUID, recipeId: UUID) {
+        exceptionToThrowOnAddBookmark?.let {
+            exceptionToThrowOnAddBookmark = null
+            throw it
+        }
         _bookmarkedIds.value = _bookmarkedIds.value + recipeId
     }
 
