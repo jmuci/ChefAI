@@ -4,6 +4,8 @@ import com.tenmilelabs.chefai.auth.data.network.AuthInterceptor
 import com.tenmilelabs.chefai.auth.domain.TokenProvider
 import com.tenmilelabs.chefai.recipes.data.network.ChefAIApiService
 import com.tenmilelabs.chefai.recipes.data.network.RecipeNetworkDataSource
+import com.tenmilelabs.chefai.search.data.network.RecipeSearchApiService
+import com.tenmilelabs.chefai.search.data.network.RecipeSearchNetworkDataSource
 import com.tenmilelabs.recipescraper.RecipeHtmlParser
 import dagger.Binds
 import dagger.Module
@@ -38,6 +40,11 @@ abstract class RecipeNetworkDataSourceModule {
     abstract fun bindRecipeNetworkDataSource(
         chefAIApiService: ChefAIApiService
     ): RecipeNetworkDataSource
+
+    @Binds
+    abstract fun bindRecipeSearchNetworkDataSource(
+        recipeSearchApiService: RecipeSearchApiService
+    ): RecipeSearchNetworkDataSource
 }
 
 @Module
@@ -60,6 +67,16 @@ object NetworkModule {
         // Install authentication interceptor
         install(AuthInterceptor) {
             this.tokenProvider = tokenProvider
+        }
+
+        // No requestTimeoutMillis here deliberately: SyncApiService.pullRecipes pages ~100
+        // recipes at a time and image upload/download stream bytes, both of which can
+        // legitimately run longer than a search-appropriate timeout. Callers that need a tight
+        // request timeout (e.g. search) set their own via a per-request `timeout { }` block,
+        // which Ktor allows to override this client-level config.
+        install(HttpTimeout) {
+            connectTimeoutMillis = 10_000
+            socketTimeoutMillis = 10_000
         }
 
         install(Logging) {
