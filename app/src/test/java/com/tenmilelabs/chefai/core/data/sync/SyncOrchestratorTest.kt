@@ -648,6 +648,42 @@ class SyncOrchestratorTest {
         assertThat(dto.ingredients).isEmpty()
     }
 
+    @Test
+    fun `pull does not wipe a locally-pending ingredient the server was never told about`() = runTest(testDispatcher) {
+        // Reproduces a data-loss bug: a brand-new ingredient (its catalog entry not yet SYNCED) is
+        // filtered out of the push — see "push filters out ingredient refs not known to server" —
+        // so the recipe is accepted server-side with zero ingredients. The pull that immediately
+        // follows must not treat that empty server list as authoritative and delete the ingredient
+        // this device still has; it was never given a chance to actually sync.
+        val newIngredientId = UuidV7Generator.newId() // not in ingredientDao -> not SYNCED, filtered from push
+        val recipe = createDirtyRecipe(uuid = recipeId1)
+        recipeDao.upsertRecipe(recipe)
+        recipeIngredientDao.upsertRecipeIngredient(
+            RecipeIngredientEntity(recipeId1, newIngredientId, 2.0, "cups", 1000L)
+        )
+
+        syncNetworkDataSource.pushResponses.addLast(
+            SyncPushResponse(
+                accepted = listOf(AcceptedEntityDto(recipeId1.toString(), 5000L)),
+                conflicts = emptyList(),
+                errors = emptyList(),
+                serverTimestamp = 5000L
+            )
+        )
+        // Server echoes back exactly what it received: the recipe, with no ingredients.
+        val serverEcho = createSyncRecipeDto(uuid = recipeId1, updatedAt = 5000L).copy(ingredients = emptyList())
+        syncNetworkDataSource.pullResponses.addLast(
+            SyncPullResponse(recipes = listOf(serverEcho), serverTimestamp = 6000L, hasMore = false)
+        )
+
+        syncOrchestrator.sync()
+
+        val ingredients = recipeIngredientDao.getIngredientsForRecipe(recipeId1)
+        assertThat(ingredients).hasSize(1)
+        assertThat(ingredients[0].ingredientId).isEqualTo(newIngredientId)
+        assertThat(ingredients[0].syncState).isEqualTo(SyncState.PENDING)
+    }
+
     // ==================== INTEGRATION TESTS ====================
 
     @Test
