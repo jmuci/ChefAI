@@ -185,3 +185,35 @@ after the local write, not at some distant future sync. This cost a full debuggi
 purely local and has nothing to do with the server, prefer a **sibling table** keyed to the recipe
 (`recipe_image_state`) — structurally immune, and it can't be forgotten by the next person adding a
 field to the mapper. See ADR-011 Decision 5.
+
+### 25. MockK cannot reliably mock a suspend function that returns `kotlin.Result<T>`
+`coEvery { sessionManager.refreshToken() } returns Result.failure(e)` (and `coAnswers { Result.failure(e) }`
+— both were tried) does **not** produce the value you'd expect. `Result<T>` is a compiler-magic inline
+class with special-cased suspend-function ABI handling, and MockK's proxy doesn't replicate it: the
+stubbed value gets wrapped in an *extra* layer, so the caller actually observes
+`Result.success(Result.failure(e))` — `.isFailure` on that outer wrapper is `false`. Confirmed
+empirically (printed the actual return value) while testing `RecipeSearchRepository`'s
+refresh-then-retry path — cost real debugging time because the bug is silent: `Result.success(Unit)`
+stubs are unaffected (the outer wrapper is correctly a success either way), so only the *failure* case
+breaks, and a `coVerify(exactly = N)` call-count mismatch is the only visible symptom, not a type error.
+**Fix**: don't mock a `Result`-returning suspend function directly. Exercise the real object instead —
+e.g. `core/testutil/FakeSessionManager.kt`'s `createTestSessionManagerWithAuthSource` builds a real
+`SessionManager` and drives a real failure through `FakeAuthNetworkDataSource.shouldThrowError`, which
+sidesteps the bug entirely because nothing mocks a `Result`-typed suspend function.
+
+### 26. `MainCoroutineRule`'s default dispatcher has its own scheduler — `advanceTimeBy` in a bare `runTest {}` won't reach it
+`MainCoroutineRule(testDispatcher: TestDispatcher = UnconfinedTestDispatcher())` creates a dispatcher
+bound to its **own** `TestCoroutineScheduler` when no scheduler is passed in. A bare `runTest { }` in
+your test method creates a **different** one. `viewModelScope` runs on `Dispatchers.Main` (→ the
+rule's scheduler), so if a ViewModel test does anything time-based — `.debounce()`, `delay()`, a
+timeout — `advanceTimeBy`/`runCurrent` called inside `runTest { }` silently advance the *wrong* clock
+and the coroutine under test never proceeds (symptom: `uiState.value` stays stuck at its `initialValue`
+forever, no crash, no timeout). This is why `RecipeSearchViewModelTest` (the first ViewModel test in
+this codebase to use `.debounce()`) doesn't use `MainCoroutineRule` — it mirrors `LoginViewModelTest`'s
+pattern instead: `private val testDispatcher = StandardTestDispatcher()`, `Dispatchers.setMain(testDispatcher)`
++ `TestScope(testDispatcher)` in `@Before`, `Dispatchers.resetMain()` in `@After`, and every test body
+is `testScope.runTest { ... }` — one shared scheduler, `advanceTimeBy` actually reaches the debounce.
+Separately: reading `uiState.value` directly (instead of subscribing via Turbine's `.test { }`) never
+starts the upstream flow at all when `uiState` is `stateIn(..., SharingStarted.WhileSubscribed(5000), ...)`
+— `.value` only reads whatever was last pushed by an active collector, and `MutableStateFlow.value = x`
+on an *input* flow doesn't force `stateIn`'s upstream to run without at least one subscriber.
