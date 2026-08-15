@@ -314,4 +314,26 @@ class FakeRecipeDao : RecipeDao {
     override suspend fun countRecipesForUser(creatorId: UUID): Int {
         return recipes.values.count { it.creatorId == creatorId && it.deletedAt == null }
     }
+
+    // --- Search (offline/anonymous fallback) ---
+
+    /** Mirrors the real `LIKE`-based query's semantics: title OR an active tag/label match. */
+    override suspend fun searchRecipesWithDetails(query: String, limit: Int): List<RecipeWithDetails> {
+        return recipes.values
+            .filter { it.deletedAt == null }
+            .filter { recipe ->
+                recipe.title.contains(query, ignoreCase = true) ||
+                    recipeTags.any {
+                        it.recipeId == recipe.uuid && it.deletedAt == null &&
+                            tags[it.tagId]?.displayName?.contains(query, ignoreCase = true) == true
+                    } ||
+                    recipeLabels.any {
+                        it.recipeId == recipe.uuid && it.deletedAt == null &&
+                            labels[it.labelId]?.displayName?.contains(query, ignoreCase = true) == true
+                    }
+            }
+            .sortedByDescending { it.updatedAt }
+            .take(limit)
+            .map { assembleRecipeWithDetails(it) }
+    }
 }
