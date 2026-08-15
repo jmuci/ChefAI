@@ -80,6 +80,9 @@
     <string name="recipes_subtitle">Browse recipes and pick your next meal.</string>
     <string name="recipes_title">Ready to cook?</string>
     <string name="save_button">Save</string>
+    <string name="search_added_to_collection">Added to your collection</string>
+    <string name="search_error">Something went wrong while searching</string>
+    <string name="search_recipe_not_yet_synced">This recipe hasn\'t synced to your device yet</string>
     <string name="section_basic_information">Basic Information</string>
     <string name="section_ingredients">Ingredients *</string>
     <string name="section_instructions">Instructions *</string>
