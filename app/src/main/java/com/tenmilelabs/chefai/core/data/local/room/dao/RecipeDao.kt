@@ -204,4 +204,37 @@ interface RecipeDao {
     @Query("SELECT COUNT(*) FROM recipes WHERE creatorId = :creatorId AND deletedAt IS NULL")
     suspend fun countRecipesForUser(creatorId: UUID): Int
 
+    // --- Search (offline/anonymous fallback — see RecipeSearchRepository) ---
+
+    /**
+     * Plain `LIKE` scan over title plus tag/label display names — the fallback used when the
+     * network search is unreachable (offline) or unavailable (anonymous sessions have no JWT).
+     * No FTS4, no ranking, no stemming: at the local corpus size (a single device's synced
+     * recipes) a `LIKE` scan is sub-millisecond, and this is a deliberate degradation the UI
+     * flags to the user, not a second source of truth to keep polished.
+     */
+    @Transaction
+    @Query(
+        """
+        SELECT * FROM recipes r
+        WHERE r.deletedAt IS NULL
+          AND (
+            r.title LIKE '%' || :query || '%'
+            OR EXISTS (
+                SELECT 1 FROM recipe_tags rt
+                INNER JOIN tags t ON t.uuid = rt.tagId
+                WHERE rt.recipeId = r.uuid AND rt.deletedAt IS NULL AND t.displayName LIKE '%' || :query || '%'
+            )
+            OR EXISTS (
+                SELECT 1 FROM recipe_labels rl
+                INNER JOIN labels l ON l.uuid = rl.labelId
+                WHERE rl.recipeId = r.uuid AND rl.deletedAt IS NULL AND l.displayName LIKE '%' || :query || '%'
+            )
+          )
+        ORDER BY r.updatedAt DESC
+        LIMIT :limit
+        """
+    )
+    suspend fun searchRecipesWithDetails(query: String, limit: Int): List<RecipeWithDetails>
+
 }
