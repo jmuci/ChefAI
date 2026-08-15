@@ -21,6 +21,8 @@ import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipeImporter
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipeImporter
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import com.tenmilelabs.chefai.recipes.domain.repository.RenderedImageFetcher
+import com.tenmilelabs.chefai.search.data.repository.DefaultRecipeSearchRepository
+import com.tenmilelabs.chefai.search.domain.repository.RecipeSearchRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -150,4 +152,13 @@ abstract class TestRepositoryModule {
     @Binds
     @Singleton
     abstract fun bindRenderedImageFetcher(fetcher: WebViewImageFetcher): RenderedImageFetcher
+
+    /**
+     * Binds the real [DefaultRecipeSearchRepository] (same as production) — required for Hilt's
+     * shared test component to resolve `RecipeSearchViewModel`'s graph (see
+     * docs/claude/gotchas.md #21), even though no instrumented test exercises search yet.
+     */
+    @Binds
+    @Singleton
+    abstract fun bindRecipeSearchRepository(repository: DefaultRecipeSearchRepository): RecipeSearchRepository
 }
