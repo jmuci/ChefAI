@@ -55,6 +55,22 @@ class FakeRecipeIngredientDao : RecipeIngredientDao {
         }
     }
 
+    override suspend fun updateSyncStateForRecipeIngredients(
+        recipeId: UUID,
+        ingredientIds: List<UUID>,
+        syncState: SyncState,
+        updatedAt: Long
+    ) {
+        val ids = ingredientIds.toSet()
+        recipeIngredientsFlow.value = recipeIngredientsFlow.value.map { ingredient ->
+            if (ingredient.recipeId == recipeId && ingredient.ingredientId in ids) {
+                ingredient.copy(syncState = syncState, updatedAt = updatedAt)
+            } else {
+                ingredient
+            }
+        }
+    }
+
     override suspend fun markPendingForRecipes(recipeIds: List<UUID>, updatedAt: Long) {
         recipeIngredientsFlow.value = recipeIngredientsFlow.value.map { ri ->
             if (ri.recipeId in recipeIds) {

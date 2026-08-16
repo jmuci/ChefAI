@@ -146,7 +146,7 @@ class SyncOrchestrator @Inject constructor(
             Timber.d("Push: Sending batch of ${recipeBatch.size} recipes, ${bookmarkBatch.size} bookmarks, ${mealPlanBatch.size} meal plans")
             // TODO decouple synchronization of unrelated entities such a recipes and meal plans.
             val response = syncNetworkDataSource.pushRecipes(SyncPushRequest(recipeBatch, bookmarkBatch, mealPlanBatch))
-            processPushResponse(response)
+            processPushResponse(response, recipeBatch)
             totalAccepted += response.accepted.size
             totalConflicts += response.conflicts.size
             totalErrors += response.errors.size
@@ -192,14 +192,30 @@ class SyncOrchestrator @Inject constructor(
         return recipe.toSyncDto(steps, ingredients, tags, labels)
     }
 
-    private suspend fun processPushResponse(response: SyncPushResponse) {
+    private suspend fun processPushResponse(response: SyncPushResponse, pushedRecipes: List<SyncRecipeDto>) {
+        // Unlike steps/tags/labels, ingredient refs are filtered before push (buildSyncRecipeDto
+        // only sends ones already known to the server; see #101) — so "recipe X was accepted"
+        // doesn't mean every local ingredient ref for X was actually sent. Blanket-marking every
+        // local row SYNCED used to lie about the ones filtered out, which made the following pull's
+        // upsertRecipeAggregate treat them as safe to delete — permanently losing ingredients the
+        // server was never told about. Marking only the ones actually included keeps the rest
+        // PENDING so upsertRecipeAggregate can tell the two cases apart and preserve them.
+        val pushedIngredientIdsByRecipe = pushedRecipes.associate { dto ->
+            dto.uuid to dto.ingredients.map { UUID.fromString(it.ingredientId) }
+        }
+
         // Process accepted recipes
         for (accepted in response.accepted) {
             val uuid = UUID.fromString(accepted.uuid)
             transactionRunner {
                 recipeDao.updateSyncState(uuid, SyncState.SYNCED, accepted.serverUpdatedAt)
                 recipeStepDao.updateSyncStateForRecipe(uuid, SyncState.SYNCED, accepted.serverUpdatedAt)
-                recipeIngredientDao.updateSyncStateForRecipe(uuid, SyncState.SYNCED, accepted.serverUpdatedAt)
+                val pushedIngredientIds = pushedIngredientIdsByRecipe[accepted.uuid].orEmpty()
+                if (pushedIngredientIds.isNotEmpty()) {
+                    recipeIngredientDao.updateSyncStateForRecipeIngredients(
+                        uuid, pushedIngredientIds, SyncState.SYNCED, accepted.serverUpdatedAt
+                    )
+                }
                 recipeTagCrossRefDao.updateSyncStateForRecipe(uuid, SyncState.SYNCED, accepted.serverUpdatedAt)
                 recipeLabelCrossRefDao.updateSyncStateForRecipe(uuid, SyncState.SYNCED, accepted.serverUpdatedAt)
             }
@@ -368,19 +384,31 @@ class SyncOrchestrator @Inject constructor(
         recipeStepDao.deleteAllForRecipe(recipeId)
         recipeStepDao.upsertAll(syncRecipe.toStepEntities())
 
+        // Ingredients this device already has that the server has never accepted — buildSyncRecipeDto
+        // filters these out of every push until their catalog entry is SYNCED (#101), so a PENDING
+        // cross-ref here doesn't mean "stale," it means "not yet offered to the server." A pull is
+        // otherwise server-authoritative, but for this table specifically the server's list is known
+        // incomplete, so these must survive the delete-and-replace below or they're gone for good.
+        val localPendingIngredients = recipeIngredientDao.getIngredientsForRecipe(recipeId)
+            .filter { it.syncState == SyncState.PENDING }
+
         recipeIngredientDao.deleteAllForRecipe(recipeId)
         val ingredientEntities = syncRecipe.toIngredientEntities()
         // We prevent upserting recipes that reference ingredients that that don't exist in Room.
-        if (ingredientEntities.isNotEmpty()) {
+        val validEntities = if (ingredientEntities.isEmpty()) {
+            emptyList()
+        } else {
             val referencedIds = ingredientEntities.map { it.ingredientId }
             val existingIds = ingredientDao.getExistingIds(referencedIds).toSet()
-            val validEntities = ingredientEntities.filter { it.ingredientId in existingIds }
-            if (validEntities.size < ingredientEntities.size) {
+            val valid = ingredientEntities.filter { it.ingredientId in existingIds }
+            if (valid.size < ingredientEntities.size) {
                 val missing = referencedIds.filterNot { it in existingIds }
                 Timber.w("upsertRecipeAggregate: recipe %s references %d unknown ingredientId(s), skipping them: %s", syncRecipe.uuid, missing.size, missing)
             }
-            recipeIngredientDao.upsertAll(validEntities)
+            valid
         }
+        // Server-confirmed entries win on overlap; distinctBy keeps the first occurrence.
+        recipeIngredientDao.upsertAll((validEntities + localPendingIngredients).distinctBy { it.ingredientId })
 
         recipeTagCrossRefDao.deleteAllForRecipe(recipeId)
         val tagCrossRefs = syncRecipe.toTagCrossRefs()

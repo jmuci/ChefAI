@@ -35,6 +35,16 @@ interface RecipeIngredientDao {
     suspend fun updateSyncStateForRecipe(recipeId: UUID, syncState: SyncState, updatedAt: Long)
 
     /**
+     * Like [updateSyncStateForRecipe] but scoped to specific ingredient refs. Unlike steps/tags/
+     * labels, ingredient refs are filtered before push (see buildSyncRecipeDto — the backend
+     * requires a pre-seeded catalog entry, #101), so "recipe X was accepted" doesn't mean every
+     * local ingredient ref for X was actually sent. Marking the wrong ones SYNCED here previously
+     * caused the following pull to delete them as stale, permanently losing data.
+     */
+    @Query("UPDATE recipe_ingredients SET syncState = :syncState, updatedAt = :updatedAt WHERE recipeId = :recipeId AND ingredientId IN (:ingredientIds)")
+    suspend fun updateSyncStateForRecipeIngredients(recipeId: UUID, ingredientIds: List<UUID>, syncState: SyncState, updatedAt: Long)
+
+    /**
      * Upserts all ingredient cross-references for a recipe.
      * This is a transactional operation that replaces all existing ingredients for the recipe.
      */
