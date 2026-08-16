@@ -17,6 +17,7 @@ import java.util.UUID
  */
 internal object ScreenBaseRoutes {
     const val HOME = "home_screen"
+    const val SEARCH = "search_screen"
     const val MEAL_PLANS = "meal_plans_screen"
     const val RECIPES = "recipes_screen"
     const val RECIPE_DETAILS = "recipe_details_screen"
@@ -71,6 +72,7 @@ enum class AppDestinations(
     val route: String,
 ) {
     HOME(R.string.app_dest_title_home, ScreenBaseRoutes.HOME),
+    SEARCH(R.string.app_dest_title_search, ScreenBaseRoutes.SEARCH),
     MEAL_PLANS(R.string.app_dest_title_meal_plans, ScreenBaseRoutes.MEAL_PLANS),
     RECIPES(R.string.app_dest_title_recipes, ScreenBaseRoutes.RECIPES),
     RECIPE_DETAILS(

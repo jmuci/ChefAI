@@ -6,6 +6,7 @@
     <string name="app_dest_title_recipe_details">Recipe Details</string>
     <string name="app_dest_title_recipes">Recipes</string>
     <string name="app_dest_title_register">Register</string>
+    <string name="app_dest_title_search">Search</string>
     <string name="app_dest_title_recipe_editor">Recipe Editor</string>
     <string name="app_dest_title_import_recipe">Import Recipe</string>
     <string name="app_dest_title_import_recipe_browser">Import Recipe</string>
