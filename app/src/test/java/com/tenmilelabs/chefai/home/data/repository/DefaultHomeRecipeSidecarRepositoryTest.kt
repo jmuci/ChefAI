@@ -121,25 +121,27 @@ class DefaultHomeRecipeSidecarRepositoryTest {
     }
 
     @Test
-    fun `PENDING recipe is skipped`() = runTest {
-        // Seed an existing PENDING recipe
+    fun `PENDING recipe is skipped and its data is never overwritten`() = runTest {
+        // Seed an existing PENDING recipe with a local edit that diverges from the sidecar's title
         recipeDao.seed(recipes = listOf(
             sidecar.recipes.first().let { dto ->
                 dto.toRecipeEntity()
-                    .copy(syncState = SyncState.PENDING)
+                    .copy(syncState = SyncState.PENDING, title = "My Unsynced Local Edit")
             }
         ))
 
         val written = repository.upsertSidecar(sidecar)
 
         assertThat(written).isEqualTo(1) // only recipe2 written
-        // recipe1 must not have been overwritten
+        // recipe1 must not have been overwritten — neither its sync state nor its data
         val r1 = recipeDao.getRecipeById(UUID.fromString(recipe1Id))
         assertThat(r1!!.syncState).isEqualTo(SyncState.PENDING)
+        assertThat(r1.title).isEqualTo("My Unsynced Local Edit")
     }
 
     @Test
-    fun `SYNCED recipe is skipped`() = runTest {
+    fun `SYNCED recipe is overwritten with fresh sidecar data`() = runTest {
+        // A prior sidecar delivery (or any SYNCED write) left recipe1 with a stale title.
         recipeDao.seed(recipes = listOf(
             sidecar.recipes.first().let { dto ->
                 dto.toRecipeEntity()
@@ -149,10 +151,12 @@ class DefaultHomeRecipeSidecarRepositoryTest {
 
         val written = repository.upsertSidecar(sidecar)
 
-        assertThat(written).isEqualTo(1)
-        // Title should not be overwritten
+        // SYNCED is no longer skipped — both recipes are (re)written, consistent with
+        // SyncOrchestrator.applyPulledRecipe, which also overwrites SYNCED rows from server data.
+        assertThat(written).isEqualTo(2)
         val r1 = recipeDao.getRecipeById(UUID.fromString(recipe1Id))
-        assertThat(r1!!.title).isEqualTo("Old Title")
+        assertThat(r1!!.title).isEqualTo("Herb-Crusted Chicken")
+        assertThat(r1.syncState).isEqualTo(SyncState.SYNCED)
     }
 
     @Test
@@ -198,17 +202,37 @@ class DefaultHomeRecipeSidecarRepositoryTest {
     }
 
     @Test
-    fun `returns zero when all recipes already exist`() = runTest {
-        // Seed both as SYNCED
+    fun `returns zero when all recipes already exist as PENDING`() = runTest {
+        // Seed both as PENDING (unpushed local edits) — the only state that still causes a skip
         sidecar.recipes.forEach { dto ->
             recipeDao.seed(recipes = listOf(
                 dto.toRecipeEntity()
-                    .copy(syncState = SyncState.SYNCED)
+                    .copy(syncState = SyncState.PENDING)
             ))
         }
 
         val written = repository.upsertSidecar(sidecar)
         assertThat(written).isEqualTo(0)
+    }
+
+    @Test
+    fun `tags and labels are upserted even when every recipe is skipped`() = runTest {
+        // Seed both recipes as PENDING so every recipe in the sidecar is skipped. Reference data
+        // (creators/tags/labels) must still land — the method used to short-circuit to a no-op
+        // before reaching those upserts when recipesToWrite ended up empty.
+        sidecar.recipes.forEach { dto ->
+            recipeDao.seed(recipes = listOf(
+                dto.toRecipeEntity()
+                    .copy(syncState = SyncState.PENDING)
+            ))
+        }
+
+        val written = repository.upsertSidecar(sidecar)
+
+        assertThat(written).isEqualTo(0)
+        assertThat(userDao.getUserById(UUID.fromString(creatorId))).isNotNull()
+        assertThat(tagDao.getTagById(UUID.fromString(tagId))).isNotNull()
+        assertThat(labelDao.getLabelById(UUID.fromString(labelId))).isNotNull()
     }
 
     @Test
@@ -257,9 +281,9 @@ class DefaultHomeRecipeSidecarRepositoryTest {
     }
 
     @Test
-    fun `ingredients and steps are not written for skipped recipes`() = runTest {
+    fun `ingredients and steps are not written for skipped (PENDING) recipes`() = runTest {
         recipeDao.seed(recipes = listOf(
-            sidecar.recipes[0].toRecipeEntity().copy(syncState = SyncState.SYNCED)
+            sidecar.recipes[0].toRecipeEntity().copy(syncState = SyncState.PENDING)
         ))
 
         val sidecarWithData = sidecar.copy(
@@ -276,5 +300,33 @@ class DefaultHomeRecipeSidecarRepositoryTest {
         assertThat(ingredientDao.getAllIngredients()).isEmpty()
         assertThat(recipeIngredientDao.getIngredientsForRecipe(UUID.fromString(recipe1Id))).isEmpty()
         assertThat(recipeStepDao.getStepsForRecipe(UUID.fromString(recipe1Id))).isEmpty()
+    }
+
+    @Test
+    fun `SYNCED recipe with no ingredients gains ingredients and steps from a later sidecar delivery`() = runTest {
+        // Simulates the exact scenario the skip-on-SYNCED bug used to strand permanently: an
+        // earlier delivery wrote the recipe as SYNCED with no ingredients/steps, and a later
+        // delivery carries the missing detail. It must land, not be silently dropped forever.
+        recipeDao.seed(recipes = listOf(sidecar.recipes[0].toRecipeEntity()))
+
+        val sidecarWithDetail = sidecar.copy(
+            recipes = listOf(
+                sidecar.recipes[0].copy(
+                    ingredients = listOf(SidecarIngredient(name = "Chicken breast", quantity = 500.0, unit = "g")),
+                    steps = listOf(SidecarStep(orderIndex = 0, instruction = "Preheat oven to 200°C.")),
+                ),
+            ),
+        )
+
+        val written = repository.upsertSidecar(sidecarWithDetail)
+
+        assertThat(written).isEqualTo(1)
+        val crossRefs = recipeIngredientDao.getIngredientsForRecipe(UUID.fromString(recipe1Id))
+        assertThat(crossRefs).hasSize(1)
+        assertThat(crossRefs.first().unit).isEqualTo("g")
+
+        val steps = recipeStepDao.getStepsForRecipe(UUID.fromString(recipe1Id))
+        assertThat(steps).hasSize(1)
+        assertThat(steps.first().instruction).isEqualTo("Preheat oven to 200°C.")
     }
 }

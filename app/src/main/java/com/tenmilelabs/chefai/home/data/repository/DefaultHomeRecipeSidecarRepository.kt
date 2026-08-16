@@ -48,11 +48,21 @@ class DefaultHomeRecipeSidecarRepository @Inject constructor(
 
     override suspend fun upsertSidecar(sidecar: HomeSidecarDto): Int = withContext(ioDispatcher) {
         transactionRunner {
-            // 1. Determine which recipes to skip (already PENDING or SYNCED — don't overwrite user edits or server-owned data)
+            // 1. Upsert reference data first (FK order: creators → tags → labels), unconditionally —
+            //    this must happen even if every recipe below ends up skipped, otherwise a sidecar
+            //    that only carries new tags/labels for existing recipes would silently drop them.
+            userDao.upsertAll(sidecar.creators.map { it.toUserEntity() })
+            tagDao.upsertAll(sidecar.tags.map { it.toTagEntity() })
+            labelDao.upsertAll(sidecar.labels.map { it.toLabelEntity() })
+
+            // 2. Determine which recipes to skip. Only PENDING (unpushed local edits) is skipped —
+            //    SYNCED rows are still overwritten so a later sidecar delivery can complete detail
+            //    (e.g. ingredients/steps) an earlier delivery omitted. This mirrors
+            //    SyncOrchestrator.applyPulledRecipe, which also overwrites SYNCED rows from server data.
             val recipeUuids = sidecar.recipes.mapNotNull { runCatching { UUID.fromString(it.uuid) }.getOrNull() }
             val skipIds = recipeUuids.filter { uuid ->
                 val existing = recipeDao.getRecipeById(uuid)
-                existing != null && (existing.syncState == SyncState.PENDING || existing.syncState == SyncState.SYNCED)
+                existing != null && existing.syncState == SyncState.PENDING
             }.toSet()
 
             val recipesToWrite = sidecar.recipes.filter { dto ->
@@ -65,15 +75,11 @@ class DefaultHomeRecipeSidecarRepository @Inject constructor(
                 return@transactionRunner 0
             }
 
-            // 2. Upsert in FK order: creators → tags → labels → recipes → cross-refs
-            userDao.upsertAll(sidecar.creators.map { it.toUserEntity() })
-            tagDao.upsertAll(sidecar.tags.map { it.toTagEntity() })
-            labelDao.upsertAll(sidecar.labels.map { it.toLabelEntity() })
-
+            // 3. Upsert recipes
             val recipeEntities = recipesToWrite.map { it.toRecipeEntity() }
             recipeDao.upsertAll(recipeEntities)
 
-            // 3. Upsert cross-refs for written recipes only
+            // 4. Upsert cross-refs for written recipes only
             val writtenIds = recipeEntities.map { it.uuid }.toSet()
             val now = System.currentTimeMillis()
 
@@ -114,7 +120,7 @@ class DefaultHomeRecipeSidecarRepository @Inject constructor(
             if (tagCrossRefs.isNotEmpty()) recipeTagCrossRefDao.upsertAll(tagCrossRefs)
             if (labelCrossRefs.isNotEmpty()) recipeLabelCrossRefDao.upsertAll(labelCrossRefs)
 
-            // 4. Upsert ingredients and steps for written recipes
+            // 5. Upsert ingredients and steps for written recipes
             val allIngredients = mutableListOf<IngredientEntity>()
             val allRecipeIngredients = mutableListOf<RecipeIngredientEntity>()
             val allSteps = mutableListOf<RecipeStepEntity>()
