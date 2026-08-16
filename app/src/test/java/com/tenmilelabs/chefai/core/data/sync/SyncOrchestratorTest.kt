@@ -529,6 +529,29 @@ class SyncOrchestratorTest {
     }
 
     @Test
+    fun `pull stops instead of looping forever when the server's cursor never advances`() = runTest(testDispatcher) {
+        syncMetadataDao.upsert(
+            com.tenmilelabs.chefai.core.data.local.room.SyncMetadataEntity("recipes", 5000L)
+        )
+
+        // hasMore=true on every page, but serverTimestamp never exceeds the starting checkpoint —
+        // a misbehaving server that can never be paginated past. Queue several identical pages so
+        // the test would fail loudly (by draining the queue) if pull() doesn't stop on its own.
+        repeat(5) {
+            syncNetworkDataSource.pullResponses.addLast(
+                SyncPullResponse(recipes = listOf(createSyncRecipeDto(uuid = recipeId1)), serverTimestamp = 5000L, hasMore = true)
+            )
+        }
+
+        val result = syncOrchestrator.sync()
+
+        assertThat(syncNetworkDataSource.capturedPullCalls).hasSize(1)
+        assertThat(result.pullResult.pages).isEqualTo(1)
+        // The one page we did receive is still applied — stopping early isn't data loss.
+        assertThat(recipeDao.getRecipeById(recipeId1)).isNotNull()
+    }
+
+    @Test
     fun `pull updates sync checkpoint`() = runTest(testDispatcher) {
         syncNetworkDataSource.pullResponses.addLast(
             SyncPullResponse(recipes = emptyList(), serverTimestamp = 9999L, hasMore = false)
