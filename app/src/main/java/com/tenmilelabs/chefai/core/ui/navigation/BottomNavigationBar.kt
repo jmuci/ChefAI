@@ -36,6 +36,10 @@ enum class TopLevelDestination(
         icon = R.drawable.ic_home_black_24dp,
         appDestination = AppDestinations.HOME
     ),
+    SEARCH(
+        icon = R.drawable.ic_search_24dp,
+        appDestination = AppDestinations.SEARCH
+    ),
     RECIPES(
         icon = R.drawable.ic_recipe_library_24dp,
         appDestination = AppDestinations.RECIPES

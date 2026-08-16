@@ -51,6 +51,7 @@ import com.tenmilelabs.chefai.recipes.ui.details.RecipeDetailsScreen
 import com.tenmilelabs.chefai.recipes.ui.editor.RecipeEditorScreen
 import com.tenmilelabs.chefai.recipes.ui.urlimport.ImportRecipeRoute
 import com.tenmilelabs.chefai.recipes.ui.urlimport.browser.BrowserImportRoute
+import com.tenmilelabs.chefai.search.ui.SearchScreen
 import timber.log.Timber
 
 @Composable
@@ -86,6 +87,12 @@ fun ChefAINavGraph(
                 onRecipeClick = { recipeUuid ->
                     navActions.navigateToRecipeDetail(recipeUuid)
                 },
+            )
+        }
+        composable(route = AppDestinations.SEARCH.route) {
+            SearchScreen(
+                snackbarHostState = snackbarHostState,
+                onRecipeClick = { recipeUuid -> navActions.navigateToRecipeDetail(recipeUuid) },
             )
         }
         composable(route = AppDestinations.RECIPES.route) {
