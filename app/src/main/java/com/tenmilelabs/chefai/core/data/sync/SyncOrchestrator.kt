@@ -299,10 +299,20 @@ class SyncOrchestrator @Inject constructor(
             val bookmarkMaxTs = response.bookmarkedRecipes.maxOfOrNull { it.updatedAt } ?: 0L
             val mealPlanMaxTs = response.mealPlans.maxOfOrNull { it.updatedAt } ?: 0L
             val newCursor = maxOf(response.serverTimestamp, bookmarkMaxTs, mealPlanMaxTs)
+            val cursorAdvanced = newCursor > since
             syncMetadataDao.upsert(SyncMetadataEntity(ENTITY_TYPE_RECIPES, newCursor))
 
             since = newCursor
             pages++
+
+            if (!cursorAdvanced && response.hasMore) {
+                // A cursor that can't move forward while the server still claims more data would
+                // spin here forever, re-fetching the same page on every iteration. Stop and let
+                // the next scheduled sync retry from this checkpoint instead of hanging the
+                // caller and hammering the backend indefinitely.
+                Timber.w("Pull: cursor stalled at $since after page $pages despite hasMore=true — stopping to avoid an infinite loop")
+                break
+            }
         } while (response.hasMore)
 
         Timber.d("Pull: completed — upserted=$totalUpserted, deleted=$totalDeleted, pages=$pages")
