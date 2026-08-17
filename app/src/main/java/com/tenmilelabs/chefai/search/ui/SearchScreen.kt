@@ -2,25 +2,47 @@ package com.tenmilelabs.chefai.search.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.dimensionResource
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.tenmilelabs.chefai.R
 import java.util.UUID
 
 /**
- * The Search tab.
- *
- * Temporary stub — nav plumbing only, wired up so [com.tenmilelabs.chefai.core.ui.navigation.ChefAINavGraph]
- * and the bottom nav bar have somewhere to go. Step 2 of the search-tab plan
- * (`docs/prompts/search-tab-plan.md`) fills this in with the search bar moved off Home plus the
- * category-card browse page. [snackbarHostState] and [onRecipeClick] are unused for now — they are
- * part of that step's contract, so the signature is settled here rather than changing call sites
- * again later.
+ * The Search tab. A [RecipeSearchBar] overlays the browse landing page; expanding it (by typing or
+ * by tapping a category card) covers the page with results. Mirrors how the bar sat on Home before
+ * search became its own tab.
  */
 @Composable
 fun SearchScreen(
     snackbarHostState: SnackbarHostState,
     onRecipeClick: (UUID) -> Unit,
+    viewModel: RecipeSearchViewModel = hiltViewModel(),
 ) {
-    Box(modifier = Modifier.fillMaxSize())
+    var expanded by rememberSaveable { mutableStateOf(false) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Step 5 puts SearchBrowseContent here.
+
+        RecipeSearchBar(
+            viewModel = viewModel,
+            snackbarHostState = snackbarHostState,
+            onRecipeClick = onRecipeClick,
+            expanded = expanded,
+            onExpandedChange = { expanded = it },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .padding(horizontal = dimensionResource(R.dimen.padding_small)),
+        )
+    }
 }

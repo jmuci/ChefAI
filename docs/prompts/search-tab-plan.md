@@ -208,15 +208,33 @@ resolve its own.
 
 ### 2.3 `home/ui/HomeScreen.kt` — remove search
 
-- Delete the `RecipeSearchOverlay(...)` call and its `import …search.ui.RecipeSearchOverlay`.
-- Keep the enclosing `Box(modifier = Modifier.fillMaxSize())` — `LoadingContent` / `EmptyContent`
-  rely on filling it.
-- In `HomeContent`, revert the search-bar clearance hack: `contentPadding` top goes from `64.dp`
-  back to `dimensionResource(R.dimen.padding_extra_small)`, and the two-line comment above it
-  ("Extra top clearance so the collapsed search bar…") is deleted along with the now-unused
-  `androidx.compose.ui.unit.dp` import.
-- Remove imports that go unused (`Alignment`, `fillMaxWidth`, `padding`, possibly `dp`). Let the
-  compiler warnings tell you exactly which — do not guess and delete something still in use.
+This is a **faithful revert** of what commit `1ef5354` ("Recipe search: SearchBar UI + Home wiring")
+did to this one file. Read that commit first — `git show 1ef5354 -- app/src/main/java/com/tenmilelabs/chefai/home/ui/HomeScreen.kt` —
+and undo exactly it. Reverting to the known-good pre-search state is lower risk than a partial
+cleanup, because that state actually shipped.
+
+Concretely, four things come back out:
+
+1. **The `Box` wrapper goes away entirely.** Before search, `HomeScreen`'s body was a bare
+   `when (val state = uiState) { … }` at top level — no `Box`. `LoadingContent` and `EmptyContent`
+   already `fillMaxSize()` internally, so they do not need one. De-indent the `when` back to its
+   original nesting.
+2. **The `RecipeSearchOverlay(...)` call** and the `// Not a LazyColumn item — …` comment above it.
+3. **`HomeContent`'s `contentPadding`** goes back to the exact original single line:
+   ```kotlin
+   contentPadding = PaddingValues(vertical = dimensionResource(R.dimen.padding_extra_small)),
+   ```
+   along with the two-line `// Extra top clearance so the collapsed search bar…` comment.
+4. **Exactly the six imports that commit added**, no more and no fewer:
+   `androidx.compose.foundation.layout.Box`, `…layout.fillMaxWidth`, `…layout.padding`,
+   `androidx.compose.ui.Alignment`, `androidx.compose.ui.unit.dp`, and
+   `com.tenmilelabs.chefai.search.ui.RecipeSearchOverlay`.
+
+   Keep `androidx.compose.foundation.layout.fillMaxSize` (still used by `HomeContent`'s modifier)
+   and `androidx.compose.ui.res.dimensionResource` (still used by the restored `contentPadding`).
+
+Afterwards, `git diff` on this file should be a clean inverse of `1ef5354`'s hunks. If it is not,
+something extra was changed — investigate before moving on.
 
 ### Verify
 ```

@@ -88,6 +88,30 @@
     <string name="search_error">Something went wrong while searching</string>
     <string name="search_offline_results">Showing results saved on this device</string>
     <string name="search_recipe_not_yet_synced">This recipe hasn\'t synced to your device yet</string>
+
+    <!-- Search tab — browse sections -->
+    <string name="search_section_by_meal">Search by Meal</string>
+    <string name="search_section_popular_categories">Most Popular Categories</string>
+
+    <!-- Search tab — meal categories -->
+    <string name="search_category_breakfast">Breakfast</string>
+    <string name="search_category_lunch">Lunch</string>
+    <string name="search_category_snack">Snack</string>
+    <string name="search_category_dinner">Dinner</string>
+    <string name="search_category_dessert">Dessert</string>
+    <string name="search_category_kid_friendly">Kid-Friendly</string>
+
+    <!-- Search tab — popular categories -->
+    <string name="search_category_low_carb">Low-Carb</string>
+    <string name="search_category_sandwiches_wraps">Sandwiches &amp; Wraps</string>
+    <string name="search_category_quick_easy">Quick &amp; Easy</string>
+    <string name="search_category_budget_friendly">Budget-Friendly</string>
+    <string name="search_category_air_fryer">Air Fryer</string>
+    <string name="search_category_vegetarian">Vegetarian</string>
+    <string name="search_category_protein_packed">Protein-Packed</string>
+    <string name="search_category_healthy">Healthy</string>
+    <string name="search_category_cookies">Cookies</string>
+    <string name="search_category_comfort_food">Comfort Food</string>
     <string name="section_basic_information">Basic Information</string>
     <string name="section_ingredients">Ingredients *</string>
     <string name="section_instructions">Instructions *</string>

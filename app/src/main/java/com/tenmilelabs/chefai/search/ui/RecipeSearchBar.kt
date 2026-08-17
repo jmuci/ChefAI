@@ -22,15 +22,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.components.RecipeListCard
@@ -39,22 +35,22 @@ import com.tenmilelabs.chefai.core.util.LoadingContent
 import java.util.UUID
 
 /**
- * Home's search bar. Owns its own expanded/collapsed state locally — deliberately not lifted into
- * [com.tenmilelabs.chefai.home.ui.HomeViewModel], which stays untouched. [RecipeSearchViewModel]
- * (via its own [hiltViewModel]) owns only query text and results; neither ViewModel knows the
- * other exists.
+ * The Search tab's search bar. Collapsed it sits at the top of the tab; expanded it takes over the
+ * screen and renders results. [expanded] is hoisted so the browse page's category cards can open
+ * the results view (see [SearchScreen]). [RecipeSearchViewModel] owns query text and results.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RecipeSearchOverlay(
+fun RecipeSearchBar(
+    viewModel: RecipeSearchViewModel,
     snackbarHostState: SnackbarHostState,
     onRecipeClick: (UUID) -> Unit,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: RecipeSearchViewModel = hiltViewModel(),
 ) {
     val query by viewModel.query.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var expanded by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
 
     LaunchedEffect(viewModel) {
@@ -71,20 +67,20 @@ fun RecipeSearchOverlay(
     SearchBar(
         modifier = modifier,
         expanded = expanded,
-        onExpandedChange = { expanded = it },
+        onExpandedChange = onExpandedChange,
         inputField = {
             SearchBarDefaults.InputField(
                 query = query,
                 onQueryChange = viewModel::onQueryChanged,
-                onSearch = { expanded = true },
+                onSearch = { onExpandedChange(true) },
                 expanded = expanded,
-                onExpandedChange = { expanded = it },
+                onExpandedChange = onExpandedChange,
                 placeholder = { Text(stringResource(R.string.placeholder_search)) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = {
                     if (expanded) {
                         IconButton(onClick = {
-                            expanded = false
+                            onExpandedChange(false)
                             viewModel.onQueryChanged("")
                         }) {
                             Icon(
@@ -103,7 +99,7 @@ fun RecipeSearchOverlay(
                 .fillMaxWidth()
                 .weight(1f),
             onRecipeClick = { recipeId ->
-                expanded = false
+                onExpandedChange(false)
                 onRecipeClick(recipeId)
             },
             onSaveToCollection = viewModel::onSaveToCollection,
