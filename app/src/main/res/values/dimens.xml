@@ -9,6 +9,7 @@
     <dimen name="recipe_card_height">120dp</dimen>
     <dimen name="category_card_height">96dp</dimen>
     <dimen name="card_corner_radius">16dp</dimen>
+    <dimen name="search_bar_clearance">72dp</dimen>
     <dimen name="row_height_medium">50dp</dimen>
     <dimen name="section_header_height">60dp</dimen>
     <dimen name="nav_bar_icon_size">30dp</dimen>

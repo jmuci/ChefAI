@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.search.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -15,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.dimensionResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.search.ui.components.SearchBrowseContent
 import java.util.UUID
 
 /**
@@ -31,7 +33,15 @@ fun SearchScreen(
     var expanded by rememberSaveable { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Step 5 puts SearchBrowseContent here.
+        SearchBrowseContent(
+            onCategoryClick = { /* Step 6 */ },
+            contentPadding = PaddingValues(
+                start = dimensionResource(R.dimen.padding_medium),
+                end = dimensionResource(R.dimen.padding_medium),
+                top = dimensionResource(R.dimen.search_bar_clearance),
+                bottom = dimensionResource(R.dimen.padding_medium),
+            ),
+        )
 
         RecipeSearchBar(
             viewModel = viewModel,
