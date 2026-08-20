@@ -7,26 +7,30 @@ import com.tenmilelabs.chefai.core.data.sync.SyncExecutor
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
-import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay
-import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
+import com.tenmilelabs.chefai.mealplans.domain.usecase.LocalMealPlanGenerator
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.UUID
+import java.util.concurrent.CancellationException
 import javax.inject.Inject
 
 sealed interface MealPlanDetailUiState {
@@ -34,25 +38,24 @@ sealed interface MealPlanDetailUiState {
     data object NotFound : MealPlanDetailUiState
     data class Success(
         val mealPlan: MealPlan,
-        val dayItems: List<DayItem>,
+        val board: MealPlanBoard,
+        /** True while a generation attempt (remote or local) is in flight. */
         val isGenerating: Boolean = false,
-    ) : MealPlanDetailUiState
+    ) : MealPlanDetailUiState {
+        val upcoming: List<DaySection> get() = board.upcoming
+        val cooked: List<PlannedMeal> get() = board.cooked
+        val cookedCount: Int get() = board.cookedCount
+        val totalCount: Int get() = board.totalCount
+        val progress: Float get() = board.progress
+
+        /** Whether meal names need a "Lunch"/"Dinner" label to be unambiguous. */
+        val showsSlotLabels: Boolean
+            get() = mealPlan.preferences.mealType == MealType.DINNER_AND_LUNCH
+    }
 }
 
 sealed interface MealPlanDetailEvent {
     data class ShowError(val message: String) : MealPlanDetailEvent
-}
-
-/**
- * A flattened item for the lazy list: either a day header or a recipe card.
- */
-sealed interface DayItem {
-    data class Header(val label: String) : DayItem
-    data class RecipeCard(
-        val recipe: RecipePreview,
-        val recipeId: UUID,
-    ) : DayItem
-    data class MissingRecipe(val recipeId: UUID) : DayItem
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -62,6 +65,7 @@ class MealPlanDetailViewModel @Inject constructor(
     private val mealPlanRepository: MealPlanRepository,
     recipesRepository: RecipesRepository,
     private val syncExecutor: SyncExecutor,
+    private val localMealPlanGenerator: LocalMealPlanGenerator,
 ) : ViewModel() {
 
     private val mealPlanId: UUID = UUID.fromString(
@@ -72,33 +76,28 @@ class MealPlanDetailViewModel @Inject constructor(
     private val _events = MutableSharedFlow<MealPlanDetailEvent>()
     val events: SharedFlow<MealPlanDetailEvent> = _events.asSharedFlow()
 
+    private val isGenerating = MutableStateFlow(false)
+
     val uiState: StateFlow<MealPlanDetailUiState> = mealPlanRepository.observeMealPlan(mealPlanId)
         .flatMapLatest { mealPlan ->
             if (mealPlan == null) {
                 flowOf(MealPlanDetailUiState.NotFound)
             } else {
-                val allRecipeIds = mealPlan.days.flatMap { day ->
-                    listOfNotNull(day.lunchRecipeId, day.dinnerRecipeId)
-                }.distinct()
+                val recipeIds = mealPlan.days
+                    .flatMap { listOfNotNull(it.lunchRecipeId, it.dinnerRecipeId) }
+                    .distinct()
 
-                if (allRecipeIds.isEmpty()) {
-                    flowOf(
-                        MealPlanDetailUiState.Success(
-                            mealPlan = mealPlan,
-                            dayItems = buildDayItems(mealPlan, emptyMap()),
-                        )
-                    )
+                val previews = if (recipeIds.isEmpty()) {
+                    flowOf(emptyList())
                 } else {
-                    recipesRepository.getRecipePreviewsByIds(allRecipeIds)
-                        .map { previews ->
-                            val previewMap = previews.associateBy { it.uuid }
-                            MealPlanDetailUiState.Success(
-                                mealPlan = mealPlan,
-                                dayItems = buildDayItems(mealPlan, previewMap),
-                            )
-                        }
+                    recipesRepository.getRecipePreviewsByIds(recipeIds)
                 }
+
+                previews.map { list -> buildState(mealPlan, list.associateBy { it.uuid }) }
             }
+        }
+        .combine(isGenerating) { state, generating ->
+            if (state is MealPlanDetailUiState.Success) state.copy(isGenerating = generating) else state
         }
         .stateIn(
             scope = viewModelScope,
@@ -106,79 +105,89 @@ class MealPlanDetailViewModel @Inject constructor(
             initialValue = MealPlanDetailUiState.Loading,
         )
 
-    fun onGenerate() {
+    /** Flips a single planned meal between cooked and outstanding. */
+    fun onToggleCooked(meal: PlannedMeal) {
         viewModelScope.launch {
             try {
-                // 1. Push so the server has the meal plan (suspends until complete)
-                Timber.d("onGenerate: pushing meal plan $mealPlanId to server")
-                syncExecutor.sync()
-
-                // 2. Call the generate endpoint
-                Timber.d("onGenerate: calling generate API for $mealPlanId")
-                mealPlanRepository.requestGeneration(mealPlanId)
-                    .getOrThrow()
-
-                // 3. Wait briefly for server-side generation to complete, then pull results.
-                //    Generation is fast (~100ms) but async on the server.
-                delay(GENERATION_POLL_DELAY_MS)
-                Timber.d("onGenerate: pulling generated results for $mealPlanId")
-                syncExecutor.sync()
+                mealPlanRepository.setMealCooked(meal.dayId, meal.slot, cooked = !meal.isCooked)
             } catch (e: Exception) {
-                Timber.e(e, "onGenerate: failed for plan $mealPlanId")
-                _events.emit(MealPlanDetailEvent.ShowError(e.message ?: "Generation failed"))
+                if (e is CancellationException) throw e
+                Timber.e(e, "onToggleCooked: failed for day ${meal.dayId} slot ${meal.slot}")
+                _events.emit(MealPlanDetailEvent.ShowError("Couldn't update this meal"))
             }
         }
+    }
+
+    /**
+     * Fills the plan with recipes: the backend generator first, the on-device scheduler if that
+     * cannot deliver.
+     *
+     * The local fallback runs both when the remote attempt throws and when it returns without the
+     * plan actually gaining days — an anonymous session pushes nothing and has its pulled meal
+     * plans skipped, so the round trip can "succeed" and still leave the plan empty.
+     */
+    fun onGenerate() {
+        if (isGenerating.value) return
+        isGenerating.update { true }
+
+        viewModelScope.launch {
+            try {
+                val remoteFilled = runCatching { generateRemotely() }
+                    .onFailure { Timber.w(it, "onGenerate: remote generation failed for $mealPlanId") }
+                    .getOrDefault(false)
+
+                if (remoteFilled) return@launch
+
+                Timber.d("onGenerate: falling back to on-device generation for $mealPlanId")
+                val plan = mealPlanRepository.observeMealPlan(mealPlanId).first()
+                if (plan == null) {
+                    _events.emit(MealPlanDetailEvent.ShowError("Meal plan not found"))
+                    return@launch
+                }
+
+                localMealPlanGenerator(plan)
+                    .onFailure {
+                        _events.emit(
+                            MealPlanDetailEvent.ShowError(
+                                "Save a few recipes first — we build plans from your collection."
+                            )
+                        )
+                    }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "onGenerate: failed for plan $mealPlanId")
+                _events.emit(MealPlanDetailEvent.ShowError(e.message ?: "Generation failed"))
+            } finally {
+                isGenerating.update { false }
+            }
+        }
+    }
+
+    /** Runs the server round trip. Returns whether the plan actually came back with days. */
+    private suspend fun generateRemotely(): Boolean {
+        Timber.d("generateRemotely: pushing meal plan $mealPlanId")
+        syncExecutor.sync()
+
+        mealPlanRepository.requestGeneration(mealPlanId).getOrThrow()
+
+        // Generation is async on the server; give it a beat before pulling the result back.
+        delay(GENERATION_POLL_DELAY_MS)
+        syncExecutor.sync()
+
+        return mealPlanRepository.observeMealPlan(mealPlanId).first()?.days?.isNotEmpty() == true
     }
 
     companion object {
         /** Delay before pulling to let server-side generation finish. */
         private const val GENERATION_POLL_DELAY_MS = 2_000L
 
-        internal fun buildDayItems(
+        /** Wraps [MealPlanBoard.from] in the screen's success state. */
+        internal fun buildState(
             mealPlan: MealPlan,
             recipeMap: Map<UUID, RecipePreview>,
-        ): List<DayItem> {
-            val items = mutableListOf<DayItem>()
-            val isSingleMealType = mealPlan.preferences.mealType == MealType.DINNER
-
-            for (day in mealPlan.days.sortedBy { it.dayIndex }) {
-                val dayNumber = day.dayIndex + 1
-
-                if (isSingleMealType) {
-                    // Single meal type: "Day 1"
-                    items.add(DayItem.Header("Day $dayNumber"))
-                    val recipeId = day.dinnerRecipeId ?: day.lunchRecipeId
-                    if (recipeId != null) {
-                        val preview = recipeMap[recipeId]
-                        if (preview != null) {
-                            items.add(DayItem.RecipeCard(recipe = preview, recipeId = recipeId))
-                        } else {
-                            items.add(DayItem.MissingRecipe(recipeId))
-                        }
-                    }
-                } else {
-                    // Multiple meal types: separate headers per meal
-                    if (day.lunchRecipeId != null) {
-                        items.add(DayItem.Header("Day $dayNumber — Lunch"))
-                        val preview = recipeMap[day.lunchRecipeId]
-                        if (preview != null) {
-                            items.add(DayItem.RecipeCard(recipe = preview, recipeId = day.lunchRecipeId))
-                        } else {
-                            items.add(DayItem.MissingRecipe(day.lunchRecipeId))
-                        }
-                    }
-                    if (day.dinnerRecipeId != null) {
-                        items.add(DayItem.Header("Day $dayNumber — Dinner"))
-                        val preview = recipeMap[day.dinnerRecipeId]
-                        if (preview != null) {
-                            items.add(DayItem.RecipeCard(recipe = preview, recipeId = day.dinnerRecipeId))
-                        } else {
-                            items.add(DayItem.MissingRecipe(day.dinnerRecipeId))
-                        }
-                    }
-                }
-            }
-            return items
-        }
+        ): MealPlanDetailUiState.Success = MealPlanDetailUiState.Success(
+            mealPlan = mealPlan,
+            board = MealPlanBoard.from(mealPlan, recipeMap),
+        )
     }
 }

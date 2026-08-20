@@ -8,11 +8,17 @@ import com.tenmilelabs.chefai.core.data.sync.FakeSyncExecutor
 import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import com.tenmilelabs.chefai.mealplans.data.repository.FakeMealPlanRepository
+import com.tenmilelabs.chefai.core.testutil.recipePreview1
+import com.tenmilelabs.chefai.core.testutil.recipePreview2
 import com.tenmilelabs.chefai.mealplans.domain.model.DietaryRestriction
+import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay
+import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
+import com.tenmilelabs.chefai.mealplans.domain.usecase.LocalMealPlanGenerator
+import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -38,6 +44,9 @@ class CreateMealPlanViewModelTest {
         repository = FakeMealPlanRepository()
         recipesRepository = FakeRecipesRepository()
         recipesRepository.fakeRecipeCount = 50 // enough to allow COLLECTION_ONLY
+        // No local recipes by default, so the on-device fallback cannot fill a plan and the
+        // remote path alone decides the outcome. Tests that exercise the fallback seed this.
+        recipesRepository.setRecipePreviewsToEmit(emptyList())
         sessionManager = createTestSessionManager(CoroutineScope(mainCoroutineRule.testDispatcher))
         syncExecutor = FakeSyncExecutor()
         viewModel = createViewModel()
@@ -52,6 +61,7 @@ class CreateMealPlanViewModelTest {
             sessionManager = sessionManager,
             syncExecutor = syncExecutor,
             recipesRepository = recipesRepository,
+            localMealPlanGenerator = LocalMealPlanGenerator(recipesRepository, repository),
         )
     }
 
@@ -183,7 +193,9 @@ class CreateMealPlanViewModelTest {
     // --- Save ---
 
     @Test
-    fun `SaveMealPlan emits MealPlanReady when sync and generation succeed`() = runTest {
+    fun `SaveMealPlan emits MealPlanReady when the server returns a schedule`() = runTest {
+        repository.daysFromServer = listOf(serverDay())
+
         viewModel.uiEvents.test {
             viewModel.onAction(WizardAction.SaveMealPlan)
             val event = awaitItem()
@@ -192,7 +204,18 @@ class CreateMealPlanViewModelTest {
     }
 
     @Test
-    fun `SaveMealPlan emits MealPlanSavedAsDraft when sync fails`() = runTest {
+    fun `SaveMealPlan emits MealPlanSavedAsDraft when the server accepts but returns no days`() = runTest {
+        // The anonymous case: the call succeeds, but pulled meal plans are skipped, so the plan
+        // gains nothing. With no local recipes either, there is nothing left to fall back to.
+        viewModel.uiEvents.test {
+            viewModel.onAction(WizardAction.SaveMealPlan)
+            val event = awaitItem()
+            assertThat(event).isInstanceOf(CreateMealPlanEvent.MealPlanSavedAsDraft::class.java)
+        }
+    }
+
+    @Test
+    fun `SaveMealPlan emits MealPlanSavedAsDraft when sync fails and there are no local recipes`() = runTest {
         syncExecutor.shouldThrow = true
         viewModel.uiEvents.test {
             viewModel.onAction(WizardAction.SaveMealPlan)
@@ -202,13 +225,44 @@ class CreateMealPlanViewModelTest {
     }
 
     @Test
-    fun `SaveMealPlan emits MealPlanSavedAsDraft when generation fails`() = runTest {
+    fun `SaveMealPlan emits MealPlanSavedAsDraft when generation fails and there are no local recipes`() = runTest {
         repository.shouldFailGeneration = true
         viewModel.uiEvents.test {
             viewModel.onAction(WizardAction.SaveMealPlan)
             val event = awaitItem()
             assertThat(event).isInstanceOf(CreateMealPlanEvent.MealPlanSavedAsDraft::class.java)
         }
+    }
+
+    @Test
+    fun `SaveMealPlan falls back to on-device generation when sync fails`() = runTest {
+        syncExecutor.shouldThrow = true
+        recipesRepository.setRecipePreviewsToEmit(listOf(recipePreview1, recipePreview2))
+
+        viewModel.uiEvents.test {
+            viewModel.onAction(WizardAction.SaveMealPlan)
+            val event = awaitItem()
+            assertThat(event).isInstanceOf(CreateMealPlanEvent.MealPlanReady::class.java)
+        }
+
+        val userId = sessionManager.getCurrentUserId()!!
+        val plan = repository.observeMealPlansForUser(userId).first().single()
+        assertThat(repository.locallyGeneratedIds).containsExactly(plan.uuid)
+        assertThat(plan.days).hasSize(plan.preferences.planLengthDays)
+        assertThat(plan.status).isEqualTo(MealPlanStatus.READY)
+    }
+
+    @Test
+    fun `SaveMealPlan prefers the server schedule over on-device generation`() = runTest {
+        repository.daysFromServer = listOf(serverDay())
+        recipesRepository.setRecipePreviewsToEmit(listOf(recipePreview1, recipePreview2))
+
+        viewModel.uiEvents.test {
+            viewModel.onAction(WizardAction.SaveMealPlan)
+            awaitItem()
+        }
+
+        assertThat(repository.locallyGeneratedIds).isEmpty()
     }
 
     @Test
@@ -236,6 +290,7 @@ class CreateMealPlanViewModelTest {
 
     @Test
     fun `SaveMealPlan resets isSaving to false after success`() = runTest {
+        repository.daysFromServer = listOf(serverDay())
         viewModel.uiEvents.test {
             viewModel.onAction(WizardAction.SaveMealPlan)
             awaitItem()
@@ -291,4 +346,12 @@ class CreateMealPlanViewModelTest {
         vm.onAction(WizardAction.SetRecipeSource(RecipeSource.COLLECTION_ONLY))
         assertThat(vm.uiState.value.recipeSource).isEqualTo(RecipeSource.INCLUDE_PUBLIC)
     }
+
+    /** A day standing in for one the backend generator produced. */
+    private fun serverDay() = MealPlanDay(
+        uuid = UUID.randomUUID(),
+        dayIndex = 0,
+        dinnerRecipeId = UUID.randomUUID(),
+        lunchRecipeId = null,
+    )
 }

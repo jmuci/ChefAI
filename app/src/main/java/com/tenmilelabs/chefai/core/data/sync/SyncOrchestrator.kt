@@ -487,10 +487,29 @@ class SyncOrchestrator @Inject constructor(
         val entity = dto.toMealPlanEntity(userId)
         mealPlanDao.upsertMealPlan(entity)
 
+        // "Cooked" is local-only state the sync payload knows nothing about, so capture it before
+        // the replace below and carry it forward. Keyed by dayIndex rather than day uuid: the
+        // server re-issues day rows with its own ids when it regenerates a plan, but the position
+        // in the week is what the user marked cooked.
+        val previousDays = mealPlanDao.getDaysForMealPlan(planUuid).associateBy { it.dayIndex }
+
         // Always replace days — server is authoritative (especially after generation)
         mealPlanDao.deleteDaysForMealPlan(planUuid)
         if (dto.days.isNotEmpty()) {
-            mealPlanDao.upsertDays(dto.days.map { it.toMealPlanDayEntity(planUuid) })
+            mealPlanDao.upsertDays(
+                dto.days.map { dayDto ->
+                    val day = dayDto.toMealPlanDayEntity(planUuid)
+                    val previous = previousDays[day.dayIndex] ?: return@map day
+                    // A mark only survives if the slot still holds the *same* recipe: when the
+                    // server regenerates a day with a different meal, that meal has not been cooked.
+                    day.copy(
+                        dinnerCookedAt = previous.dinnerCookedAt
+                            .takeIf { previous.dinnerRecipeId == day.dinnerRecipeId },
+                        lunchCookedAt = previous.lunchCookedAt
+                            .takeIf { previous.lunchRecipeId == day.lunchRecipeId },
+                    )
+                }
+            )
         }
     }
 

@@ -44,6 +44,20 @@ interface MealPlanDao {
     @Query("SELECT * FROM meal_plan_days WHERE mealPlanId = :mealPlanId ORDER BY dayIndex ASC")
     fun observeDaysForMealPlan(mealPlanId: UUID): Flow<List<MealPlanDayEntity>>
 
+    /**
+     * Every day row belonging to a user's live plans, so the list screen can show per-plan cooked
+     * progress without opening a Room flow per plan.
+     */
+    @Query(
+        """
+        SELECT d.* FROM meal_plan_days d
+        INNER JOIN meal_plans p ON p.uuid = d.mealPlanId
+        WHERE p.userId = :userId AND p.deletedAt IS NULL
+        ORDER BY d.dayIndex ASC
+        """
+    )
+    fun observeDaysForUser(userId: UUID): Flow<List<MealPlanDayEntity>>
+
     @Query("SELECT * FROM meal_plan_days WHERE mealPlanId = :mealPlanId ORDER BY dayIndex ASC")
     suspend fun getDaysForMealPlan(mealPlanId: UUID): List<MealPlanDayEntity>
 
@@ -52,4 +66,12 @@ interface MealPlanDao {
 
     @Query("DELETE FROM meal_plan_days WHERE mealPlanId = :mealPlanId")
     suspend fun deleteDaysForMealPlan(mealPlanId: UUID)
+
+    /** Marks (or, with a `null` [cookedAt], unmarks) a day's dinner as cooked. */
+    @Query("UPDATE meal_plan_days SET dinnerCookedAt = :cookedAt WHERE uuid = :dayId")
+    suspend fun setDinnerCookedAt(dayId: UUID, cookedAt: Long?)
+
+    /** Marks (or, with a `null` [cookedAt], unmarks) a day's lunch as cooked. */
+    @Query("UPDATE meal_plan_days SET lunchCookedAt = :cookedAt WHERE uuid = :dayId")
+    suspend fun setLunchCookedAt(dayId: UUID, cookedAt: Long?)
 }

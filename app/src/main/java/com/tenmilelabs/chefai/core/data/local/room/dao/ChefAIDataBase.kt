@@ -44,7 +44,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         TagEntity::class,
         UserEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 @TypeConverters(UuidConverters::class)
@@ -168,5 +168,21 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
 val MIGRATION_4_5 = object : Migration(4, 5) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE recipe_drafts ADD COLUMN privacy TEXT NOT NULL DEFAULT 'PUBLIC'")
+    }
+}
+
+/**
+ * Adds the per-slot cooked timestamps on
+ * [com.tenmilelabs.chefai.core.data.local.room.MealPlanDayEntity] that back "mark as cooked" on the
+ * meal-plan detail screen.
+ *
+ * Nullable with no default: `null` means "not cooked yet", which is the right state for every row
+ * that already exists, so no backfill is needed. Plain `ADD COLUMN` — nothing is being removed, so
+ * none of [MIGRATION_2_3]'s table-rebuild dance applies.
+ */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE meal_plan_days ADD COLUMN dinnerCookedAt INTEGER")
+        db.execSQL("ALTER TABLE meal_plan_days ADD COLUMN lunchCookedAt INTEGER")
     }
 }

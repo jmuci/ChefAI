@@ -12,6 +12,7 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
+import com.tenmilelabs.chefai.mealplans.domain.usecase.LocalMealPlanGenerator
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -34,6 +36,7 @@ class CreateMealPlanViewModel @Inject constructor(
     private val sessionManager: SessionManager,
     private val syncExecutor: SyncExecutor,
     private val recipesRepository: RecipesRepository,
+    private val localMealPlanGenerator: LocalMealPlanGenerator,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CreateMealPlanUiState())
@@ -135,28 +138,54 @@ class CreateMealPlanViewModel @Inject constructor(
                 return@launch
             }
 
-            // Plan saved locally — now attempt immediate generation (sync → generate → pull).
-            // If any step fails, fall back to DRAFT so the user can retry from the detail screen.
-            try {
-                Timber.d("saveMealPlan: pushing plan $mealPlanId to server")
-                syncExecutor.sync()
+            // Plan saved locally — now attempt immediate generation (sync → generate → pull), then
+            // the on-device generator, then DRAFT so the user can retry from the detail screen.
+            val filled = generateRemotely(mealPlanId) || generateLocally(mealPlanId)
 
-                Timber.d("saveMealPlan: calling generate API for $mealPlanId")
-                mealPlanRepository.requestGeneration(mealPlanId).getOrThrow()
-
-                delay(GENERATION_POLL_DELAY_MS)
-                Timber.d("saveMealPlan: pulling generated results for $mealPlanId")
-                syncExecutor.sync()
-
-                _uiState.update { it.copy(isSaving = false) }
-                _uiEvent.emit(CreateMealPlanEvent.MealPlanReady(mealPlanId))
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
-                Timber.w(e, "saveMealPlan: generation failed for $mealPlanId, falling back to DRAFT")
-                _uiState.update { it.copy(isSaving = false) }
-                _uiEvent.emit(CreateMealPlanEvent.MealPlanSavedAsDraft(mealPlanId))
-            }
+            _uiState.update { it.copy(isSaving = false) }
+            _uiEvent.emit(
+                if (filled) {
+                    CreateMealPlanEvent.MealPlanReady(mealPlanId)
+                } else {
+                    CreateMealPlanEvent.MealPlanSavedAsDraft(mealPlanId)
+                }
+            )
         }
+    }
+
+    /**
+     * Runs the server round trip for [mealPlanId].
+     *
+     * @return whether the plan actually came back with days — a call that succeeds without
+     *   delivering a schedule (an anonymous session has its pulled meal plans skipped) still counts
+     *   as unfilled, so the caller moves on to the local generator.
+     */
+    private suspend fun generateRemotely(mealPlanId: UUID): Boolean = try {
+        Timber.d("saveMealPlan: pushing plan $mealPlanId to server")
+        syncExecutor.sync()
+
+        Timber.d("saveMealPlan: calling generate API for $mealPlanId")
+        mealPlanRepository.requestGeneration(mealPlanId).getOrThrow()
+
+        delay(GENERATION_POLL_DELAY_MS)
+        Timber.d("saveMealPlan: pulling generated results for $mealPlanId")
+        syncExecutor.sync()
+
+        mealPlanRepository.observeMealPlan(mealPlanId).first()?.days?.isNotEmpty() == true
+    } catch (e: Exception) {
+        if (e is CancellationException) throw e
+        Timber.w(e, "saveMealPlan: remote generation failed for $mealPlanId")
+        false
+    }
+
+    /** Fills [mealPlanId] from the recipes on this device. @return whether it produced a schedule. */
+    private suspend fun generateLocally(mealPlanId: UUID): Boolean = try {
+        val plan = mealPlanRepository.observeMealPlan(mealPlanId).first()
+        plan != null && localMealPlanGenerator(plan).isSuccess
+    } catch (e: Exception) {
+        if (e is CancellationException) throw e
+        Timber.w(e, "saveMealPlan: on-device generation failed for $mealPlanId")
+        false
     }
 
     companion object {

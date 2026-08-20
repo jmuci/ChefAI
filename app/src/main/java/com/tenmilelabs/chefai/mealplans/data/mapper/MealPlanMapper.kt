@@ -26,6 +26,8 @@ fun MealPlanDayEntity.toDomain(): MealPlanDay = MealPlanDay(
     dayIndex = dayIndex,
     dinnerRecipeId = dinnerRecipeId,
     lunchRecipeId = lunchRecipeId,
+    dinnerCookedAt = dinnerCookedAt,
+    lunchCookedAt = lunchCookedAt,
 )
 
 fun MealPlan.toEntity(): MealPlanEntity = MealPlanEntity(
@@ -45,4 +47,6 @@ fun MealPlanDay.toEntity(mealPlanId: java.util.UUID): MealPlanDayEntity = MealPl
     dayIndex = dayIndex,
     dinnerRecipeId = dinnerRecipeId,
     lunchRecipeId = lunchRecipeId,
+    dinnerCookedAt = dinnerCookedAt,
+    lunchCookedAt = lunchCookedAt,
 )

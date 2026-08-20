@@ -184,6 +184,22 @@
     <string name="meal_plan_not_found_subtitle">This meal plan may have been deleted.</string>
     <string name="app_dest_title_meal_plan_detail">Meal Plan</string>
 
+    <!-- Meal plan detail: cooked tracking -->
+    <string name="meal_plan_mark_cooked">Mark as cooked</string>
+    <string name="meal_plan_mark_not_cooked">Mark as not cooked</string>
+    <string name="meal_plan_recipe_unavailable">Recipe not available</string>
+    <string name="meal_plan_cooked_section_title">Cooked this week</string>
+    <string name="meal_plan_progress">%1$d of %2$d meals cooked</string>
+    <string name="meal_plan_progress_none">Nothing cooked yet — pick a day to start</string>
+    <string name="meal_plan_progress_complete">Every meal cooked. Great week! 🎉</string>
+    <string name="meal_plan_preferences_title">Plan preferences</string>
+    <string name="meal_plan_preferences_show">Show plan preferences</string>
+    <string name="meal_plan_preferences_hide">Hide plan preferences</string>
+    <string name="meal_plan_not_generated_title">No recipes yet</string>
+    <string name="meal_plan_not_generated_subtitle">Build this plan from the recipes in your collection.</string>
+    <string name="meal_plan_generate">Build my plan</string>
+    <string name="meal_plan_generating">Building your meal plan…</string>
+
     <!-- Meal Plan Wizard -->
     <string name="app_dest_title_meal_plan_wizard">Create Meal Plan</string>
     <string name="wizard_step_basics">📋 The Basics</string>
