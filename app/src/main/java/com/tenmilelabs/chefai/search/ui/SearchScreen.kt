@@ -9,11 +9,15 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.dimensionResource
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.search.ui.components.SearchBrowseContent
@@ -31,6 +35,8 @@ fun SearchScreen(
     viewModel: RecipeSearchViewModel = hiltViewModel(),
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
+    var searchBarHeight by remember { mutableStateOf(0.dp) }
+    val density = LocalDensity.current
 
     Box(modifier = Modifier.fillMaxSize()) {
         SearchBrowseContent(
@@ -41,7 +47,7 @@ fun SearchScreen(
             contentPadding = PaddingValues(
                 start = dimensionResource(R.dimen.padding_medium),
                 end = dimensionResource(R.dimen.padding_medium),
-                top = dimensionResource(R.dimen.search_bar_clearance),
+                top = searchBarHeight + dimensionResource(R.dimen.padding_small),
                 bottom = dimensionResource(R.dimen.padding_medium),
             ),
         )
@@ -55,7 +61,12 @@ fun SearchScreen(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .padding(horizontal = dimensionResource(R.dimen.padding_small)),
+                .padding(horizontal = dimensionResource(R.dimen.padding_small))
+                .onSizeChanged { size ->
+                    if (!expanded) {
+                        searchBarHeight = with(density) { size.height.toDp() }
+                    }
+                },
         )
     }
 }
