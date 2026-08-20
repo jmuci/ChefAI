@@ -179,6 +179,29 @@ class RecipeSearchViewModelTest {
     }
 
     @Test
+    fun `a category's query runs the same search pipeline as typed input`() = testScope.runTest {
+        // SearchScreen's onCategoryClick feeds SearchCategory.query straight into
+        // onQueryChanged — this proves that term reaches the repository through the normal
+        // debounce/search flow, with no separate code path for category taps.
+        val recipe = preview(title = "Veggie Bowl")
+        searchRepository.outcomeToReturn = RecipeSearchOutcome(listOf(recipe), false, RecipeSearchSource.REMOTE)
+
+        viewModel.uiState.test {
+            assertThat(awaitItem()).isEqualTo(SearchUiState.Idle)
+
+            viewModel.onQueryChanged("vegetarian")
+            advanceTimeBy(400)
+            runCurrent()
+
+            assertThat(awaitItem()).isEqualTo(SearchUiState.Searching)
+            val results = awaitItem() as SearchUiState.Results
+            assertThat(results.items).containsExactly(recipe)
+            assertThat(searchRepository.queriesReceived).containsExactly("vegetarian")
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun `a LOCAL_FALLBACK source is flagged offline`() = testScope.runTest {
         searchRepository.outcomeToReturn =
             RecipeSearchOutcome(listOf(preview()), false, RecipeSearchSource.LOCAL_FALLBACK)
