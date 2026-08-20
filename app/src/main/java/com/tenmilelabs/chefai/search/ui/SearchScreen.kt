@@ -34,7 +34,10 @@ fun SearchScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         SearchBrowseContent(
-            onCategoryClick = { /* Step 6 */ },
+            onCategoryClick = { category ->
+                viewModel.onQueryChanged(category.query)
+                expanded = true
+            },
             contentPadding = PaddingValues(
                 start = dimensionResource(R.dimen.padding_medium),
                 end = dimensionResource(R.dimen.padding_medium),
