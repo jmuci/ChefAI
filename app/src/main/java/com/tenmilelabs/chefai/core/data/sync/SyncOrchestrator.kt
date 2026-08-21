@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.core.data.sync
 
 import com.tenmilelabs.chefai.core.data.local.room.BookmarkedRecipeEntity
+import com.tenmilelabs.chefai.core.data.local.room.MealPlanDayEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.SyncMetadataEntity
 import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
@@ -498,7 +499,7 @@ class SyncOrchestrator @Inject constructor(
         if (dto.days.isNotEmpty()) {
             mealPlanDao.upsertDays(
                 dto.days.map { dayDto ->
-                    val day = dayDto.toMealPlanDayEntity(planUuid)
+                    val day = dropUnknownRecipes(dayDto.toMealPlanDayEntity(planUuid))
                     val previous = previousDays[day.dayIndex] ?: return@map day
                     // A mark only survives if the slot still holds the *same* recipe: when the
                     // server regenerates a day with a different meal, that meal has not been cooked.
@@ -511,6 +512,31 @@ class SyncOrchestrator @Inject constructor(
                 }
             )
         }
+    }
+
+    /**
+     * Nulls out a day's recipe reference(s) that don't resolve on this device.
+     *
+     * `meal_plan_days.dinnerRecipeId`/`lunchRecipeId` carry no local FK (see
+     * [MealPlanDayEntity]), so a pulled day can reference a recipe this device never receives —
+     * e.g. a server-generated plan whose candidate query picked something outside what the
+     * client's pull is scoped to deliver. Left alone, that produces a permanently unresolvable
+     * "Recipe not available" row (`MealPlanMealRow`) that no future sync can fix. Dropping the
+     * reference instead makes the slot behave like any other unfilled one — [MealPlanBoard]
+     * already skips a day/slot with no recipe assigned.
+     */
+    private suspend fun dropUnknownRecipes(day: MealPlanDayEntity): MealPlanDayEntity {
+        val dinner = day.dinnerRecipeId?.takeIf { recipeDao.getRecipeById(it) != null }
+        val lunch = day.lunchRecipeId?.takeIf { recipeDao.getRecipeById(it) != null }
+        if (dinner == day.dinnerRecipeId && lunch == day.lunchRecipeId) return day
+
+        Timber.w(
+            "applyPulledMealPlan: day %s references unknown recipe(s) — dinner=%s lunch=%s, dropping",
+            day.uuid,
+            day.dinnerRecipeId.takeIf { dinner == null },
+            day.lunchRecipeId.takeIf { lunch == null },
+        )
+        return day.copy(dinnerRecipeId = dinner, lunchRecipeId = lunch)
     }
 
     private enum class ApplyResult { UPSERTED, DELETED }

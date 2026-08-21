@@ -750,6 +750,7 @@ class SyncOrchestratorTest {
         val planId = UuidV7Generator.newId()
         val dinnerRecipeId = UuidV7Generator.newId()
         val dayId = UuidV7Generator.newId()
+        recipeDao.upsertRecipe(createDirtyRecipe(uuid = dinnerRecipeId, syncState = SyncState.SYNCED))
         val serverPlan = createSyncMealPlanDto(
             uuid = planId,
             name = "Server Plan",
@@ -777,10 +778,47 @@ class SyncOrchestratorTest {
     }
 
     @Test
+    fun `pull drops a day's recipe reference when the recipe never arrives on this device`() =
+        runTest(testDispatcher) {
+            val planId = UuidV7Generator.newId()
+            val knownRecipeId = UuidV7Generator.newId()
+            val unknownRecipeId = UuidV7Generator.newId()
+            recipeDao.upsertRecipe(createDirtyRecipe(uuid = knownRecipeId, syncState = SyncState.SYNCED))
+            val serverPlan = createSyncMealPlanDto(
+                uuid = planId,
+                days = listOf(
+                    createSyncMealPlanDayDto(
+                        dayIndex = 0,
+                        dinnerRecipeId = unknownRecipeId,
+                        lunchRecipeId = knownRecipeId,
+                    )
+                ),
+            )
+            syncNetworkDataSource.pullResponses.addLast(
+                SyncPullResponse(
+                    recipes = emptyList(),
+                    serverTimestamp = 5000L,
+                    hasMore = false,
+                    mealPlans = listOf(serverPlan),
+                )
+            )
+
+            syncOrchestrator.sync()
+
+            val savedDay = mealPlanDao.getDaysForMealPlan(planId).single()
+            // A recipe this device never received (e.g. a server-generated plan whose candidate
+            // query picked something outside the client's pull scope) must not persist as a
+            // permanently unresolvable reference — the slot behaves like an unfilled one instead.
+            assertThat(savedDay.dinnerRecipeId).isNull()
+            assertThat(savedDay.lunchRecipeId).isEqualTo(knownRecipeId)
+        }
+
+    @Test
     fun `pull carries a cooked mark forward when the day still holds the same recipe`() = runTest(testDispatcher) {
         val planId = UuidV7Generator.newId()
         val dinnerRecipeId = UuidV7Generator.newId()
         val localDayId = UuidV7Generator.newId()
+        recipeDao.upsertRecipe(createDirtyRecipe(uuid = dinnerRecipeId, syncState = SyncState.SYNCED))
         mealPlanDao.upsertMealPlan(
             createSyncMealPlanDto(uuid = planId).toMealPlanEntity(sessionManager.getCurrentUserId()!!)
         )
@@ -831,6 +869,7 @@ class SyncOrchestratorTest {
         val planId = UuidV7Generator.newId()
         val oldRecipeId = UuidV7Generator.newId()
         val newRecipeId = UuidV7Generator.newId()
+        recipeDao.upsertRecipe(createDirtyRecipe(uuid = newRecipeId, syncState = SyncState.SYNCED))
         mealPlanDao.upsertMealPlan(
             createSyncMealPlanDto(uuid = planId).toMealPlanEntity(sessionManager.getCurrentUserId()!!)
         )
