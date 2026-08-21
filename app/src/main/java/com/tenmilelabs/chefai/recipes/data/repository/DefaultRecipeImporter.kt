@@ -8,16 +8,19 @@ import com.tenmilelabs.chefai.recipes.data.mapper.toRecipeDraft
 import com.tenmilelabs.chefai.recipes.data.network.BOT_WALL_STATUSES
 import com.tenmilelabs.chefai.recipes.data.network.decodeHtml
 import com.tenmilelabs.chefai.recipes.domain.model.RecipeImportResult
+import com.tenmilelabs.chefai.recipes.domain.repository.HostResolver
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipeImporter
 import com.tenmilelabs.chefai.recipes.domain.repository.RenderedHtmlFetcher
 import com.tenmilelabs.recipescraper.RecipeHtmlParser
 import com.tenmilelabs.recipescraper.model.ScrapeResult
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpRequestTimeoutException
+import io.ktor.client.plugins.RedirectResponseException
 import io.ktor.client.plugins.ResponseException
 import io.ktor.client.request.get
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
+import io.ktor.http.HttpHeaders
 import io.ktor.http.charset
 import io.ktor.http.contentType
 import io.ktor.utils.io.readAvailable
@@ -35,6 +38,9 @@ import kotlin.time.Duration.Companion.seconds
 /** Caps how much of a fetched page is read into memory — well past any real recipe page. */
 private const val MAX_BODY_BYTES = 3 * 1024 * 1024
 
+/** Bounds manual redirect-following — the same guard rail browsers apply against redirect loops. */
+private const val MAX_REDIRECT_HOPS = 5
+
 /**
  * How long the off-screen browser gets to produce a recipe before the import gives up on it.
  *
@@ -49,11 +55,12 @@ class DefaultRecipeImporter @Inject constructor(
     private val recipeHtmlParser: RecipeHtmlParser,
     private val renderedHtmlFetcher: RenderedHtmlFetcher,
     private val metadataRepository: MetadataRepository,
+    private val hostResolver: HostResolver,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : RecipeImporter {
 
     override suspend fun import(url: String): RecipeImportResult = withContext(ioDispatcher) {
-        val normalizedUrl = normalizeAndValidateUrl(url) ?: return@withContext RecipeImportResult.InvalidUrl
+        val normalizedUrl = normalizeAndValidateUrl(url, hostResolver) ?: return@withContext RecipeImportResult.InvalidUrl
 
         val fetched = fetchHtml(normalizedUrl)
         val httpResult = when (fetched) {
@@ -117,31 +124,70 @@ class DefaultRecipeImporter @Inject constructor(
         ) : FetchOutcome
     }
 
-    private suspend fun fetchHtml(url: String): FetchOutcome = try {
+    /** One step of [fetchHtml]'s redirect loop: either a terminal [outcome], or one more [location] to follow. */
+    private sealed interface FetchStep {
+        data class Terminal(val outcome: FetchOutcome) : FetchStep
+        data class Redirect(val location: String) : FetchStep
+    }
+
+    /**
+     * Follows redirects itself (the client has `followRedirects = false` — see
+     * [com.tenmilelabs.chefai.core.di.NetworkModule.provideScraperHttpClient]) so every hop can be
+     * re-validated by [validateRedirectTarget] before it's followed, not just the first URL.
+     */
+    private suspend fun fetchHtml(url: String): FetchOutcome {
+        var currentUrl = url
+        repeat(MAX_REDIRECT_HOPS + 1) {
+            when (val step = fetchOnce(currentUrl)) {
+                is FetchStep.Terminal -> return step.outcome
+                is FetchStep.Redirect -> {
+                    val next = validateRedirectTarget(currentUrl, step.location, hostResolver)
+                    if (next == null) {
+                        Timber.w("Recipe import redirect failed the SSRF guard: %s", step.location)
+                        return FetchOutcome.Failure(RecipeImportResult.NetworkError("Redirected to a disallowed address"))
+                    }
+                    currentUrl = next
+                }
+            }
+        }
+        return FetchOutcome.Failure(RecipeImportResult.NetworkError("Too many redirects"))
+    }
+
+    private suspend fun fetchOnce(url: String): FetchStep = try {
         val response = httpClient.get(url)
         val contentType = response.contentType()
         val mimeType = contentType?.withoutParameters()?.toString().orEmpty()
-        if (!mimeType.equals("text/html", ignoreCase = true) &&
+        val outcome = if (!mimeType.equals("text/html", ignoreCase = true) &&
             !mimeType.equals("application/xhtml+xml", ignoreCase = true)
         ) {
             FetchOutcome.Failure(RecipeImportResult.NetworkError("Not an HTML page"))
         } else {
             FetchOutcome.Html(response.readBodyCapped(contentType?.charset()))
         }
+        FetchStep.Terminal(outcome)
     } catch (e: CancellationException) {
         throw e
+    } catch (e: RedirectResponseException) {
+        val location = e.response.headers[HttpHeaders.Location]
+        if (location != null) {
+            FetchStep.Redirect(location)
+        } else {
+            FetchStep.Terminal(FetchOutcome.Failure(RecipeImportResult.NetworkError("Redirect missing Location")))
+        }
     } catch (e: HttpRequestTimeoutException) {
         Timber.w(e, "Recipe import request timed out")
-        FetchOutcome.Failure(RecipeImportResult.NetworkError(e.message ?: "Request timed out"))
+        FetchStep.Terminal(FetchOutcome.Failure(RecipeImportResult.NetworkError(e.message ?: "Request timed out")))
     } catch (e: ResponseException) {
         Timber.w(e, "Recipe import received an error response")
-        FetchOutcome.Failure(
-            error = RecipeImportResult.NetworkError(e.message ?: "Request failed"),
-            looksLikeBotWall = e.response.status in BOT_WALL_STATUSES,
+        FetchStep.Terminal(
+            FetchOutcome.Failure(
+                error = RecipeImportResult.NetworkError(e.message ?: "Request failed"),
+                looksLikeBotWall = e.response.status in BOT_WALL_STATUSES,
+            ),
         )
     } catch (e: IOException) {
         Timber.w(e, "Recipe import network error")
-        FetchOutcome.Failure(RecipeImportResult.NetworkError(e.message ?: "Network error"))
+        FetchStep.Terminal(FetchOutcome.Failure(RecipeImportResult.NetworkError(e.message ?: "Network error")))
     }
 
     /**

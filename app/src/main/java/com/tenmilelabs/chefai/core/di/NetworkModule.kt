@@ -92,13 +92,18 @@ object NetworkModule {
     /**
      * Unauthenticated client for fetching third-party recipe pages during URL import.
      * Must never carry ChefAI auth headers or run scraped HTML through content negotiation.
+     *
+     * Redirects are followed manually by callers (see [com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeImporter]
+     * and [com.tenmilelabs.chefai.recipes.domain.usecase.CacheRecipeImage]) rather than by the
+     * client, so every hop can be re-validated against the SSRF guard before it's followed — a
+     * page can 3xx to an internal address just as easily as it can host one directly.
      */
     @Provides
     @Singleton
     @ScraperHttpClient
     fun provideScraperHttpClient(): HttpClient = HttpClient(CIO) {
         expectSuccess = true
-        followRedirects = true
+        followRedirects = false
 
         install(HttpTimeout) {
             requestTimeoutMillis = 15_000
