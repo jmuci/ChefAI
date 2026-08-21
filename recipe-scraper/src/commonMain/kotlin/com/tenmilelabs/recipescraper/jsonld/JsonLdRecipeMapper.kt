@@ -51,13 +51,19 @@ private fun JsonElement.yieldStrings(): List<String> = when (this) {
     is JsonObject -> emptyList()
 }
 
+/**
+ * Handles the flat `JsonArray` of string primitives schema.org specifies, plus shapes sites publish
+ * in practice that it doesn't: a lone string instead of an array, an array of objects (e.g.
+ * `HowToSupply`-typed entries with a `name`/`text` field), and ingredients grouped into nested
+ * arrays — mirroring how [toInstructionSteps] already handles a typed/nested shape.
+ */
 private fun JsonElement.toIngredients(): List<ScrapedIngredient> =
     when (this) {
-        is JsonArray -> mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
-            .mapNotNull(::cleanHtmlText)
+        is JsonArray -> flatMap { it.toIngredients() }
+        is JsonObject -> listOfNotNull(cleanHtmlText(stringOrNull("name") ?: stringOrNull("text")))
             .map(::parseIngredient)
 
-        else -> emptyList()
+        is JsonPrimitive -> listOfNotNull(contentOrNull?.let(::cleanHtmlText)).map(::parseIngredient)
     }
 
 private fun JsonElement.toInstructionSteps(): List<String> = when (this) {

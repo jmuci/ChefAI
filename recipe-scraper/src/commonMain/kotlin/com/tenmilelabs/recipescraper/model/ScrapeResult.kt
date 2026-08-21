@@ -13,7 +13,7 @@ sealed interface ScrapeResult {
 
     /**
      * The document parsed cleanly but carried no usable recipe — either no recipe markup at all,
-     * or markup too incomplete to use (no title, or neither ingredients nor instructions).
+     * or markup too incomplete to use (no title, or no ingredients).
      */
     data object NoRecipeFound : ScrapeResult
 
