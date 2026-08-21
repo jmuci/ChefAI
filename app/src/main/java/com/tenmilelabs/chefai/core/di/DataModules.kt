@@ -22,8 +22,10 @@ import com.tenmilelabs.chefai.core.data.repository.DefaultMetadataRepository
 import com.tenmilelabs.chefai.core.domain.repository.MetadataRepository
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeImporter
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeRepository
+import com.tenmilelabs.chefai.recipes.data.network.SystemHostResolver
 import com.tenmilelabs.chefai.recipes.data.network.WebViewHtmlFetcher
 import com.tenmilelabs.chefai.recipes.data.network.WebViewImageFetcher
+import com.tenmilelabs.chefai.recipes.domain.repository.HostResolver
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipeImporter
 import com.tenmilelabs.chefai.recipes.domain.repository.RenderedHtmlFetcher
 import com.tenmilelabs.chefai.recipes.domain.repository.RenderedImageFetcher
@@ -80,6 +82,10 @@ abstract class RepositoryModule {
     @Singleton
     @Binds
     abstract fun bindRecipeSearchRepository(repository: DefaultRecipeSearchRepository): RecipeSearchRepository
+
+    @Singleton
+    @Binds
+    abstract fun bindHostResolver(resolver: SystemHostResolver): HostResolver
 }
 
 

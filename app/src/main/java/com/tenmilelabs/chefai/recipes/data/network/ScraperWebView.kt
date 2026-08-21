@@ -3,10 +3,15 @@ package com.tenmilelabs.chefai.recipes.data.network
 import android.annotation.SuppressLint
 import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import com.tenmilelabs.chefai.recipes.data.repository.isSafeHost
+import com.tenmilelabs.chefai.recipes.domain.repository.HostResolver
 import kotlinx.serialization.json.Json
 import timber.log.Timber
+import java.io.ByteArrayInputStream
+import java.net.HttpURLConnection
 
 /** Skips absurd snapshots rather than marshalling them across the JNI bridge and parsing them. */
 private const val MAX_SNAPSHOT_CHARS = 4 * 1024 * 1024
@@ -116,14 +121,45 @@ internal fun WebView.applyScraperHardening() {
  * A [WebViewClient] that keeps the load inside the web: `http(s)` navigations (including the
  * redirects a bot check bounces through) proceed, anything else — `intent://`, `market://`,
  * `tel:` — is refused rather than handed to another app.
+ *
+ * [hostResolver] defaults to real DNS ([SystemHostResolver]) rather than being Hilt-injected: this
+ * class is constructed directly at each of its three call sites (an off-screen WebView is neither
+ * a singleton nor scoped to a screen, so there's no natural injection point), and the default
+ * keeps those call sites unchanged while still letting tests substitute a fake.
  */
-internal open class ScraperWebViewClient : WebViewClient() {
+internal open class ScraperWebViewClient(
+    private val hostResolver: HostResolver = SystemHostResolver(),
+) : WebViewClient() {
 
     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
         val scheme = request?.url?.scheme?.lowercase()
         val isWeb = scheme == "http" || scheme == "https"
         if (!isWeb) Timber.d("Blocked non-web navigation during scrape: %s", request?.url)
         return !isWeb
+    }
+
+    /**
+     * The authoritative SSRF guard for everything the page itself fetches — the document, every
+     * redirect hop, and every subresource (image, XHR, fetch, iframe) — not just the top-level
+     * navigation [shouldOverrideUrlLoading] sees. This callback runs off the UI thread (see the
+     * platform docs on [WebViewClient.shouldInterceptRequest]), which is what makes a blocking DNS
+     * resolution here safe where it would risk an ANR in [shouldOverrideUrlLoading].
+     */
+    override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
+        val url = request?.url ?: return null
+        val scheme = url.scheme?.lowercase()
+        if (scheme != "http" && scheme != "https") return null
+        val host = url.host
+        if (host.isNullOrEmpty() || host.isSafeHost(hostResolver)) return null
+        Timber.w("Blocked scrape request to disallowed host: %s", url)
+        return WebResourceResponse(
+            "text/plain",
+            "UTF-8",
+            HttpURLConnection.HTTP_FORBIDDEN,
+            "Forbidden",
+            emptyMap(),
+            ByteArrayInputStream(ByteArray(0)),
+        )
     }
 }
 

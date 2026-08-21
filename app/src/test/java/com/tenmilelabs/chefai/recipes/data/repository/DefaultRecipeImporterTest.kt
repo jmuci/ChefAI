@@ -37,11 +37,13 @@ class DefaultRecipeImporterTest {
     private fun importer(
         engine: MockEngine,
         renderedHtmlFetcher: FakeRenderedHtmlFetcher = FakeRenderedHtmlFetcher(),
+        hostResolver: FakeHostResolver = FakeHostResolver(),
     ): DefaultRecipeImporter = DefaultRecipeImporter(
-        httpClient = HttpClient(engine) { expectSuccess = true },
+        httpClient = HttpClient(engine) { expectSuccess = true; followRedirects = false },
         recipeHtmlParser = RecipeHtmlParser(),
         renderedHtmlFetcher = renderedHtmlFetcher,
         metadataRepository = FakeMetadataRepository(),
+        hostResolver = hostResolver,
         ioDispatcher = Dispatchers.Unconfined,
     )
 
@@ -105,7 +107,19 @@ class DefaultRecipeImporterTest {
 
     @Test
     fun `returns InvalidUrl for a private-network address`() = runTest {
-        val result = importer(htmlEngine(JSON_LD_RECIPE_HTML)).import("http://192.168.1.5/x")
+        val hostResolver = FakeHostResolver(mapOf("192.168.1.5" to FakeHostResolver.literal("192.168.1.5")))
+
+        val result = importer(htmlEngine(JSON_LD_RECIPE_HTML), hostResolver = hostResolver).import("http://192.168.1.5/x")
+
+        assertThat(result).isEqualTo(RecipeImportResult.InvalidUrl)
+    }
+
+    @Test
+    fun `returns InvalidUrl for a hostname whose DNS record points at a blocked address`() = runTest {
+        val hostResolver = FakeHostResolver(mapOf("evil.example.com" to FakeHostResolver.literal("169.254.169.254")))
+
+        val result = importer(htmlEngine(JSON_LD_RECIPE_HTML), hostResolver = hostResolver)
+            .import("https://evil.example.com/recipe")
 
         assertThat(result).isEqualTo(RecipeImportResult.InvalidUrl)
     }
@@ -174,5 +188,65 @@ class DefaultRecipeImporterTest {
 
         assertThat(result).isInstanceOf(RecipeImportResult.NetworkError::class.java)
         assertThat(fetcher.callCount).isEqualTo(0)
+    }
+
+    // --- Redirects ---
+
+    @Test
+    fun `follows a redirect to a safe address and imports from it`() = runTest {
+        val engine = MockEngine { request ->
+            if (request.url.toString() == "https://example.com/original") {
+                respond(
+                    content = ByteReadChannel(ByteArray(0)),
+                    status = HttpStatusCode.MovedPermanently,
+                    headers = headersOf(HttpHeaders.Location, "https://example.com/final"),
+                )
+            } else {
+                respond(
+                    content = ByteReadChannel(JSON_LD_RECIPE_HTML),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "text/html"),
+                )
+            }
+        }
+
+        val result = importer(engine).import("https://example.com/original")
+
+        assertThat(result).isInstanceOf(RecipeImportResult.Success::class.java)
+    }
+
+    @Test
+    fun `returns NetworkError rather than following a redirect to a blocked address`() = runTest {
+        val hostResolver = FakeHostResolver(mapOf("internal.attacker.example" to FakeHostResolver.literal("169.254.169.254")))
+        val engine = MockEngine {
+            respond(
+                content = ByteReadChannel(ByteArray(0)),
+                status = HttpStatusCode.Found,
+                headers = headersOf(HttpHeaders.Location, "https://internal.attacker.example/steal"),
+            )
+        }
+
+        val result = importer(engine, hostResolver = hostResolver).import("https://example.com/original")
+
+        assertThat(result).isInstanceOf(RecipeImportResult.NetworkError::class.java)
+    }
+
+    @Test
+    fun `gives up after too many redirects rather than looping forever`() = runTest {
+        var hops = 0
+        val engine = MockEngine {
+            hops++
+            respond(
+                content = ByteReadChannel(ByteArray(0)),
+                status = HttpStatusCode.Found,
+                headers = headersOf(HttpHeaders.Location, "https://example.com/hop-$hops"),
+            )
+        }
+
+        val result = importer(engine).import("https://example.com/start")
+
+        assertThat(result).isInstanceOf(RecipeImportResult.NetworkError::class.java)
+        // The initial request plus MAX_REDIRECT_HOPS follow-ups, no more.
+        assertThat(hops).isEqualTo(6)
     }
 }

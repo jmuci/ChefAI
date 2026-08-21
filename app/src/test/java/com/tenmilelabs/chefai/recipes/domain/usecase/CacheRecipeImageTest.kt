@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.recipes.domain.usecase
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import com.tenmilelabs.chefai.recipes.data.network.MAX_IMAGE_BYTES
+import com.tenmilelabs.chefai.recipes.data.repository.FakeHostResolver
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRenderedImageFetcher
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -29,10 +30,12 @@ class CacheRecipeImageTest {
         engine: MockEngine,
         renderedImageFetcher: FakeRenderedImageFetcher = FakeRenderedImageFetcher(),
         recipeImageStore: RecipeImageStore = mockk { coEvery { write(any(), any()) } returns STORED_PATH },
+        hostResolver: FakeHostResolver = FakeHostResolver(),
     ) = CacheRecipeImage(
-        httpClient = HttpClient(engine) { expectSuccess = true },
+        httpClient = HttpClient(engine) { expectSuccess = true; followRedirects = false },
         renderedImageFetcher = renderedImageFetcher,
         recipeImageStore = recipeImageStore,
+        hostResolver = hostResolver,
         ioDispatcher = Dispatchers.Unconfined,
     )
 
@@ -127,11 +130,73 @@ class CacheRecipeImageTest {
         val store = mockk<RecipeImageStore>(relaxed = true)
         // The engine would throw if reached — its handler is never installed.
         val engine = MockEngine { respondError(HttpStatusCode.InternalServerError) }
+        val hostResolver = FakeHostResolver(mapOf("169.254.169.254" to FakeHostResolver.literal("169.254.169.254")))
 
-        val result = useCase(engine, fetcher, store).invoke(UUID.randomUUID(), "http://169.254.169.254/latest/meta-data/")
+        val result = useCase(engine, fetcher, store, hostResolver)
+            .invoke(UUID.randomUUID(), "http://169.254.169.254/latest/meta-data/")
 
         assertThat(result).isNull()
         assertThat(fetcher.callCount).isEqualTo(0)
+        coVerify(exactly = 0) { store.write(any(), any()) }
+    }
+
+    @Test
+    fun `an image url whose DNS record points at a blocked address is rejected`() = runTest {
+        val fetcher = FakeRenderedImageFetcher(IMAGE_BYTES)
+        val store = mockk<RecipeImageStore>(relaxed = true)
+        val engine = MockEngine { respondError(HttpStatusCode.InternalServerError) }
+        val hostResolver = FakeHostResolver(mapOf("evil.example.com" to FakeHostResolver.literal("169.254.169.254")))
+
+        val result = useCase(engine, fetcher, store, hostResolver)
+            .invoke(UUID.randomUUID(), "https://evil.example.com/img.jpg")
+
+        assertThat(result).isNull()
+        assertThat(fetcher.callCount).isEqualTo(0)
+        coVerify(exactly = 0) { store.write(any(), any()) }
+    }
+
+    @Test
+    fun `follows a redirect to a safe address and caches the bytes`() = runTest {
+        val store = mockk<RecipeImageStore> { coEvery { write(any(), any()) } returns STORED_PATH }
+        val recipeId = UUID.randomUUID()
+        val engine = MockEngine { request ->
+            if (request.url.toString() == "https://example.com/original.jpg") {
+                respond(
+                    content = ByteReadChannel(ByteArray(0)),
+                    status = HttpStatusCode.MovedPermanently,
+                    headers = headersOf(HttpHeaders.Location, "https://example.com/final.jpg"),
+                )
+            } else {
+                respond(
+                    content = ByteReadChannel(IMAGE_BYTES),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "image/jpeg"),
+                )
+            }
+        }
+
+        val result = useCase(engine, recipeImageStore = store).invoke(recipeId, "https://example.com/original.jpg")
+
+        assertThat(result).isEqualTo(STORED_PATH)
+        coVerify(exactly = 1) { store.write(recipeId, IMAGE_BYTES) }
+    }
+
+    @Test
+    fun `does not follow a redirect to a blocked address`() = runTest {
+        val store = mockk<RecipeImageStore>(relaxed = true)
+        val hostResolver = FakeHostResolver(mapOf("internal.attacker.example" to FakeHostResolver.literal("169.254.169.254")))
+        val engine = MockEngine {
+            respond(
+                content = ByteReadChannel(ByteArray(0)),
+                status = HttpStatusCode.Found,
+                headers = headersOf(HttpHeaders.Location, "https://internal.attacker.example/steal.jpg"),
+            )
+        }
+
+        val result = useCase(engine, recipeImageStore = store, hostResolver = hostResolver)
+            .invoke(UUID.randomUUID(), "https://example.com/original.jpg")
+
+        assertThat(result).isNull()
         coVerify(exactly = 0) { store.write(any(), any()) }
     }
 
