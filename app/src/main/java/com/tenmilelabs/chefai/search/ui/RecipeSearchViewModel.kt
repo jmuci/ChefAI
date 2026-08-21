@@ -23,6 +23,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,6 +40,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -84,6 +86,14 @@ class RecipeSearchViewModel @Inject constructor(
 
     private val _uiEvent = MutableSharedFlow<SearchUiEvent>(replay = 1)
     val uiEvents: SharedFlow<SearchUiEvent> = _uiEvent.asSharedFlow()
+
+    /**
+     * One-shot, not replayed (unlike [uiEvents]) — a stale navigation event replaying into a
+     * freshly recomposed collector would silently re-navigate the user to a recipe they already
+     * backed out of.
+     */
+    private val _navigateToRecipe = Channel<UUID>(Channel.BUFFERED)
+    val navigateToRecipe: Flow<UUID> = _navigateToRecipe.receiveAsFlow()
 
     private val _bookmarkedIds: Flow<Set<UUID>> = sessionManager.userSession
         .flatMapLatest { session ->
@@ -137,6 +147,24 @@ class RecipeSearchViewModel @Inject constructor(
 
     fun onQueryChanged(newQuery: String) {
         _query.value = newQuery
+    }
+
+    /**
+     * [RecipeDetailsScreen] reads only from Room, but a search result may be a recipe this device
+     * hasn't pulled yet (see [onSaveToCollection]'s doc for why that's real, not just theoretical).
+     * Navigating straight there would land on the "recipe not found" screen, so gate on local
+     * existence first: if it's missing, kick a sync and tell the user instead of opening a dead
+     * end — mirroring the same check [onSaveToCollection] already does for bookmarking.
+     */
+    fun onRecipeClick(recipeId: UUID) {
+        viewModelScope.launch {
+            if (recipesRepository.getRecipeStream(recipeId).first() != null) {
+                _navigateToRecipe.send(recipeId)
+            } else {
+                syncScheduler.requestImmediateSync()
+                _uiEvent.emit(SearchUiEvent.ShowSnackbar(R.string.search_recipe_not_yet_synced))
+            }
+        }
     }
 
     /**

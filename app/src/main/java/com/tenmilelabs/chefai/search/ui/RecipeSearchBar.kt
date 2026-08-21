@@ -64,6 +64,13 @@ fun RecipeSearchBar(
         }
     }
 
+    LaunchedEffect(viewModel, onExpandedChange, onRecipeClick) {
+        viewModel.navigateToRecipe.collect { recipeId ->
+            onExpandedChange(false)
+            onRecipeClick(recipeId)
+        }
+    }
+
     SearchBar(
         modifier = modifier,
         expanded = expanded,
@@ -98,10 +105,7 @@ fun RecipeSearchBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-            onRecipeClick = { recipeId ->
-                onExpandedChange(false)
-                onRecipeClick(recipeId)
-            },
+            onRecipeClick = viewModel::onRecipeClick,
             onSaveToCollection = viewModel::onSaveToCollection,
         )
     }

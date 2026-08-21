@@ -304,4 +304,36 @@ class RecipeSearchViewModelTest {
             assertThat(event.messageRes).isEqualTo(R.string.search_recipe_not_yet_synced)
         }
     }
+
+    @Test
+    fun `clicking a recipe present in Room emits a navigation event`() = testScope.runTest {
+        val recipeId = UUID.randomUUID()
+        recipesRepository.emitRecipe(recipeId, recipe1)
+
+        turbineScope {
+            val navigations = viewModel.navigateToRecipe.testIn(backgroundScope)
+            viewModel.onRecipeClick(recipeId)
+            runCurrent()
+
+            assertThat(navigations.awaitItem()).isEqualTo(recipeId)
+        }
+    }
+
+    @Test
+    fun `clicking a recipe absent from Room requests a sync and shows the not-yet-synced snackbar, without navigating`() =
+        testScope.runTest {
+            val recipeId = UUID.randomUUID()
+            recipesRepository.emitRecipe(recipeId, null) // Room: not found
+
+            turbineScope {
+                val navigations = viewModel.navigateToRecipe.testIn(backgroundScope)
+                val events = viewModel.uiEvents.testIn(backgroundScope)
+                viewModel.onRecipeClick(recipeId)
+                runCurrent()
+
+                val event = events.awaitItem() as SearchUiEvent.ShowSnackbar
+                assertThat(event.messageRes).isEqualTo(R.string.search_recipe_not_yet_synced)
+                navigations.expectNoEvents()
+            }
+        }
 }
