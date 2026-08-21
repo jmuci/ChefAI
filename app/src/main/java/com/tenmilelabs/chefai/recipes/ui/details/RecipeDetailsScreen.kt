@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.recipes.ui.details
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -18,8 +19,6 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.ui.graphics.Color
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.FloatingActionButton
@@ -36,6 +35,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -47,6 +48,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -278,20 +280,35 @@ fun RecipeDetailsContent(
     } // Box
 }
 
+private const val DESCRIPTION_COLLAPSED_MAX_LINES = 4
+
 @Composable
 private fun RecipeDescription(description: String) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = dimensionResource(id = R.dimen.padding_medium)),
-        colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surfaceVariant)
-    ) {
+    var isExpanded by rememberSaveable(description) { mutableStateOf(false) }
+    var isOverflowing by remember(description) { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = description,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_medium))
+            maxLines = if (isExpanded) Int.MAX_VALUE else DESCRIPTION_COLLAPSED_MAX_LINES,
+            overflow = TextOverflow.Ellipsis,
+            onTextLayout = { result ->
+                if (!isExpanded) isOverflowing = result.hasVisualOverflow
+            },
         )
+        if (isOverflowing || isExpanded) {
+            Text(
+                text = stringResource(if (isExpanded) R.string.view_less else R.string.view_more),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier
+                    .padding(top = dimensionResource(id = R.dimen.padding_extra_small))
+                    .clickable { isExpanded = !isExpanded },
+            )
+        }
     }
 }
 

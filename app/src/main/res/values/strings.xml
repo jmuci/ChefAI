@@ -73,6 +73,8 @@
     <string name="recipe_hyperlink">See original recipe online</string>
     <string name="recipe_image_content_description">Recipe Image</string>
     <string name="recipe_not_found_error">Recipe Not Found!</string>
+    <string name="view_more">View more</string>
+    <string name="view_less">View less</string>
     <string name="save_to_collection_content_description">Save to collection</string>
     <string name="remove_from_collection_content_description">Remove from collection</string>
     <string name="recipe_not_found_error_subtitle">Oops! This was not supposed to happen. Please navigate back and try again later.</string>
