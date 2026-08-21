@@ -92,6 +92,21 @@ class LocalMealPlanGeneratorTest {
     }
 
     @Test
+    fun `a collection-only plan draws from the user's own recipes`() = runTest {
+        recipesRepository.setRecipePreviewsToEmit(
+            listOf(recipePreview1, recipePreview2, recipePreview3)
+        )
+        val plan = plan(planLengthDays = 2, recipeSource = RecipeSource.COLLECTION_ONLY)
+        mealPlanRepository.createMealPlan(plan)
+
+        val result = generator(plan)
+
+        assertThat(result.getOrNull()).isEqualTo(2)
+        val saved = mealPlanRepository.observeMealPlan(plan.uuid).first()!!
+        assertThat(saved.days).hasSize(2)
+    }
+
+    @Test
     fun `nothing in a freshly generated plan is marked cooked`() = runTest {
         recipesRepository.setRecipePreviewsToEmit(listOf(recipePreview1, recipePreview2))
         val plan = plan(planLengthDays = 3, mealType = MealType.DINNER_AND_LUNCH)

@@ -5,6 +5,7 @@ import com.tenmilelabs.chefai.core.data.local.room.MealPlanEntity
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import java.util.UUID
 
@@ -13,9 +14,14 @@ class FakeMealPlanDao : MealPlanDao {
     private val plans = mutableMapOf<UUID, MealPlanEntity>()
     private val days = mutableMapOf<UUID, MealPlanDayEntity>()
     private val plansFlow = MutableStateFlow<Map<UUID, MealPlanEntity>>(emptyMap())
+    private val daysFlow = MutableStateFlow<Map<UUID, MealPlanDayEntity>>(emptyMap())
 
     private fun notifyChange() {
         plansFlow.value = plans.toMap()
+    }
+
+    private fun notifyDaysChange() {
+        daysFlow.value = days.toMap()
     }
 
     override fun observeMealPlansForUser(userId: UUID): Flow<List<MealPlanEntity>> =
@@ -67,16 +73,37 @@ class FakeMealPlanDao : MealPlanDao {
         plans.values.count { it.userId == userId && it.deletedAt == null }
 
     override fun observeDaysForMealPlan(mealPlanId: UUID): Flow<List<MealPlanDayEntity>> =
-        plansFlow.map { days.values.filter { it.mealPlanId == mealPlanId }.sortedBy { it.dayIndex } }
+        daysFlow.map { it.values.filter { day -> day.mealPlanId == mealPlanId }.sortedBy { day -> day.dayIndex } }
+
+    override fun observeDaysForUser(userId: UUID): Flow<List<MealPlanDayEntity>> =
+        combine(plansFlow, daysFlow) { plansMap, daysMap ->
+            val planIds = plansMap.values
+                .filter { it.userId == userId && it.deletedAt == null }
+                .map { it.uuid }
+                .toSet()
+            daysMap.values.filter { it.mealPlanId in planIds }.sortedBy { it.dayIndex }
+        }
 
     override suspend fun getDaysForMealPlan(mealPlanId: UUID): List<MealPlanDayEntity> =
         days.values.filter { it.mealPlanId == mealPlanId }.sortedBy { it.dayIndex }
 
     override suspend fun upsertDays(days: List<MealPlanDayEntity>) {
         days.forEach { this.days[it.uuid] = it }
+        notifyDaysChange()
     }
 
     override suspend fun deleteDaysForMealPlan(mealPlanId: UUID) {
         days.keys.removeAll(days.values.filter { it.mealPlanId == mealPlanId }.map { it.uuid }.toSet())
+        notifyDaysChange()
+    }
+
+    override suspend fun setDinnerCookedAt(dayId: UUID, cookedAt: Long?) {
+        days[dayId]?.let { days[dayId] = it.copy(dinnerCookedAt = cookedAt) }
+        notifyDaysChange()
+    }
+
+    override suspend fun setLunchCookedAt(dayId: UUID, cookedAt: Long?) {
+        days[dayId]?.let { days[dayId] = it.copy(lunchCookedAt = cookedAt) }
+        notifyDaysChange()
     }
 }
