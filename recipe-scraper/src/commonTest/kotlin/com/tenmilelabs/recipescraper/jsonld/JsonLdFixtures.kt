@@ -138,4 +138,61 @@ internal object JsonLdFixtures {
         </script>
         </head><body></body></html>
     """.trimIndent()
+
+    val INSTRUCTIONS_ONLY = """
+        <html><head>
+        <script type="application/ld+json">
+        {
+          "@type": "Recipe",
+          "name": "Instructions Only Recipe",
+          "recipeInstructions": ["Do the thing.", "Do another thing."]
+        }
+        </script>
+        </head><body></body></html>
+    """.trimIndent()
+
+    val OBJECT_INGREDIENTS = """
+        <html><head>
+        <script type="application/ld+json">
+        {
+          "@type": "Recipe",
+          "name": "HowToSupply Ingredients Recipe",
+          "recipeIngredient": [
+            {"@type": "HowToSupply", "name": "2 cups flour"},
+            {"@type": "HowToSupply", "text": "1 cup milk"}
+          ],
+          "recipeInstructions": ["Mix it all together."]
+        }
+        </script>
+        </head><body></body></html>
+    """.trimIndent()
+
+    val SINGLE_STRING_INGREDIENT = """
+        <html><head>
+        <script type="application/ld+json">
+        {
+          "@type": "Recipe",
+          "name": "Single String Ingredient Recipe",
+          "recipeIngredient": "1 cup rice",
+          "recipeInstructions": ["Cook the rice."]
+        }
+        </script>
+        </head><body></body></html>
+    """.trimIndent()
+
+    val GROUPED_INGREDIENTS = """
+        <html><head>
+        <script type="application/ld+json">
+        {
+          "@type": "Recipe",
+          "name": "Grouped Ingredients Recipe",
+          "recipeIngredient": [
+            ["1 cup sugar", "2 eggs"],
+            ["1 tsp vanilla"]
+          ],
+          "recipeInstructions": ["Combine everything."]
+        }
+        </script>
+        </head><body></body></html>
+    """.trimIndent()
 }

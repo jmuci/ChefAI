@@ -93,4 +93,28 @@ class JsonLdExtractorTest {
         assertEquals(emptyList(), recipe?.ingredients)
         assertEquals(emptyList(), recipe?.instructions)
     }
+
+    @Test
+    fun `maps HowToSupply-style ingredient objects by their name or text field`() {
+        val recipe = extract(JsonLdFixtures.OBJECT_INGREDIENTS)
+
+        assertEquals(listOf("2 cups flour", "1 cup milk"), recipe?.ingredients?.map { it.raw })
+    }
+
+    @Test
+    fun `maps a single ingredient string instead of an array`() {
+        val recipe = extract(JsonLdFixtures.SINGLE_STRING_INGREDIENT)
+
+        assertEquals(listOf("1 cup rice"), recipe?.ingredients?.map { it.raw })
+    }
+
+    @Test
+    fun `flattens ingredients grouped into nested arrays`() {
+        val recipe = extract(JsonLdFixtures.GROUPED_INGREDIENTS)
+
+        assertEquals(
+            listOf("1 cup sugar", "2 eggs", "1 tsp vanilla"),
+            recipe?.ingredients?.map { it.raw },
+        )
+    }
 }

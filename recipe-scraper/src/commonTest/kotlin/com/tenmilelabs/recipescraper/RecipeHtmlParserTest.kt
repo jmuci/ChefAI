@@ -48,6 +48,26 @@ class RecipeHtmlParserTest {
     }
 
     @Test
+    fun `falls through to NoRecipeFound when the only JSON-LD candidate has instructions but no ingredients`() {
+        assertEquals(
+            ScrapeResult.NoRecipeFound,
+            parser.parse(JsonLdFixtures.INSTRUCTIONS_ONLY, "https://example.com/r"),
+        )
+    }
+
+    @Test
+    fun `falls back to microdata when JSON-LD has instructions but no ingredients and microdata does`() {
+        val html = JsonLdFixtures.INSTRUCTIONS_ONLY.replace("</body></html>", "") +
+            MicrodataFixtures.FULL_RECIPE.substringAfter("<body>")
+
+        val result = parser.parse(html, "https://example.com/r")
+
+        val success = assertIs<ScrapeResult.Success>(result)
+        assertEquals(ExtractionSource.MICRODATA, success.source)
+        assertEquals("Chocolate Chip Cookies", success.recipe.title)
+    }
+
+    @Test
     fun `falls through to NoRecipeFound when the only microdata scope has no ingredients or instructions`() {
         assertEquals(ScrapeResult.NoRecipeFound, parser.parse(MicrodataFixtures.NAME_ONLY, "https://example.com/r"))
     }

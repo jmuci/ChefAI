@@ -18,8 +18,9 @@ import com.tenmilelabs.recipescraper.model.ScrapedRecipe
  *
  * Two extraction tiers are tried in order, JSON-LD then microdata, since JSON-LD is both the more
  * common format on recipe sites and the more reliably structured one. A tier only counts as a hit
- * when it produces a recipe with a non-blank title *and* at least one ingredient or instruction —
- * a schema.org block that carries only a name is not a usable recipe, so the next tier is tried.
+ * when it produces a recipe with a non-blank title *and* at least one ingredient — a block with
+ * instructions but no ingredients has nothing to show on the ingredients tab, so the next tier is
+ * tried instead of silently succeeding with an empty list.
  */
 class RecipeHtmlParser {
 
@@ -47,4 +48,4 @@ class RecipeHtmlParser {
 }
 
 private fun ScrapedRecipe.isUsable(): Boolean =
-    title.isNotBlank() && (ingredients.isNotEmpty() || instructions.isNotEmpty())
+    title.isNotBlank() && ingredients.isNotEmpty()
