@@ -13,6 +13,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,6 +27,7 @@ import com.tenmilelabs.chefai.mealplans.domain.model.DietaryRestriction
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
+import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
@@ -77,7 +79,51 @@ fun MealPlanCard(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
+
+            CookedProgress(mealPlan = mealPlan)
         }
+    }
+}
+
+/**
+ * How much of the plan has been cooked, so the list answers "where am I this week?" without
+ * opening each plan. Hidden for a plan with no recipes yet, where there is no progress to show.
+ */
+@Composable
+private fun CookedProgress(
+    mealPlan: MealPlan,
+    modifier: Modifier = Modifier,
+) {
+    val meals = mealPlan.days.flatMap { day ->
+        MealSlot.entries.mapNotNull { slot ->
+            day.recipeIdFor(slot)?.let { slot to day.cookedAtFor(slot) }
+        }
+    }
+    if (meals.isEmpty()) return
+
+    val cooked = meals.count { (_, cookedAt) -> cookedAt != null }
+
+    Column(modifier = modifier.padding(top = 12.dp)) {
+        LinearProgressIndicator(
+            progress = { cooked.toFloat() / meals.size },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.15f),
+            gapSize = 0.dp,
+            drawStopIndicator = {},
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = if (cooked == meals.size) {
+                "\uD83C\uDF89 All ${meals.size} meals cooked"
+            } else {
+                "$cooked of ${meals.size} meals cooked"
+            },
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+        )
     }
 }
 

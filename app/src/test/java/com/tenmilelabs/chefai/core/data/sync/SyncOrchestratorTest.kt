@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.core.data.sync
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
+import com.tenmilelabs.chefai.core.data.local.room.MealPlanDayEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
@@ -26,12 +27,15 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeTagDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
+import com.tenmilelabs.chefai.core.data.sync.mapper.toMealPlanEntity
 import com.tenmilelabs.chefai.core.data.sync.network.FakeSyncNetworkDataSource
 import com.tenmilelabs.chefai.core.data.sync.network.dto.AcceptedEntityDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.ConflictEntityDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncErrorDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncBookmarkPullDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncCreatorDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDayDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPullResponse
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPushResponse
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeDto
@@ -66,6 +70,7 @@ class SyncOrchestratorTest {
     private lateinit var recipeTagCrossRefDao: FakeRecipeTagCrossRefDao
     private lateinit var recipeLabelCrossRefDao: FakeRecipeLabelCrossRefDao
     private lateinit var bookmarkedRecipeDao: FakeBookmarkedRecipeDao
+    private lateinit var mealPlanDao: FakeMealPlanDao
     private lateinit var sessionManager: SessionManager
     private lateinit var userDao: FakeUserDao
     private lateinit var syncMetadataDao: FakeSyncMetadataDao
@@ -99,6 +104,7 @@ class SyncOrchestratorTest {
         recipeTagCrossRefDao = FakeRecipeTagCrossRefDao()
         recipeLabelCrossRefDao = FakeRecipeLabelCrossRefDao()
         bookmarkedRecipeDao = FakeBookmarkedRecipeDao()
+        mealPlanDao = FakeMealPlanDao()
         sessionManager = createTestSessionManager(CoroutineScope(testDispatcher))
         syncMetadataDao = FakeSyncMetadataDao()
         syncNetworkDataSource = FakeSyncNetworkDataSource()
@@ -118,7 +124,7 @@ class SyncOrchestratorTest {
             recipeTagCrossRefDao = recipeTagCrossRefDao,
             recipeLabelCrossRefDao = recipeLabelCrossRefDao,
             bookmarkedRecipeDao = bookmarkedRecipeDao,
-            mealPlanDao = FakeMealPlanDao(),
+            mealPlanDao = mealPlanDao,
             sessionManager = sessionManager,
             syncMetadataDao = syncMetadataDao,
             transactionRunner = fakeTransactionRunner,
@@ -177,6 +183,36 @@ class SyncOrchestratorTest {
         ),
         tagIds = listOf(tagId1.toString()),
         labelIds = listOf(labelId1.toString())
+    )
+
+    private fun createSyncMealPlanDto(
+        uuid: UUID = UuidV7Generator.newId(),
+        name: String = "Server Plan",
+        status: String = "READY",
+        updatedAt: Long = 2000L,
+        deletedAt: Long? = null,
+        days: List<SyncMealPlanDayDto> = emptyList(),
+    ): SyncMealPlanDto = SyncMealPlanDto(
+        uuid = uuid.toString(),
+        name = name,
+        status = status,
+        preferencesJson = "{}",
+        createdAt = 1000L,
+        updatedAt = updatedAt,
+        deletedAt = deletedAt,
+        days = days,
+    )
+
+    private fun createSyncMealPlanDayDto(
+        uuid: UUID = UuidV7Generator.newId(),
+        dayIndex: Int = 0,
+        dinnerRecipeId: UUID? = null,
+        lunchRecipeId: UUID? = null,
+    ): SyncMealPlanDayDto = SyncMealPlanDayDto(
+        uuid = uuid.toString(),
+        dayIndex = dayIndex,
+        dinnerRecipeId = dinnerRecipeId?.toString(),
+        lunchRecipeId = lunchRecipeId?.toString(),
     )
 
     // ==================== PUSH TESTS ====================
@@ -705,6 +741,132 @@ class SyncOrchestratorTest {
         assertThat(ingredients).hasSize(1)
         assertThat(ingredients[0].ingredientId).isEqualTo(newIngredientId)
         assertThat(ingredients[0].syncState).isEqualTo(SyncState.PENDING)
+    }
+
+    // ==================== MEAL PLAN PULL TESTS ====================
+
+    @Test
+    fun `pull applies a meal plan and its days for the current user`() = runTest(testDispatcher) {
+        val planId = UuidV7Generator.newId()
+        val dinnerRecipeId = UuidV7Generator.newId()
+        val dayId = UuidV7Generator.newId()
+        val serverPlan = createSyncMealPlanDto(
+            uuid = planId,
+            name = "Server Plan",
+            days = listOf(createSyncMealPlanDayDto(uuid = dayId, dayIndex = 0, dinnerRecipeId = dinnerRecipeId)),
+        )
+        syncNetworkDataSource.pullResponses.addLast(
+            SyncPullResponse(
+                recipes = emptyList(),
+                serverTimestamp = 5000L,
+                hasMore = false,
+                mealPlans = listOf(serverPlan),
+            )
+        )
+
+        syncOrchestrator.sync()
+
+        val savedPlan = mealPlanDao.getMealPlanById(planId)!!
+        assertThat(savedPlan.name).isEqualTo("Server Plan")
+        assertThat(savedPlan.userId).isEqualTo(sessionManager.getCurrentUserId())
+        assertThat(savedPlan.syncState).isEqualTo(SyncState.SYNCED)
+
+        val savedDays = mealPlanDao.getDaysForMealPlan(planId)
+        assertThat(savedDays).hasSize(1)
+        assertThat(savedDays.single().dinnerRecipeId).isEqualTo(dinnerRecipeId)
+    }
+
+    @Test
+    fun `pull carries a cooked mark forward when the day still holds the same recipe`() = runTest(testDispatcher) {
+        val planId = UuidV7Generator.newId()
+        val dinnerRecipeId = UuidV7Generator.newId()
+        val localDayId = UuidV7Generator.newId()
+        mealPlanDao.upsertMealPlan(
+            createSyncMealPlanDto(uuid = planId).toMealPlanEntity(sessionManager.getCurrentUserId()!!)
+        )
+        mealPlanDao.upsertDays(
+            listOf(
+                MealPlanDayEntity(
+                    uuid = localDayId,
+                    mealPlanId = planId,
+                    dayIndex = 0,
+                    dinnerRecipeId = dinnerRecipeId,
+                    lunchRecipeId = null,
+                    dinnerCookedAt = 12345L,
+                )
+            )
+        )
+
+        // Server re-issues day rows with its own uuids, but dayIndex 0 still points at the same recipe.
+        val serverDayId = UuidV7Generator.newId()
+        syncNetworkDataSource.pullResponses.addLast(
+            SyncPullResponse(
+                recipes = emptyList(),
+                serverTimestamp = 5000L,
+                hasMore = false,
+                mealPlans = listOf(
+                    createSyncMealPlanDto(
+                        uuid = planId,
+                        days = listOf(
+                            createSyncMealPlanDayDto(
+                                uuid = serverDayId,
+                                dayIndex = 0,
+                                dinnerRecipeId = dinnerRecipeId,
+                            )
+                        ),
+                    )
+                ),
+            )
+        )
+
+        syncOrchestrator.sync()
+
+        val savedDays = mealPlanDao.getDaysForMealPlan(planId)
+        assertThat(savedDays.single().uuid).isEqualTo(serverDayId)
+        assertThat(savedDays.single().dinnerCookedAt).isEqualTo(12345L)
+    }
+
+    @Test
+    fun `pull drops a cooked mark when the day's recipe changed`() = runTest(testDispatcher) {
+        val planId = UuidV7Generator.newId()
+        val oldRecipeId = UuidV7Generator.newId()
+        val newRecipeId = UuidV7Generator.newId()
+        mealPlanDao.upsertMealPlan(
+            createSyncMealPlanDto(uuid = planId).toMealPlanEntity(sessionManager.getCurrentUserId()!!)
+        )
+        mealPlanDao.upsertDays(
+            listOf(
+                MealPlanDayEntity(
+                    uuid = UuidV7Generator.newId(),
+                    mealPlanId = planId,
+                    dayIndex = 0,
+                    dinnerRecipeId = oldRecipeId,
+                    lunchRecipeId = null,
+                    dinnerCookedAt = 12345L,
+                )
+            )
+        )
+
+        // Server regenerated day 0 with a different dinner — that meal has not been cooked.
+        syncNetworkDataSource.pullResponses.addLast(
+            SyncPullResponse(
+                recipes = emptyList(),
+                serverTimestamp = 5000L,
+                hasMore = false,
+                mealPlans = listOf(
+                    createSyncMealPlanDto(
+                        uuid = planId,
+                        days = listOf(createSyncMealPlanDayDto(dayIndex = 0, dinnerRecipeId = newRecipeId)),
+                    )
+                ),
+            )
+        )
+
+        syncOrchestrator.sync()
+
+        val savedDays = mealPlanDao.getDaysForMealPlan(planId)
+        assertThat(savedDays.single().dinnerRecipeId).isEqualTo(newRecipeId)
+        assertThat(savedDays.single().dinnerCookedAt).isNull()
     }
 
     // ==================== INTEGRATION TESTS ====================

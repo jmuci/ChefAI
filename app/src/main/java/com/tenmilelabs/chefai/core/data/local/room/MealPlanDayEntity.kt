@@ -26,4 +26,14 @@ data class MealPlanDayEntity(
     val dayIndex: Int,
     val dinnerRecipeId: UUID?,
     val lunchRecipeId: UUID?,
+    /**
+     * Epoch millis the user marked dinner cooked, `null` while outstanding.
+     *
+     * Local-only for now: the sync payload carries no cooked state, so
+     * [com.tenmilelabs.chefai.core.data.sync.SyncOrchestrator] carries these forward by `dayIndex`
+     * when a pull replaces a plan's days.
+     */
+    val dinnerCookedAt: Long? = null,
+    /** Epoch millis the user marked lunch cooked. See [dinnerCookedAt]. */
+    val lunchCookedAt: Long? = null,
 )

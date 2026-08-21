@@ -1,6 +1,8 @@
 package com.tenmilelabs.chefai.mealplans.domain.repository
 
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
+import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay
+import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
@@ -15,4 +17,22 @@ interface MealPlanRepository {
     suspend fun deleteMealPlan(uuid: UUID)
 
     suspend fun requestGeneration(planId: UUID): Result<Unit>
+
+    /**
+     * Marks a single planned meal cooked, or clears the mark when [cooked] is `false`.
+     *
+     * Local-only: the sync payload carries no cooked state, so this does not dirty the plan or
+     * request a sync. See [com.tenmilelabs.chefai.core.data.local.room.MealPlanDayEntity].
+     */
+    suspend fun setMealCooked(dayId: UUID, slot: MealSlot, cooked: Boolean)
+
+    /**
+     * Replaces a plan's days with a locally generated schedule and moves it to
+     * [com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus.READY].
+     *
+     * Used by the on-device fallback when the backend generator is unreachable or the session is
+     * anonymous. The plan is left dirty so a later sync pushes it, after which a server-generated
+     * schedule for the same plan overwrites these days.
+     */
+    suspend fun saveLocallyGeneratedDays(planId: UUID, days: List<MealPlanDay>)
 }

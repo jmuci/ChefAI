@@ -8,6 +8,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_1_2
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_2_3
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_3_4
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_4_5
+import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_5_6
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -164,11 +165,59 @@ class ChefAIDatabaseMigrationTest {
     }
 
     @Test
-    fun migrateAll1To5_succeeds() {
+    fun migrate5To6_keepsPlannedDaysAndStartsThemUncooked() {
+        val planId = UUID.randomUUID()
+        val dayId = UUID.randomUUID()
+        val userId = UUID.randomUUID()
+        val dinnerId = UUID.randomUUID()
+
+        helper.createDatabase(TEST_DB, 5).use { db ->
+            // meal_plans.userId is a CASCADE foreign key onto users, so the owner has to exist.
+            db.execSQL(
+                """
+                INSERT INTO users (uuid, displayName, email, avatarUrl, updatedAt, deletedAt, syncState)
+                VALUES (?, 'Tester', 'tester@example.com', '', 1, NULL, 'SYNCED')
+                """.trimIndent(),
+                arrayOf(userId.toBlob())
+            )
+            db.execSQL(
+                """
+                INSERT INTO meal_plans (
+                    uuid, userId, name, status, preferencesJson, createdAt, updatedAt,
+                    deletedAt, syncState
+                ) VALUES (?, ?, '3-day meal plan', 'READY', '{}', 1, 1, NULL, 'SYNCED')
+                """.trimIndent(),
+                arrayOf(planId.toBlob(), userId.toBlob())
+            )
+            db.execSQL(
+                """
+                INSERT INTO meal_plan_days (uuid, mealPlanId, dayIndex, dinnerRecipeId, lunchRecipeId)
+                VALUES (?, ?, 0, ?, NULL)
+                """.trimIndent(),
+                arrayOf(dayId.toBlob(), planId.toBlob(), dinnerId.toBlob())
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 6, true, MIGRATION_5_6)
+
+        db.query("SELECT dayIndex, dinnerCookedAt, lunchCookedAt FROM meal_plan_days").use { cursor ->
+            assertTrue("the planned day should survive the migration", cursor.moveToFirst())
+            assertEquals(0, cursor.getInt(0))
+            assertTrue(
+                "a day that existed before cooked tracking has not been cooked",
+                cursor.isNull(1) && cursor.isNull(2)
+            )
+            assertEquals(1, cursor.count)
+        }
+    }
+
+    @Test
+    fun migrateAll1To6_succeeds() {
         helper.createDatabase(TEST_DB, 1).close()
 
         helper.runMigrationsAndValidate(
-            TEST_DB, 5, true, MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5
+            TEST_DB, 6, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6
         )
     }
 }
