@@ -13,6 +13,7 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import timber.log.Timber
 import java.util.UUID
 import javax.inject.Inject
@@ -32,6 +33,9 @@ class DefaultMealPlanRepository @Inject constructor(
             mealPlanDao.observeMealPlanById(uuid),
             mealPlanDao.observeDaysForMealPlan(uuid),
         ) { entity, days -> entity?.toDomain(days) }
+
+    override fun observeMealPlanDay(dayId: UUID): Flow<MealPlanDay?> =
+        mealPlanDao.observeDayById(dayId).map { it?.toDomain() }
 
     override fun observeMealPlansForUser(userId: UUID): Flow<List<MealPlan>> =
         combine(

@@ -189,6 +189,7 @@
     <!-- Meal plan detail: cooked tracking -->
     <string name="meal_plan_mark_cooked">Mark as cooked</string>
     <string name="meal_plan_mark_not_cooked">Mark as not cooked</string>
+    <string name="meal_plan_toggle_cooked_error">Couldn\'t update this meal</string>
     <string name="meal_plan_recipe_unavailable">Recipe not available</string>
     <string name="meal_plan_cooked_section_title">Cooked this week</string>
     <string name="meal_plan_progress">%1$d of %2$d meals cooked</string>

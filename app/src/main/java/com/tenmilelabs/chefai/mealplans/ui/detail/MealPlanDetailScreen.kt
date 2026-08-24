@@ -60,7 +60,7 @@ import java.util.UUID
 
 @Composable
 fun MealPlanDetailScreen(
-    onRecipeClick: (UUID) -> Unit,
+    onMealClick: (PlannedMeal) -> Unit,
     snackbarHostState: SnackbarHostState = SnackbarHostState(),
     viewModel: MealPlanDetailViewModel = hiltViewModel(),
     modifier: Modifier = Modifier,
@@ -85,7 +85,7 @@ fun MealPlanDetailScreen(
         )
         is MealPlanDetailUiState.Success -> MealPlanDetailContent(
             state = state,
-            onRecipeClick = onRecipeClick,
+            onMealClick = onMealClick,
             onToggleCooked = viewModel::onToggleCooked,
             onGenerate = viewModel::onGenerate,
             modifier = modifier,
@@ -96,7 +96,7 @@ fun MealPlanDetailScreen(
 @Composable
 private fun MealPlanDetailContent(
     state: MealPlanDetailUiState.Success,
-    onRecipeClick: (UUID) -> Unit,
+    onMealClick: (PlannedMeal) -> Unit,
     onToggleCooked: (PlannedMeal) -> Unit,
     onGenerate: () -> Unit,
     modifier: Modifier = Modifier,
@@ -140,7 +140,7 @@ private fun MealPlanDetailContent(
                     recipe = meal.recipe,
                     isCooked = false,
                     slotLabel = if (state.showsSlotLabels) meal.slot.label else null,
-                    onClick = { onRecipeClick(meal.recipeId) },
+                    onClick = { onMealClick(meal) },
                     onToggleCooked = { onToggleCooked(meal) },
                 )
             }
@@ -159,7 +159,7 @@ private fun MealPlanDetailContent(
                     isCooked = true,
                     dayLabel = meal.dayLabel,
                     slotLabel = if (state.showsSlotLabels) meal.slot.label else null,
-                    onClick = { onRecipeClick(meal.recipeId) },
+                    onClick = { onMealClick(meal) },
                     onToggleCooked = { onToggleCooked(meal) },
                 )
             }
@@ -532,7 +532,7 @@ private fun MealPlanDetailLightPreview() {
     ChefAITheme(darkTheme = false) {
         MealPlanDetailContent(
             state = previewState(),
-            onRecipeClick = {},
+            onMealClick = {},
             onToggleCooked = {},
             onGenerate = {},
         )
@@ -545,7 +545,7 @@ private fun MealPlanDetailDarkPreview() {
     ChefAITheme(darkTheme = true) {
         MealPlanDetailContent(
             state = previewState(),
-            onRecipeClick = {},
+            onMealClick = {},
             onToggleCooked = {},
             onGenerate = {},
         )
@@ -558,7 +558,7 @@ private fun MealPlanDetailEmptyPreview() {
     ChefAITheme(darkTheme = false) {
         MealPlanDetailContent(
             state = previewState().copy(board = MealPlanBoard(upcoming = emptyList(), cooked = emptyList())),
-            onRecipeClick = {},
+            onMealClick = {},
             onToggleCooked = {},
             onGenerate = {},
         )

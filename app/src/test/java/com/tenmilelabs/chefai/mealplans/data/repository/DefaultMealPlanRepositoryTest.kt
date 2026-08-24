@@ -87,6 +87,42 @@ class DefaultMealPlanRepositoryTest {
         assertThat(plans.map { it.uuid }).containsExactly(mine.uuid)
     }
 
+    // --- observeMealPlanDay ---
+
+    @Test
+    fun `observeMealPlanDay emits the day by its own id, independent of the plan`() = runTest {
+        val plan = planWithOneDay()
+        repository.createMealPlan(plan)
+        val dayId = plan.days.single().uuid
+
+        val day = repository.observeMealPlanDay(dayId).first()
+
+        assertThat(day?.uuid).isEqualTo(dayId)
+    }
+
+    @Test
+    fun `observeMealPlanDay emits null for an unknown day id`() = runTest {
+        val day = repository.observeMealPlanDay(UUID.randomUUID()).first()
+
+        assertThat(day).isNull()
+    }
+
+    @Test
+    fun `observeMealPlanDay reflects a cooked toggle`() = runTest {
+        val plan = planWithOneDay()
+        repository.createMealPlan(plan)
+        val dayId = plan.days.single().uuid
+
+        repository.observeMealPlanDay(dayId).test {
+            assertThat(awaitItem()?.dinnerCookedAt).isNull()
+
+            repository.setMealCooked(dayId, MealSlot.DINNER, cooked = true)
+
+            assertThat(awaitItem()?.dinnerCookedAt).isNotNull()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     // --- setMealCooked ---
 
     @Test

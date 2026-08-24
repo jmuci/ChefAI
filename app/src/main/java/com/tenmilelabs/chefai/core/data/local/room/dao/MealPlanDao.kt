@@ -61,6 +61,13 @@ interface MealPlanDao {
     @Query("SELECT * FROM meal_plan_days WHERE mealPlanId = :mealPlanId ORDER BY dayIndex ASC")
     suspend fun getDaysForMealPlan(mealPlanId: UUID): List<MealPlanDayEntity>
 
+    /**
+     * A single day by its own id, for screens that only know which slot they were opened from
+     * (e.g. a recipe opened from a meal plan) rather than the whole plan.
+     */
+    @Query("SELECT * FROM meal_plan_days WHERE uuid = :dayId")
+    fun observeDayById(dayId: UUID): Flow<MealPlanDayEntity?>
+
     @Upsert
     suspend fun upsertDays(days: List<MealPlanDayEntity>)
 
