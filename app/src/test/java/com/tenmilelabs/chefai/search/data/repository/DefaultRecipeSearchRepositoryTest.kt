@@ -98,15 +98,47 @@ class DefaultRecipeSearchRepositoryTest {
     )
 
     @Test
-    fun `an anonymous session skips the network entirely and goes straight to the local fallback`() = runTest {
+    fun `an anonymous session hits the network and returns the remote catalog`() = runTest {
+        // ChefAI#184: this used to short-circuit to the on-device scan, capping anonymous search
+        // at whatever the device had already synced. The backend serves anonymous callers the
+        // public catalog, so the round trip is worth making.
         anonymousSession()
+        seedLocalRecipe("Chicken Soup")
+        coEvery { fakeApiService.search("chicken", 20, 0) } returns remoteResult()
+
+        val outcome = repository().search("chicken", 20, 0)
+
+        assertThat(outcome.source).isEqualTo(RecipeSearchSource.REMOTE)
+        assertThat(outcome.results.single().title).isEqualTo("Remote Chicken")
+        coVerify(exactly = 1) { fakeApiService.search("chicken", 20, 0) }
+    }
+
+    @Test
+    fun `an anonymous session still falls back locally when the network fails`() = runTest {
+        anonymousSession()
+        coEvery { fakeApiService.search(any(), any(), any()) } returns RecipeSearchNetworkResult.Error("boom")
         val recipeId = seedLocalRecipe("Chicken Soup")
 
         val outcome = repository().search("chicken", 20, 0)
 
         assertThat(outcome.source).isEqualTo(RecipeSearchSource.LOCAL_FALLBACK)
         assertThat(outcome.results.map { it.uuid }).containsExactly(recipeId)
-        coVerify(exactly = 0) { fakeApiService.search(any(), any(), any()) }
+    }
+
+    @Test
+    fun `an anonymous Unauthorized falls back without attempting a pointless token refresh`() = runTest {
+        // Only reachable against a backend that predates ChefAI#184. An anonymous session has no
+        // refresh token, so refreshing here would burn a round trip on every keystroke to fail.
+        anonymousSession()
+        coEvery { fakeApiService.search(any(), any(), any()) } returns RecipeSearchNetworkResult.Unauthorized
+        val recipeId = seedLocalRecipe("Chicken Soup")
+
+        val outcome = repository().search("chicken", 20, 0)
+
+        assertThat(outcome.source).isEqualTo(RecipeSearchSource.LOCAL_FALLBACK)
+        assertThat(outcome.results.map { it.uuid }).containsExactly(recipeId)
+        coVerify(exactly = 0) { sessionManager.refreshToken() }
+        coVerify(exactly = 1) { fakeApiService.search(any(), any(), any()) }
     }
 
     @Test
