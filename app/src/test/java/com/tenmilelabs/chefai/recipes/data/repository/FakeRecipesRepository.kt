@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.recipes.data.repository
 
 import com.tenmilelabs.chefai.core.domain.model.Recipe
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
+import com.tenmilelabs.chefai.recipes.domain.repository.RecipeFetchResult
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -59,6 +60,10 @@ class FakeRecipesRepository : RecipesRepository {
     }
 
     fun emitRecipe(recipeId: UUID, recipe: Recipe?) {
+        // Keep storedRecipes (what getRecipe/getOrFetchRecipe read) consistent with the flow —
+        // in Room these are two query shapes over the same table, so a fake that let them
+        // diverge would make "present in Room" mean different things to different callers.
+        if (recipe != null) storedRecipes[recipeId] = recipe else storedRecipes.remove(recipeId)
         getFlowForRecipe(recipeId).tryEmit(recipe)
     }
 
@@ -119,6 +124,24 @@ class FakeRecipesRepository : RecipesRepository {
             throw (exceptionForGetRecipe ?: Exception("Configured repository error"))
         }
         return storedRecipes[uuid]
+    }
+
+    // What getOrFetchRecipe returns for a uuid absent from storedRecipes/remoteRecipes below.
+    var fetchOutcomeWhenNotFoundRemotely: RecipeFetchResult = RecipeFetchResult.NotAvailable
+    private val remoteRecipes = mutableMapOf<UUID, Recipe>()
+
+    /** Recipe a remote fetch would successfully return (and persist) for [recipeId]. */
+    fun setRemoteRecipe(recipeId: UUID, recipe: Recipe) {
+        remoteRecipes[recipeId] = recipe
+    }
+
+    override suspend fun getOrFetchRecipe(uuid: UUID): RecipeFetchResult {
+        getRecipe(uuid)?.let { return RecipeFetchResult.Found(it) }
+        val remote = remoteRecipes[uuid] ?: return fetchOutcomeWhenNotFoundRemotely
+        // Mirror the real repository: a successful fetch persists before returning Found.
+        storedRecipes[uuid] = remote
+        getFlowForRecipe(uuid).tryEmit(remote)
+        return RecipeFetchResult.Found(remote)
     }
 
     fun setRecipesForList(recipes: List<Recipe>) {

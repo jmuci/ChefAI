@@ -159,6 +159,29 @@ data class SyncCreatorDto(
     val deletedAt: Long?
 )
 
+/**
+ * Response body for `GET /api/v1/recipes/{recipeId}` — fetches one recipe aggregate the
+ * device hasn't synced yet (ChefAI#186), e.g. a search result tapped before any pull has
+ * delivered it. Shares [SyncRecipeDto] and the same reference-data/creator shapes
+ * [SyncPullResponse] already carries, so the exact upsert ordering [SyncOrchestrator] uses
+ * for a pull page applies here unchanged — see [SyncOrchestrator.fetchAndPersistRecipe].
+ */
+@Serializable
+data class RecipeDetailResponseDto(
+    val recipe: SyncRecipeDto,
+    val referenceData: SyncReferenceDataDto,
+    val creators: List<SyncCreatorDto>
+)
+
+@Serializable
+data class SyncReferenceDataDto(
+    val ingredients: List<SyncIngredientDto> = emptyList(),
+    val allergens: List<SyncAllergenDto> = emptyList(),
+    val sourceClassifications: List<SyncSourceClassificationDto> = emptyList(),
+    val tags: List<SyncTagDto> = emptyList(),
+    val labels: List<SyncLabelDto> = emptyList(),
+)
+
 @Serializable
 data class SyncPullResponse(
     val recipes: List<SyncRecipeDto>,

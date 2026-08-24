@@ -25,6 +25,8 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
+import com.tenmilelabs.chefai.core.data.sync.RecipeFetchOutcome
+import com.tenmilelabs.chefai.core.data.sync.SyncOrchestrator
 import com.tenmilelabs.chefai.core.domain.model.Label
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
@@ -46,6 +48,8 @@ import com.tenmilelabs.chefai.core.testutil.testTags
 import com.tenmilelabs.chefai.core.testutil.testUser
 import com.tenmilelabs.chefai.recipes.data.network.FakeApiService
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
+import com.tenmilelabs.chefai.recipes.domain.repository.RecipeFetchResult
+import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -77,6 +81,7 @@ class DefaultRecipeRepositoryTest {
     private lateinit var sessionManager: SessionManager
     private lateinit var syncManager: FakeSyncManager
     private lateinit var recipeImageStore: RecipeImageStore
+    private lateinit var syncOrchestrator: SyncOrchestrator
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var testScope: TestScope
 
@@ -140,6 +145,7 @@ class DefaultRecipeRepositoryTest {
         remoteDataSource = FakeApiService()
         syncManager = FakeSyncManager()
         recipeImageStore = mockk(relaxed = true)
+        syncOrchestrator = mockk(relaxed = true)
 
         recipeRepository =
             DefaultRecipeRepository(
@@ -154,7 +160,8 @@ class DefaultRecipeRepositoryTest {
                 remoteDataSource,
                 sessionManager,
                 recipeImageStore,
-                syncManager
+                syncManager,
+                syncOrchestrator
             )
 
         // Seed the fake DAO with our test data.
@@ -499,5 +506,53 @@ class DefaultRecipeRepositoryTest {
         recipeRepository.softDeleteRecipe(recipeId1)
 
         assertThat(syncManager.mutationSyncCount).isEqualTo(1)
+    }
+
+    // ==================== getOrFetchRecipe (ChefAI#186) ====================
+
+    @Test
+    fun `getOrFetchRecipe() returns Found from Room without calling the network fetch`() = runTest {
+        val result = recipeRepository.getOrFetchRecipe(recipeId1)
+
+        assertThat(result).isInstanceOf(RecipeFetchResult.Found::class.java)
+        coVerify(exactly = 0) { syncOrchestrator.fetchAndPersistRecipe(any()) }
+    }
+
+    @Test
+    fun `getOrFetchRecipe() persists via the orchestrator and returns Found when the recipe is missing locally`() =
+        runTest {
+            val missingRecipeId = UuidV7Generator.newId()
+            coEvery { syncOrchestrator.fetchAndPersistRecipe(missingRecipeId) } coAnswers {
+                // Simulates the orchestrator's real side effect: a successful fetch persists
+                // the recipe into Room before this returns.
+                recipeDao.upsertRecipe(recipeEntity1.copy(uuid = missingRecipeId))
+                RecipeFetchOutcome.PERSISTED
+            }
+
+            val result = recipeRepository.getOrFetchRecipe(missingRecipeId)
+
+            assertThat(result).isInstanceOf(RecipeFetchResult.Found::class.java)
+            assertThat((result as RecipeFetchResult.Found).recipe.uuid).isEqualTo(missingRecipeId)
+        }
+
+    @Test
+    fun `getOrFetchRecipe() returns NotAvailable when the orchestrator reports the recipe isn't available`() =
+        runTest {
+            val missingRecipeId = UuidV7Generator.newId()
+            coEvery { syncOrchestrator.fetchAndPersistRecipe(missingRecipeId) } returns RecipeFetchOutcome.NOT_AVAILABLE
+
+            val result = recipeRepository.getOrFetchRecipe(missingRecipeId)
+
+            assertThat(result).isEqualTo(RecipeFetchResult.NotAvailable)
+        }
+
+    @Test
+    fun `getOrFetchRecipe() returns NetworkError when the orchestrator's fetch fails`() = runTest {
+        val missingRecipeId = UuidV7Generator.newId()
+        coEvery { syncOrchestrator.fetchAndPersistRecipe(missingRecipeId) } returns RecipeFetchOutcome.NETWORK_ERROR
+
+        val result = recipeRepository.getOrFetchRecipe(missingRecipeId)
+
+        assertThat(result).isEqualTo(RecipeFetchResult.NetworkError)
     }
 }

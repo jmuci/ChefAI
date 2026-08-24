@@ -12,6 +12,8 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeLabelCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.TagDao
+import com.tenmilelabs.chefai.core.data.sync.RecipeFetchOutcome
+import com.tenmilelabs.chefai.core.data.sync.SyncOrchestrator
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import com.tenmilelabs.chefai.core.domain.model.Recipe
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
@@ -21,6 +23,7 @@ import com.tenmilelabs.chefai.recipes.data.mapper.toDomain
 import com.tenmilelabs.chefai.recipes.data.mapper.toRecipePreviewDomain
 import com.tenmilelabs.chefai.recipes.data.mapper.toRoomEntity
 import com.tenmilelabs.chefai.recipes.data.network.RecipeNetworkDataSource
+import com.tenmilelabs.chefai.recipes.domain.repository.RecipeFetchResult
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
@@ -51,7 +54,8 @@ class DefaultRecipeRepository @Inject constructor(
     private val networkDataSource: RecipeNetworkDataSource,
     private val sessionManager: SessionManager,
     private val recipeImageStore: RecipeImageStore,
-    private val syncManager: SyncScheduler) : RecipesRepository {
+    private val syncManager: SyncScheduler,
+    private val syncOrchestrator: SyncOrchestrator) : RecipesRepository {
 
     override fun getRecipesPreviewStream(): Flow<List<RecipePreview>> {
         // TODO pass the userId to only show recipes from the user when filtering.
@@ -130,6 +134,18 @@ class DefaultRecipeRepository @Inject constructor(
         val details = recipeDao.getRecipeWithDetails(uuid) ?: return null
         val ingredients = recipeDao.observeIngredientsForRecipe(uuid).first()
         return details.toDomain(ingredients)
+    }
+
+    override suspend fun getOrFetchRecipe(uuid: UUID): RecipeFetchResult {
+        getRecipe(uuid)?.let { return RecipeFetchResult.Found(it) }
+        return when (syncOrchestrator.fetchAndPersistRecipe(uuid)) {
+            // Re-reads via getRecipe rather than mapping the fetched DTO directly, reusing its
+            // existing DAO-to-domain mapping instead of adding a second one.
+            RecipeFetchOutcome.PERSISTED -> getRecipe(uuid)?.let { RecipeFetchResult.Found(it) }
+                ?: RecipeFetchResult.NotAvailable
+            RecipeFetchOutcome.NOT_AVAILABLE -> RecipeFetchResult.NotAvailable
+            RecipeFetchOutcome.NETWORK_ERROR -> RecipeFetchResult.NetworkError
+        }
     }
 
     @Transaction

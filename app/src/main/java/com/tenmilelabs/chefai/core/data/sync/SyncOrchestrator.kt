@@ -43,6 +43,8 @@ import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPushResponse
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeDto
 import com.tenmilelabs.chefai.core.di.IoDispatcher
 import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.recipes.data.network.RecipeDetailNetworkDataSource
+import com.tenmilelabs.chefai.recipes.data.network.RecipeDetailNetworkResult
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -67,9 +69,13 @@ data class PullResult(
     val pages: Int
 )
 
+/** Outcome of [SyncOrchestrator.fetchAndPersistRecipe] — see ChefAI#186. */
+enum class RecipeFetchOutcome { PERSISTED, NOT_AVAILABLE, NETWORK_ERROR }
+
 @Singleton
 class SyncOrchestrator @Inject constructor(
     private val syncNetworkDataSource: SyncNetworkDataSource,
+    private val recipeDetailNetworkDataSource: RecipeDetailNetworkDataSource,
     private val allergenDao: AllergenDao,
     private val sourceClassificationDao: SourceClassificationDao,
     private val ingredientDao: IngredientDao,
@@ -335,6 +341,40 @@ class SyncOrchestrator @Inject constructor(
         Timber.d("Pull: completed — upserted=$totalUpserted, deleted=$totalDeleted, pages=$pages")
         return PullResult(totalUpserted, totalDeleted, pages)
     }
+
+    /**
+     * Fetches one recipe by id from `GET /api/v1/recipes/{recipeId}` and persists it, for a
+     * search result the device hasn't pulled yet (ChefAI#186) — [pull] can't help here since
+     * it's authenticated and delta-scoped, and an anonymous session's [pull] never even runs
+     * (see [com.tenmilelabs.chefai.core.data.sync.worker.SyncWorker]).
+     *
+     * Upserts reference data in the exact same FK order [pull] uses (see the comment in
+     * [pull]) before [upsertRecipeAggregate], inside one [transactionRunner] — this is the
+     * only transaction in this call path, so nesting isn't a concern even though
+     * [upsertRecipeAggregate]'s other two callers each wrap it in their own.
+     */
+    suspend fun fetchAndPersistRecipe(recipeId: UUID): RecipeFetchOutcome =
+        when (val result = recipeDetailNetworkDataSource.fetchRecipe(recipeId)) {
+            is RecipeDetailNetworkResult.Success -> {
+                transactionRunner {
+                    userDao.upsertAll(result.response.creators.map { it.toUserEntity() })
+                    allergenDao.upsertAll(result.response.referenceData.allergens.map { it.toAllergenEntity() })
+                    sourceClassificationDao.upsertAll(
+                        result.response.referenceData.sourceClassifications.map { it.toSourceClassificationEntity() }
+                    )
+                    ingredientDao.upsertAll(result.response.referenceData.ingredients.map { it.toIngredientEntity() })
+                    tagDao.upsertAll(result.response.referenceData.tags.map { it.toTagEntity() })
+                    labelDao.upsertAll(result.response.referenceData.labels.map { it.toLabelEntity() })
+                    upsertRecipeAggregate(result.response.recipe)
+                }
+                RecipeFetchOutcome.PERSISTED
+            }
+            RecipeDetailNetworkResult.NotFound -> RecipeFetchOutcome.NOT_AVAILABLE
+            RecipeDetailNetworkResult.Unauthorized, is RecipeDetailNetworkResult.Error -> {
+                Timber.w("fetchAndPersistRecipe: fetch failed for %s: %s", recipeId, result)
+                RecipeFetchOutcome.NETWORK_ERROR
+            }
+        }
 
     private suspend fun applyPulledRecipe(syncRecipe: SyncRecipeDto): ApplyResult {
         val recipeUuid = UUID.fromString(syncRecipe.uuid)

@@ -35,6 +35,7 @@ import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeIngredientDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeStepDto
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
+import com.tenmilelabs.chefai.recipes.data.network.FakeRecipeDetailNetworkDataSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
@@ -113,6 +114,7 @@ class SyncE2ETest {
 
         syncOrchestrator = SyncOrchestrator(
             syncNetworkDataSource = syncNetworkDataSource,
+            recipeDetailNetworkDataSource = FakeRecipeDetailNetworkDataSource(),
             recipeDao = recipeDao,
             recipeImageStateDao = FakeRecipeImageStateDao(),
             recipeStepDao = recipeStepDao,

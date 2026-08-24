@@ -13,6 +13,7 @@ import com.tenmilelabs.chefai.core.testutil.FakeSyncScheduler
 import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
 import com.tenmilelabs.chefai.core.testutil.recipe1
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
+import com.tenmilelabs.chefai.recipes.domain.repository.RecipeFetchResult
 import com.tenmilelabs.chefai.search.domain.repository.FakeRecipeSearchRepository
 import com.tenmilelabs.chefai.search.domain.repository.RecipeSearchOutcome
 import com.tenmilelabs.chefai.search.domain.repository.RecipeSearchSource
@@ -258,10 +259,11 @@ class RecipeSearchViewModelTest {
     }
 
     @Test
-    fun `saving a recipe absent from Room requests a sync and shows the not-yet-synced snackbar, without bookmarking`() =
+    fun `saving a recipe absent from Room whose remote fetch also fails requests a sync and shows the not-yet-synced snackbar, without bookmarking`() =
         testScope.runTest {
             val recipeId = UUID.randomUUID()
             recipesRepository.emitRecipe(recipeId, null) // Room: not found
+            recipesRepository.fetchOutcomeWhenNotFoundRemotely = RecipeFetchResult.NetworkError
 
             turbineScope {
                 val events = viewModel.uiEvents.testIn(backgroundScope)
@@ -270,6 +272,23 @@ class RecipeSearchViewModelTest {
 
                 val event = events.awaitItem() as SearchUiEvent.ShowSnackbar
                 assertThat(event.messageRes).isEqualTo(R.string.search_recipe_not_yet_synced)
+            }
+        }
+
+    @Test
+    fun `saving a recipe absent from Room whose remote fetch is definitively unavailable shows that message, without a sync`() =
+        testScope.runTest {
+            val recipeId = UUID.randomUUID()
+            recipesRepository.emitRecipe(recipeId, null) // Room: not found
+            recipesRepository.fetchOutcomeWhenNotFoundRemotely = RecipeFetchResult.NotAvailable
+
+            turbineScope {
+                val events = viewModel.uiEvents.testIn(backgroundScope)
+                viewModel.onSaveToCollection(recipeId)
+                runCurrent()
+
+                val event = events.awaitItem() as SearchUiEvent.ShowSnackbar
+                assertThat(event.messageRes).isEqualTo(R.string.search_recipe_unavailable)
             }
         }
 
@@ -287,6 +306,23 @@ class RecipeSearchViewModelTest {
             assertThat(event.messageRes).isEqualTo(R.string.search_added_to_collection)
         }
     }
+
+    @Test
+    fun `saving a recipe absent from Room but resolved by a remote fetch bookmarks it and shows the added confirmation`() =
+        testScope.runTest {
+            val recipeId = UUID.randomUUID()
+            recipesRepository.emitRecipe(recipeId, null) // Room: not found
+            recipesRepository.setRemoteRecipe(recipeId, recipe1)
+
+            turbineScope {
+                val events = viewModel.uiEvents.testIn(backgroundScope)
+                viewModel.onSaveToCollection(recipeId)
+                runCurrent()
+
+                val event = events.awaitItem() as SearchUiEvent.ShowSnackbar
+                assertThat(event.messageRes).isEqualTo(R.string.search_added_to_collection)
+            }
+        }
 
     @Test
     fun `an FK violation on bookmark is caught, not propagated, and requests a sync`() = testScope.runTest {
@@ -320,10 +356,11 @@ class RecipeSearchViewModelTest {
     }
 
     @Test
-    fun `clicking a recipe absent from Room requests a sync and shows the not-yet-synced snackbar, without navigating`() =
+    fun `clicking a recipe absent from Room whose remote fetch also fails requests a sync and shows the not-yet-synced snackbar, without navigating`() =
         testScope.runTest {
             val recipeId = UUID.randomUUID()
             recipesRepository.emitRecipe(recipeId, null) // Room: not found
+            recipesRepository.fetchOutcomeWhenNotFoundRemotely = RecipeFetchResult.NetworkError
 
             turbineScope {
                 val navigations = viewModel.navigateToRecipe.testIn(backgroundScope)
@@ -336,4 +373,38 @@ class RecipeSearchViewModelTest {
                 navigations.expectNoEvents()
             }
         }
+
+    @Test
+    fun `clicking a recipe absent from Room whose remote fetch is definitively unavailable shows that message, without navigating or syncing`() =
+        testScope.runTest {
+            val recipeId = UUID.randomUUID()
+            recipesRepository.emitRecipe(recipeId, null) // Room: not found
+            recipesRepository.fetchOutcomeWhenNotFoundRemotely = RecipeFetchResult.NotAvailable
+
+            turbineScope {
+                val navigations = viewModel.navigateToRecipe.testIn(backgroundScope)
+                val events = viewModel.uiEvents.testIn(backgroundScope)
+                viewModel.onRecipeClick(recipeId)
+                runCurrent()
+
+                val event = events.awaitItem() as SearchUiEvent.ShowSnackbar
+                assertThat(event.messageRes).isEqualTo(R.string.search_recipe_unavailable)
+                navigations.expectNoEvents()
+            }
+        }
+
+    @Test
+    fun `clicking a recipe absent from Room but resolved by a remote fetch navigates to it`() = testScope.runTest {
+        val recipeId = UUID.randomUUID()
+        recipesRepository.emitRecipe(recipeId, null) // Room: not found
+        recipesRepository.setRemoteRecipe(recipeId, recipe1)
+
+        turbineScope {
+            val navigations = viewModel.navigateToRecipe.testIn(backgroundScope)
+            viewModel.onRecipeClick(recipeId)
+            runCurrent()
+
+            assertThat(navigations.awaitItem()).isEqualTo(recipeId)
+        }
+    }
 }
