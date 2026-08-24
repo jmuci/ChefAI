@@ -22,12 +22,9 @@ class DefaultRecipeSearchRepository @Inject constructor(
 ) : RecipeSearchRepository {
 
     override suspend fun search(query: String, limit: Int, offset: Int): RecipeSearchOutcome {
-        // Anonymous sessions have no JWT and would 401 on every keystroke — skip the guaranteed
-        // round trip and go straight to the local fallback.
-        if (sessionManager.userSession.value is UserSession.Anonymous) {
-            return localFallback(query, limit)
-        }
-
+        // Anonymous sessions go over the wire like any other: the backend serves them the PUBLIC
+        // catalog without a JWT. This used to short-circuit to localFallback() instead, which
+        // capped anonymous search at whatever this device had already synced — ChefAI#184.
         return when (val result = apiService.search(query, limit, offset)) {
             is RecipeSearchNetworkResult.Success -> result.response.toOutcome()
             is RecipeSearchNetworkResult.Error -> localFallback(query, limit)
@@ -35,8 +32,18 @@ class DefaultRecipeSearchRepository @Inject constructor(
         }
     }
 
-    /** Mirrors SyncWorker.doWork(): a single refresh-then-retry, never a loop. */
+    /**
+     * Mirrors SyncWorker.doWork(): a single refresh-then-retry, never a loop.
+     *
+     * An anonymous session has no refresh token, so refreshing would be a guaranteed-failing round
+     * trip on a path that fires every keystroke — fall back straight away instead. A current
+     * backend never 401s an anonymous search at all, so this branch only guards against pointing
+     * at a server that predates ChefAI#184.
+     */
     private suspend fun onUnauthorized(query: String, limit: Int, offset: Int): RecipeSearchOutcome {
+        if (sessionManager.userSession.value is UserSession.Anonymous) {
+            return localFallback(query, limit)
+        }
         if (sessionManager.refreshToken().isFailure) {
             return localFallback(query, limit)
         }
