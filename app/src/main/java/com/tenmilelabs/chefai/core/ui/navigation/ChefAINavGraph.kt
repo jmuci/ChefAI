@@ -92,7 +92,7 @@ fun ChefAINavGraph(
         composable(route = AppDestinations.SEARCH.route) {
             SearchScreen(
                 snackbarHostState = snackbarHostState,
-                onRecipeClick = { recipeUuid -> navActions.navigateToRecipeDetail(recipeUuid) },
+                onRecipeClick = { recipeUuid -> navActions.navigateToSearchRecipeDetail(recipeUuid) },
             )
         }
         composable(route = AppDestinations.RECIPES.route) {
@@ -118,6 +118,15 @@ fun ChefAINavGraph(
         }
         composable(route = AppDestinations.MEAL_PLAN_RECIPE_DETAIL.route) {
             RecipeDetailsScreen(snackbarHostState = snackbarHostState)
+        }
+        composable(route = AppDestinations.SEARCH_RECIPE_DETAIL.route) {
+            RecipeDetailsScreen(
+                snackbarHostState = snackbarHostState,
+                onEditClick = { recipeId ->
+                    navActions.navigateToEditRecipe(recipeId)
+                },
+                onNavigateBack = { navController.popBackStack() },
+            )
         }
         navigation(
             startDestination = ScreenBaseRoutes.MEAL_PLAN_WIZARD_BASICS,
