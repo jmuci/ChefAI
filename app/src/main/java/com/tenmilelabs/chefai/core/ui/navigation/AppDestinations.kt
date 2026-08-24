@@ -5,10 +5,13 @@ import androidx.navigation.NavHostController
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.DRAFT_ID_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.IMPORT_URL_ARG
+import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.MEAL_PLAN_DAY_ID_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.MEAL_PLAN_ID_ARG
+import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.MEAL_PLAN_SLOT_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.PREFILL_URL_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.RECIPE_ID_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.ScreenBaseRoutes.RECIPE_DETAILS
+import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import java.net.URLEncoder
 import java.util.UUID
 
@@ -43,6 +46,17 @@ internal object ScreenBaseRoutes {
 object AppDestinationArgs {
     const val RECIPE_ID_ARG = "recipeUuid"
     const val MEAL_PLAN_ID_ARG = "mealPlanId"
+
+    /**
+     * Id of the [com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay] a recipe was opened
+     * from, plus [MEAL_PLAN_SLOT_ARG]. Present only on [ScreenBaseRoutes.MEAL_PLAN_RECIPE_DETAIL] —
+     * that pair, not the recipe id alone, identifies the planned meal a "mark as cooked" toggle
+     * would act on, since the same recipe can fill more than one slot in a week.
+     */
+    const val MEAL_PLAN_DAY_ID_ARG = "mealPlanDayId"
+
+    /** [com.tenmilelabs.chefai.mealplans.domain.model.MealSlot] name paired with [MEAL_PLAN_DAY_ID_ARG]. */
+    const val MEAL_PLAN_SLOT_ARG = "mealPlanSlot"
 
     /**
      * Id of a pre-seeded [com.tenmilelabs.chefai.core.data.local.room.RecipeDraftEntity] the editor
@@ -101,7 +115,8 @@ enum class AppDestinations(
     ),
     MEAL_PLAN_RECIPE_DETAIL(
         R.string.app_dest_title_recipe_details,
-        "${ScreenBaseRoutes.MEAL_PLAN_RECIPE_DETAIL}/{$RECIPE_ID_ARG}"
+        "${ScreenBaseRoutes.MEAL_PLAN_RECIPE_DETAIL}/{$RECIPE_ID_ARG}" +
+            "/{$MEAL_PLAN_DAY_ID_ARG}/{$MEAL_PLAN_SLOT_ARG}"
     ),
     SEARCH_RECIPE_DETAIL(
         R.string.app_dest_title_recipe_details,
@@ -179,8 +194,14 @@ class NavigationActions(private val navController: NavHostController) {
         navController.navigate("${ScreenBaseRoutes.MEAL_PLAN_DETAIL}/$mealPlanId")
     }
 
-    fun navigateToMealPlanRecipeDetail(recipeId: UUID) {
-        navController.navigate("${ScreenBaseRoutes.MEAL_PLAN_RECIPE_DETAIL}/$recipeId")
+    /**
+     * @param dayId identifies the planned meal (day + [slot]) so the recipe screen can offer its
+     *   own "mark as cooked" toggle — the same recipe can fill more than one slot in a week.
+     */
+    fun navigateToMealPlanRecipeDetail(recipeId: UUID, dayId: UUID, slot: MealSlot) {
+        navController.navigate(
+            "${ScreenBaseRoutes.MEAL_PLAN_RECIPE_DETAIL}/$recipeId/$dayId/${slot.name}"
+        )
     }
 
     /**

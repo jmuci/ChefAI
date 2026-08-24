@@ -12,7 +12,17 @@ import com.tenmilelabs.chefai.core.testutil.recipeId1
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.mealplans.data.repository.FakeMealPlanRepository
+import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
+import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay
+import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
+import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
+import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
+import com.tenmilelabs.chefai.mealplans.domain.model.MealType
+import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
+import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
+import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -30,6 +40,7 @@ class RecipeDetailsViewModelTest {
     private lateinit var recipesRepository: FakeRecipesRepository
     private lateinit var collectionsRepository: FakeCollectionsRepository
     private lateinit var sessionManager: SessionManager
+    private lateinit var mealPlanRepository: FakeMealPlanRepository
     private lateinit var savedStateHandle: SavedStateHandle
 
     @Before
@@ -39,14 +50,47 @@ class RecipeDetailsViewModelTest {
         sessionManager = createTestSessionManager(
             testScope = CoroutineScope(mainCoroutineRule.testDispatcher)
         )
+        mealPlanRepository = FakeMealPlanRepository()
         savedStateHandle = SavedStateHandle().apply {
             set(AppDestinationArgs.RECIPE_ID_ARG, recipeId1.toString())
         }
     }
 
     private fun initializeViewModel() {
-        viewModel = RecipeDetailsViewModel(recipesRepository, collectionsRepository, sessionManager, savedStateHandle)
+        viewModel = RecipeDetailsViewModel(
+            recipesRepository, collectionsRepository, sessionManager, mealPlanRepository, savedStateHandle
+        )
     }
+
+    /** A meal plan with a single day/slot, for the "opened from a meal plan" test cases. */
+    private fun planWithDay(dayId: UUID, dinnerCookedAt: Long? = null) = MealPlan(
+        uuid = UUID.randomUUID(),
+        userId = UUID.randomUUID(),
+        name = "Week plan",
+        preferences = MealPlanPreferences(
+            planLengthDays = 3,
+            mealType = MealType.DINNER,
+            dietaryRestrictions = emptySet(),
+            recipeSource = RecipeSource.INCLUDE_PUBLIC,
+            maxPrepTimeMinutes = null,
+            servingsPerMeal = 2,
+            batchCooking = false,
+            leftoverFriendly = false,
+            varietyPreference = VarietyPreference.MEDIUM,
+        ),
+        status = MealPlanStatus.READY,
+        createdAt = 0L,
+        updatedAt = 0L,
+        days = listOf(
+            MealPlanDay(
+                uuid = dayId,
+                dayIndex = 0,
+                dinnerRecipeId = recipeId1,
+                lunchRecipeId = null,
+                dinnerCookedAt = dinnerCookedAt,
+            )
+        ),
+    )
 
     @Test
     fun `initial state is loading and recipeUuid is set`() = runTest {
@@ -323,6 +367,80 @@ class RecipeDetailsViewModelTest {
             }
 
             assertThat(effects.awaitItem()).isEqualTo(RecipeDetailsEffect.RecipeDeleted)
+        }
+    }
+
+    @Test
+    fun `showCookedToggle is false when opened without meal plan args`() = runTest {
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+
+            val successState = awaitItem()
+            assertThat(successState.showCookedToggle).isFalse()
+            assertThat(successState.isCooked).isFalse()
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `showCookedToggle and isCooked reflect the meal plan slot when opened from a meal plan`() = runTest {
+        val dayId = UUID.randomUUID()
+        savedStateHandle[AppDestinationArgs.MEAL_PLAN_DAY_ID_ARG] = dayId.toString()
+        savedStateHandle[AppDestinationArgs.MEAL_PLAN_SLOT_ARG] = MealSlot.DINNER.name
+        mealPlanRepository.emitPlans(planWithDay(dayId, dinnerCookedAt = null))
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+
+            val successState = awaitItem()
+            assertThat(successState.showCookedToggle).isTrue()
+            assertThat(successState.isCooked).isFalse()
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onToggleCooked - marks the meal plan slot cooked`() = runTest {
+        val dayId = UUID.randomUUID()
+        savedStateHandle[AppDestinationArgs.MEAL_PLAN_DAY_ID_ARG] = dayId.toString()
+        savedStateHandle[AppDestinationArgs.MEAL_PLAN_SLOT_ARG] = MealSlot.DINNER.name
+        mealPlanRepository.emitPlans(planWithDay(dayId, dinnerCookedAt = null))
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+            assertThat(awaitItem().isCooked).isFalse()
+
+            viewModel.onToggleCooked()
+            assertThat(awaitItem().isCooked).isTrue()
+
+            viewModel.onToggleCooked()
+            assertThat(awaitItem().isCooked).isFalse()
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onToggleCooked - without meal plan args - does nothing`() = runTest {
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+            assertThat(awaitItem().showCookedToggle).isFalse()
+
+            viewModel.onToggleCooked() // no dayId/slot in the saved state — should be a no-op
+
+            expectNoEvents()
         }
     }
 }

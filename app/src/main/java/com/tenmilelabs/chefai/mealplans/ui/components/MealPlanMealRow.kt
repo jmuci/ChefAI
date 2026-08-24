@@ -12,9 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilledIconToggleButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,9 +24,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -40,6 +34,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
+import com.tenmilelabs.chefai.core.ui.components.CookedToggleButton
 import com.tenmilelabs.chefai.core.ui.recipeImageModel
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
@@ -141,39 +136,8 @@ fun MealPlanMealRow(
                 }
             }
 
-            CookedToggle(isCooked = isCooked, onToggle = onToggleCooked)
+            CookedToggleButton(isCooked = isCooked, onToggle = onToggleCooked)
         }
-    }
-}
-
-/**
- * The chef-hat toggle. Filled once the meal is cooked, so a glance down the list reads as a column
- * of ticked-off hats.
- */
-@Composable
-private fun CookedToggle(
-    isCooked: Boolean,
-    onToggle: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    FilledIconToggleButton(
-        checked = isCooked,
-        onCheckedChange = { onToggle() },
-        modifier = modifier.semantics { role = Role.Checkbox },
-        colors = IconButtonDefaults.filledIconToggleButtonColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            checkedContainerColor = MaterialTheme.colorScheme.primary,
-            checkedContentColor = MaterialTheme.colorScheme.onPrimary,
-        ),
-    ) {
-        Icon(
-            painter = painterResource(R.drawable.ic_chef_hat_black_24dp),
-            contentDescription = stringResource(
-                if (isCooked) R.string.meal_plan_mark_not_cooked else R.string.meal_plan_mark_cooked
-            ),
-            modifier = Modifier.size(22.dp),
-        )
     }
 }
 

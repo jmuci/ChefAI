@@ -11,6 +11,8 @@ import com.tenmilelabs.chefai.core.domain.model.Recipe
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.core.util.Async
 import com.tenmilelabs.chefai.core.util.WhileUiSubscribed
+import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
+import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -28,6 +30,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.UUID
+import java.util.concurrent.CancellationException
 import javax.inject.Inject
 
 data class RecipesDetailsUiState(
@@ -37,6 +40,9 @@ data class RecipesDetailsUiState(
     val userMessage: Int? = null,
     val showDeleteConfirmation: Boolean = false,
     val isDeleting: Boolean = false,
+    /** True when this recipe was opened from a meal plan slot, so a cooked toggle applies. */
+    val showCookedToggle: Boolean = false,
+    val isCooked: Boolean = false,
 )
 
 /** One-shot side effects emitted by [RecipeDetailsViewModel], consumed by the UI. */
@@ -49,16 +55,46 @@ private data class DeleteUiState(
     val isDeleting: Boolean = false,
 )
 
+/**
+ * Intermediate combine result — `combine` only has typed overloads up to 5 flows, so this bundles
+ * the first 5 to leave room for the cooked-state flow to combine on top.
+ */
+private data class CombinedState(
+    val isLoading: Boolean,
+    val recipeAsync: Async<Recipe>,
+    val userMessage: Int?,
+    val isBookmarked: Boolean,
+    val deleteUi: DeleteUiState,
+)
+
+/** The planned meal (day + slot) a recipe was opened from, kept as a pair so one is never set without the other. */
+private data class MealPlanSlotRef(val dayId: UUID, val slot: MealSlot)
+
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class RecipeDetailsViewModel @Inject constructor(
     private val recipesRepository: RecipesRepository,
     private val collectionsRepository: CollectionsRepository,
     private val sessionManager: SessionManager,
+    private val mealPlanRepository: MealPlanRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
     val recipeUuid: UUID = UUID.fromString(savedStateHandle[AppDestinationArgs.RECIPE_ID_ARG]!!)
+
+    /**
+     * Present only when this screen was opened from a meal plan slot
+     * ([com.tenmilelabs.chefai.core.ui.navigation.AppDestinations.MEAL_PLAN_RECIPE_DETAIL]) — the
+     * day/slot pair a "mark as cooked" toggle here would act on. `null` on the plain recipe
+     * details route, which hides the toggle entirely.
+     */
+    private val mealPlanSlotRef: MealPlanSlotRef? = run {
+        val dayId = savedStateHandle.get<String>(AppDestinationArgs.MEAL_PLAN_DAY_ID_ARG)
+            ?.let(UUID::fromString)
+        val slot = savedStateHandle.get<String>(AppDestinationArgs.MEAL_PLAN_SLOT_ARG)
+            ?.let(MealSlot::valueOf)
+        if (dayId != null && slot != null) MealPlanSlotRef(dayId, slot) else null
+    }
 
     private val _isLoading = MutableStateFlow(false)
     private val _userMessage: MutableStateFlow<Int?> = MutableStateFlow(null)
@@ -96,17 +132,27 @@ class RecipeDetailsViewModel @Inject constructor(
             collectionsRepository.observeBookmarkedRecipeIds(userId).map { ids -> recipeUuid in ids }
         }
 
-    val uiState: StateFlow<RecipesDetailsUiState> = combine(
+    private val _isCooked: Flow<Boolean> = mealPlanSlotRef?.let { ref ->
+        mealPlanRepository.observeMealPlanDay(ref.dayId).map { day -> day?.cookedAtFor(ref.slot) != null }
+    } ?: flowOf(false)
+
+    private val _combinedState = combine(
         _isLoading, _recipeAsync, _userMessage, _isBookmarked, _deleteUi
     ) { isLoading, recipeAsync, userMessage, isBookmarked, deleteUi ->
-        when (recipeAsync) {
+        CombinedState(isLoading, recipeAsync, userMessage, isBookmarked, deleteUi)
+    }
+
+    val uiState: StateFlow<RecipesDetailsUiState> = combine(
+        _combinedState, _isCooked
+    ) { combined, isCooked ->
+        when (val recipeAsync = combined.recipeAsync) {
             Async.Loading -> {
                 RecipesDetailsUiState(isLoading = true)
             }
 
             is Async.Error -> {
                 if (_isDeleted.value) {
-                    RecipesDetailsUiState(isLoading = true, isDeleting = deleteUi.isDeleting)
+                    RecipesDetailsUiState(isLoading = true, isDeleting = combined.deleteUi.isDeleting)
                 } else {
                     RecipesDetailsUiState(userMessage = recipeAsync.errorMessage)
                 }
@@ -115,11 +161,13 @@ class RecipeDetailsViewModel @Inject constructor(
             is Async.Success -> {
                 RecipesDetailsUiState(
                     recipe = recipeAsync.data,
-                    isLoading = isLoading,
-                    isBookmarked = isBookmarked,
-                    userMessage = userMessage,
-                    showDeleteConfirmation = deleteUi.showConfirmation,
-                    isDeleting = deleteUi.isDeleting,
+                    isLoading = combined.isLoading,
+                    isBookmarked = combined.isBookmarked,
+                    userMessage = combined.userMessage,
+                    showDeleteConfirmation = combined.deleteUi.showConfirmation,
+                    isDeleting = combined.deleteUi.isDeleting,
+                    showCookedToggle = mealPlanSlotRef != null,
+                    isCooked = isCooked,
                 )
             }
         }
@@ -141,6 +189,20 @@ class RecipeDetailsViewModel @Inject constructor(
                 collectionsRepository.removeBookmark(userId, recipeUuid)
             } else {
                 collectionsRepository.addBookmark(userId, recipeUuid)
+            }
+        }
+    }
+
+    /** Flips the meal plan slot this recipe was opened from between cooked and outstanding. */
+    fun onToggleCooked() {
+        val ref = mealPlanSlotRef ?: return
+        viewModelScope.launch {
+            try {
+                mealPlanRepository.setMealCooked(ref.dayId, ref.slot, cooked = !uiState.value.isCooked)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "onToggleCooked: failed for day ${ref.dayId} slot ${ref.slot}")
+                _userMessage.value = R.string.meal_plan_toggle_cooked_error
             }
         }
     }

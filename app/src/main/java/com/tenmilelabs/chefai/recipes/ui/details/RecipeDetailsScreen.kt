@@ -59,6 +59,7 @@ import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.Recipe
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
+import com.tenmilelabs.chefai.core.ui.components.CookedToggleButton
 import com.tenmilelabs.chefai.core.ui.components.InfoChip
 import com.tenmilelabs.chefai.core.ui.components.InfoChipType
 import com.tenmilelabs.chefai.core.ui.components.RecipePrivacyBadge
@@ -113,6 +114,9 @@ fun RecipeDetailsScreen(
                 onConfirmDelete = viewModel::confirmDelete,
                 onDismissDeleteDialog = viewModel::dismissDeleteDialog,
                 isDeleting = uiState.isDeleting,
+                showCookedToggle = uiState.showCookedToggle,
+                isCooked = uiState.isCooked,
+                onToggleCooked = viewModel::onToggleCooked,
             )
         } else {
             EmptyContent(
@@ -148,6 +152,9 @@ fun RecipeDetailsContent(
     onConfirmDelete: () -> Unit = {},
     onDismissDeleteDialog: () -> Unit = {},
     isDeleting: Boolean = false,
+    showCookedToggle: Boolean = false,
+    isCooked: Boolean = false,
+    onToggleCooked: () -> Unit = {},
 ) {
     if (showDeleteConfirmation) {
         DeleteConfirmationDialog(
@@ -178,6 +185,13 @@ fun RecipeDetailsContent(
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.weight(1f)
                 )
+                if (showCookedToggle) {
+                    CookedToggleButton(
+                        isCooked = isCooked,
+                        onToggle = onToggleCooked,
+                        modifier = Modifier.padding(end = dimensionResource(id = R.dimen.padding_extra_small)),
+                    )
+                }
                 IconButton(onClick = onToggleBookmark) {
                     Icon(
                         imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
@@ -373,6 +387,22 @@ fun RecipeDetailsFullScreenPreview() {
 fun RecipeDetailsBookmarkedPreview() {
     ChefAITheme {
         RecipeDetailsContent(recipe = RecipeData.recipe, isBookmarked = true)
+    }
+}
+
+@Preview(name = "From meal plan — to cook", showBackground = true)
+@Composable
+fun RecipeDetailsCookedToggleToCookPreview() {
+    ChefAITheme {
+        RecipeDetailsContent(recipe = RecipeData.recipe, showCookedToggle = true, isCooked = false)
+    }
+}
+
+@Preview(name = "From meal plan — cooked", showBackground = true)
+@Composable
+fun RecipeDetailsCookedToggleCookedPreview() {
+    ChefAITheme {
+        RecipeDetailsContent(recipe = RecipeData.recipe, showCookedToggle = true, isCooked = true)
     }
 }
 

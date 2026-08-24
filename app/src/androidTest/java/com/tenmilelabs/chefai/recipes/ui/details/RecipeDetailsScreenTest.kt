@@ -84,6 +84,36 @@ class RecipeDetailsScreenTest {
     }
 
     @Test
+    fun cookedToggle_hidden_whenShowCookedToggleIsFalse() {
+        composeTestRule.setContent {
+            ChefAITheme {
+                RecipeDetailsContent(recipe = RecipeData.recipe, showCookedToggle = false)
+            }
+        }
+
+        composeTestRule.onNodeWithTag("CookedToggleButton").assertDoesNotExist()
+    }
+
+    @Test
+    fun cookedToggle_shown_andInvokesCallback_whenProvided() {
+        var toggled = false
+        composeTestRule.setContent {
+            ChefAITheme {
+                RecipeDetailsContent(
+                    recipe = RecipeData.recipe,
+                    showCookedToggle = true,
+                    isCooked = false,
+                    onToggleCooked = { toggled = true },
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithTag("CookedToggleButton").assertIsDisplayed().performClick()
+
+        assertTrue(toggled)
+    }
+
+    @Test
     fun confirmationDialog_notShown_byDefault() {
         composeTestRule.setContent {
             ChefAITheme {

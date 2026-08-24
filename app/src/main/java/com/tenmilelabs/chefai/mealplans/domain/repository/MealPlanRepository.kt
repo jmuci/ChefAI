@@ -12,6 +12,12 @@ interface MealPlanRepository {
 
     fun observeMealPlan(uuid: UUID): Flow<MealPlan?>
 
+    /**
+     * A single day by its own id, independent of the plan it belongs to — used by screens (e.g.
+     * a recipe opened from a meal plan) that only know the day/slot they were opened from.
+     */
+    fun observeMealPlanDay(dayId: UUID): Flow<MealPlanDay?>
+
     suspend fun createMealPlan(mealPlan: MealPlan)
 
     suspend fun deleteMealPlan(uuid: UUID)

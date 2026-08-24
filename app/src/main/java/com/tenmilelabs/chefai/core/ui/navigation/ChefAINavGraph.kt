@@ -112,11 +112,19 @@ fun ChefAINavGraph(
         }
         composable(route = AppDestinations.MEAL_PLAN_DETAIL.route) {
             MealPlanDetailScreen(
-                onRecipeClick = { recipeId -> navActions.navigateToMealPlanRecipeDetail(recipeId) },
+                onMealClick = { meal ->
+                    navActions.navigateToMealPlanRecipeDetail(meal.recipeId, meal.dayId, meal.slot)
+                },
                 snackbarHostState = snackbarHostState,
             )
         }
-        composable(route = AppDestinations.MEAL_PLAN_RECIPE_DETAIL.route) {
+        composable(
+            route = AppDestinations.MEAL_PLAN_RECIPE_DETAIL.route,
+            arguments = listOf(
+                navArgument(AppDestinationArgs.MEAL_PLAN_DAY_ID_ARG) { type = NavType.StringType },
+                navArgument(AppDestinationArgs.MEAL_PLAN_SLOT_ARG) { type = NavType.StringType },
+            ),
+        ) {
             RecipeDetailsScreen(snackbarHostState = snackbarHostState)
         }
         composable(route = AppDestinations.SEARCH_RECIPE_DETAIL.route) {

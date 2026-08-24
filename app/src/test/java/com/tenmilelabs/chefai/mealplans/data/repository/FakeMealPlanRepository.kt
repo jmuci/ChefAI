@@ -31,6 +31,10 @@ class FakeMealPlanRepository : MealPlanRepository {
         return plans.map { list -> list.find { it.uuid == uuid } }
     }
 
+    override fun observeMealPlanDay(dayId: UUID): Flow<MealPlanDay?> {
+        return plans.map { list -> list.flatMap { it.days }.find { it.uuid == dayId } }
+    }
+
     override fun observeMealPlansForUser(userId: UUID): Flow<List<MealPlan>> {
         if (shouldThrowOnObserve) throw RuntimeException("Fake observe error")
         return plans.map { list -> list.filter { it.userId == userId } }
