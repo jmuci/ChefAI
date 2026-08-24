@@ -30,23 +30,35 @@ import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 
 enum class TopLevelDestination(
     val icon: Int,
-    val appDestination: AppDestinations
+    val appDestination: AppDestinations,
+    /**
+     * Base routes of child screens (e.g. a recipe detail opened from this tab) that should keep
+     * this tab highlighted in the bottom nav — see [isRouteInSection].
+     */
+    val childRoutePrefixes: Set<String> = emptySet(),
 ) {
     HOME(
         icon = R.drawable.ic_home_black_24dp,
-        appDestination = AppDestinations.HOME
+        appDestination = AppDestinations.HOME,
+        childRoutePrefixes = setOf(ScreenBaseRoutes.HOME_RECIPE_DETAIL),
     ),
     SEARCH(
         icon = R.drawable.ic_search_24dp,
-        appDestination = AppDestinations.SEARCH
+        appDestination = AppDestinations.SEARCH,
+        childRoutePrefixes = setOf(ScreenBaseRoutes.SEARCH_RECIPE_DETAIL),
     ),
     RECIPES(
         icon = R.drawable.ic_recipe_library_24dp,
-        appDestination = AppDestinations.RECIPES
+        appDestination = AppDestinations.RECIPES,
+        childRoutePrefixes = setOf(ScreenBaseRoutes.RECIPE_DETAILS),
     ),
     MEAL_PLANS(
         icon = R.drawable.ic_chef_hat_black_24dp,
-        appDestination = AppDestinations.MEAL_PLANS
+        appDestination = AppDestinations.MEAL_PLANS,
+        childRoutePrefixes = setOf(
+            ScreenBaseRoutes.MEAL_PLAN_DETAIL,
+            ScreenBaseRoutes.MEAL_PLAN_RECIPE_DETAIL,
+        ),
     ),
 }
 
@@ -128,16 +140,10 @@ fun NavigationRailBar(navController: NavController) {
  * This allows child routes (e.g., meal plan detail, recipe opened from meal plans)
  * to keep the parent tab highlighted in the bottom navigation bar.
  */
-private fun isRouteInSection(currentRoute: String?, item: TopLevelDestination): Boolean {
+internal fun isRouteInSection(currentRoute: String?, item: TopLevelDestination): Boolean {
     if (currentRoute == null) return false
     if (currentRoute == item.appDestination.route) return true
-    return when (item) {
-        TopLevelDestination.MEAL_PLANS -> currentRoute.startsWith(ScreenBaseRoutes.MEAL_PLAN_DETAIL) ||
-            currentRoute.startsWith(ScreenBaseRoutes.MEAL_PLAN_RECIPE_DETAIL)
-        TopLevelDestination.RECIPES -> currentRoute.startsWith(ScreenBaseRoutes.RECIPE_DETAILS)
-        TopLevelDestination.SEARCH -> currentRoute.startsWith(ScreenBaseRoutes.SEARCH_RECIPE_DETAIL)
-        TopLevelDestination.HOME -> currentRoute.startsWith(ScreenBaseRoutes.HOME_RECIPE_DETAIL)
-    }
+    return item.childRoutePrefixes.any { currentRoute.startsWith(it) }
 }
 
 @Preview(

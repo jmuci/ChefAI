@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -30,6 +31,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.NavType
+import androidx.navigation.NamedNavArgument
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.createGraph
@@ -80,6 +82,23 @@ fun ChefAINavGraph(
     // Login/Register are available via profile menu or settings.
     val startDestination = AppDestinations.HOME.route
 
+    // Shared by every recipe-details entry point so they all get edit + back navigation wired
+    // in the same way; MEAL_PLAN_RECIPE_DETAIL is the only one with extra route args.
+    fun NavGraphBuilder.recipeDetailsDestination(
+        route: String,
+        arguments: List<NamedNavArgument> = emptyList(),
+    ) {
+        composable(route = route, arguments = arguments) {
+            RecipeDetailsScreen(
+                snackbarHostState = snackbarHostState,
+                onEditClick = { recipeId ->
+                    navActions.navigateToEditRecipe(recipeId)
+                },
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+    }
+
     val graph = navController.createGraph(startDestination = startDestination) {
         composable(route = AppDestinations.HOME.route) {
             HomeScreen(
@@ -118,33 +137,15 @@ fun ChefAINavGraph(
                 snackbarHostState = snackbarHostState,
             )
         }
-        composable(
+        recipeDetailsDestination(
             route = AppDestinations.MEAL_PLAN_RECIPE_DETAIL.route,
             arguments = listOf(
                 navArgument(AppDestinationArgs.MEAL_PLAN_DAY_ID_ARG) { type = NavType.StringType },
                 navArgument(AppDestinationArgs.MEAL_PLAN_SLOT_ARG) { type = NavType.StringType },
             ),
-        ) {
-            RecipeDetailsScreen(snackbarHostState = snackbarHostState)
-        }
-        composable(route = AppDestinations.SEARCH_RECIPE_DETAIL.route) {
-            RecipeDetailsScreen(
-                snackbarHostState = snackbarHostState,
-                onEditClick = { recipeId ->
-                    navActions.navigateToEditRecipe(recipeId)
-                },
-                onNavigateBack = { navController.popBackStack() },
-            )
-        }
-        composable(route = AppDestinations.HOME_RECIPE_DETAIL.route) {
-            RecipeDetailsScreen(
-                snackbarHostState = snackbarHostState,
-                onEditClick = { recipeId ->
-                    navActions.navigateToEditRecipe(recipeId)
-                },
-                onNavigateBack = { navController.popBackStack() },
-            )
-        }
+        )
+        recipeDetailsDestination(route = AppDestinations.SEARCH_RECIPE_DETAIL.route)
+        recipeDetailsDestination(route = AppDestinations.HOME_RECIPE_DETAIL.route)
         navigation(
             startDestination = ScreenBaseRoutes.MEAL_PLAN_WIZARD_BASICS,
             route = ScreenBaseRoutes.MEAL_PLAN_WIZARD,
@@ -214,17 +215,7 @@ fun ChefAINavGraph(
                 )
             }
         }
-        composable(
-            route = AppDestinations.RECIPE_DETAILS.route,
-        ) {
-            RecipeDetailsScreen(
-                snackbarHostState = snackbarHostState,
-                onEditClick = { recipeId ->
-                    navActions.navigateToEditRecipe(recipeId)
-                },
-                onNavigateBack = { navController.popBackStack() },
-            )
-        }
+        recipeDetailsDestination(route = AppDestinations.RECIPE_DETAILS.route)
         composable(
             route = AppDestinations.RECIPE_EDITOR.route,
             arguments = listOf(
