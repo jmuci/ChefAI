@@ -90,6 +90,7 @@
     <string name="search_error">Something went wrong while searching</string>
     <string name="search_offline_results">Showing results saved on this device</string>
     <string name="search_recipe_not_yet_synced">This recipe hasn\'t synced to your device yet</string>
+    <string name="search_recipe_unavailable">This recipe isn\'t available right now</string>
 
     <!-- Search tab — browse sections -->
     <string name="search_section_by_meal">Search by Meal</string>

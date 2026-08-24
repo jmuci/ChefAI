@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.home.data.repository
 
 import com.tenmilelabs.chefai.core.domain.model.Recipe
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
+import com.tenmilelabs.chefai.recipes.domain.repository.RecipeFetchResult
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -36,6 +37,7 @@ class FakeRecipesRepository : RecipesRepository {
     override fun getPublicRecipesStream(): Flow<List<Recipe>> = error("Not used in home tests")
     override suspend fun getRecipe(uuid: UUID): Recipe? = error("Not used in home tests")
     override fun getRecipeStream(uuid: UUID): Flow<Recipe?> = error("Not used in home tests")
+    override suspend fun getOrFetchRecipe(uuid: UUID): RecipeFetchResult = error("Not used in home tests")
     override suspend fun createRecipe(recipe: Recipe) = error("Not used in home tests")
     override suspend fun updateRecipe(recipe: Recipe) = error("Not used in home tests")
     override suspend fun deleteAllRecipes() = error("Not used in home tests")

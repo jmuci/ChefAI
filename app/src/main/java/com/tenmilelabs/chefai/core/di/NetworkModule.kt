@@ -3,6 +3,8 @@ package com.tenmilelabs.chefai.core.di
 import com.tenmilelabs.chefai.auth.data.network.AuthInterceptor
 import com.tenmilelabs.chefai.auth.domain.TokenProvider
 import com.tenmilelabs.chefai.recipes.data.network.ChefAIApiService
+import com.tenmilelabs.chefai.recipes.data.network.RecipeDetailApiService
+import com.tenmilelabs.chefai.recipes.data.network.RecipeDetailNetworkDataSource
 import com.tenmilelabs.chefai.recipes.data.network.RecipeNetworkDataSource
 import com.tenmilelabs.chefai.search.data.network.RecipeSearchApiService
 import com.tenmilelabs.chefai.search.data.network.RecipeSearchNetworkDataSource
@@ -45,6 +47,11 @@ abstract class RecipeNetworkDataSourceModule {
     abstract fun bindRecipeSearchNetworkDataSource(
         recipeSearchApiService: RecipeSearchApiService
     ): RecipeSearchNetworkDataSource
+
+    @Binds
+    abstract fun bindRecipeDetailNetworkDataSource(
+        recipeDetailApiService: RecipeDetailApiService
+    ): RecipeDetailNetworkDataSource
 }
 
 @Module

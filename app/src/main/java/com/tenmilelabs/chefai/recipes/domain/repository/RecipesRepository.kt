@@ -5,6 +5,17 @@ import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
+/** Outcome of [RecipesRepository.getOrFetchRecipe] — see ChefAI#186. */
+sealed interface RecipeFetchResult {
+    data class Found(val recipe: Recipe) : RecipeFetchResult
+
+    /** The recipe doesn't exist, is soft-deleted, or is private and not owned by this caller. */
+    data object NotAvailable : RecipeFetchResult
+
+    /** The recipe might exist, but it couldn't be resolved — a transient failure worth retrying. */
+    data object NetworkError : RecipeFetchResult
+}
+
 interface RecipesRepository {
     fun getRecipesStream(): Flow<List<Recipe>>
 
@@ -16,6 +27,14 @@ interface RecipesRepository {
 
     suspend fun getRecipe(uuid: UUID): Recipe?
     fun getRecipeStream(uuid: UUID): Flow<Recipe?>
+
+    /**
+     * Returns the recipe from Room if present; otherwise fetches it from
+     * `GET /api/v1/recipes/{recipeId}` and persists it before returning. For a search result
+     * not yet delivered by `/sync/pull` — anonymous sessions never even pull (see
+     * ChefAI#186) — this is what makes it possible to open or bookmark that result at all.
+     */
+    suspend fun getOrFetchRecipe(uuid: UUID): RecipeFetchResult
 
     suspend fun createRecipe(recipe: Recipe)
 

@@ -14,6 +14,7 @@ import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.ui.recipeImageModel
 import com.tenmilelabs.chefai.core.util.WhileUiSubscribed
+import com.tenmilelabs.chefai.recipes.domain.repository.RecipeFetchResult
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import com.tenmilelabs.chefai.search.domain.repository.RecipeSearchOutcome
 import com.tenmilelabs.chefai.search.domain.repository.RecipeSearchRepository
@@ -35,7 +36,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -150,19 +150,26 @@ class RecipeSearchViewModel @Inject constructor(
     }
 
     /**
-     * [RecipeDetailsScreen] reads only from Room, but a search result may be a recipe this device
-     * hasn't pulled yet (see [onSaveToCollection]'s doc for why that's real, not just theoretical).
-     * Navigating straight there would land on the "recipe not found" screen, so gate on local
-     * existence first: if it's missing, kick a sync and tell the user instead of opening a dead
-     * end — mirroring the same check [onSaveToCollection] already does for bookmarking.
+     * [RecipeDetailsScreen] reads only from Room, but a search result may be a recipe this
+     * device hasn't pulled yet (see [onSaveToCollection]'s doc for why that's real, not just
+     * theoretical) — and for an anonymous session, [SyncScheduler.requestImmediateSync] can
+     * never fix that (`SyncWorker` skips anonymous sessions entirely). [RecipesRepository.getOrFetchRecipe]
+     * closes that gap: Room first, then a one-off anonymous-capable fetch (ChefAI#186).
+     * Navigation only fires once the recipe actually exists locally, so [RecipeDetailsScreen]
+     * needs no changes — it's correct by construction once this returns.
      */
     fun onRecipeClick(recipeId: UUID) {
         viewModelScope.launch {
-            if (recipesRepository.getRecipeStream(recipeId).first() != null) {
-                _navigateToRecipe.send(recipeId)
-            } else {
-                syncScheduler.requestImmediateSync()
-                _uiEvent.emit(SearchUiEvent.ShowSnackbar(R.string.search_recipe_not_yet_synced))
+            when (recipesRepository.getOrFetchRecipe(recipeId)) {
+                is RecipeFetchResult.Found -> _navigateToRecipe.send(recipeId)
+                RecipeFetchResult.NotAvailable ->
+                    _uiEvent.emit(SearchUiEvent.ShowSnackbar(R.string.search_recipe_unavailable))
+                RecipeFetchResult.NetworkError -> {
+                    // Harmless no-op for an anonymous session; a real retry path for an
+                    // authenticated one, since a later full sync could still succeed.
+                    syncScheduler.requestImmediateSync()
+                    _uiEvent.emit(SearchUiEvent.ShowSnackbar(R.string.search_recipe_not_yet_synced))
+                }
             }
         }
     }
@@ -181,10 +188,17 @@ class RecipeSearchViewModel @Inject constructor(
             is UserSession.Loading -> return
         }
         viewModelScope.launch {
-            if (recipesRepository.getRecipeStream(recipeId).first() == null) {
-                syncScheduler.requestImmediateSync()
-                _uiEvent.emit(SearchUiEvent.ShowSnackbar(R.string.search_recipe_not_yet_synced))
-                return@launch
+            when (recipesRepository.getOrFetchRecipe(recipeId)) {
+                RecipeFetchResult.NotAvailable -> {
+                    _uiEvent.emit(SearchUiEvent.ShowSnackbar(R.string.search_recipe_unavailable))
+                    return@launch
+                }
+                RecipeFetchResult.NetworkError -> {
+                    syncScheduler.requestImmediateSync()
+                    _uiEvent.emit(SearchUiEvent.ShowSnackbar(R.string.search_recipe_not_yet_synced))
+                    return@launch
+                }
+                is RecipeFetchResult.Found -> Unit // fall through to bookmarking below
             }
             try {
                 collectionsRepository.addBookmark(userId, recipeId)

@@ -38,11 +38,18 @@ import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDayDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPullResponse
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPushResponse
+import com.tenmilelabs.chefai.core.data.sync.network.dto.RecipeDetailResponseDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncIngredientDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncLabelDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncReferenceDataDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeIngredientDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeStepDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncTagDto
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
+import com.tenmilelabs.chefai.recipes.data.network.FakeRecipeDetailNetworkDataSource
+import com.tenmilelabs.chefai.recipes.data.network.RecipeDetailNetworkResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -75,6 +82,7 @@ class SyncOrchestratorTest {
     private lateinit var userDao: FakeUserDao
     private lateinit var syncMetadataDao: FakeSyncMetadataDao
     private lateinit var syncNetworkDataSource: FakeSyncNetworkDataSource
+    private lateinit var recipeDetailNetworkDataSource: FakeRecipeDetailNetworkDataSource
 
     /** A pass-through TransactionRunner that just executes the block (no real transaction). */
     private val fakeTransactionRunner = FakeTransactionRunner()
@@ -108,9 +116,11 @@ class SyncOrchestratorTest {
         sessionManager = createTestSessionManager(CoroutineScope(testDispatcher))
         syncMetadataDao = FakeSyncMetadataDao()
         syncNetworkDataSource = FakeSyncNetworkDataSource()
+        recipeDetailNetworkDataSource = FakeRecipeDetailNetworkDataSource()
 
         syncOrchestrator = SyncOrchestrator(
             syncNetworkDataSource = syncNetworkDataSource,
+            recipeDetailNetworkDataSource = recipeDetailNetworkDataSource,
             recipeDao = recipeDao,
             recipeImageStateDao = FakeRecipeImageStateDao(),
             recipeStepDao = recipeStepDao,
@@ -941,4 +951,86 @@ class SyncOrchestratorTest {
         assertThat(pulledRecipe.title).isEqualTo("Server New Recipe")
         assertThat(pulledRecipe.syncState).isEqualTo(SyncState.SYNCED)
     }
+
+    // ==================== fetchAndPersistRecipe (ChefAI#186) ====================
+
+    private fun createRecipeDetailResponseDto(uuid: UUID = recipeId1) = RecipeDetailResponseDto(
+        recipe = createSyncRecipeDto(uuid = uuid, title = "Fetched Recipe"),
+        referenceData = SyncReferenceDataDto(
+            ingredients = listOf(
+                SyncIngredientDto(
+                    uuid = ingredientId1.toString(),
+                    displayName = "Flour",
+                    allergenId = null,
+                    sourcePrimaryId = null,
+                    updatedAt = 100L,
+                    deletedAt = null
+                )
+            ),
+            tags = listOf(SyncTagDto(uuid = tagId1.toString(), displayName = "Quick", updatedAt = 100L, deletedAt = null)),
+            labels = listOf(SyncLabelDto(uuid = labelId1.toString(), displayName = "Vegan", updatedAt = 100L, deletedAt = null)),
+        ),
+        creators = listOf(
+            SyncCreatorDto(
+                uuid = creatorId.toString(),
+                displayName = "Chef Jane",
+                email = "jane@example.com",
+                avatarUrl = "",
+                updatedAt = 100L,
+                deletedAt = null
+            )
+        )
+    )
+
+    @Test
+    fun `fetchAndPersistRecipe persists the recipe and its reference data, and returns PERSISTED`() =
+        runTest(testDispatcher) {
+            recipeDetailNetworkDataSource.resultToReturn =
+                RecipeDetailNetworkResult.Success(createRecipeDetailResponseDto(uuid = recipeId1))
+
+            val outcome = syncOrchestrator.fetchAndPersistRecipe(recipeId1)
+
+            assertThat(outcome).isEqualTo(RecipeFetchOutcome.PERSISTED)
+            assertThat(recipeDao.getRecipeById(recipeId1)?.title).isEqualTo("Fetched Recipe")
+            assertThat(recipeDao.getRecipeById(recipeId1)?.syncState).isEqualTo(SyncState.SYNCED)
+            assertThat(ingredientDao.getIngredientById(ingredientId1)?.displayName).isEqualTo("Flour")
+            assertThat(tagDao.getTagById(tagId1)?.displayName).isEqualTo("Quick")
+            assertThat(labelDao.getLabelById(labelId1)?.displayName).isEqualTo("Vegan")
+            // Pins the ChefAI#186 fix: creator must be persisted too, or recipes.creatorId is a
+            // dangling FK for any device that has never seen this author before.
+            assertThat(userDao.getUserById(creatorId)?.displayName).isEqualTo("Chef Jane")
+        }
+
+    @Test
+    fun `fetchAndPersistRecipe returns NOT_AVAILABLE without writing anything when the recipe is not found`() =
+        runTest(testDispatcher) {
+            recipeDetailNetworkDataSource.resultToReturn = RecipeDetailNetworkResult.NotFound
+
+            val outcome = syncOrchestrator.fetchAndPersistRecipe(recipeId1)
+
+            assertThat(outcome).isEqualTo(RecipeFetchOutcome.NOT_AVAILABLE)
+            assertThat(recipeDao.getRecipeById(recipeId1)).isNull()
+        }
+
+    @Test
+    fun `fetchAndPersistRecipe returns NETWORK_ERROR without writing anything on an Unauthorized result`() =
+        runTest(testDispatcher) {
+            recipeDetailNetworkDataSource.resultToReturn = RecipeDetailNetworkResult.Unauthorized
+
+            val outcome = syncOrchestrator.fetchAndPersistRecipe(recipeId1)
+
+            assertThat(outcome).isEqualTo(RecipeFetchOutcome.NETWORK_ERROR)
+            assertThat(recipeDao.getRecipeById(recipeId1)).isNull()
+        }
+
+    @Test
+    fun `fetchAndPersistRecipe returns NETWORK_ERROR without writing anything on an Error result`() =
+        runTest(testDispatcher) {
+            recipeDetailNetworkDataSource.resultToReturn = RecipeDetailNetworkResult.Error("boom")
+
+            val outcome = syncOrchestrator.fetchAndPersistRecipe(recipeId1)
+
+            assertThat(outcome).isEqualTo(RecipeFetchOutcome.NETWORK_ERROR)
+            assertThat(recipeDao.getRecipeById(recipeId1)).isNull()
+        }
 }
