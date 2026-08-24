@@ -135,6 +135,7 @@ private fun isRouteInSection(currentRoute: String?, item: TopLevelDestination): 
         TopLevelDestination.MEAL_PLANS -> currentRoute.startsWith(ScreenBaseRoutes.MEAL_PLAN_DETAIL) ||
             currentRoute.startsWith(ScreenBaseRoutes.MEAL_PLAN_RECIPE_DETAIL)
         TopLevelDestination.RECIPES -> currentRoute.startsWith(ScreenBaseRoutes.RECIPE_DETAILS)
+        TopLevelDestination.SEARCH -> currentRoute.startsWith(ScreenBaseRoutes.SEARCH_RECIPE_DETAIL)
         else -> false
     }
 }

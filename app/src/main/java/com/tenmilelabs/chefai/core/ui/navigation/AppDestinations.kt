@@ -30,6 +30,7 @@ internal object ScreenBaseRoutes {
     const val REGISTER = "register_screen"
     const val MEAL_PLAN_DETAIL = "meal_plan_detail"
     const val MEAL_PLAN_RECIPE_DETAIL = "meal_plan_recipe_detail"
+    const val SEARCH_RECIPE_DETAIL = "search_recipe_detail"
     const val MEAL_PLAN_WIZARD = "meal_plan_wizard"
     const val MEAL_PLAN_WIZARD_BASICS = "meal_plan_wizard_basics"
     const val MEAL_PLAN_WIZARD_PREFERENCES = "meal_plan_wizard_preferences"
@@ -101,6 +102,10 @@ enum class AppDestinations(
     MEAL_PLAN_RECIPE_DETAIL(
         R.string.app_dest_title_recipe_details,
         "${ScreenBaseRoutes.MEAL_PLAN_RECIPE_DETAIL}/{$RECIPE_ID_ARG}"
+    ),
+    SEARCH_RECIPE_DETAIL(
+        R.string.app_dest_title_recipe_details,
+        "${ScreenBaseRoutes.SEARCH_RECIPE_DETAIL}/{$RECIPE_ID_ARG}"
     ),
     MEAL_PLAN_WIZARD(R.string.app_dest_title_meal_plan_wizard, ScreenBaseRoutes.MEAL_PLAN_WIZARD),
     SETTINGS(R.string.app_dest_title_settings, ScreenBaseRoutes.SETTINGS),
@@ -176,6 +181,14 @@ class NavigationActions(private val navController: NavHostController) {
 
     fun navigateToMealPlanRecipeDetail(recipeId: UUID) {
         navController.navigate("${ScreenBaseRoutes.MEAL_PLAN_RECIPE_DETAIL}/$recipeId")
+    }
+
+    /**
+     * Opens recipe details from the Search tab, on its own route so the bottom nav keeps Search
+     * highlighted instead of falling back to Recipes (see [isRouteInSection]).
+     */
+    fun navigateToSearchRecipeDetail(recipeId: UUID) {
+        navController.navigate("${ScreenBaseRoutes.SEARCH_RECIPE_DETAIL}/$recipeId")
     }
 
     fun navigateToMealPlanWizard() {
