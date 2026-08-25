@@ -203,6 +203,7 @@
     <string name="meal_plan_not_generated_subtitle">Build this plan from the recipes in your collection.</string>
     <string name="meal_plan_generate">Build my plan</string>
     <string name="meal_plan_generating">Building your meal plan…</string>
+    <string name="meal_plan_print">Print meal plan</string>
 
     <!-- Shopping List -->
     <string name="app_dest_title_shopping_list">Shopping List</string>

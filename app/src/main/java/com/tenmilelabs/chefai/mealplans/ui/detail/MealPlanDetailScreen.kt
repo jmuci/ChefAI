@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -55,6 +56,7 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
 import com.tenmilelabs.chefai.mealplans.ui.components.MealPlanMealRow
+import com.tenmilelabs.chefai.mealplans.ui.detail.print.printMealPlan
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import java.util.UUID
 
@@ -66,11 +68,13 @@ fun MealPlanDetailScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
                 is MealPlanDetailEvent.ShowError -> snackbarHostState.showSnackbar(event.message)
+                is MealPlanDetailEvent.PrintReady -> printMealPlan(context, event.document)
             }
         }
     }
