@@ -146,6 +146,25 @@ browser would fail the same way, eight seconds later. A page that loaded fine bu
 recipe on it gets the rendered retry (for the JS-rendered case) but never sends the user to a
 browser, because there would be nothing there for them to do.
 
+```mermaid
+flowchart TD
+    A[User pastes a URL] --> B[Plain GET via ScraperHttpClient]
+    B -->|200, parses OK| Z[RecipeHtmlParser → Success]
+    B -->|200, no recipe found| C{Retry rendered?}
+    B -->|401/403/429/503<br/>BOT_WALL_STATUSES| D[Off-screen WebView<br/>poll outerHTML, up to 8s]
+    B -->|404 / DNS fail / timeout| Y[Fail immediately —<br/>a browser fails the same way]
+    C -->|yes, page may be JS-rendered| D
+    D -->|parser accepts a snapshot| Z
+    D -->|8s budget exhausted,<br/>original was a bot-wall refusal| E[Visible in-app browser<br/>BrowserImportScreen]
+    D -->|8s budget exhausted,<br/>original just had no recipe| F[NoRecipeFound —<br/>nothing to send the user to]
+    E -->|user clears the check,<br/>recipe appears| Z
+```
+
+Image caching (Decision 6, below) mirrors this same ladder one tier lower — plain GET through
+`@ScraperHttpClient`, escalate to an off-screen `WebView` navigated straight to the image URL on the
+same `BOT_WALL_STATUSES`, no visible-browser tier (there's nothing for the user to clear on an image
+request).
+
 **Why not a backend endpoint.** Delegating the fetch to the Ktor backend was the obvious
 alternative and is *worse* for exactly the two sites that motivated this: it concentrates requests
 on one datacenter IP, which Akamai and Cloudflare score far more harshly than the residential
@@ -251,6 +270,40 @@ A second, adjacent bug surfaced by the same investigation was fixed alongside it
   now resolves `imageUrl` against `sourceUrl` with `java.net.URI.resolve`, falling back to the raw
   value if that throws — not in `:recipe-scraper`, whose README documents that it "reports what the
   page actually published" and leaves resolution to the caller.
+
+---
+
+## Decision 7: Resolver-backed SSRF guard, not string pattern-matching
+
+**Added August 2026 (#179).**
+
+Decision 4's unauthenticated `@ScraperHttpClient` prevents an auth-token leak to a third-party host,
+but on its own does nothing to stop that client from being pointed at an *internal* host — this app
+fetches whatever URL the user pastes, or whatever a scraped page's own markup points at. The original
+`normalizeAndValidateUrl` only pattern-matched the host string against literal loopback/private-range
+forms, which missed three real gaps: a hostname whose DNS record resolves to an internal address
+(DNS rebinding), IPv6 loopback/link-local/unique-local literals (`isObviouslyUnsafeLiteralHost` was
+IPv4-only), and redirects — both the scraper Ktor client and the WebView tier (Decision 5) followed
+a 3xx automatically, so a validated URL could still 3xx its way to an internal one unchecked.
+
+**The fix resolves before it judges.** `normalizeAndValidateUrl` (`RecipeUrlValidation.kt`) now takes
+an injectable `HostResolver`, resolves the host to its actual `InetAddress`es, and rejects if any of
+them is loopback, link-local, site-local, any-local, multicast, or an IPv6 unique-local address
+(`fc00::/7` — not caught by `isSiteLocalAddress`, which only recognizes the deprecated IPv6 site-local
+range). Resolving through the same platform resolver the real connection will use means every
+alternate IPv4 encoding (octal, hex, decimal-integer) it normalizes is caught for free, without
+enumerating them. The scraper Ktor client stopped auto-following redirects so each hop can be
+re-validated via `validateRedirectTarget` before being followed, and `ScraperWebViewClient` gained a
+`shouldInterceptRequest` guard so a scraped page's own redirects and subresource requests get the
+same treatment — closing the gap a `<script src="http://169.254.169.254/...">` on a hostile page
+would otherwise have opened.
+
+**A second, weaker check stays, deliberately.** `normalizeUrlForDisplay` — used synchronously from
+`MainActivity.onCreate`/`onNewIntent` for the share-target intent, where a real DNS lookup would risk
+`NetworkOnMainThreadException` — still only pattern-matches literal IPv4/`localhost` hosts. It exists
+solely so an obviously-internal pasted URL doesn't even flash into the UI; every URL from that path
+still passes through the full resolver-backed check in `DefaultRecipeImporter`, the actual security
+boundary.
 
 ---
 

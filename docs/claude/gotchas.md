@@ -60,8 +60,10 @@ Use `PreviewData` object — previews with `"Title"` and `""` URLs don't catch r
 
 ## Data Layer
 
-### 8. Hardcoded test UUID
-`RecipesViewModel` and `DefaultRecipeRepository` still use `F47AC10B58CC4372A5670E02B2C3D479`. Must be replaced with real user from `SessionManager`.
+### 8. (Resolved) Hardcoded test UUID
+`RecipesViewModel` and `DefaultRecipeRepository` used to hardcode `F47AC10B58CC4372A5670E02B2C3D479`
+instead of resolving the real user. Fixed — both now go through `SessionManager.userSession`. Kept
+in place rather than deleted, since other entries and code comments cite gotchas by number.
 
 ### 9. Room schema migrations
 Every schema change needs a migration. Forgetting one crashes the app on update. Always add migration + test with in-memory DB.

@@ -21,7 +21,7 @@ Before writing any code, determine which layer(s) the task touches:
 | Data / Repository | `data/repository/` impl + DAO + mapper files |
 | Schema change | `core/data/local/room/` entities + `ChefAIDataBase.kt` |
 | Auth | `auth/` package + `docs/authentication.md` |
-| Sync | `core/data/` sync files + `docs/rfcs/rfc-001-offline-first-sync.md` |
+| Sync | `core/data/` sync files + `docs/sync-deep-dive.md` + [ADR-006](../adrs/adr-006-sync-protocol.md) |
 | New feature | `docs/adrs/adr-0005-feature-based-package-structure.md` for package guidelines |
 
 ## Step 3: Check for Relevant Skills
