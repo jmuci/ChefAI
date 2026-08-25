@@ -58,6 +58,7 @@ enum class TopLevelDestination(
         childRoutePrefixes = setOf(
             ScreenBaseRoutes.MEAL_PLAN_DETAIL,
             ScreenBaseRoutes.MEAL_PLAN_RECIPE_DETAIL,
+            ScreenBaseRoutes.MEAL_PLAN_SHOPPING_LIST,
         ),
     ),
 }

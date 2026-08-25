@@ -32,6 +32,7 @@ internal object ScreenBaseRoutes {
     const val LOGIN = "login_screen"
     const val REGISTER = "register_screen"
     const val MEAL_PLAN_DETAIL = "meal_plan_detail"
+    const val MEAL_PLAN_SHOPPING_LIST = "meal_plan_shopping_list"
     const val MEAL_PLAN_RECIPE_DETAIL = "meal_plan_recipe_detail"
     const val SEARCH_RECIPE_DETAIL = "search_recipe_detail"
     const val HOME_RECIPE_DETAIL = "home_recipe_detail"
@@ -113,6 +114,10 @@ enum class AppDestinations(
     MEAL_PLAN_DETAIL(
         R.string.app_dest_title_meal_plan_detail,
         "${ScreenBaseRoutes.MEAL_PLAN_DETAIL}/{$MEAL_PLAN_ID_ARG}"
+    ),
+    MEAL_PLAN_SHOPPING_LIST(
+        R.string.app_dest_title_shopping_list,
+        "${ScreenBaseRoutes.MEAL_PLAN_SHOPPING_LIST}/{$MEAL_PLAN_ID_ARG}"
     ),
     MEAL_PLAN_RECIPE_DETAIL(
         R.string.app_dest_title_recipe_details,
@@ -197,6 +202,11 @@ class NavigationActions(private val navController: NavHostController) {
 
     fun navigateToMealPlanDetail(mealPlanId: UUID) {
         navController.navigate("${ScreenBaseRoutes.MEAL_PLAN_DETAIL}/$mealPlanId")
+    }
+
+    /** Opens the shopping list derived from an open meal plan. */
+    fun navigateToMealPlanShoppingList(mealPlanId: UUID) {
+        navController.navigate("${ScreenBaseRoutes.MEAL_PLAN_SHOPPING_LIST}/$mealPlanId")
     }
 
     /**

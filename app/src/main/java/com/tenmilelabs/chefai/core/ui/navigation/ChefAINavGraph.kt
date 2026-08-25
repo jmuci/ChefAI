@@ -17,12 +17,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +50,7 @@ import com.tenmilelabs.chefai.mealplans.ui.create.CreateMealPlanViewModel
 import com.tenmilelabs.chefai.mealplans.ui.create.WizardAdvancedScreen
 import com.tenmilelabs.chefai.mealplans.ui.create.WizardBasicsScreen
 import com.tenmilelabs.chefai.mealplans.ui.create.WizardPreferencesScreen
+import com.tenmilelabs.chefai.mealplans.ui.shoppinglist.ShoppingListScreen
 import com.tenmilelabs.chefai.recipes.ui.RecipesScreen
 import com.tenmilelabs.chefai.recipes.ui.details.RecipeDetailsScreen
 import com.tenmilelabs.chefai.recipes.ui.editor.RecipeEditorScreen
@@ -55,6 +58,7 @@ import com.tenmilelabs.chefai.recipes.ui.urlimport.ImportRecipeRoute
 import com.tenmilelabs.chefai.recipes.ui.urlimport.browser.BrowserImportRoute
 import com.tenmilelabs.chefai.search.ui.SearchScreen
 import timber.log.Timber
+import java.util.UUID
 
 @Composable
 fun ChefAINavGraph(
@@ -136,6 +140,9 @@ fun ChefAINavGraph(
                 },
                 snackbarHostState = snackbarHostState,
             )
+        }
+        composable(route = AppDestinations.MEAL_PLAN_SHOPPING_LIST.route) {
+            ShoppingListScreen(snackbarHostState = snackbarHostState)
         }
         recipeDetailsDestination(
             route = AppDestinations.MEAL_PLAN_RECIPE_DETAIL.route,
@@ -286,6 +293,11 @@ fun ChefAINavGraph(
     var isTopLevelDestination by rememberSaveable { mutableStateOf(false) }
     var currentRoute by rememberSaveable { mutableStateOf(startDestination) }
 
+    // Captured off the meal-plan-detail destination's own arguments so the shared FAB knows which
+    // plan's shopping list to open — the Scaffold only otherwise tracks the route pattern, not its
+    // filled-in path arguments.
+    var currentMealPlanId by rememberSaveable { mutableStateOf<String?>(null) }
+
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     var isFabMenuExpanded by rememberSaveable { mutableStateOf(false) }
 
@@ -297,8 +309,12 @@ fun ChefAINavGraph(
     // Add destination listener only once and properly dispose of it
     DisposableEffect(navController) {
         val listener =
-            NavController.OnDestinationChangedListener { _: NavController, destination: NavDestination, _ ->
+            NavController.OnDestinationChangedListener { _: NavController, destination: NavDestination, arguments ->
                 val newRoute = destination.route ?: AppDestinations.HOME.route
+
+                if (destination.route == AppDestinations.MEAL_PLAN_DETAIL.route) {
+                    currentMealPlanId = arguments?.getString(AppDestinationArgs.MEAL_PLAN_ID_ARG)
+                }
 
                 val wizardRoutes = setOf(
                     ScreenBaseRoutes.MEAL_PLAN_WIZARD_BASICS,
@@ -399,6 +415,21 @@ fun ChefAINavGraph(
                             imageVector = Icons.Default.Add,
                             contentDescription = "Create meal plan",
                         )
+                    }
+                }
+                AppDestinations.MEAL_PLAN_DETAIL.route -> {
+                    currentMealPlanId?.let { planId ->
+                        FloatingActionButton(
+                            onClick = {
+                                navActions.navigateToMealPlanShoppingList(UUID.fromString(planId))
+                            },
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ShoppingCart,
+                                contentDescription = stringResource(R.string.shopping_list_open),
+                            )
+                        }
                     }
                 }
             }
