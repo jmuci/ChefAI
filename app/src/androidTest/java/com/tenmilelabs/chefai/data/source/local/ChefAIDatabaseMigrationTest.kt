@@ -9,6 +9,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_2_3
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_3_4
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_4_5
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_5_6
+import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_6_7
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -212,12 +213,55 @@ class ChefAIDatabaseMigrationTest {
     }
 
     @Test
-    fun migrateAll1To6_succeeds() {
+    fun migrate6To7_addsShoppingListChecksTable() {
+        val planId = UUID.randomUUID()
+        val userId = UUID.randomUUID()
+
+        helper.createDatabase(TEST_DB, 6).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO users (uuid, displayName, email, avatarUrl, updatedAt, deletedAt, syncState)
+                VALUES (?, 'Tester', 'tester@example.com', '', 1, NULL, 'SYNCED')
+                """.trimIndent(),
+                arrayOf(userId.toBlob())
+            )
+            db.execSQL(
+                """
+                INSERT INTO meal_plans (
+                    uuid, userId, name, status, preferencesJson, createdAt, updatedAt,
+                    deletedAt, syncState
+                ) VALUES (?, ?, '3-day meal plan', 'READY', '{}', 1, 1, NULL, 'SYNCED')
+                """.trimIndent(),
+                arrayOf(planId.toBlob(), userId.toBlob())
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 7, true, MIGRATION_6_7)
+
+        db.query("SELECT name FROM meal_plans WHERE uuid = ?", arrayOf(planId.toBlob())).use { cursor ->
+            assertTrue("the meal plan should survive the migration", cursor.moveToFirst())
+            assertEquals("3-day meal plan", cursor.getString(0))
+        }
+
+        db.execSQL(
+            "INSERT INTO shopping_list_checks (mealPlanId, itemKey, checkedAt) VALUES (?, 'onion', 123)",
+            arrayOf(planId.toBlob())
+        )
+        db.query("SELECT itemKey, checkedAt FROM shopping_list_checks").use { cursor ->
+            assertTrue("the newly inserted check row should be readable", cursor.moveToFirst())
+            assertEquals("onion", cursor.getString(0))
+            assertEquals(123L, cursor.getLong(1))
+            assertEquals(1, cursor.count)
+        }
+    }
+
+    @Test
+    fun migrateAll1To7_succeeds() {
         helper.createDatabase(TEST_DB, 1).close()
 
         helper.runMigrationsAndValidate(
-            TEST_DB, 6, true,
-            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6
+            TEST_DB, 7, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7
         )
     }
 }

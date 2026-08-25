@@ -11,6 +11,7 @@ import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.SourceClassificationEntity
 import com.tenmilelabs.chefai.core.data.local.room.TagEntity
 import com.tenmilelabs.chefai.core.data.local.room.UserEntity
+import com.tenmilelabs.chefai.core.data.local.room.relations.PlanIngredientRow
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeImageCandidate
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeImageUploadCandidate
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
@@ -119,6 +120,29 @@ class FakeRecipeDao : RecipeDao {
                         allergenName = allergen?.displayName,
                         srcCategory = source?.category,
                         srcSubcategory = source?.subcategory
+                    )
+                }
+        }
+    }
+
+    /** Mirrors the real query's `deletedAt IS NULL` filters on all three tables. */
+    override fun observeIngredientsForRecipes(recipeIds: List<UUID>): Flow<List<PlanIngredientRow>> {
+        val idSet = recipeIds.toHashSet()
+        return trigger.map {
+            recipeIngredients
+                .filter { it.recipeId in idSet && it.deletedAt == null }
+                .mapNotNull { recipeIngredient ->
+                    val recipe = recipes[recipeIngredient.recipeId]
+                        ?.takeIf { it.deletedAt == null } ?: return@mapNotNull null
+                    val ingredient = ingredients[recipeIngredient.ingredientId]
+                        ?.takeIf { it.deletedAt == null } ?: return@mapNotNull null
+                    PlanIngredientRow(
+                        recipeId = recipe.uuid,
+                        recipeServings = recipe.servings,
+                        ingredientId = ingredient.uuid,
+                        ingredientDisplayName = ingredient.displayName,
+                        quantity = recipeIngredient.quantity,
+                        unit = recipeIngredient.unit,
                     )
                 }
         }

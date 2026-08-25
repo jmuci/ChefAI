@@ -5,6 +5,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
+import com.tenmilelabs.chefai.core.data.local.room.relations.PlanIngredientRow
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeImageCandidate
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeImageUploadCandidate
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
@@ -40,6 +41,30 @@ interface RecipeDao {
         WHERE ri.recipeId = :recipeId
     """)
     fun observeIngredientsForRecipe(recipeId: UUID): Flow<List<RecipeIngredient>>
+
+    /**
+     * Ingredients for a batch of recipes in one query, for the meal-plan shopping list.
+     *
+     * Unlike [observeIngredientsForRecipe] this filters soft-deleted rows out on all three tables:
+     * a shopping list must not send you out for something belonging to a deleted recipe.
+     */
+    @Query("""
+        SELECT
+            ri.recipeId AS recipeId,
+            r.servings AS recipeServings,
+            ri.ingredientId AS ingredientId,
+            i.displayName AS ingredientDisplayName,
+            ri.quantity AS quantity,
+            ri.unit AS unit
+        FROM recipe_ingredients AS ri
+        INNER JOIN recipes AS r ON ri.recipeId = r.uuid
+        INNER JOIN ingredients AS i ON ri.ingredientId = i.uuid
+        WHERE ri.recipeId IN (:recipeIds)
+          AND ri.deletedAt IS NULL
+          AND r.deletedAt IS NULL
+          AND i.deletedAt IS NULL
+    """)
+    fun observeIngredientsForRecipes(recipeIds: List<UUID>): Flow<List<PlanIngredientRow>>
 
     @Query("SELECT * FROM recipes WHERE uuid = :uuid")
     suspend fun getRecipeById(uuid: UUID): RecipeEntity?
