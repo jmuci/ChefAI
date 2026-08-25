@@ -14,10 +14,12 @@ import com.tenmilelabs.chefai.mealplans.data.network.MealPlanApiService
 import com.tenmilelabs.chefai.mealplans.data.network.MealPlanNetworkDataSource
 import com.tenmilelabs.chefai.mealplans.data.repository.DefaultMealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
+import com.tenmilelabs.chefai.recipes.data.network.SystemHostResolver
 import com.tenmilelabs.chefai.recipes.data.network.WebViewImageFetcher
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeImporter
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeRepository
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipeImporter
+import com.tenmilelabs.chefai.recipes.domain.repository.HostResolver
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipeImporter
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import com.tenmilelabs.chefai.recipes.domain.repository.RenderedImageFetcher
@@ -161,4 +163,14 @@ abstract class TestRepositoryModule {
     @Binds
     @Singleton
     abstract fun bindRecipeSearchRepository(repository: DefaultRecipeSearchRepository): RecipeSearchRepository
+
+    /**
+     * Binds the real [SystemHostResolver] (same as production) — required for Hilt's shared test
+     * component to resolve `CacheRecipeImage`'s graph (see docs/claude/gotchas.md #21). Real DNS
+     * resolution is harmless here: every instrumented test's fake-importer drafts use a blank
+     * `imageUrl`, so `CacheRecipeImage` never actually reaches this dependency at runtime.
+     */
+    @Binds
+    @Singleton
+    abstract fun bindHostResolver(resolver: SystemHostResolver): HostResolver
 }
