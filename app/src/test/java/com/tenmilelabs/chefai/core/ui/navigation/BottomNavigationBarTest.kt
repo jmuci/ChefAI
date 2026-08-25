@@ -54,6 +54,11 @@ class BottomNavigationBarTest {
     }
 
     @Test
+    fun `meal plan shopping list keeps Meal Plans selected`() {
+        assertSelectsOnly(TopLevelDestination.MEAL_PLANS, "${ScreenBaseRoutes.MEAL_PLAN_SHOPPING_LIST}/plan-1")
+    }
+
+    @Test
     fun `recipe opened from a meal plan keeps Meal Plans selected`() {
         assertSelectsOnly(
             TopLevelDestination.MEAL_PLANS,

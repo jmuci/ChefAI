@@ -204,6 +204,16 @@
     <string name="meal_plan_generate">Build my plan</string>
     <string name="meal_plan_generating">Building your meal plan…</string>
 
+    <!-- Shopping List -->
+    <string name="app_dest_title_shopping_list">Shopping List</string>
+    <string name="shopping_list_open">Shopping list</string>
+    <string name="shopping_list_progress">%1$d of %2$d picked up</string>
+    <string name="shopping_list_uncheck_all">Uncheck all</string>
+    <string name="shopping_list_empty_title">Nothing to buy yet</string>
+    <string name="shopping_list_empty_subtitle">Build this plan first, or add ingredients to its recipes.</string>
+    <string name="shopping_list_toggle_error">Couldn\'t update this item</string>
+    <string name="shopping_list_clear_error">Couldn\'t clear the list</string>
+
     <!-- Meal Plan Wizard -->
     <string name="app_dest_title_meal_plan_wizard">Create Meal Plan</string>
     <string name="wizard_step_basics">📋 The Basics</string>
