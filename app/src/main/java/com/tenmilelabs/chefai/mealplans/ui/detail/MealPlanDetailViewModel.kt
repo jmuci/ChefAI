@@ -8,7 +8,10 @@ import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
+import com.tenmilelabs.chefai.mealplans.domain.print.MealPlanPrintDocument
+import com.tenmilelabs.chefai.mealplans.domain.print.MealPlanPrintDocumentBuilder
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
+import com.tenmilelabs.chefai.mealplans.domain.repository.ShoppingListRepository
 import com.tenmilelabs.chefai.mealplans.domain.usecase.LocalMealPlanGenerator
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -56,6 +59,7 @@ sealed interface MealPlanDetailUiState {
 
 sealed interface MealPlanDetailEvent {
     data class ShowError(val message: String) : MealPlanDetailEvent
+    data class PrintReady(val document: MealPlanPrintDocument) : MealPlanDetailEvent
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -63,9 +67,10 @@ sealed interface MealPlanDetailEvent {
 class MealPlanDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val mealPlanRepository: MealPlanRepository,
-    recipesRepository: RecipesRepository,
+    private val recipesRepository: RecipesRepository,
     private val syncExecutor: SyncExecutor,
     private val localMealPlanGenerator: LocalMealPlanGenerator,
+    private val shoppingListRepository: ShoppingListRepository,
 ) : ViewModel() {
 
     private val mealPlanId: UUID = UUID.fromString(
@@ -114,6 +119,39 @@ class MealPlanDetailViewModel @Inject constructor(
                 if (e is CancellationException) throw e
                 Timber.e(e, "onToggleCooked: failed for day ${meal.dayId} slot ${meal.slot}")
                 _events.emit(MealPlanDetailEvent.ShowError("Couldn't update this meal"))
+            }
+        }
+    }
+
+    /** Builds a print-ready document for the current plan and hands it back via [events]. */
+    fun onPrintClick() {
+        val state = uiState.value
+        if (state !is MealPlanDetailUiState.Success || state.totalCount == 0) return
+
+        viewModelScope.launch {
+            try {
+                val plan = state.mealPlan
+                val recipeIds = plan.days
+                    .flatMap { listOfNotNull(it.lunchRecipeId, it.dinnerRecipeId) }
+                    .distinct()
+
+                val recipeMap = if (recipeIds.isEmpty()) {
+                    emptyMap()
+                } else {
+                    recipesRepository.getRecipePreviewsByIds(recipeIds).first().associateBy { it.uuid }
+                }
+                val ingredients = if (recipeIds.isEmpty()) {
+                    emptyList()
+                } else {
+                    shoppingListRepository.observeIngredientsForRecipes(recipeIds).first()
+                }
+
+                val document = MealPlanPrintDocumentBuilder.build(plan, recipeMap, ingredients)
+                _events.emit(MealPlanDetailEvent.PrintReady(document))
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "onPrintClick: failed to build print document for $mealPlanId")
+                _events.emit(MealPlanDetailEvent.ShowError("Couldn't prepare the plan for printing"))
             }
         }
     }

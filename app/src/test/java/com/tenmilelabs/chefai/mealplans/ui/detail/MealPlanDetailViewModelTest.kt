@@ -9,6 +9,7 @@ import com.tenmilelabs.chefai.core.testutil.recipePreview2
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import com.tenmilelabs.chefai.mealplans.data.repository.FakeMealPlanRepository
+import com.tenmilelabs.chefai.mealplans.data.repository.FakeShoppingListRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.DietaryRestriction
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay
@@ -18,6 +19,7 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
+import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.PlannedIngredient
 import com.tenmilelabs.chefai.mealplans.domain.usecase.LocalMealPlanGenerator
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -38,6 +40,7 @@ class MealPlanDetailViewModelTest {
     private lateinit var mealPlanRepository: FakeMealPlanRepository
     private lateinit var recipesRepository: FakeRecipesRepository
     private lateinit var syncExecutor: FakeSyncExecutor
+    private lateinit var shoppingListRepository: FakeShoppingListRepository
 
     private val planId = UUID.randomUUID()
     private val dayId = UUID.randomUUID()
@@ -48,6 +51,7 @@ class MealPlanDetailViewModelTest {
         recipesRepository = FakeRecipesRepository()
         recipesRepository.setRecipePreviewsToEmit(listOf(recipePreview1, recipePreview2))
         syncExecutor = FakeSyncExecutor()
+        shoppingListRepository = FakeShoppingListRepository()
     }
 
     // --- State ---
@@ -211,6 +215,69 @@ class MealPlanDetailViewModelTest {
         }
     }
 
+    // --- Printing ---
+
+    @Test
+    fun `onPrintClick emits a print-ready document with one column per day`() = runTest {
+        mealPlanRepository.emitPlans(planWith(fullDay()))
+        shoppingListRepository.setIngredientsForRecipe(
+            recipePreview1.uuid,
+            listOf(PlannedIngredient(recipePreview1.uuid, recipeServings = 2, displayName = "Egg", quantity = 2.0, unit = "")),
+        )
+        val viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            awaitItem().let { if (it is MealPlanDetailUiState.Loading) awaitItem() else it }
+
+            viewModel.events.test {
+                viewModel.onPrintClick()
+                val event = awaitItem()
+                assertThat(event).isInstanceOf(MealPlanDetailEvent.PrintReady::class.java)
+                val document = (event as MealPlanDetailEvent.PrintReady).document
+                assertThat(document.blocks.single().columns).hasSize(1)
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onPrintClick does nothing for an empty plan`() = runTest {
+        mealPlanRepository.emitPlans(emptyPlan())
+        val viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            awaitItem().let { if (it is MealPlanDetailUiState.Loading) awaitItem() else it }
+
+            viewModel.events.test {
+                viewModel.onPrintClick()
+                expectNoEvents()
+            }
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onPrintClick surfaces an error event when ingredients fail to load`() = runTest {
+        mealPlanRepository.emitPlans(planWith(fullDay()))
+        shoppingListRepository.shouldThrowOnObserveIngredients = true
+        val viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            awaitItem().let { if (it is MealPlanDetailUiState.Loading) awaitItem() else it }
+
+            viewModel.events.test {
+                viewModel.onPrintClick()
+                assertThat(awaitItem()).isInstanceOf(MealPlanDetailEvent.ShowError::class.java)
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     // --- Helpers ---
 
     private fun createViewModel() = MealPlanDetailViewModel(
@@ -221,6 +288,7 @@ class MealPlanDetailViewModelTest {
         recipesRepository = recipesRepository,
         syncExecutor = syncExecutor,
         localMealPlanGenerator = LocalMealPlanGenerator(recipesRepository, mealPlanRepository),
+        shoppingListRepository = shoppingListRepository,
     )
 
     private fun fullDay(lunchCookedAt: Long? = null, dinnerCookedAt: Long? = null) = MealPlanDay(

@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.core.ui.navigation
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -28,7 +29,8 @@ fun ChefAITopAppBar(
     @StringRes titleResId: Int,
     onNavigationClick: (() -> Unit)? = null,
     onLogin: () -> Unit = {},
-    onLogout: () -> Unit = {}
+    onLogout: () -> Unit = {},
+    extraActions: @Composable RowScope.() -> Unit = {},
 ) {
 
     return CenterAlignedTopAppBar(
@@ -58,6 +60,8 @@ fun ChefAITopAppBar(
             }
         },
         actions = {
+            // Screen-specific actions (e.g. print), closest to the title
+            extraActions()
             // Sync status indicator (hidden when idle)
             SyncStatusIndicator()
             // User profile menu on the right side

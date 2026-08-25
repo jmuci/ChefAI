@@ -24,12 +24,15 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.NavType
@@ -45,6 +48,8 @@ import com.tenmilelabs.chefai.auth.ui.RegisterScreen
 import com.tenmilelabs.chefai.home.ui.HomeScreen
 import com.tenmilelabs.chefai.mealplans.ui.MealPlansScreen
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailScreen
+import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailUiState
+import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailViewModel
 import com.tenmilelabs.chefai.mealplans.ui.create.CreateMealPlanEvent
 import com.tenmilelabs.chefai.mealplans.ui.create.CreateMealPlanViewModel
 import com.tenmilelabs.chefai.mealplans.ui.create.WizardAdvancedScreen
@@ -370,7 +375,25 @@ fun ChefAINavGraph(
                     onLogout = {},
                     onLogin = {
                         navActions.navigateToLogin()
-                    }
+                    },
+                    extraActions = {
+                        if (currentRoute == AppDestinations.MEAL_PLAN_DETAIL.route) {
+                            navController.currentBackStackEntry?.let { entry ->
+                                val printViewModel: MealPlanDetailViewModel = hiltViewModel(entry)
+                                val printState by printViewModel.uiState.collectAsStateWithLifecycle()
+                                val canPrint = (printState as? MealPlanDetailUiState.Success)
+                                    ?.totalCount?.let { it > 0 } == true
+                                if (canPrint) {
+                                    IconButton(onClick = { printViewModel.onPrintClick() }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Print,
+                                            contentDescription = stringResource(R.string.meal_plan_print),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    },
                 )
             }
         },
