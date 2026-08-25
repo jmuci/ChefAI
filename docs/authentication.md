@@ -198,6 +198,26 @@ Result:
 - the anonymous recipes created after logout are preserved
 - those anonymous recipes are reassigned to `user2`
 
+### AccountSwitchHandler decision tree
+
+```mermaid
+flowchart TD
+    A[New login succeeds] --> B{Last authenticated<br/>user ID on record?}
+    B -- none --> C[First authenticated login<br/>nothing to reconcile]
+    B -- same as new user --> D[Same-account re-login<br/>local data already theirs]
+    B -- different user --> E{Active anonymous<br/>data present?}
+    E -- no --> F[database.clearAllTables&#40;&#41;<br/>then sync pulls the new user fresh]
+    E -- yes --> G[Remove stale data from<br/>the previous authenticated user]
+    G --> H[Preserve the anonymous data,<br/>re-parent it to the new user]
+    C --> I[Proceed to sync]
+    D --> I
+    F --> I
+    H --> I
+```
+
+This runs in `AccountSwitchHandler`, before sync begins — see [ADR-008](adrs/adr-008-data-handling-across-sessions.md)
+for why a different user wipes Room but a re-login or first login never does.
+
 ## Usage Examples
 
 ### 1. Observing Authentication State in Composables
@@ -335,26 +355,25 @@ fun provideHttpClient(sessionManager: SessionManager) = HttpClient(CIO) {
 }
 ```
 
-## Current Development Setup (Feb 2026)
+## Current Development Setup (Aug 2026)
 
 **Auth API calls are implemented.** `SessionManager.login()`, `register()`, and `refreshToken()` all
 make real Ktor HTTP calls to the backend at `http://10.0.2.2:8080` (emulator localhost).
 
-**Remaining gaps:**
+**Done, despite what an older version of this doc said:**
 
-- `loadSession()` reconstructs a `User` with placeholder `displayName = "User"` — user details
-  should be fetched from backend or stored locally during login.
-- `RecipesViewModel` and `DefaultRecipeRepository` still use a hardcoded test user UUID
-  (`F47AC10B58CC4372A5670E02B2C3D479`) instead of getting the actual user from `SessionManager`.
-- Anonymous-first flow is **not implemented** — the app requires login; there is no anonymous
-  session, no local-only user, and no anonymous → authenticated upgrade path yet.
+- Anonymous-first is fully implemented — see [ADR-007](adrs/adr-007-anonymous-first.md) and the
+  "Session and Account-Switch Behavior" section above. The app never requires login.
+- `RecipesViewModel` and `DefaultRecipeRepository` resolve the real user from
+  `SessionManager.userSession` (`Anonymous`/`Authenticated`) — no hardcoded test UUID.
+- `loadSession()` restores `displayName` from `SecurePreferences.getDisplayName()`, populated during
+  login/register — not a hardcoded placeholder.
 
 **What still needs work:**
 
-1. Wire `SessionManager` into `RecipesViewModel` and `DefaultRecipeRepository` to use the real user.
-2. Implement anonymous-first: allow app usage without login, create local-only session.
-3. Implement anonymous → authenticated upgrade (merge local data into authenticated account).
-4. Store user profile details locally during login so `loadSession()` can fully restore them.
+- Token refresh is not yet serialized — see [gotchas.md #13](claude/gotchas.md).
+- Biometric auth, "Remember Me", explicit session timeout, and logout-on-401 are unbuilt (see
+  Future Enhancements below).
 
 ## API Requests
 
@@ -426,10 +445,10 @@ if (sessionManager.isTokenExpired()) {
 
 - [x] Implement actual login API call
 - [x] Implement token refresh API call
-- [ ] Anonymous-first session (use app without login)
-- [ ] Anonymous → authenticated upgrade flow
-- [ ] Store user profile locally during login
-- [ ] Wire real user ID into repositories (replace hardcoded test UUID)
+- [x] Anonymous-first session (use app without login)
+- [x] Anonymous → authenticated upgrade flow
+- [x] Store user profile locally during login
+- [x] Wire real user ID into repositories (replace hardcoded test UUID)
 - [ ] Add biometric authentication option
 - [ ] Implement "Remember Me" functionality
 - [ ] Add session timeout handling

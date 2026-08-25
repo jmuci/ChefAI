@@ -2,7 +2,11 @@
 
 **Authors:** Jose Mucientes
 
-**Status:** Draft
+**Status:** Superseded by [ADR-006](../adrs/adr-006-sync-protocol.md) (sync protocol),
+[ADR-007](../adrs/adr-007-anonymous-first.md) (anonymous-first accounts), and
+[ADR-008](../adrs/adr-008-data-handling-across-sessions.md) (data handling across sessions) — those
+three ADRs describe what was actually built during this RFC's implementation and are the current
+source of truth. Kept for the original motivation/context, not as an implementation reference.
 
 **Date:** 2026-02-23
 
