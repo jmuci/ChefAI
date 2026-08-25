@@ -13,7 +13,9 @@ import com.tenmilelabs.chefai.core.domain.repository.MetadataRepository
 import com.tenmilelabs.chefai.mealplans.data.network.MealPlanApiService
 import com.tenmilelabs.chefai.mealplans.data.network.MealPlanNetworkDataSource
 import com.tenmilelabs.chefai.mealplans.data.repository.DefaultMealPlanRepository
+import com.tenmilelabs.chefai.mealplans.data.repository.DefaultShoppingListRepository
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
+import com.tenmilelabs.chefai.mealplans.domain.repository.ShoppingListRepository
 import com.tenmilelabs.chefai.recipes.data.network.SystemHostResolver
 import com.tenmilelabs.chefai.recipes.data.network.WebViewImageFetcher
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeImporter
@@ -126,6 +128,15 @@ abstract class TestRepositoryModule {
     @Binds
     @Singleton
     abstract fun bindMealPlanRepository(repository: DefaultMealPlanRepository): MealPlanRepository
+
+    /**
+     * Binds the shopping list repository (same as production) — required for Hilt's shared test
+     * component to resolve `ShoppingListViewModel`'s graph (see docs/claude/gotchas.md #21), even
+     * though no instrumented test exercises the shopping list screen yet.
+     */
+    @Binds
+    @Singleton
+    abstract fun bindShoppingListRepository(repository: DefaultShoppingListRepository): ShoppingListRepository
 
     /**
      * Binds the meal plan network data source (same as production) — required for Hilt's shared

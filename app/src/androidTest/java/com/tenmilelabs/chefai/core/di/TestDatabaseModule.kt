@@ -83,6 +83,9 @@ object TestDatabaseModule {
     fun provideMealPlanDao(database: ChefAIDataBase) = database.mealPlanDao()
 
     @Provides
+    fun provideShoppingListCheckDao(database: ChefAIDataBase) = database.shoppingListCheckDao()
+
+    @Provides
     @Singleton
     fun provideTransactionRunner(database: ChefAIDataBase): TransactionRunner =
         RoomTransactionRunner(database)
