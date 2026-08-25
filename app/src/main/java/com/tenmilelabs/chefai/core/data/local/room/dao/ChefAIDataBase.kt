@@ -18,6 +18,7 @@ import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.RecipeStepEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
+import com.tenmilelabs.chefai.core.data.local.room.ShoppingListCheckEntity
 import com.tenmilelabs.chefai.core.data.local.room.SourceClassificationEntity
 import com.tenmilelabs.chefai.core.data.local.room.SyncMetadataEntity
 import com.tenmilelabs.chefai.core.data.local.room.TagEntity
@@ -39,12 +40,13 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         RecipeLabelCrossRef::class,
         RecipeStepEntity::class,
         RecipeTagCrossRef::class,
+        ShoppingListCheckEntity::class,
         SourceClassificationEntity::class,
         SyncMetadataEntity::class,
         TagEntity::class,
         UserEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 @TypeConverters(UuidConverters::class)
@@ -65,6 +67,7 @@ abstract class ChefAIDataBase : RoomDatabase() {
     abstract fun syncMetadataDao(): SyncMetadataDao
     abstract fun recipeDraftDao(): RecipeDraftDao
     abstract fun mealPlanDao(): MealPlanDao
+    abstract fun shoppingListCheckDao(): ShoppingListCheckDao
 }
 
 /**
@@ -184,5 +187,30 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE meal_plan_days ADD COLUMN dinnerCookedAt INTEGER")
         db.execSQL("ALTER TABLE meal_plan_days ADD COLUMN lunchCookedAt INTEGER")
+    }
+}
+
+/**
+ * Adds `shopping_list_checks`, which backs ticking items off a meal plan's shopping list.
+ *
+ * Local-only, so there is no sync bookkeeping on it. `ON DELETE CASCADE` from `meal_plans` means a
+ * deleted plan takes its ticks with it — the list has no meaning without the plan.
+ */
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `shopping_list_checks` (
+                `mealPlanId` BLOB NOT NULL, `itemKey` TEXT NOT NULL, `checkedAt` INTEGER NOT NULL,
+                PRIMARY KEY(`mealPlanId`, `itemKey`),
+                FOREIGN KEY(`mealPlanId`) REFERENCES `meal_plans`(`uuid`)
+                    ON UPDATE NO ACTION ON DELETE CASCADE
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_shopping_list_checks_mealPlanId` " +
+                "ON `shopping_list_checks` (`mealPlanId`)"
+        )
     }
 }
