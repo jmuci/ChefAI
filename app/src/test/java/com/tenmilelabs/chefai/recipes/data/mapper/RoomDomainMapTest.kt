@@ -27,6 +27,8 @@ class RoomDomainMapTest {
     private fun recipe(
         localImagePath: String? = null,
         imageBlobId: String? = null,
+        caloriesPerServing: Int? = null,
+        proteinGramsPerServing: Int? = null,
     ) = Recipe(
         uuid = UuidV7Generator.newId(),
         title = "Carbonara",
@@ -38,6 +40,8 @@ class RoomDomainMapTest {
         prepTimeMinutes = 10,
         cookTimeMinutes = 20,
         servings = 2,
+        caloriesPerServing = caloriesPerServing,
+        proteinGramsPerServing = proteinGramsPerServing,
         creator = creator,
         recipeExternalUrl = null,
         ingredients = emptyList(),
@@ -68,5 +72,21 @@ class RoomDomainMapTest {
 
         assertThat(entity.imageBlobId).isNull()
         assertThat(entity.localImagePath).isNull()
+    }
+
+    @Test
+    fun `toRoomEntity carries calories and protein per serving`() {
+        val entity = recipe(caloriesPerServing = 350, proteinGramsPerServing = 12).toRoomEntity()
+
+        assertThat(entity.caloriesPerServing).isEqualTo(350)
+        assertThat(entity.proteinGramsPerServing).isEqualTo(12)
+    }
+
+    @Test
+    fun `a recipe with no nutrition data maps to null, not zero`() {
+        val entity = recipe().toRoomEntity()
+
+        assertThat(entity.caloriesPerServing).isNull()
+        assertThat(entity.proteinGramsPerServing).isNull()
     }
 }

@@ -21,6 +21,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_3_4
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_4_5
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_5_6
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_6_7
+import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_7_8
 import com.tenmilelabs.chefai.core.data.repository.DefaultMetadataRepository
 import com.tenmilelabs.chefai.core.domain.repository.MetadataRepository
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeImporter
@@ -110,7 +111,7 @@ object DatabaseModules {
         )
             .addMigrations(
                 MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
-                MIGRATION_6_7,
+                MIGRATION_6_7, MIGRATION_7_8,
             )
             .fallbackToDestructiveMigration()
             .build()

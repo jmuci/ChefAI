@@ -31,6 +31,13 @@ data class Recipe(
     val prepTimeMinutes: Int,
     val cookTimeMinutes: Int,
     val servings: Int,
+    /**
+     * Calories per serving, as published by the recipe's source or entered by hand. `null` means
+     * unknown — never computed from ingredients, and never defaulted to zero.
+     */
+    val caloriesPerServing: Int? = null,
+    /** Protein grams per serving. Same provenance and null-means-unknown convention as [caloriesPerServing]. */
+    val proteinGramsPerServing: Int? = null,
     val creator: User,
     val recipeExternalUrl: String?,
     val privacy: RecipePrivacy = RecipePrivacy.PUBLIC,

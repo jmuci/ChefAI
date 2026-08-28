@@ -17,6 +17,10 @@ data class RecipePreview(
     val prepTimeMinutes: Int,
     val cookTimeMinutes: Int,
     val servings: Int,
+    /** See [Recipe.caloriesPerServing]. `null` means unknown. */
+    val caloriesPerServing: Int? = null,
+    /** See [Recipe.proteinGramsPerServing]. `null` means unknown. */
+    val proteinGramsPerServing: Int? = null,
     val creatorId: UUID,
     val privacy: RecipePrivacy = RecipePrivacy.PUBLIC,
     val tags: List<Tag>,

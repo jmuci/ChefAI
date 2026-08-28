@@ -45,6 +45,13 @@ data class RecipeEntity(
     val prepTimeMinutes: Int,
     val cookTimeMinutes: Int,
     val servings: Int,
+    /**
+     * Calories per serving, as published by the source or entered by hand — never computed from
+     * ingredients. `null` means unknown, not zero. See [com.tenmilelabs.chefai.core.domain.model.Recipe.caloriesPerServing].
+     */
+    val caloriesPerServing: Int? = null,
+    /** Protein grams per serving. Same provenance and null-means-unknown convention as [caloriesPerServing]. */
+    val proteinGramsPerServing: Int? = null,
     val creatorId: UUID,
     val recipeExternalUrl: String?,
     val privacy: RecipePrivacy = RecipePrivacy.PUBLIC,

@@ -20,6 +20,8 @@ sealed interface EditorAction {
     data class PrepTimeChanged(val time: String) : EditorAction
     data class CookTimeChanged(val time: String) : EditorAction
     data class ServingsChanged(val servings: String) : EditorAction
+    data class CaloriesChanged(val calories: String) : EditorAction
+    data class ProteinChanged(val protein: String) : EditorAction
     data class ExternalUrlChanged(val url: String) : EditorAction
     data class PrivacyChanged(val privacy: RecipePrivacy) : EditorAction
     data class ImageUrlChanged(val url: String) : EditorAction
