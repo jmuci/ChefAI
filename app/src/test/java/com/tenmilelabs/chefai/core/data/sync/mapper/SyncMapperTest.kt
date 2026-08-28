@@ -274,6 +274,26 @@ class SyncMapperTest {
     }
 
     @Test
+    fun `toRecipeEntity passes the given calories and protein through untouched, so a pull doesn't erase locally-entered nutrition`() {
+        val entity = syncRecipeDto.toRecipeEntity(
+            localImagePath = null,
+            caloriesPerServing = 350,
+            proteinGramsPerServing = 12,
+        )
+
+        assertThat(entity.caloriesPerServing).isEqualTo(350)
+        assertThat(entity.proteinGramsPerServing).isEqualTo(12)
+    }
+
+    @Test
+    fun `toRecipeEntity defaults calories and protein to null when the caller doesn't have an existing local value`() {
+        val entity = syncRecipeDto.toRecipeEntity(localImagePath = null)
+
+        assertThat(entity.caloriesPerServing).isNull()
+        assertThat(entity.proteinGramsPerServing).isNull()
+    }
+
+    @Test
     fun `toStepEntities maps steps with SYNCED syncState`() {
         val steps = syncRecipeDto.toStepEntities()
 

@@ -50,7 +50,8 @@ object RecipeEditorReducer {
         }
 
         is EditorAction.CaloriesChanged -> {
-            if (action.calories.isEmpty() || action.calories.toIntOrNull() != null) {
+            val parsed = action.calories.toIntOrNull()
+            if (action.calories.isEmpty() || (parsed != null && parsed >= 0)) {
                 state.copy(
                     recipeFields = state.recipeFields.copy(caloriesPerServing = action.calories)
                 ).markDirty()
@@ -58,7 +59,8 @@ object RecipeEditorReducer {
         }
 
         is EditorAction.ProteinChanged -> {
-            if (action.protein.isEmpty() || action.protein.toIntOrNull() != null) {
+            val parsed = action.protein.toIntOrNull()
+            if (action.protein.isEmpty() || (parsed != null && parsed >= 0)) {
                 state.copy(
                     recipeFields = state.recipeFields.copy(proteinGramsPerServing = action.protein)
                 ).markDirty()

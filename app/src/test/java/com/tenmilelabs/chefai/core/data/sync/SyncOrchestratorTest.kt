@@ -493,6 +493,27 @@ class SyncOrchestratorTest {
     }
 
     @Test
+    fun `pull preserves locally-entered calories and protein, which the server never sends`() = runTest(testDispatcher) {
+        val existingRecipe = createDirtyRecipe(uuid = recipeId1, syncState = SyncState.SYNCED)
+            .copy(caloriesPerServing = 350, proteinGramsPerServing = 12)
+        recipeDao.upsertRecipe(existingRecipe)
+
+        // SyncRecipeDto has no calories/protein fields yet (Phase 4) — this is what the server
+        // sends back for every recipe, nutrition entered or not.
+        val serverRecipe = createSyncRecipeDto(uuid = recipeId1, title = "Updated Title", updatedAt = 5000L)
+        syncNetworkDataSource.pullResponses.addLast(
+            SyncPullResponse(recipes = listOf(serverRecipe), serverTimestamp = 5000L, hasMore = false)
+        )
+
+        syncOrchestrator.sync()
+
+        val updatedRecipe = recipeDao.getRecipeById(recipeId1)!!
+        assertThat(updatedRecipe.title).isEqualTo("Updated Title")
+        assertThat(updatedRecipe.caloriesPerServing).isEqualTo(350)
+        assertThat(updatedRecipe.proteinGramsPerServing).isEqualTo(12)
+    }
+
+    @Test
     fun `pull server wins when local is PENDING and server is newer`() = runTest(testDispatcher) {
         val localRecipe = createDirtyRecipe(uuid = recipeId1, title = "Local Edit", updatedAt = 1000L)
         recipeDao.upsertRecipe(localRecipe)

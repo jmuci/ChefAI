@@ -104,10 +104,19 @@ fun SyncIngredientDto.toIngredientEntity(): IngredientEntity = IngredientEntity(
  * for the row, or a pull immediately after caching an image (e.g. the post-mutation push/pull that
  * follows every import) overwrites it back to null via this entity's full-row upsert.
  *
+ * [caloriesPerServing]/[proteinGramsPerServing] aren't part of [SyncRecipeDto] yet either (Phase 4
+ * of the nutrition feature, not yet built) — same treatment: the caller passes through whatever
+ * this device already had, so a pull doesn't silently erase calories/protein the user just entered
+ * locally before the backend can round-trip them.
+ *
  * `imageBlobId` needs no such threading: it is server-owned, so the DTO's value is by definition
  * the authoritative one (ADR-011 / Stage 2 D1).
  */
-fun SyncRecipeDto.toRecipeEntity(localImagePath: String?): RecipeEntity = RecipeEntity(
+fun SyncRecipeDto.toRecipeEntity(
+    localImagePath: String?,
+    caloriesPerServing: Int? = null,
+    proteinGramsPerServing: Int? = null,
+): RecipeEntity = RecipeEntity(
     uuid = UUID.fromString(uuid),
     title = title,
     description = description,
@@ -118,6 +127,8 @@ fun SyncRecipeDto.toRecipeEntity(localImagePath: String?): RecipeEntity = Recipe
     prepTimeMinutes = prepTimeMinutes,
     cookTimeMinutes = cookTimeMinutes,
     servings = servings,
+    caloriesPerServing = caloriesPerServing,
+    proteinGramsPerServing = proteinGramsPerServing,
     creatorId = UUID.fromString(creatorId),
     recipeExternalUrl = recipeExternalUrl,
     privacy = RecipePrivacy.valueOf(privacy.uppercase()),

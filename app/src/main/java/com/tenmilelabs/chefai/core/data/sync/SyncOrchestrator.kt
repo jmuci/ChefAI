@@ -419,10 +419,17 @@ class SyncOrchestrator @Inject constructor(
     private suspend fun upsertRecipeAggregate(syncRecipe: SyncRecipeDto) {
         val recipeId = UUID.fromString(syncRecipe.uuid)
 
-        // The DTO never carries the device-local cached-image path (see SyncMapper.toRecipeEntity) —
-        // read back whatever this device already has so this upsert doesn't wipe it.
+        // The DTO never carries the device-local cached-image path, or (until Phase 4) calories/
+        // protein per serving (see SyncMapper.toRecipeEntity) — read back whatever this device
+        // already has for all three so this upsert doesn't wipe them.
         val existing = recipeDao.getRecipeById(recipeId)
-        recipeDao.upsertRecipe(syncRecipe.toRecipeEntity(existing?.localImagePath))
+        recipeDao.upsertRecipe(
+            syncRecipe.toRecipeEntity(
+                localImagePath = existing?.localImagePath,
+                caloriesPerServing = existing?.caloriesPerServing,
+                proteinGramsPerServing = existing?.proteinGramsPerServing,
+            )
+        )
 
         // A recipe whose image blob changed — most often from null, when another device finally
         // uploaded one — deserves a fresh set of download attempts. Without this, three failures

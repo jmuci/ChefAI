@@ -94,6 +94,12 @@ class RecipeEditorReducerTest {
     }
 
     @Test
+    fun `CaloriesChanged rejects negative numbers`() {
+        val result = RecipeEditorReducer.reduce(emptyState, EditorAction.CaloriesChanged("-50"))
+        assertEquals("", result.recipeFields.caloriesPerServing) // unchanged
+    }
+
+    @Test
     fun `ProteinChanged accepts valid integer string`() {
         val result = RecipeEditorReducer.reduce(emptyState, EditorAction.ProteinChanged("12"))
         assertEquals("12", result.recipeFields.proteinGramsPerServing)
@@ -103,6 +109,12 @@ class RecipeEditorReducerTest {
     fun `ProteinChanged rejects non-numeric input`() {
         val result = RecipeEditorReducer.reduce(emptyState, EditorAction.ProteinChanged("some"))
         assertEquals("", result.recipeFields.proteinGramsPerServing)
+    }
+
+    @Test
+    fun `ProteinChanged rejects negative numbers`() {
+        val result = RecipeEditorReducer.reduce(emptyState, EditorAction.ProteinChanged("-12"))
+        assertEquals("", result.recipeFields.proteinGramsPerServing) // unchanged
     }
 
     @Test
