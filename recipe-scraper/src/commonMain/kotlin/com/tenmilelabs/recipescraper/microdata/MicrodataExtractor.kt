@@ -6,7 +6,13 @@ import com.tenmilelabs.recipescraper.ingredient.parseIngredient
 import com.tenmilelabs.recipescraper.model.ScrapedRecipe
 import com.tenmilelabs.recipescraper.util.cleanHtmlText
 import com.tenmilelabs.recipescraper.util.firstIntOrNull
+import com.tenmilelabs.recipescraper.util.firstNutritionIntOrNull
 import com.tenmilelabs.recipescraper.util.parseDurationToMinutes
+
+// Same bounds as the JSON-LD tier (JsonLdRecipeMapper) — kept in sync, not shared, since the two
+// tiers already don't share their field-extraction constants.
+private const val MAX_PLAUSIBLE_CALORIES = 5000
+private const val MAX_PLAUSIBLE_PROTEIN_GRAMS = 300
 
 /**
  * Extracts a recipe from schema.org microdata (`itemscope`/`itemprop` attributes) — the second-tier
@@ -28,6 +34,10 @@ internal fun extractMicrodataRecipe(document: Document, sourceUrl: String): Scra
         cookTimeMinutes = parseDurationToMinutes(scope.propertyValue("cookTime")),
         totalTimeMinutes = parseDurationToMinutes(scope.propertyValue("totalTime")),
         servings = firstIntOrNull(scope.propertyValue("recipeYield")),
+        caloriesPerServing = scope.propertyValue("calories")
+            ?.let { firstNutritionIntOrNull(it, MAX_PLAUSIBLE_CALORIES) },
+        proteinGramsPerServing = scope.propertyValue("proteinContent")
+            ?.let { firstNutritionIntOrNull(it, MAX_PLAUSIBLE_PROTEIN_GRAMS) },
         ingredients = scope.propertyValues("recipeIngredient")
             .mapNotNull(::cleanHtmlText)
             .map(::parseIngredient),

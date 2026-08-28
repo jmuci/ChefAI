@@ -26,6 +26,8 @@ class ScrapedRecipeMapperTest {
         cookTimeMinutes: Int? = 20,
         totalTimeMinutes: Int? = null,
         servings: Int? = 4,
+        caloriesPerServing: Int? = null,
+        proteinGramsPerServing: Int? = null,
         ingredients: List<ScrapedIngredient> = emptyList(),
         instructions: List<String> = emptyList(),
         keywords: List<String> = emptyList(),
@@ -39,6 +41,8 @@ class ScrapedRecipeMapperTest {
         cookTimeMinutes = cookTimeMinutes,
         totalTimeMinutes = totalTimeMinutes,
         servings = servings,
+        caloriesPerServing = caloriesPerServing,
+        proteinGramsPerServing = proteinGramsPerServing,
         ingredients = ingredients,
         instructions = instructions,
         keywords = keywords,
@@ -125,6 +129,26 @@ class ScrapedRecipeMapperTest {
 
         assertEquals("0", draft.prepTimeMinutes)
         assertEquals("0", draft.servings)
+    }
+
+    @Test
+    fun `scraped calories and protein carry through as strings`() {
+        val draft = minimalScrapedRecipe(caloriesPerServing = 350, proteinGramsPerServing = 12)
+            .toRecipeDraft(UUID.randomUUID(), emptyList(), emptyList())
+
+        assertEquals("350", draft.caloriesPerServing)
+        assertEquals("12", draft.proteinGramsPerServing)
+    }
+
+    @Test
+    fun `absent calories and protein become blank, not the string zero`() {
+        // Unlike prep time and servings, nutrition is optional and never blocks toRecipe() — blank
+        // means "not entered", matching manual entry in the editor.
+        val draft = minimalScrapedRecipe(caloriesPerServing = null, proteinGramsPerServing = null)
+            .toRecipeDraft(UUID.randomUUID(), emptyList(), emptyList())
+
+        assertEquals("", draft.caloriesPerServing)
+        assertEquals("", draft.proteinGramsPerServing)
     }
 
     @Test
@@ -269,8 +293,12 @@ class ScrapedRecipeMapperTest {
         assertEquals("0", draft.prepTimeMinutes)
         assertEquals("0", draft.cookTimeMinutes)
         assertEquals("0", draft.servings)
+        assertEquals("", draft.caloriesPerServing)
+        assertEquals("", draft.proteinGramsPerServing)
 
-        // Regression guard for the constraint that RecipeDraft.toRecipe() throws on blank numerics.
+        // Regression guard for the constraint that RecipeDraft.toRecipe() throws on blank numerics —
+        // calories/protein must stay blank-safe here too, since RecipeDraft.toRecipe() parses them
+        // with toIntOrNull(), not toInt().
         draft.toRecipe(testUser)
     }
 }

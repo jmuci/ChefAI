@@ -180,6 +180,60 @@ internal object JsonLdFixtures {
         </head><body></body></html>
     """.trimIndent()
 
+    val WITH_NUTRITION = """
+        <html><head>
+        <script type="application/ld+json">
+        {
+          "@type": "Recipe",
+          "name": "Nutrition Recipe",
+          "recipeIngredient": ["1 cup rice"],
+          "recipeInstructions": ["Cook the rice."],
+          "nutrition": {
+            "@type": "NutritionInformation",
+            "calories": "270 calories",
+            "proteinContent": "12 g"
+          }
+        }
+        </script>
+        </head><body></body></html>
+    """.trimIndent()
+
+    val IMPLAUSIBLE_NUTRITION = """
+        <html><head>
+        <script type="application/ld+json">
+        {
+          "@type": "Recipe",
+          "name": "Implausible Nutrition Recipe",
+          "recipeIngredient": ["1 cup rice"],
+          "recipeInstructions": ["Cook the rice."],
+          "nutrition": {
+            "@type": "NutritionInformation",
+            "calories": "99999",
+            "proteinContent": "9999 g"
+          }
+        }
+        </script>
+        </head><body></body></html>
+    """.trimIndent()
+
+    val ZERO_AND_DECIMAL_NUTRITION = """
+        <html><head>
+        <script type="application/ld+json">
+        {
+          "@type": "Recipe",
+          "name": "Zero And Decimal Nutrition Recipe",
+          "recipeIngredient": ["1 cup water"],
+          "recipeInstructions": ["Drink the water."],
+          "nutrition": {
+            "@type": "NutritionInformation",
+            "calories": "0 calories",
+            "proteinContent": "12.5 g"
+          }
+        }
+        </script>
+        </head><body></body></html>
+    """.trimIndent()
+
     val GROUPED_INGREDIENTS = """
         <html><head>
         <script type="application/ld+json">

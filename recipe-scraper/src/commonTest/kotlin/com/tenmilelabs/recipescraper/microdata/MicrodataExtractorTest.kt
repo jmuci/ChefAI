@@ -27,6 +27,17 @@ class MicrodataExtractorTest {
         assertEquals(listOf("cookies", "dessert"), recipe?.keywords)
         assertEquals("Baker Bob", recipe?.author)
         assertEquals("https://example.com/r", recipe?.sourceUrl)
+        // No nutrition markup on this fixture — unknown, not zero.
+        assertNull(recipe?.caloriesPerServing)
+        assertNull(recipe?.proteinGramsPerServing)
+    }
+
+    @Test
+    fun `extracts calories and protein from a nested NutritionInformation scope`() {
+        val recipe = extract(MicrodataFixtures.WITH_NUTRITION)
+
+        assertEquals(270, recipe?.caloriesPerServing)
+        assertEquals(12, recipe?.proteinGramsPerServing)
     }
 
     @Test

@@ -5,12 +5,19 @@ import com.tenmilelabs.recipescraper.model.ScrapedIngredient
 import com.tenmilelabs.recipescraper.model.ScrapedRecipe
 import com.tenmilelabs.recipescraper.util.cleanHtmlText
 import com.tenmilelabs.recipescraper.util.firstIntOrNull
+import com.tenmilelabs.recipescraper.util.firstNutritionIntOrNull
 import com.tenmilelabs.recipescraper.util.parseDurationToMinutes
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+
+// Per-serving plausibility bounds for values pulled out of a page's `nutrition` block — generous
+// enough to admit any real recipe, tight enough to reject an obviously mis-extracted number (a
+// percentage, a year, an unrelated id).
+private const val MAX_PLAUSIBLE_CALORIES = 5000
+private const val MAX_PLAUSIBLE_PROTEIN_GRAMS = 300
 
 /**
  * Maps one `Recipe`-typed JSON-LD object to a [ScrapedRecipe].
@@ -20,6 +27,7 @@ import kotlinx.serialization.json.contentOrNull
  */
 internal fun mapJsonLdRecipe(obj: JsonObject, sourceUrl: String): ScrapedRecipe? {
     val title = cleanHtmlText(obj.stringOrNull("name")) ?: return null
+    val nutrition = obj["nutrition"] as? JsonObject
 
     return ScrapedRecipe(
         title = title,
@@ -29,6 +37,10 @@ internal fun mapJsonLdRecipe(obj: JsonObject, sourceUrl: String): ScrapedRecipe?
         cookTimeMinutes = parseDurationToMinutes(obj.stringOrNull("cookTime")),
         totalTimeMinutes = parseDurationToMinutes(obj.stringOrNull("totalTime")),
         servings = obj["recipeYield"]?.yieldStrings()?.firstNotNullOfOrNull(::firstIntOrNull),
+        caloriesPerServing = nutrition?.stringOrNull("calories")
+            ?.let { firstNutritionIntOrNull(it, MAX_PLAUSIBLE_CALORIES) },
+        proteinGramsPerServing = nutrition?.stringOrNull("proteinContent")
+            ?.let { firstNutritionIntOrNull(it, MAX_PLAUSIBLE_PROTEIN_GRAMS) },
         ingredients = (obj["recipeIngredient"] ?: obj["ingredients"])?.toIngredients().orEmpty(),
         instructions = obj["recipeInstructions"]?.toInstructionSteps().orEmpty(),
         keywords = obj.keywords(),

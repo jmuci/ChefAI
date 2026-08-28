@@ -48,4 +48,18 @@ internal object MicrodataFixtures {
     """.trimIndent()
 
     val NO_RECIPE_SCOPE = "<html><body><div itemscope itemtype=\"https://schema.org/Article\">hello</div></body></html>"
+
+    val WITH_NUTRITION = """
+        <html><body>
+        <div itemscope itemtype="https://schema.org/Recipe">
+          <span itemprop="name">Nutrition Recipe</span>
+          <li itemprop="recipeIngredient">1 cup rice</li>
+          <li itemprop="recipeInstructions">Cook the rice.</li>
+          <div itemprop="nutrition" itemscope itemtype="https://schema.org/NutritionInformation">
+            <span itemprop="calories">270 calories</span>
+            <span itemprop="proteinContent">12 g</span>
+          </div>
+        </div>
+        </body></html>
+    """.trimIndent()
 }

@@ -40,3 +40,15 @@ private val FIRST_INT = Regex("\\d+")
 // Guards against picking up a stray number from prose ("Makes 24 cookies" is fine; a 4-digit
 // value is far more likely to be a year or an ID than a serving count).
 private const val MAX_PLAUSIBLE_SERVINGS = 999
+
+/**
+ * Extracts the first whole number from a nutrition value such as `"270 calories"` or `"12 g"`,
+ * truncating any decimal component (`"12.5 g"` → 12). Unlike [firstIntOrNull], zero is a legitimate
+ * result here — a diet soda's "0 calories" is a real published value, not a missing one — so only
+ * [maxPlausibleValue] guards against extracting something that clearly isn't this nutrient.
+ */
+internal fun firstNutritionIntOrNull(raw: String?, maxPlausibleValue: Int): Int? {
+    if (raw.isNullOrBlank()) return null
+    val digits = FIRST_INT.find(raw)?.value ?: return null
+    return digits.toIntOrNull()?.takeIf { it in 0..maxPlausibleValue }
+}
