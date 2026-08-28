@@ -1,9 +1,8 @@
 package com.tenmilelabs.chefai.mealplans.domain.shoppinglist
 
+import com.tenmilelabs.chefai.core.util.QuantityFormat
+import com.tenmilelabs.chefai.recipes.domain.scaling.RecipeScaling
 import java.util.UUID
-import kotlin.math.abs
-import kotlin.math.floor
-import kotlin.math.round
 
 /** One line on the list: an ingredient, how much of it, and whether it's been picked up. */
 data class ShoppingListItem(
@@ -48,6 +47,8 @@ object ShoppingListBuilder {
      * @param slotCountByRecipe how many slots each recipe fills in the plan. A recipe cooked twice
      *   in a week needs twice the shopping, and [ingredients] carries its rows only once.
      * @param plannedServings the plan's servings-per-meal; `0` or less disables scaling.
+     *   A recipe that published no yield of its own is scaled from
+     *   [RecipeScaling.DEFAULT_SERVINGS] rather than left alone, matching the details screen.
      * @param checkedKeys item keys already ticked off, from `shopping_list_checks`.
      */
     fun build(
@@ -61,8 +62,11 @@ object ShoppingListBuilder {
         val scaledRows = ingredients
             .filter { it.displayName.isNotBlank() }
             .map { row ->
-                val servingsFactor = if (plannedServings > 0 && row.recipeServings > 0) {
-                    plannedServings.toDouble() / row.recipeServings
+                // The recipe's own yield, or the assumed default when it never published one —
+                // the same fallback the recipe details screen scales from, so a plan and the
+                // recipe it came from never disagree about what "one serving" means.
+                val servingsFactor = if (plannedServings > 0) {
+                    plannedServings.toDouble() / RecipeScaling.baseServings(row.recipeServings)
                 } else {
                     1.0
                 }
@@ -126,12 +130,8 @@ object ShoppingListBuilder {
     private val WHITESPACE = Regex("\\s+")
 }
 
-/** "2", "0.5", "1.25" — at most two decimals, no trailing zeros, no scientific notation. */
-internal fun formatQuantity(value: Double): String {
-    val rounded = round(value * 100.0) / 100.0
-    return if (rounded == floor(rounded) && abs(rounded) < 1e15) {
-        rounded.toLong().toString()
-    } else {
-        rounded.toString().trimEnd('0').trimEnd('.')
-    }
-}
+/**
+ * Shopping-list amounts are aggregated totals — "how much do I buy" — so they read as decimals
+ * rather than the cooking fractions a single recipe's quantities use. See [QuantityFormat].
+ */
+internal fun formatQuantity(value: Double): String = QuantityFormat.decimal(value)

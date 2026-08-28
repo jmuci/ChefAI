@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.recipes.ui.details
 
+import android.content.res.Configuration
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -70,8 +71,10 @@ import com.tenmilelabs.chefai.core.ui.recipeImageModel
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.core.util.EmptyContent
 import com.tenmilelabs.chefai.core.util.LoadingContent
-import com.tenmilelabs.chefai.core.util.MathUtils
+import com.tenmilelabs.chefai.core.util.QuantityFormat
+import com.tenmilelabs.chefai.recipes.domain.scaling.RecipeScaling
 import com.tenmilelabs.chefai.recipes.ui.components.DeleteConfirmationDialog
+import com.tenmilelabs.chefai.recipes.ui.details.components.ServingsStepper
 import timber.log.Timber
 
 
@@ -102,22 +105,31 @@ fun RecipeDetailsScreen(
     if (uiState.isLoading) {
         LoadingContent()
     } else {
-        if (uiState.recipe != null) {
+        val recipe = uiState.recipe
+        if (recipe != null) {
             RecipeDetailsContent(
-                recipe = uiState.recipe!!,
-                onEditClick = onEditClick?.let { callback ->
-                    { callback(viewModel.recipeUuid) }
+                recipe = recipe,
+                onAction = { action ->
+                    when (action) {
+                        RecipeDetailsAction.EditClicked -> onEditClick?.invoke(viewModel.recipeUuid)
+                        RecipeDetailsAction.ToggleBookmark -> viewModel.toggleBookmark()
+                        RecipeDetailsAction.DeleteClicked -> viewModel.onDeleteClick()
+                        RecipeDetailsAction.ConfirmDelete -> viewModel.confirmDelete()
+                        RecipeDetailsAction.DismissDeleteDialog -> viewModel.dismissDeleteDialog()
+                        RecipeDetailsAction.ToggleCooked -> viewModel.onToggleCooked()
+                        is RecipeDetailsAction.ServingsChanged ->
+                            viewModel.onServingsChange(action.servings)
+                    }
                 },
+                servings = uiState.servings,
                 isBookmarked = uiState.isBookmarked,
-                onToggleBookmark = viewModel::toggleBookmark,
-                onDeleteClick = onNavigateBack?.let { { viewModel.onDeleteClick() } },
+                canEdit = onEditClick != null,
+                // Deleting navigates away, so the button is only offered when there is somewhere to go.
+                canDelete = onNavigateBack != null,
                 showDeleteConfirmation = uiState.showDeleteConfirmation,
-                onConfirmDelete = viewModel::confirmDelete,
-                onDismissDeleteDialog = viewModel::dismissDeleteDialog,
                 isDeleting = uiState.isDeleting,
                 showCookedToggle = uiState.showCookedToggle,
                 isCooked = uiState.isCooked,
-                onToggleCooked = viewModel::onToggleCooked,
             )
         } else {
             EmptyContent(
@@ -142,25 +154,40 @@ fun RecipeDetailsScreen(
     }
 }
 
+/**
+ * The recipe details screen, stateless.
+ *
+ * @param servings the portions the ingredient list is shown at; the quantities are scaled from
+ *   [recipe] to match, here rather than by the caller, so the stepper and the list can never
+ *   disagree about what they are showing.
+ * @param canEdit whether the caller has somewhere for the edit FAB to go.
+ * @param canDelete whether the caller has somewhere to navigate after a delete.
+ */
 @Composable
 fun RecipeDetailsContent(
     recipe: Recipe,
-    onEditClick: (() -> Unit)? = null,
+    onAction: (RecipeDetailsAction) -> Unit = {},
+    servings: ServingsUiState = ServingsUiState.forRecipeServings(recipe.servings),
     isBookmarked: Boolean = false,
-    onToggleBookmark: () -> Unit = {},
-    onDeleteClick: (() -> Unit)? = null,
+    canEdit: Boolean = false,
+    canDelete: Boolean = false,
     showDeleteConfirmation: Boolean = false,
-    onConfirmDelete: () -> Unit = {},
-    onDismissDeleteDialog: () -> Unit = {},
     isDeleting: Boolean = false,
     showCookedToggle: Boolean = false,
     isCooked: Boolean = false,
-    onToggleCooked: () -> Unit = {},
 ) {
     if (showDeleteConfirmation) {
         DeleteConfirmationDialog(
-            onConfirm = onConfirmDelete,
-            onDismiss = onDismissDeleteDialog,
+            onConfirm = { onAction(RecipeDetailsAction.ConfirmDelete) },
+            onDismiss = { onAction(RecipeDetailsAction.DismissDeleteDialog) },
+        )
+    }
+
+    val ingredients = remember(recipe.ingredients, servings.base, servings.current) {
+        RecipeScaling.scale(
+            ingredients = recipe.ingredients,
+            baseServings = servings.base,
+            targetServings = servings.current,
         )
     }
 
@@ -189,11 +216,11 @@ fun RecipeDetailsContent(
                 if (showCookedToggle) {
                     CookedToggleButton(
                         isCooked = isCooked,
-                        onToggle = onToggleCooked,
+                        onToggle = { onAction(RecipeDetailsAction.ToggleCooked) },
                         modifier = Modifier.padding(end = dimensionResource(id = R.dimen.padding_extra_small)),
                     )
                 }
-                IconButton(onClick = onToggleBookmark) {
+                IconButton(onClick = { onAction(RecipeDetailsAction.ToggleBookmark) }) {
                     Icon(
                         imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
                         contentDescription = stringResource(
@@ -203,9 +230,9 @@ fun RecipeDetailsContent(
                         tint = if (isBookmarked) Color(0xFFFFD700) else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (onDeleteClick != null) {
+                if (canDelete) {
                     IconButton(
-                        onClick = onDeleteClick,
+                        onClick = { onAction(RecipeDetailsAction.DeleteClicked) },
                         enabled = !isDeleting,
                         modifier = Modifier.testTag("DeleteRecipeButton"),
                     ) {
@@ -259,6 +286,14 @@ fun RecipeDetailsContent(
                 RecipeDescription(recipe.description)
                 Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_medium)))
             }
+
+            ServingsStepper(
+                servings = servings.current,
+                range = servings.range,
+                onServingsChange = { onAction(RecipeDetailsAction.ServingsChanged(it)) },
+                isEstimated = servings.isEstimated,
+            )
+            Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_medium)))
         }
 
         TabRow(selectedTabIndex = selectedTabIndex) {
@@ -275,14 +310,14 @@ fun RecipeDetailsContent(
         // Column above so the whole screen (header + tab content) scrolls as one, rather than the
         // tab section being squeezed into whatever space is left and scrolling independently.
         when (selectedTabIndex) {
-            0 -> IngredientsList(ingredients = recipe.ingredients)
+            0 -> IngredientsList(ingredients = ingredients)
             1 -> StepsList(steps = recipe.steps)
         }
     }
 
-    if (onEditClick != null) {
+    if (canEdit) {
         FloatingActionButton(
-            onClick = onEditClick,
+            onClick = { onAction(RecipeDetailsAction.EditClicked) },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(16.dp),
@@ -349,8 +384,11 @@ fun IngredientsList(ingredients: List<RecipeIngredient>) {
                         .padding(vertical = dimensionResource(id = R.dimen.padding_small)),
                     style = MaterialTheme.typography.bodyLarge
                 )
+                val amount = QuantityFormat.cooking(ingredient.quantity, ingredient.unit)
                 Text(
-                    text = MathUtils.removeTrailingZeros(ingredient.quantity.toString()) + " " + ingredient.unit,
+                    // A unitless ingredient reads "2", not "2 " — the shopping list's renderer
+                    // makes the same distinction.
+                    text = if (ingredient.unit.isBlank()) amount else "$amount ${ingredient.unit}",
                     modifier = Modifier
                         .padding(vertical = dimensionResource(id = R.dimen.padding_small)),
                     textAlign = TextAlign.End,
@@ -432,9 +470,38 @@ fun RecipeDetailsDeleteConfirmationPreview() {
     ChefAITheme {
         RecipeDetailsContent(
             recipe = RecipeData.recipe,
-            onDeleteClick = {},
+            canDelete = true,
             showDeleteConfirmation = true,
         )
+    }
+}
+
+@Preview(name = "Scaled to 8 portions", showBackground = true)
+@Preview(
+    name = "Scaled to 8 portions — dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+fun RecipeDetailsScaledPreview() {
+    ChefAITheme {
+        RecipeDetailsContent(
+            recipe = RecipeData.recipe,
+            servings = ServingsUiState.forRecipeServings(RecipeData.recipe.servings).copy(current = 8),
+        )
+    }
+}
+
+@Preview(name = "Recipe with no published yield", showBackground = true)
+@Preview(
+    name = "Recipe with no published yield — dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+fun RecipeDetailsEstimatedServingsPreview() {
+    ChefAITheme {
+        RecipeDetailsContent(recipe = RecipeData.recipe.copy(servings = 0))
     }
 }
 

@@ -14,6 +14,7 @@ import com.tenmilelabs.chefai.core.util.WhileUiSubscribed
 import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
+import com.tenmilelabs.chefai.recipes.domain.scaling.RecipeScaling
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
@@ -43,7 +44,64 @@ data class RecipesDetailsUiState(
     /** True when this recipe was opened from a meal plan slot, so a cooked toggle applies. */
     val showCookedToggle: Boolean = false,
     val isCooked: Boolean = false,
+    val servings: ServingsUiState = ServingsUiState.DEFAULT,
 )
+
+/** What the portions stepper renders: the chosen count and the counts it may be moved between. */
+data class ServingsUiState(
+    val current: Int,
+    /**
+     * The yield [current] is scaled against — the recipe's own, or [RecipeScaling.DEFAULT_SERVINGS]
+     * when it published none. Held rather than re-derived so the stepper and the ingredient list
+     * cannot end up dividing by different numbers.
+     */
+    val base: Int,
+    val range: IntRange,
+    /**
+     * True when the recipe never published a yield, so [base] is [RecipeScaling.DEFAULT_SERVINGS]
+     * rather than something the recipe actually said. Scaling is still correct in relative terms;
+     * the absolute number is an assumption worth surfacing.
+     */
+    val isEstimated: Boolean,
+) {
+    companion object {
+        /**
+         * Placeholder for the states that have no recipe yet (loading, error). Not flagged
+         * estimated: nothing was assumed about a recipe that hasn't arrived.
+         */
+        val DEFAULT = ServingsUiState(
+            current = RecipeScaling.DEFAULT_SERVINGS,
+            base = RecipeScaling.DEFAULT_SERVINGS,
+            range = RecipeScaling.servingsRange(RecipeScaling.DEFAULT_SERVINGS),
+            isEstimated = false,
+        )
+
+        /** The state a recipe opens at: its own yield, unscaled. */
+        fun forRecipeServings(recipeServings: Int): ServingsUiState {
+            val base = RecipeScaling.baseServings(recipeServings)
+            return ServingsUiState(
+                current = base,
+                base = base,
+                range = RecipeScaling.servingsRange(base),
+                isEstimated = recipeServings < RecipeScaling.MIN_SERVINGS,
+            )
+        }
+    }
+}
+
+/**
+ * Everything the user can do on the recipe details screen. One action type rather than a callback
+ * per control, so the screen's surface doesn't widen with every new interaction.
+ */
+sealed interface RecipeDetailsAction {
+    data object EditClicked : RecipeDetailsAction
+    data object ToggleBookmark : RecipeDetailsAction
+    data object DeleteClicked : RecipeDetailsAction
+    data object ConfirmDelete : RecipeDetailsAction
+    data object DismissDeleteDialog : RecipeDetailsAction
+    data object ToggleCooked : RecipeDetailsAction
+    data class ServingsChanged(val servings: Int) : RecipeDetailsAction
+}
 
 /** One-shot side effects emitted by [RecipeDetailsViewModel], consumed by the UI. */
 sealed interface RecipeDetailsEffect {
@@ -77,7 +135,7 @@ class RecipeDetailsViewModel @Inject constructor(
     private val collectionsRepository: CollectionsRepository,
     private val sessionManager: SessionManager,
     private val mealPlanRepository: MealPlanRepository,
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
     val recipeUuid: UUID = UUID.fromString(savedStateHandle[AppDestinationArgs.RECIPE_ID_ARG]!!)
@@ -136,6 +194,18 @@ class RecipeDetailsViewModel @Inject constructor(
         mealPlanRepository.observeMealPlanDay(ref.dayId).map { day -> day?.cookedAtFor(ref.slot) != null }
     } ?: flowOf(false)
 
+    /**
+     * The user's chosen portion count, or [SERVINGS_UNSET] while they haven't chosen one.
+     *
+     * Deliberately holds *only* the override rather than the effective value: the recipe stream
+     * re-emits on every unrelated write (a bookmark, a sync pull), and folding the recipe's own
+     * yield in here would reset the user's choice each time. It is backed by [SavedStateHandle] so
+     * the choice survives process death, and cleared implicitly by leaving the screen — scaling is
+     * a way of reading a recipe, not an edit to it.
+     */
+    private val _selectedServings: StateFlow<Int> =
+        savedStateHandle.getStateFlow(SELECTED_SERVINGS_KEY, SERVINGS_UNSET)
+
     private val _combinedState = combine(
         _isLoading, _recipeAsync, _userMessage, _isBookmarked, _deleteUi
     ) { isLoading, recipeAsync, userMessage, isBookmarked, deleteUi ->
@@ -143,8 +213,8 @@ class RecipeDetailsViewModel @Inject constructor(
     }
 
     val uiState: StateFlow<RecipesDetailsUiState> = combine(
-        _combinedState, _isCooked
-    ) { combined, isCooked ->
+        _combinedState, _isCooked, _selectedServings
+    ) { combined, isCooked, selectedServings ->
         when (val recipeAsync = combined.recipeAsync) {
             Async.Loading -> {
                 RecipesDetailsUiState(isLoading = true)
@@ -159,8 +229,17 @@ class RecipeDetailsViewModel @Inject constructor(
             }
 
             is Async.Success -> {
+                val recipe = recipeAsync.data
+                val base = ServingsUiState.forRecipeServings(recipe.servings)
+                // An out-of-range override (SERVINGS_UNSET, or a value saved for a recipe whose
+                // yield has since been edited) falls back to the recipe's own yield.
+                val servings = if (selectedServings in base.range) {
+                    base.copy(current = selectedServings)
+                } else {
+                    base
+                }
                 RecipesDetailsUiState(
-                    recipe = recipeAsync.data,
+                    recipe = recipe,
                     isLoading = combined.isLoading,
                     isBookmarked = combined.isBookmarked,
                     userMessage = combined.userMessage,
@@ -168,6 +247,7 @@ class RecipeDetailsViewModel @Inject constructor(
                     isDeleting = combined.deleteUi.isDeleting,
                     showCookedToggle = mealPlanSlotRef != null,
                     isCooked = isCooked,
+                    servings = servings,
                 )
             }
         }
@@ -180,6 +260,18 @@ class RecipeDetailsViewModel @Inject constructor(
 
     fun snackbarMessageShown() {
         _userMessage.value = null
+    }
+
+    /**
+     * Rescales the ingredient list to [servings].
+     *
+     * Stored raw. Clamping here would have to read the range out of [uiState], which is the
+     * placeholder `1..10` until the recipe loads — that would silently cap a batch recipe's own
+     * yield at 10. The combine above validates the stored value against the recipe that actually
+     * arrived and falls back to its yield when it doesn't fit.
+     */
+    fun onServingsChange(servings: Int) {
+        savedStateHandle[SELECTED_SERVINGS_KEY] = servings
     }
 
     fun toggleBookmark() {
@@ -228,5 +320,12 @@ class RecipeDetailsViewModel @Inject constructor(
                 _userMessage.value = R.string.delete_recipe_error
             }
         }
+    }
+
+    private companion object {
+        const val SELECTED_SERVINGS_KEY = "recipeDetailsSelectedServings"
+
+        /** No choice made yet. Never a valid portion count, so it can't collide with one. */
+        const val SERVINGS_UNSET = 0
     }
 }

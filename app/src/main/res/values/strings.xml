@@ -76,6 +76,16 @@
     <string name="placeholder_search">Search…</string>
     <string name="placeholder_servings">4</string>
     <string name="placeholder_unit">cup, tsp…</string>
+
+    <!-- Recipe scaling: the portions stepper on the recipe details screen -->
+    <string name="portions_label">Portions</string>
+    <string name="portions_estimated">This recipe didn\'t say how much it makes — scaling from %1$d.</string>
+    <string name="decrease_portions_content_description">Decrease portions</string>
+    <string name="increase_portions_content_description">Increase portions</string>
+    <plurals name="portions_count">
+        <item quantity="one">%1$d portion</item>
+        <item quantity="other">%1$d portions</item>
+    </plurals>
     <string name="recipe_details_error">Failed to open the detailed view. Please try again later.</string>
     <string name="recipe_details_screen_title">Recipe Steps</string>
     <string name="recipe_hyperlink">See original recipe online</string>
