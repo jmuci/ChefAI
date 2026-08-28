@@ -12,10 +12,11 @@ import javax.inject.Inject
 /**
  * Fills a meal plan from the recipes already on the device.
  *
- * The fallback for when the backend generator cannot run: it is unreachable, it errored, or the
- * session is anonymous (anonymous sessions never receive pulled meal plans, so the server could not
- * deliver a schedule even if it produced one). Without it a plan created offline stays an empty
- * DRAFT forever.
+ * The universal fallback when the primary generation path — see
+ * [GenerateMealPlanUseCase] — doesn't fill the plan: the server round trip is unreachable or
+ * errors, the anonymous-capable stateless endpoint fails, or the session is anonymous with
+ * `COLLECTION_ONLY` (a query the server can't answer, since "my collection" exists only on this
+ * device). Without it a plan created offline stays an empty DRAFT forever.
  *
  * A server-generated schedule for the same plan overwrites these days on the next pull, so this is
  * a stop-gap rather than a competing source of truth.

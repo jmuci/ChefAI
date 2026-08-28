@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.mealplans.domain.repository
 
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay
+import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
 import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
@@ -23,6 +24,19 @@ interface MealPlanRepository {
     suspend fun deleteMealPlan(uuid: UUID)
 
     suspend fun requestGeneration(planId: UUID): Result<Unit>
+
+    /**
+     * Fills [planId] via the anonymous-capable stateless generation endpoint, persisting any
+     * recipes the device does not already have. Used when the session is anonymous — an
+     * authenticated session uses [requestGeneration] instead, which the server can associate with
+     * a stored plan.
+     *
+     * @return the number of days written, or [Result.failure] on a network/server error.
+     */
+    suspend fun generateStatelessAndSave(
+        planId: UUID,
+        preferences: MealPlanPreferences,
+    ): Result<Int>
 
     /**
      * Marks a single planned meal cooked, or clears the mark when [cooked] is `false`.
