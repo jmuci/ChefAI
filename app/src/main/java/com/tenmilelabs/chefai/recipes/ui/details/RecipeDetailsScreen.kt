@@ -328,6 +328,15 @@ private fun RecipeDescription(description: String) {
 
 @Composable
 fun IngredientsList(ingredients: List<RecipeIngredient>) {
+    if (ingredients.isEmpty()) {
+        Text(
+            text = stringResource(R.string.no_ingredients_listed),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_medium)),
+        )
+        return
+    }
     Column(modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_medium))) {
         ingredients.forEach { ingredient ->
             Row {
@@ -353,6 +362,15 @@ fun IngredientsList(ingredients: List<RecipeIngredient>) {
 
 @Composable
 fun StepsList(steps: List<RecipeStep>) {
+    if (steps.isEmpty()) {
+        Text(
+            text = stringResource(R.string.no_steps_listed),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_medium)),
+        )
+        return
+    }
     Column(modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_medium))) {
         steps.sortedBy { it.orderIndex }.forEach { step ->
             Row(
@@ -362,7 +380,7 @@ fun StepsList(steps: List<RecipeStep>) {
                 verticalAlignment = Alignment.Top
             ) {
                 Text(
-                    text = "${step.orderIndex}.",
+                    text = "${step.orderIndex + 1}.",
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(end = dimensionResource(id = R.dimen.padding_small))

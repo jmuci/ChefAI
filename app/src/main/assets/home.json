@@ -29,10 +29,10 @@
       "type": "carousel",
       "id": "carousel-italian-classics",
       "items": [
-        { "type": "large_card",   "id": "italian-1", "recipeId": "dead0000-cafe-4000-8000-000000000106" },
+        { "type": "large_card", "id": "italian-1", "recipeId": "dead0000-cafe-4000-8000-000000000106" },
         { "type": "squared_card", "id": "italian-2", "recipeId": "dead0000-cafe-4000-8000-000000000107" },
         { "type": "squared_card", "id": "italian-3", "recipeId": "dead0000-cafe-4000-8000-000000000108" },
-        { "type": "large_card",   "id": "italian-4", "recipeId": "dead0000-cafe-4000-8000-000000000109" }
+        { "type": "large_card", "id": "italian-4", "recipeId": "dead0000-cafe-4000-8000-000000000109" }
       ]
     },
     {
@@ -118,8 +118,31 @@
         "creatorId": "dead0000-cafe-4000-8000-000000000001",
         "privacy": "PUBLIC",
         "updatedAt": 1773792000000,
-        "tagIds": ["dead0000-cafe-4000-8000-000000000016"],
-        "labelIds": ["dead0000-cafe-4000-8000-000000000020"]
+        "tagIds": [
+          "dead0000-cafe-4000-8000-000000000016"
+        ],
+        "labelIds": [
+          "dead0000-cafe-4000-8000-000000000020"
+        ],
+        "ingredients": [
+          { "name": "Bone-in chicken breasts", "quantity": 4, "unit": "each" },
+          { "name": "Breadcrumbs", "quantity": 1, "unit": "cup" },
+          { "name": "Fresh parsley, chopped", "quantity": 2, "unit": "tbsp" },
+          { "name": "Fresh rosemary, chopped", "quantity": 1, "unit": "tbsp" },
+          { "name": "Garlic, minced", "quantity": 3, "unit": "cloves" },
+          { "name": "Dijon mustard", "quantity": 2, "unit": "tbsp" },
+          { "name": "Olive oil", "quantity": 3, "unit": "tbsp" },
+          { "name": "Salt", "quantity": 1, "unit": "tsp" },
+          { "name": "Black pepper", "quantity": 0.5, "unit": "tsp" }
+        ],
+        "steps": [
+          { "orderIndex": 0, "instruction": "Preheat the oven to 200°C (400°F)." },
+          { "orderIndex": 1, "instruction": "Mix the breadcrumbs, parsley, rosemary and garlic in a bowl." },
+          { "orderIndex": 2, "instruction": "Brush the chicken breasts with Dijon mustard and olive oil, then season with salt and pepper." },
+          { "orderIndex": 3, "instruction": "Press the herb breadcrumb mixture onto the top of each chicken breast." },
+          { "orderIndex": 4, "instruction": "Roast for 35-40 minutes until the crust is golden and the chicken reaches 74°C (165°F) internally." },
+          { "orderIndex": 5, "instruction": "Rest for 5 minutes before serving." }
+        ]
       },
       {
         "uuid": "dead0000-cafe-4000-8000-000000000102",
@@ -133,8 +156,32 @@
         "creatorId": "dead0000-cafe-4000-8000-000000000001",
         "privacy": "PUBLIC",
         "updatedAt": 1773792000000,
-        "tagIds": ["dead0000-cafe-4000-8000-000000000010", "dead0000-cafe-4000-8000-000000000015"],
-        "labelIds": ["dead0000-cafe-4000-8000-000000000021"]
+        "tagIds": [
+          "dead0000-cafe-4000-8000-000000000010",
+          "dead0000-cafe-4000-8000-000000000015"
+        ],
+        "labelIds": [
+          "dead0000-cafe-4000-8000-000000000021"
+        ],
+        "ingredients": [
+          { "name": "Arborio rice", "quantity": 1, "unit": "cup" },
+          { "name": "Mixed mushrooms, sliced", "quantity": 200, "unit": "g" },
+          { "name": "Vegetable stock", "quantity": 750, "unit": "ml" },
+          { "name": "White wine", "quantity": 120, "unit": "ml" },
+          { "name": "Onion, finely chopped", "quantity": 1, "unit": "each" },
+          { "name": "Garlic, minced", "quantity": 2, "unit": "cloves" },
+          { "name": "Parmesan, grated", "quantity": 50, "unit": "g" },
+          { "name": "Butter", "quantity": 2, "unit": "tbsp" },
+          { "name": "Olive oil", "quantity": 1, "unit": "tbsp" }
+        ],
+        "steps": [
+          { "orderIndex": 0, "instruction": "Warm the vegetable stock in a saucepan and keep it at a gentle simmer." },
+          { "orderIndex": 1, "instruction": "Sauté the mushrooms in olive oil until golden, then set aside." },
+          { "orderIndex": 2, "instruction": "In the same pan, cook the onion and garlic in butter until soft." },
+          { "orderIndex": 3, "instruction": "Add the rice and stir for a minute, then pour in the white wine and let it absorb." },
+          { "orderIndex": 4, "instruction": "Add the warm stock one ladle at a time, stirring until absorbed before adding more, about 18-20 minutes." },
+          { "orderIndex": 5, "instruction": "Stir in the mushrooms and Parmesan, season to taste, and serve." }
+        ]
       },
       {
         "uuid": "dead0000-cafe-4000-8000-000000000103",
@@ -148,8 +195,29 @@
         "creatorId": "dead0000-cafe-4000-8000-000000000001",
         "privacy": "PUBLIC",
         "updatedAt": 1773792000000,
-        "tagIds": ["dead0000-cafe-4000-8000-000000000012", "dead0000-cafe-4000-8000-000000000013"],
-        "labelIds": ["dead0000-cafe-4000-8000-000000000021"]
+        "tagIds": [
+          "dead0000-cafe-4000-8000-000000000012",
+          "dead0000-cafe-4000-8000-000000000013"
+        ],
+        "labelIds": [
+          "dead0000-cafe-4000-8000-000000000021"
+        ],
+        "ingredients": [
+          { "name": "Sourdough bread", "quantity": 2, "unit": "slices" },
+          { "name": "Ripe avocado", "quantity": 1, "unit": "each" },
+          { "name": "Egg", "quantity": 1, "unit": "each" },
+          { "name": "Lemon juice", "quantity": 1, "unit": "tsp" },
+          { "name": "Chilli flakes", "quantity": 0.25, "unit": "tsp" },
+          { "name": "Salt", "quantity": 1, "unit": "pinch" },
+          { "name": "White vinegar", "quantity": 1, "unit": "tsp" }
+        ],
+        "steps": [
+          { "orderIndex": 0, "instruction": "Toast the sourdough slices until golden." },
+          { "orderIndex": 1, "instruction": "Mash the avocado with lemon juice and a pinch of salt." },
+          { "orderIndex": 2, "instruction": "Bring a pot of water to a gentle simmer, add the vinegar, and swirl to create a whirlpool." },
+          { "orderIndex": 3, "instruction": "Crack the egg into the water and poach for 3 minutes, then remove with a slotted spoon." },
+          { "orderIndex": 4, "instruction": "Spread the mashed avocado on the toast, top with the poached egg, and sprinkle with chilli flakes." }
+        ]
       },
       {
         "uuid": "dead0000-cafe-4000-8000-000000000104",
@@ -163,8 +231,29 @@
         "creatorId": "dead0000-cafe-4000-8000-000000000001",
         "privacy": "PUBLIC",
         "updatedAt": 1773792000000,
-        "tagIds": ["dead0000-cafe-4000-8000-000000000015"],
-        "labelIds": ["dead0000-cafe-4000-8000-000000000022"]
+        "tagIds": [
+          "dead0000-cafe-4000-8000-000000000015"
+        ],
+        "labelIds": [
+          "dead0000-cafe-4000-8000-000000000022"
+        ],
+        "ingredients": [
+          { "name": "Green curry paste", "quantity": 3, "unit": "tbsp" },
+          { "name": "Coconut milk", "quantity": 400, "unit": "ml" },
+          { "name": "Mixed vegetables (bell pepper, zucchini, bamboo shoots)", "quantity": 300, "unit": "g" },
+          { "name": "Chicken breast, sliced", "quantity": 300, "unit": "g" },
+          { "name": "Fish sauce", "quantity": 1, "unit": "tbsp" },
+          { "name": "Palm sugar", "quantity": 1, "unit": "tsp" },
+          { "name": "Lemongrass stalk", "quantity": 1, "unit": "each" },
+          { "name": "Fresh basil leaves", "quantity": 0.5, "unit": "cup" }
+        ],
+        "steps": [
+          { "orderIndex": 0, "instruction": "Heat a little coconut milk in a pan and fry the curry paste until fragrant." },
+          { "orderIndex": 1, "instruction": "Add the chicken and cook until it starts to brown." },
+          { "orderIndex": 2, "instruction": "Pour in the remaining coconut milk and the lemongrass, then bring to a simmer." },
+          { "orderIndex": 3, "instruction": "Add the vegetables and cook for 10-12 minutes until tender." },
+          { "orderIndex": 4, "instruction": "Stir in the fish sauce and palm sugar, then finish with fresh basil leaves before serving." }
+        ]
       },
       {
         "uuid": "dead0000-cafe-4000-8000-000000000105",
@@ -178,8 +267,27 @@
         "creatorId": "dead0000-cafe-4000-8000-000000000001",
         "privacy": "PUBLIC",
         "updatedAt": 1773792000000,
-        "tagIds": ["dead0000-cafe-4000-8000-000000000012"],
-        "labelIds": []
+        "tagIds": [
+          "dead0000-cafe-4000-8000-000000000012"
+        ],
+        "labelIds": [],
+        "ingredients": [
+          { "name": "Beef sirloin, thinly sliced", "quantity": 300, "unit": "g" },
+          { "name": "Bell peppers, sliced", "quantity": 2, "unit": "each" },
+          { "name": "Broccoli florets", "quantity": 1, "unit": "cup" },
+          { "name": "Garlic, minced", "quantity": 2, "unit": "cloves" },
+          { "name": "Ginger, grated", "quantity": 1, "unit": "tsp" },
+          { "name": "Oyster sauce", "quantity": 2, "unit": "tbsp" },
+          { "name": "Soy sauce", "quantity": 1, "unit": "tbsp" },
+          { "name": "Vegetable oil", "quantity": 2, "unit": "tbsp" }
+        ],
+        "steps": [
+          { "orderIndex": 0, "instruction": "Toss the beef with a little soy sauce and set aside to marinate for 5 minutes." },
+          { "orderIndex": 1, "instruction": "Heat the oil in a wok over high heat and stir-fry the beef until browned, then remove." },
+          { "orderIndex": 2, "instruction": "Add the garlic and ginger to the wok and stir-fry for 30 seconds." },
+          { "orderIndex": 3, "instruction": "Add the peppers and broccoli, stir-frying until crisp-tender." },
+          { "orderIndex": 4, "instruction": "Return the beef to the wok, add the oyster sauce, and toss together for a minute before serving." }
+        ]
       },
       {
         "uuid": "dead0000-cafe-4000-8000-000000000106",
@@ -193,8 +301,27 @@
         "creatorId": "dead0000-cafe-4000-8000-000000000001",
         "privacy": "PUBLIC",
         "updatedAt": 1773792000000,
-        "tagIds": ["dead0000-cafe-4000-8000-000000000010"],
-        "labelIds": ["dead0000-cafe-4000-8000-000000000020"]
+        "tagIds": [
+          "dead0000-cafe-4000-8000-000000000010"
+        ],
+        "labelIds": [
+          "dead0000-cafe-4000-8000-000000000020"
+        ],
+        "ingredients": [
+          { "name": "Spaghetti", "quantity": 200, "unit": "g" },
+          { "name": "Guanciale, diced", "quantity": 100, "unit": "g" },
+          { "name": "Eggs", "quantity": 2, "unit": "each" },
+          { "name": "Pecorino Romano, grated", "quantity": 50, "unit": "g" },
+          { "name": "Black pepper, freshly ground", "quantity": 1, "unit": "tsp" }
+        ],
+        "steps": [
+          { "orderIndex": 0, "instruction": "Bring a large pot of salted water to a boil and cook the spaghetti until al dente." },
+          { "orderIndex": 1, "instruction": "While the pasta cooks, fry the guanciale in a pan until crisp." },
+          { "orderIndex": 2, "instruction": "Whisk the eggs with the Pecorino and black pepper in a bowl." },
+          { "orderIndex": 3, "instruction": "Drain the pasta, reserving some cooking water, then toss it with the guanciale off the heat." },
+          { "orderIndex": 4, "instruction": "Quickly stir in the egg mixture, adding a splash of pasta water until creamy." },
+          { "orderIndex": 5, "instruction": "Serve immediately with extra Pecorino and black pepper." }
+        ]
       },
       {
         "uuid": "dead0000-cafe-4000-8000-000000000107",
@@ -208,8 +335,29 @@
         "creatorId": "dead0000-cafe-4000-8000-000000000001",
         "privacy": "PUBLIC",
         "updatedAt": 1773792000000,
-        "tagIds": ["dead0000-cafe-4000-8000-000000000010", "dead0000-cafe-4000-8000-000000000015"],
-        "labelIds": ["dead0000-cafe-4000-8000-000000000021"]
+        "tagIds": [
+          "dead0000-cafe-4000-8000-000000000010",
+          "dead0000-cafe-4000-8000-000000000015"
+        ],
+        "labelIds": [
+          "dead0000-cafe-4000-8000-000000000021"
+        ],
+        "ingredients": [
+          { "name": "Pizza dough", "quantity": 1, "unit": "ball" },
+          { "name": "San Marzano tomatoes, crushed", "quantity": 200, "unit": "g" },
+          { "name": "Fresh mozzarella, torn", "quantity": 125, "unit": "g" },
+          { "name": "Fresh basil leaves", "quantity": 8, "unit": "each" },
+          { "name": "Olive oil", "quantity": 2, "unit": "tbsp" },
+          { "name": "Salt", "quantity": 0.5, "unit": "tsp" }
+        ],
+        "steps": [
+          { "orderIndex": 0, "instruction": "Preheat the oven (with a pizza stone if available) to its highest setting." },
+          { "orderIndex": 1, "instruction": "Stretch the dough out into a round on a floured surface." },
+          { "orderIndex": 2, "instruction": "Spread the crushed tomatoes over the dough, leaving a border for the crust." },
+          { "orderIndex": 3, "instruction": "Scatter the mozzarella over the top and drizzle with olive oil and salt." },
+          { "orderIndex": 4, "instruction": "Bake for 10-12 minutes until the crust is blistered and golden." },
+          { "orderIndex": 5, "instruction": "Top with fresh basil leaves before slicing and serving." }
+        ]
       },
       {
         "uuid": "dead0000-cafe-4000-8000-000000000108",
@@ -223,8 +371,27 @@
         "creatorId": "dead0000-cafe-4000-8000-000000000001",
         "privacy": "PUBLIC",
         "updatedAt": 1773792000000,
-        "tagIds": ["dead0000-cafe-4000-8000-000000000010", "dead0000-cafe-4000-8000-000000000015"],
-        "labelIds": []
+        "tagIds": [
+          "dead0000-cafe-4000-8000-000000000010",
+          "dead0000-cafe-4000-8000-000000000015"
+        ],
+        "labelIds": [],
+        "ingredients": [
+          { "name": "Penne", "quantity": 200, "unit": "g" },
+          { "name": "Canned tomatoes", "quantity": 400, "unit": "g" },
+          { "name": "Garlic, sliced", "quantity": 3, "unit": "cloves" },
+          { "name": "Red chilli, sliced", "quantity": 1, "unit": "each" },
+          { "name": "Olive oil", "quantity": 3, "unit": "tbsp" },
+          { "name": "Fresh parsley, chopped", "quantity": 2, "unit": "tbsp" },
+          { "name": "Salt", "quantity": 1, "unit": "tsp" }
+        ],
+        "steps": [
+          { "orderIndex": 0, "instruction": "Cook the penne in salted boiling water until al dente." },
+          { "orderIndex": 1, "instruction": "Meanwhile, gently fry the garlic and chilli in olive oil until fragrant, not browned." },
+          { "orderIndex": 2, "instruction": "Add the canned tomatoes and simmer for 12-15 minutes, breaking them up with a spoon." },
+          { "orderIndex": 3, "instruction": "Season the sauce with salt, then toss in the drained pasta." },
+          { "orderIndex": 4, "instruction": "Finish with fresh parsley and serve." }
+        ]
       },
       {
         "uuid": "dead0000-cafe-4000-8000-000000000109",
@@ -238,8 +405,28 @@
         "creatorId": "dead0000-cafe-4000-8000-000000000001",
         "privacy": "PUBLIC",
         "updatedAt": 1773792000000,
-        "tagIds": ["dead0000-cafe-4000-8000-000000000010", "dead0000-cafe-4000-8000-000000000014"],
-        "labelIds": ["dead0000-cafe-4000-8000-000000000020"]
+        "tagIds": [
+          "dead0000-cafe-4000-8000-000000000010",
+          "dead0000-cafe-4000-8000-000000000014"
+        ],
+        "labelIds": [
+          "dead0000-cafe-4000-8000-000000000020"
+        ],
+        "ingredients": [
+          { "name": "Ladyfingers", "quantity": 24, "unit": "each" },
+          { "name": "Mascarpone", "quantity": 500, "unit": "g" },
+          { "name": "Eggs, separated", "quantity": 4, "unit": "each" },
+          { "name": "Sugar", "quantity": 100, "unit": "g" },
+          { "name": "Strong brewed espresso, cooled", "quantity": 300, "unit": "ml" },
+          { "name": "Cocoa powder", "quantity": 2, "unit": "tbsp" }
+        ],
+        "steps": [
+          { "orderIndex": 0, "instruction": "Whisk the egg yolks with sugar until pale, then fold in the mascarpone." },
+          { "orderIndex": 1, "instruction": "In a separate bowl, whisk the egg whites to soft peaks and fold into the mascarpone mixture." },
+          { "orderIndex": 2, "instruction": "Quickly dip each ladyfinger in the cooled espresso and layer them in a dish." },
+          { "orderIndex": 3, "instruction": "Spread half the mascarpone mixture over the ladyfingers, then repeat with a second layer." },
+          { "orderIndex": 4, "instruction": "Chill for at least 4 hours, then dust with cocoa powder before serving." }
+        ]
       },
       {
         "uuid": "dead0000-cafe-4000-8000-00000000010a",
@@ -253,8 +440,29 @@
         "creatorId": "dead0000-cafe-4000-8000-000000000001",
         "privacy": "PUBLIC",
         "updatedAt": 1773792000000,
-        "tagIds": ["dead0000-cafe-4000-8000-000000000013", "dead0000-cafe-4000-8000-000000000015"],
-        "labelIds": ["dead0000-cafe-4000-8000-000000000022"]
+        "tagIds": [
+          "dead0000-cafe-4000-8000-000000000013",
+          "dead0000-cafe-4000-8000-000000000015"
+        ],
+        "labelIds": [
+          "dead0000-cafe-4000-8000-000000000022"
+        ],
+        "ingredients": [
+          { "name": "Quinoa", "quantity": 1, "unit": "cup" },
+          { "name": "Chickpeas, drained", "quantity": 1, "unit": "can" },
+          { "name": "Kale, chopped", "quantity": 2, "unit": "cups" },
+          { "name": "Lemon, juiced", "quantity": 1, "unit": "each" },
+          { "name": "Tahini", "quantity": 2, "unit": "tbsp" },
+          { "name": "Olive oil", "quantity": 2, "unit": "tbsp" },
+          { "name": "Salt", "quantity": 0.5, "unit": "tsp" }
+        ],
+        "steps": [
+          { "orderIndex": 0, "instruction": "Cook the quinoa according to package directions and let it cool slightly." },
+          { "orderIndex": 1, "instruction": "Toss the chickpeas with olive oil and roast at 200°C (400°F) for 15 minutes until crisp." },
+          { "orderIndex": 2, "instruction": "Whisk together the tahini, lemon juice, and a splash of water to make the dressing." },
+          { "orderIndex": 3, "instruction": "Massage the kale with a little olive oil to soften it." },
+          { "orderIndex": 4, "instruction": "Combine the quinoa, kale, and roasted chickpeas, then drizzle with the tahini dressing before serving." }
+        ]
       },
       {
         "uuid": "dead0000-cafe-4000-8000-00000000010b",
@@ -268,8 +476,29 @@
         "creatorId": "dead0000-cafe-4000-8000-000000000001",
         "privacy": "PUBLIC",
         "updatedAt": 1773792000000,
-        "tagIds": ["dead0000-cafe-4000-8000-000000000011", "dead0000-cafe-4000-8000-000000000013"],
-        "labelIds": ["dead0000-cafe-4000-8000-000000000020"]
+        "tagIds": [
+          "dead0000-cafe-4000-8000-000000000011",
+          "dead0000-cafe-4000-8000-000000000013"
+        ],
+        "labelIds": [
+          "dead0000-cafe-4000-8000-000000000020"
+        ],
+        "ingredients": [
+          { "name": "Salmon fillets", "quantity": 2, "unit": "each" },
+          { "name": "Asparagus, trimmed", "quantity": 200, "unit": "g" },
+          { "name": "Butter", "quantity": 2, "unit": "tbsp" },
+          { "name": "Lemon", "quantity": 1, "unit": "each" },
+          { "name": "Garlic, minced", "quantity": 1, "unit": "clove" },
+          { "name": "Salt", "quantity": 0.5, "unit": "tsp" },
+          { "name": "Black pepper", "quantity": 0.25, "unit": "tsp" }
+        ],
+        "steps": [
+          { "orderIndex": 0, "instruction": "Season the salmon fillets with salt and pepper." },
+          { "orderIndex": 1, "instruction": "Heat a pan over medium-high heat and sear the salmon skin-side down for 4-5 minutes." },
+          { "orderIndex": 2, "instruction": "Flip the salmon and cook for another 3-4 minutes until just cooked through." },
+          { "orderIndex": 3, "instruction": "In a separate pan, sauté the asparagus with garlic until tender-crisp." },
+          { "orderIndex": 4, "instruction": "Melt the butter with a squeeze of lemon juice and drizzle over the salmon and asparagus before serving." }
+        ]
       },
       {
         "uuid": "dead0000-cafe-4000-8000-00000000010c",
@@ -283,8 +512,23 @@
         "creatorId": "dead0000-cafe-4000-8000-000000000001",
         "privacy": "PUBLIC",
         "updatedAt": 1773792000000,
-        "tagIds": ["dead0000-cafe-4000-8000-000000000012", "dead0000-cafe-4000-8000-000000000013"],
-        "labelIds": []
+        "tagIds": [
+          "dead0000-cafe-4000-8000-000000000012",
+          "dead0000-cafe-4000-8000-000000000013"
+        ],
+        "labelIds": [],
+        "ingredients": [
+          { "name": "Greek yogurt", "quantity": 1, "unit": "cup" },
+          { "name": "Granola", "quantity": 0.5, "unit": "cup" },
+          { "name": "Mixed berries", "quantity": 0.5, "unit": "cup" },
+          { "name": "Honey", "quantity": 1, "unit": "tbsp" }
+        ],
+        "steps": [
+          { "orderIndex": 0, "instruction": "Spoon a layer of Greek yogurt into a glass." },
+          { "orderIndex": 1, "instruction": "Add a layer of granola, followed by a layer of mixed berries." },
+          { "orderIndex": 2, "instruction": "Repeat the layers until the glass is full." },
+          { "orderIndex": 3, "instruction": "Drizzle honey over the top before serving." }
+        ]
       },
       {
         "uuid": "dead0000-cafe-4000-8000-00000000010d",
@@ -298,8 +542,24 @@
         "creatorId": "dead0000-cafe-4000-8000-000000000001",
         "privacy": "PUBLIC",
         "updatedAt": 1773792000000,
-        "tagIds": ["dead0000-cafe-4000-8000-000000000012", "dead0000-cafe-4000-8000-000000000015"],
-        "labelIds": []
+        "tagIds": [
+          "dead0000-cafe-4000-8000-000000000012",
+          "dead0000-cafe-4000-8000-000000000015"
+        ],
+        "labelIds": [],
+        "ingredients": [
+          { "name": "Whole-wheat tortilla", "quantity": 1, "unit": "each" },
+          { "name": "Hummus", "quantity": 3, "unit": "tbsp" },
+          { "name": "Roasted red peppers, sliced", "quantity": 0.25, "unit": "cup" },
+          { "name": "Cucumber, sliced", "quantity": 0.25, "unit": "each" },
+          { "name": "Baby spinach", "quantity": 0.5, "unit": "cup" }
+        ],
+        "steps": [
+          { "orderIndex": 0, "instruction": "Spread the hummus evenly over the tortilla." },
+          { "orderIndex": 1, "instruction": "Layer the roasted peppers, cucumber, and spinach over one half of the tortilla." },
+          { "orderIndex": 2, "instruction": "Fold in the sides and roll the tortilla up tightly." },
+          { "orderIndex": 3, "instruction": "Slice in half and serve." }
+        ]
       },
       {
         "uuid": "dead0000-cafe-4000-8000-00000000010e",
@@ -313,8 +573,29 @@
         "creatorId": "dead0000-cafe-4000-8000-000000000001",
         "privacy": "PUBLIC",
         "updatedAt": 1773792000000,
-        "tagIds": ["dead0000-cafe-4000-8000-000000000011", "dead0000-cafe-4000-8000-000000000012"],
-        "labelIds": ["dead0000-cafe-4000-8000-000000000021"]
+        "tagIds": [
+          "dead0000-cafe-4000-8000-000000000011",
+          "dead0000-cafe-4000-8000-000000000012"
+        ],
+        "labelIds": [
+          "dead0000-cafe-4000-8000-000000000021"
+        ],
+        "ingredients": [
+          { "name": "Shrimp, peeled and deveined", "quantity": 400, "unit": "g" },
+          { "name": "Butter", "quantity": 3, "unit": "tbsp" },
+          { "name": "Garlic, minced", "quantity": 4, "unit": "cloves" },
+          { "name": "White wine", "quantity": 60, "unit": "ml" },
+          { "name": "Fresh parsley, chopped", "quantity": 2, "unit": "tbsp" },
+          { "name": "Lemon", "quantity": 0.5, "unit": "each" },
+          { "name": "Salt", "quantity": 0.5, "unit": "tsp" }
+        ],
+        "steps": [
+          { "orderIndex": 0, "instruction": "Melt the butter in a large pan over medium heat and add the garlic, cooking until fragrant." },
+          { "orderIndex": 1, "instruction": "Add the shrimp in a single layer and cook for 1-2 minutes per side until pink." },
+          { "orderIndex": 2, "instruction": "Pour in the white wine and let it reduce for a minute." },
+          { "orderIndex": 3, "instruction": "Squeeze the lemon over the shrimp and season with salt." },
+          { "orderIndex": 4, "instruction": "Garnish with fresh parsley and serve immediately." }
+        ]
       },
       {
         "uuid": "dead0000-cafe-4000-8000-00000000010f",
@@ -328,8 +609,29 @@
         "creatorId": "dead0000-cafe-4000-8000-000000000001",
         "privacy": "PUBLIC",
         "updatedAt": 1773792000000,
-        "tagIds": ["dead0000-cafe-4000-8000-000000000011"],
-        "labelIds": ["dead0000-cafe-4000-8000-000000000022"]
+        "tagIds": [
+          "dead0000-cafe-4000-8000-000000000011"
+        ],
+        "labelIds": [
+          "dead0000-cafe-4000-8000-000000000022"
+        ],
+        "ingredients": [
+          { "name": "White fish fillets (cod)", "quantity": 500, "unit": "g" },
+          { "name": "Corn tortillas", "quantity": 8, "unit": "each" },
+          { "name": "Flour", "quantity": 0.5, "unit": "cup" },
+          { "name": "Beer or sparkling water", "quantity": 180, "unit": "ml" },
+          { "name": "Cabbage, shredded", "quantity": 2, "unit": "cups" },
+          { "name": "Sour cream", "quantity": 0.5, "unit": "cup" },
+          { "name": "Chipotle in adobo, minced", "quantity": 1, "unit": "tbsp" },
+          { "name": "Lime", "quantity": 1, "unit": "each" }
+        ],
+        "steps": [
+          { "orderIndex": 0, "instruction": "Whisk the flour and beer together to make a light batter." },
+          { "orderIndex": 1, "instruction": "Cut the fish into strips, dip in the batter, and fry until golden and crisp." },
+          { "orderIndex": 2, "instruction": "Mix the sour cream with the chipotle to make the crema." },
+          { "orderIndex": 3, "instruction": "Toss the shredded cabbage with a squeeze of lime juice." },
+          { "orderIndex": 4, "instruction": "Warm the tortillas, then fill with fish, cabbage slaw, and a drizzle of chipotle crema." }
+        ]
       },
       {
         "uuid": "dead0000-cafe-4000-8000-000000000110",
@@ -343,8 +645,31 @@
         "creatorId": "dead0000-cafe-4000-8000-000000000001",
         "privacy": "PUBLIC",
         "updatedAt": 1773792000000,
-        "tagIds": ["dead0000-cafe-4000-8000-000000000011"],
-        "labelIds": ["dead0000-cafe-4000-8000-000000000020"]
+        "tagIds": [
+          "dead0000-cafe-4000-8000-000000000011"
+        ],
+        "labelIds": [
+          "dead0000-cafe-4000-8000-000000000020"
+        ],
+        "ingredients": [
+          { "name": "Canned clams, with juice", "quantity": 2, "unit": "cans" },
+          { "name": "Bacon, diced", "quantity": 4, "unit": "slices" },
+          { "name": "Potatoes, diced", "quantity": 2, "unit": "cups" },
+          { "name": "Onion, diced", "quantity": 1, "unit": "each" },
+          { "name": "Celery, diced", "quantity": 1, "unit": "stalk" },
+          { "name": "Heavy cream", "quantity": 250, "unit": "ml" },
+          { "name": "Chicken or vegetable stock", "quantity": 500, "unit": "ml" },
+          { "name": "Butter", "quantity": 2, "unit": "tbsp" },
+          { "name": "Flour", "quantity": 2, "unit": "tbsp" }
+        ],
+        "steps": [
+          { "orderIndex": 0, "instruction": "Cook the bacon in a large pot until crisp, then set aside, leaving the fat in the pot." },
+          { "orderIndex": 1, "instruction": "Sauté the onion and celery in the bacon fat until softened." },
+          { "orderIndex": 2, "instruction": "Stir in the butter and flour to form a roux, cooking for a minute." },
+          { "orderIndex": 3, "instruction": "Add the stock, clam juice, and potatoes, then simmer until the potatoes are tender." },
+          { "orderIndex": 4, "instruction": "Stir in the clams and cream, and heat through without boiling." },
+          { "orderIndex": 5, "instruction": "Season to taste and top with the crispy bacon before serving." }
+        ]
       },
       {
         "uuid": "dead0000-cafe-4000-8000-000000000111",
@@ -358,8 +683,30 @@
         "creatorId": "dead0000-cafe-4000-8000-000000000001",
         "privacy": "PUBLIC",
         "updatedAt": 1773792000000,
-        "tagIds": ["dead0000-cafe-4000-8000-000000000011", "dead0000-cafe-4000-8000-000000000013"],
-        "labelIds": ["dead0000-cafe-4000-8000-000000000021"]
+        "tagIds": [
+          "dead0000-cafe-4000-8000-000000000011",
+          "dead0000-cafe-4000-8000-000000000013"
+        ],
+        "labelIds": [
+          "dead0000-cafe-4000-8000-000000000021"
+        ],
+        "ingredients": [
+          { "name": "Sushi-grade tuna, cubed", "quantity": 250, "unit": "g" },
+          { "name": "Sushi rice", "quantity": 1, "unit": "cup" },
+          { "name": "Soy sauce", "quantity": 3, "unit": "tbsp" },
+          { "name": "Sesame oil", "quantity": 1, "unit": "tbsp" },
+          { "name": "Edamame, shelled", "quantity": 0.5, "unit": "cup" },
+          { "name": "Avocado, sliced", "quantity": 1, "unit": "each" },
+          { "name": "Sesame seeds", "quantity": 1, "unit": "tbsp" },
+          { "name": "Green onion, sliced", "quantity": 2, "unit": "each" }
+        ],
+        "steps": [
+          { "orderIndex": 0, "instruction": "Cook the sushi rice according to package directions and let it cool slightly." },
+          { "orderIndex": 1, "instruction": "Whisk together the soy sauce and sesame oil, then toss with the cubed tuna." },
+          { "orderIndex": 2, "instruction": "Divide the rice between bowls." },
+          { "orderIndex": 3, "instruction": "Top with the marinated tuna, edamame, and avocado." },
+          { "orderIndex": 4, "instruction": "Garnish with sesame seeds and green onion before serving." }
+        ]
       },
       {
         "uuid": "dead0000-cafe-4000-8000-000000000112",
@@ -373,8 +720,27 @@
         "creatorId": "dead0000-cafe-4000-8000-000000000001",
         "privacy": "PUBLIC",
         "updatedAt": 1773792000000,
-        "tagIds": ["dead0000-cafe-4000-8000-000000000014"],
-        "labelIds": ["dead0000-cafe-4000-8000-000000000020"]
+        "tagIds": [
+          "dead0000-cafe-4000-8000-000000000014"
+        ],
+        "labelIds": [
+          "dead0000-cafe-4000-8000-000000000020"
+        ],
+        "ingredients": [
+          { "name": "Dark chocolate", "quantity": 100, "unit": "g" },
+          { "name": "Butter", "quantity": 100, "unit": "g" },
+          { "name": "Eggs", "quantity": 2, "unit": "each" },
+          { "name": "Sugar", "quantity": 50, "unit": "g" },
+          { "name": "Flour", "quantity": 2, "unit": "tbsp" }
+        ],
+        "steps": [
+          { "orderIndex": 0, "instruction": "Preheat the oven to 200°C (400°F) and butter two ramekins." },
+          { "orderIndex": 1, "instruction": "Melt the chocolate and butter together until smooth." },
+          { "orderIndex": 2, "instruction": "Whisk in the eggs and sugar until combined, then fold in the flour." },
+          { "orderIndex": 3, "instruction": "Divide the batter between the ramekins." },
+          { "orderIndex": 4, "instruction": "Bake for 10-12 minutes until the edges are set but the center is still soft." },
+          { "orderIndex": 5, "instruction": "Let cool for a minute, then invert onto plates and serve immediately." }
+        ]
       },
       {
         "uuid": "dead0000-cafe-4000-8000-000000000113",
@@ -388,8 +754,29 @@
         "creatorId": "dead0000-cafe-4000-8000-000000000001",
         "privacy": "PUBLIC",
         "updatedAt": 1773792000000,
-        "tagIds": ["dead0000-cafe-4000-8000-000000000014"],
-        "labelIds": ["dead0000-cafe-4000-8000-000000000021"]
+        "tagIds": [
+          "dead0000-cafe-4000-8000-000000000014"
+        ],
+        "labelIds": [
+          "dead0000-cafe-4000-8000-000000000021"
+        ],
+        "ingredients": [
+          { "name": "Digestive biscuits, crushed", "quantity": 200, "unit": "g" },
+          { "name": "Butter, melted", "quantity": 80, "unit": "g" },
+          { "name": "Cream cheese", "quantity": 500, "unit": "g" },
+          { "name": "Icing sugar", "quantity": 100, "unit": "g" },
+          { "name": "Heavy cream", "quantity": 250, "unit": "ml" },
+          { "name": "Vanilla extract", "quantity": 1, "unit": "tsp" },
+          { "name": "Mixed berries", "quantity": 2, "unit": "cups" }
+        ],
+        "steps": [
+          { "orderIndex": 0, "instruction": "Mix the crushed biscuits with melted butter and press into the base of a springform tin." },
+          { "orderIndex": 1, "instruction": "Chill the base while preparing the filling." },
+          { "orderIndex": 2, "instruction": "Beat the cream cheese with icing sugar and vanilla until smooth." },
+          { "orderIndex": 3, "instruction": "Whip the cream to soft peaks and fold it into the cream cheese mixture." },
+          { "orderIndex": 4, "instruction": "Spread the filling over the biscuit base and chill for at least 4 hours." },
+          { "orderIndex": 5, "instruction": "Top with a fresh mixed berry compote before serving." }
+        ]
       },
       {
         "uuid": "dead0000-cafe-4000-8000-000000000114",
@@ -403,8 +790,27 @@
         "creatorId": "dead0000-cafe-4000-8000-000000000001",
         "privacy": "PUBLIC",
         "updatedAt": 1773792000000,
-        "tagIds": ["dead0000-cafe-4000-8000-000000000014"],
-        "labelIds": ["dead0000-cafe-4000-8000-000000000022"]
+        "tagIds": [
+          "dead0000-cafe-4000-8000-000000000014"
+        ],
+        "labelIds": [
+          "dead0000-cafe-4000-8000-000000000022"
+        ],
+        "ingredients": [
+          { "name": "Heavy cream", "quantity": 500, "unit": "ml" },
+          { "name": "Egg yolks", "quantity": 5, "unit": "each" },
+          { "name": "Sugar", "quantity": 100, "unit": "g" },
+          { "name": "Vanilla bean or extract", "quantity": 1, "unit": "each" },
+          { "name": "Granulated sugar, for topping", "quantity": 4, "unit": "tbsp" }
+        ],
+        "steps": [
+          { "orderIndex": 0, "instruction": "Preheat the oven to 150°C (300°F)." },
+          { "orderIndex": 1, "instruction": "Heat the cream with the vanilla until just simmering, then remove from heat." },
+          { "orderIndex": 2, "instruction": "Whisk the egg yolks with sugar, then slowly whisk in the warm cream." },
+          { "orderIndex": 3, "instruction": "Strain the mixture into ramekins and place them in a water bath." },
+          { "orderIndex": 4, "instruction": "Bake for 35-40 minutes until just set with a slight wobble in the center." },
+          { "orderIndex": 5, "instruction": "Chill for at least 2 hours, then sprinkle sugar on top and caramelize with a torch before serving." }
+        ]
       }
     ]
   }
