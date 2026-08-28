@@ -16,6 +16,11 @@ package com.tenmilelabs.recipescraper.model
  * @property totalTimeMinutes total time in whole minutes. Frequently present when the prep/cook
  *   split is not, so callers can derive one from the other.
  * @property servings the yield as a whole number of servings.
+ * @property caloriesPerServing calories per serving, as published in the page's `nutrition` block.
+ *   Never derived from ingredients or divided down from a whole-recipe total — a page that only
+ *   publishes a total, not a per-serving figure, yields `null` rather than a guess.
+ * @property proteinGramsPerServing protein grams per serving. Same provenance and caveats as
+ *   [caloriesPerServing].
  * @property ingredients ingredient lines in source order; may be empty.
  * @property instructions instruction steps in order, flattened across any sections, with HTML
  *   stripped and blanks dropped; may be empty.
@@ -31,6 +36,8 @@ data class ScrapedRecipe(
     val cookTimeMinutes: Int?,
     val totalTimeMinutes: Int?,
     val servings: Int?,
+    val caloriesPerServing: Int? = null,
+    val proteinGramsPerServing: Int? = null,
     val ingredients: List<ScrapedIngredient>,
     val instructions: List<String>,
     val keywords: List<String>,

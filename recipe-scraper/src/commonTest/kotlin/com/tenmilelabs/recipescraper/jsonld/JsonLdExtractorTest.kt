@@ -27,6 +27,33 @@ class JsonLdExtractorTest {
         assertEquals(listOf("breakfast", "easy"), recipe?.keywords)
         assertEquals("Jane Doe", recipe?.author)
         assertEquals("https://example.com/r", recipe?.sourceUrl)
+        // No nutrition block on this fixture — unknown, not zero.
+        assertNull(recipe?.caloriesPerServing)
+        assertNull(recipe?.proteinGramsPerServing)
+    }
+
+    @Test
+    fun `extracts calories and protein from a nutrition block`() {
+        val recipe = extract(JsonLdFixtures.WITH_NUTRITION)
+
+        assertEquals(270, recipe?.caloriesPerServing)
+        assertEquals(12, recipe?.proteinGramsPerServing)
+    }
+
+    @Test
+    fun `rejects an implausibly large nutrition value rather than trusting it`() {
+        val recipe = extract(JsonLdFixtures.IMPLAUSIBLE_NUTRITION)
+
+        assertNull(recipe?.caloriesPerServing)
+        assertNull(recipe?.proteinGramsPerServing)
+    }
+
+    @Test
+    fun `zero calories is a real value, not treated as missing, and decimal protein is truncated`() {
+        val recipe = extract(JsonLdFixtures.ZERO_AND_DECIMAL_NUTRITION)
+
+        assertEquals(0, recipe?.caloriesPerServing)
+        assertEquals(12, recipe?.proteinGramsPerServing)
     }
 
     @Test

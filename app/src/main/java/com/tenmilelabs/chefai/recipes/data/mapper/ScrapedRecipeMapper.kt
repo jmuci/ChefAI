@@ -28,6 +28,11 @@ private const val DEFAULT_UNIT = "unit"
  * `addTagByName` — otherwise every import would duplicate catalog rows. Privacy defaults to
  * `PUBLIC`: a scraped recipe is someone else's already-published page, unlike a recipe the user
  * writes from scratch, which starts `PRIVATE` (see [RecipeDraft.privacy]).
+ *
+ * Calories/protein are the one pair of fields that stay blank rather than falling back to `"0"`
+ * when the page didn't publish them: unlike prep/cook time and servings, they're optional and
+ * never block [RecipeDraft.toRecipe] — the same "blank means not entered" convention manual entry
+ * already uses (see [com.tenmilelabs.chefai.core.domain.model.Recipe.caloriesPerServing]).
  */
 fun ScrapedRecipe.toRecipeDraft(
     recipeId: UUID,
@@ -42,6 +47,8 @@ fun ScrapedRecipe.toRecipeDraft(
     prepTimeMinutes = prepTimeMinutes?.toString() ?: "0",
     cookTimeMinutes = cookTimeMinutesOrFallback(),
     servings = servings?.toString() ?: "0",
+    caloriesPerServing = caloriesPerServing?.toString().orEmpty(),
+    proteinGramsPerServing = proteinGramsPerServing?.toString().orEmpty(),
     externalUrl = sourceUrl,
     privacy = RecipePrivacy.PUBLIC,
     ingredients = ingredients.toRecipeIngredients(knownIngredients),
