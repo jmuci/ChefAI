@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.mealplans.domain.shoppinglist
 
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.recipes.domain.scaling.RecipeScaling
 import org.junit.Test
 import java.util.UUID
 
@@ -75,24 +76,41 @@ class ShoppingListBuilderTest {
     }
 
     @Test
-    fun `planned servings scale a recipe's own servings, zero servings disables scaling`() {
+    fun `planned servings scale a recipe's own servings`() {
         val scaledRecipe = UUID.randomUUID()
-        val unscaledRecipe = UUID.randomUUID()
+        val yieldlessRecipe = UUID.randomUUID()
         val ingredients = listOf(
             ingredient(scaledRecipe, 2, "Flour", 1.0, "cup"),
-            ingredient(unscaledRecipe, 0, "Sugar", 5.0, "g"),
+            ingredient(yieldlessRecipe, 0, "Sugar", 5.0, "g"),
         )
 
         val list = ShoppingListBuilder.build(
             ingredients = ingredients,
-            slotCountByRecipe = mapOf(scaledRecipe to 1, unscaledRecipe to 1),
+            slotCountByRecipe = mapOf(scaledRecipe to 1, yieldlessRecipe to 1),
             plannedServings = 4,
             checkedKeys = emptySet(),
         )
 
         val byName = list.allItems().associateBy { it.displayName }
         assertThat(byName.getValue("Flour").quantityLabel).isEqualTo("2 cup")
+        // No published yield, so DEFAULT_SERVINGS is assumed — and the plan wants exactly that many.
         assertThat(byName.getValue("Sugar").quantityLabel).isEqualTo("5 g")
+    }
+
+    @Test
+    fun `a recipe with no published yield is scaled from the assumed default, not left alone`() {
+        val recipe = UUID.randomUUID()
+
+        val list = ShoppingListBuilder.build(
+            ingredients = listOf(ingredient(recipe, 0, "Sugar", 5.0, "g")),
+            slotCountByRecipe = mapOf(recipe to 1),
+            plannedServings = RecipeScaling.DEFAULT_SERVINGS / 2,
+            checkedKeys = emptySet(),
+        )
+
+        // The details screen presents this recipe as DEFAULT_SERVINGS portions and halves its
+        // quantities at half that; the list has to buy the same amount or the two disagree.
+        assertThat(list.allItems().single().quantityLabel).isEqualTo("2.5 g")
     }
 
     @Test

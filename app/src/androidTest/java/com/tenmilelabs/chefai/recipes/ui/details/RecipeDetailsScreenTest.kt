@@ -2,15 +2,22 @@ package com.tenmilelabs.chefai.recipes.ui.details
 
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.platform.app.InstrumentationRegistry
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.preview.RecipeData
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
+import com.tenmilelabs.chefai.recipes.domain.scaling.RecipeScaling
+import com.tenmilelabs.chefai.recipes.ui.details.components.DECREASE_SERVINGS_TAG
+import com.tenmilelabs.chefai.recipes.ui.details.components.INCREASE_SERVINGS_TAG
+import com.tenmilelabs.chefai.recipes.ui.details.components.SERVINGS_COUNT_TAG
+import junit.framework.TestCase.assertEquals
 import junit.framework.TestCase.assertFalse
 import junit.framework.TestCase.assertTrue
 import org.junit.Before
@@ -36,10 +43,10 @@ class RecipeDetailsScreenTest {
     }
 
     @Test
-    fun deleteButton_hidden_whenOnDeleteClickIsNull() {
+    fun deleteButton_hidden_whenTheCallerCannotDelete() {
         composeTestRule.setContent {
             ChefAITheme {
-                RecipeDetailsContent(recipe = RecipeData.recipe, onDeleteClick = null)
+                RecipeDetailsContent(recipe = RecipeData.recipe, canDelete = false)
             }
         }
 
@@ -47,31 +54,33 @@ class RecipeDetailsScreenTest {
     }
 
     @Test
-    fun deleteButton_shown_andInvokesCallback_whenProvided() {
-        var clicked = false
+    fun deleteButton_shown_andEmitsAction_whenTheCallerCanDelete() {
+        val actions = mutableListOf<RecipeDetailsAction>()
         composeTestRule.setContent {
             ChefAITheme {
                 RecipeDetailsContent(
                     recipe = RecipeData.recipe,
-                    onDeleteClick = { clicked = true },
+                    canDelete = true,
+                    onAction = { actions += it },
                 )
             }
         }
 
         composeTestRule.onNodeWithTag("DeleteRecipeButton").assertIsDisplayed().performClick()
 
-        assertTrue(clicked)
+        assertEquals(listOf(RecipeDetailsAction.DeleteClicked), actions)
     }
 
     @Test
-    fun deleteButton_disabled_doesNotInvokeCallback_whenIsDeleting() {
-        var clicked = false
+    fun deleteButton_disabled_emitsNoAction_whenIsDeleting() {
+        val actions = mutableListOf<RecipeDetailsAction>()
         composeTestRule.setContent {
             ChefAITheme {
                 RecipeDetailsContent(
                     recipe = RecipeData.recipe,
-                    onDeleteClick = { clicked = true },
+                    canDelete = true,
                     isDeleting = true,
+                    onAction = { actions += it },
                 )
             }
         }
@@ -80,7 +89,7 @@ class RecipeDetailsScreenTest {
             .assertIsNotEnabled()
             .performClick()
 
-        assertFalse(clicked)
+        assertTrue(actions.isEmpty())
     }
 
     @Test
@@ -95,22 +104,22 @@ class RecipeDetailsScreenTest {
     }
 
     @Test
-    fun cookedToggle_shown_andInvokesCallback_whenProvided() {
-        var toggled = false
+    fun cookedToggle_shown_andEmitsAction_whenProvided() {
+        val actions = mutableListOf<RecipeDetailsAction>()
         composeTestRule.setContent {
             ChefAITheme {
                 RecipeDetailsContent(
                     recipe = RecipeData.recipe,
                     showCookedToggle = true,
                     isCooked = false,
-                    onToggleCooked = { toggled = true },
+                    onAction = { actions += it },
                 )
             }
         }
 
         composeTestRule.onNodeWithTag("CookedToggleButton").assertIsDisplayed().performClick()
 
-        assertTrue(toggled)
+        assertEquals(listOf(RecipeDetailsAction.ToggleCooked), actions)
     }
 
     @Test
@@ -119,7 +128,7 @@ class RecipeDetailsScreenTest {
             ChefAITheme {
                 RecipeDetailsContent(
                     recipe = RecipeData.recipe,
-                    onDeleteClick = {},
+                    canDelete = true,
                     showDeleteConfirmation = false,
                 )
             }
@@ -135,7 +144,7 @@ class RecipeDetailsScreenTest {
             ChefAITheme {
                 RecipeDetailsContent(
                     recipe = RecipeData.recipe,
-                    onDeleteClick = {},
+                    canDelete = true,
                     showDeleteConfirmation = true,
                 )
             }
@@ -148,46 +157,173 @@ class RecipeDetailsScreenTest {
     }
 
     @Test
-    fun confirmationDialog_confirm_invokesOnConfirmDelete() {
-        var confirmed = false
-        var dismissed = false
+    fun confirmationDialog_confirm_emitsConfirmDelete() {
+        val actions = mutableListOf<RecipeDetailsAction>()
         composeTestRule.setContent {
             ChefAITheme {
                 RecipeDetailsContent(
                     recipe = RecipeData.recipe,
-                    onDeleteClick = {},
+                    canDelete = true,
                     showDeleteConfirmation = true,
-                    onConfirmDelete = { confirmed = true },
-                    onDismissDeleteDialog = { dismissed = true },
+                    onAction = { actions += it },
                 )
             }
         }
 
         composeTestRule.onNodeWithText(context.getString(R.string.delete_recipe_button)).performClick()
 
-        assertTrue(confirmed)
-        assertFalse(dismissed)
+        assertEquals(listOf(RecipeDetailsAction.ConfirmDelete), actions)
     }
 
     @Test
-    fun confirmationDialog_cancel_invokesOnDismissDeleteDialog() {
-        var confirmed = false
-        var dismissed = false
+    fun confirmationDialog_cancel_emitsDismissDeleteDialog() {
+        val actions = mutableListOf<RecipeDetailsAction>()
         composeTestRule.setContent {
             ChefAITheme {
                 RecipeDetailsContent(
                     recipe = RecipeData.recipe,
-                    onDeleteClick = {},
+                    canDelete = true,
                     showDeleteConfirmation = true,
-                    onConfirmDelete = { confirmed = true },
-                    onDismissDeleteDialog = { dismissed = true },
+                    onAction = { actions += it },
                 )
             }
         }
 
         composeTestRule.onNodeWithText(context.getString(R.string.cancel_button)).performClick()
 
-        assertTrue(dismissed)
-        assertFalse(confirmed)
+        assertEquals(listOf(RecipeDetailsAction.DismissDeleteDialog), actions)
     }
+
+    // --- Portions stepper -----------------------------------------------------------------------
+
+    @Test
+    fun servingsStepper_showsTheRecipesOwnYield_byDefault() {
+        composeTestRule.setContent {
+            ChefAITheme {
+                RecipeDetailsContent(recipe = RecipeData.recipe)
+            }
+        }
+
+        composeTestRule.onNodeWithTag(SERVINGS_COUNT_TAG)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeTestRule.onNodeWithText(
+            context.resources.getQuantityString(
+                R.plurals.portions_count,
+                RecipeData.recipe.servings,
+                RecipeData.recipe.servings,
+            )
+        ).assertIsDisplayed()
+    }
+
+    @Test
+    fun servingsStepper_buttonsReportTheNextCount() {
+        val actions = mutableListOf<RecipeDetailsAction>()
+        composeTestRule.setContent {
+            ChefAITheme {
+                RecipeDetailsContent(
+                    recipe = RecipeData.recipe,
+                    servings = servingsState(current = 4),
+                    onAction = { actions += it },
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithTag(INCREASE_SERVINGS_TAG).performScrollTo().performClick()
+        composeTestRule.onNodeWithTag(DECREASE_SERVINGS_TAG).performClick()
+
+        assertEquals(
+            listOf(
+                RecipeDetailsAction.ServingsChanged(5),
+                RecipeDetailsAction.ServingsChanged(3),
+            ),
+            actions,
+        )
+    }
+
+    @Test
+    fun servingsStepper_decreaseDisabled_atTheBottomOfTheRange() {
+        composeTestRule.setContent {
+            ChefAITheme {
+                RecipeDetailsContent(
+                    recipe = RecipeData.recipe,
+                    servings = servingsState(current = 1),
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithTag(DECREASE_SERVINGS_TAG).performScrollTo().assertIsNotEnabled()
+        composeTestRule.onNodeWithTag(INCREASE_SERVINGS_TAG).assertIsEnabled()
+    }
+
+    @Test
+    fun servingsStepper_increaseDisabled_atTheTopOfTheRange() {
+        composeTestRule.setContent {
+            ChefAITheme {
+                RecipeDetailsContent(
+                    recipe = RecipeData.recipe,
+                    servings = servingsState(current = 10),
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithTag(INCREASE_SERVINGS_TAG).performScrollTo().assertIsNotEnabled()
+        composeTestRule.onNodeWithTag(DECREASE_SERVINGS_TAG).assertIsEnabled()
+    }
+
+    @Test
+    fun servingsStepper_estimatedCaption_shownOnlyWhenTheYieldWasAssumed() {
+        val caption = context.getString(R.string.portions_estimated, RecipeScaling.DEFAULT_SERVINGS)
+
+        composeTestRule.setContent {
+            ChefAITheme {
+                RecipeDetailsContent(
+                    recipe = RecipeData.recipe.copy(servings = 0),
+                    servings = servingsState(current = 4, isEstimated = true),
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText(caption).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun servingsStepper_estimatedCaption_hiddenWhenTheRecipeHasAYield() {
+        val caption = context.getString(R.string.portions_estimated, RecipeScaling.DEFAULT_SERVINGS)
+
+        composeTestRule.setContent {
+            ChefAITheme {
+                RecipeDetailsContent(recipe = RecipeData.recipe)
+            }
+        }
+
+        composeTestRule.onNodeWithText(caption).assertDoesNotExist()
+    }
+
+    @Test
+    fun ingredientsTab_scalesTheQuantitiesToTheChosenPortions() {
+        // Eggs, not spaghetti: doubled Pecorino (250 -> 500 gr) collides with spaghetti's own
+        // unscaled "500 gr", which would make the negative assertion below meaningless.
+        val eggs = RecipeData.recipe.ingredients.single { it.ingredientDisplayName == "Eggs" }
+
+        composeTestRule.setContent {
+            ChefAITheme {
+                RecipeDetailsContent(
+                    recipe = RecipeData.recipe,
+                    servings = servingsState(current = RecipeData.recipe.servings * 2),
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("${eggs.quantity.toInt() * 2} ${eggs.unit}")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeTestRule.onNodeWithText("${eggs.quantity.toInt()} ${eggs.unit}")
+            .assertDoesNotExist()
+    }
+
+    /** The recipe fixture's own yield, with [current] selected on top of it. */
+    private fun servingsState(current: Int, isEstimated: Boolean = false) =
+        ServingsUiState.forRecipeServings(RecipeData.recipe.servings)
+            .copy(current = current, isEstimated = isEstimated)
 }

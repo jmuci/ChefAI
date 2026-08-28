@@ -22,6 +22,7 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
+import com.tenmilelabs.chefai.recipes.domain.scaling.RecipeScaling
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -441,6 +442,171 @@ class RecipeDetailsViewModelTest {
             viewModel.onToggleCooked() // no dayId/slot in the saved state — should be a no-op
 
             expectNoEvents()
+        }
+    }
+
+    // --- Recipe scaling -------------------------------------------------------------------------
+
+    @Test
+    fun `servings - defaults to the recipe's own yield, with quantities unscaled`() = runTest {
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+
+            val state = awaitItem()
+            assertThat(state.servings.current).isEqualTo(recipe1.servings)
+            assertThat(state.servings.base).isEqualTo(recipe1.servings)
+            assertThat(state.servings.isEstimated).isFalse()
+            assertThat(state.servings.range)
+                .isEqualTo(RecipeScaling.MIN_SERVINGS..RecipeScaling.MAX_SERVINGS)
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `servings - falls back to the default and is flagged estimated when the recipe has no yield`() = runTest {
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1.copy(servings = 0))
+
+            val state = awaitItem()
+            assertThat(state.servings.current).isEqualTo(RecipeScaling.DEFAULT_SERVINGS)
+            // The quantities as written are treated as the assumed yield, so nothing is scaled yet.
+            assertThat(state.servings.base).isEqualTo(RecipeScaling.DEFAULT_SERVINGS)
+            assertThat(state.servings.isEstimated).isTrue()
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onServingsChange - rescales the ingredient quantities`() = runTest {
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+            assertThat(awaitItem().servings.current).isEqualTo(4)
+
+            viewModel.onServingsChange(8)
+
+            val state = awaitItem()
+            assertThat(state.servings.current).isEqualTo(8)
+            assertThat(state.servings.base).isEqualTo(4)
+            // The recipe itself is untouched — scaling is a way of reading it, not an edit.
+            assertThat(state.recipe).isEqualTo(recipe1)
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onServingsChange - a count outside the recipe's range falls back to its own yield`() = runTest {
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+            assertThat(awaitItem().servings.current).isEqualTo(4)
+
+            viewModel.onServingsChange(8)
+            assertThat(awaitItem().servings.current).isEqualTo(8)
+
+            viewModel.onServingsChange(99)
+            assertThat(awaitItem().servings.current).isEqualTo(recipe1.servings)
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onServingsChange - a batch recipe's own yield survives being chosen before it loads`() = runTest {
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+
+            // Nothing has loaded, so there is no real range to clamp against yet. Clamping here
+            // against the placeholder 1..10 would silently cap this at 10.
+            viewModel.onServingsChange(24)
+            recipesRepository.emitRecipe(recipeId1, recipe1.copy(servings = 24))
+
+            assertThat(awaitItem().servings.current).isEqualTo(24)
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `servings - a batch recipe keeps its own yield selectable`() = runTest {
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1.copy(servings = 24))
+
+            val state = awaitItem()
+            assertThat(state.servings.current).isEqualTo(24)
+            assertThat(state.servings.range).isEqualTo(1..24)
+
+            // Scaling down and back up returns the recipe exactly as written.
+            viewModel.onServingsChange(12)
+            assertThat(awaitItem().servings.current).isEqualTo(12)
+
+            viewModel.onServingsChange(24)
+            assertThat(awaitItem().servings.current).isEqualTo(24)
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `servings - the chosen count survives an unrelated recipe re-emission`() = runTest {
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+            assertThat(awaitItem().servings.current).isEqualTo(4)
+
+            viewModel.onServingsChange(8)
+            assertThat(awaitItem().servings.current).isEqualTo(8)
+
+            // A sync pull or a bookmark write re-emits the same recipe; it must not reset the choice.
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+            expectNoEvents()
+            assertThat(viewModel.uiState.value.servings.current).isEqualTo(8)
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `servings - a chosen count outside the new range falls back to the recipe's yield`() = runTest {
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1.copy(servings = 24))
+            assertThat(awaitItem().servings.current).isEqualTo(24)
+
+            viewModel.onServingsChange(20)
+            assertThat(awaitItem().servings.current).isEqualTo(20)
+
+            // The recipe is edited down to a 4-serving yield, so 20 is no longer selectable.
+            recipesRepository.emitRecipe(recipeId1, recipe1.copy(servings = 4))
+
+            val state = awaitItem()
+            assertThat(state.servings.current).isEqualTo(4)
+            assertThat(state.servings.range)
+                .isEqualTo(RecipeScaling.MIN_SERVINGS..RecipeScaling.MAX_SERVINGS)
+
+            cancelAndConsumeRemainingEvents()
         }
     }
 }
