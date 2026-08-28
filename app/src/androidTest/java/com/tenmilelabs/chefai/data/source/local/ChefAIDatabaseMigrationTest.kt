@@ -10,6 +10,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_3_4
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_4_5
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_5_6
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_6_7
+import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_7_8
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -256,12 +257,81 @@ class ChefAIDatabaseMigrationTest {
     }
 
     @Test
-    fun migrateAll1To7_succeeds() {
+    fun migrate7To8_addsNutritionColumnsNullableOnRecipesBlankOnDrafts() {
+        val recipeId = UUID.randomUUID()
+        val draftId = UUID.randomUUID()
+
+        helper.createDatabase(TEST_DB, 7).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO recipes (
+                    uuid, title, description, imageUrl, imageUrlThumbnail, localImagePath,
+                    prepTimeMinutes, cookTimeMinutes, servings, creatorId, recipeExternalUrl,
+                    privacy, version, updatedAt, deletedAt, syncState
+                ) VALUES (?, 'Carbonara', 'Classic', 'https://example.com/x.jpg',
+                    'https://example.com/x.jpg', NULL, 10, 20, 2, ?, NULL,
+                    'PUBLIC', 1, 555, NULL, 'SYNCED')
+                """.trimIndent(),
+                arrayOf(recipeId.toBlob(), UUID.randomUUID().toBlob())
+            )
+            db.execSQL(
+                """
+                INSERT INTO recipe_drafts (
+                    recipeId, isNewRecipe, title, description, imageUrl, localImagePath,
+                    prepTimeMinutes, cookTimeMinutes, servings, externalUrl, privacy,
+                    ingredientsJson, stepsJson, tagsJson, labelsJson, version, updatedAt
+                ) VALUES (?, 1, 'Carbonara', 'Classic', 'https://example.com/x.jpg', NULL,
+                    '10', '20', '2', '', 'PUBLIC', '[]', '[]', '[]', '[]', 1, 555)
+                """.trimIndent(),
+                arrayOf(draftId.toBlob())
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 8, true, MIGRATION_7_8)
+
+        db.query("SELECT title, caloriesPerServing, proteinGramsPerServing FROM recipes").use { cursor ->
+            assertTrue("the pre-existing recipe should survive the migration", cursor.moveToFirst())
+            assertEquals("Carbonara", cursor.getString(0))
+            assertTrue(
+                "a recipe that existed before nutrition tracking has unknown, not zero, values",
+                cursor.isNull(1) && cursor.isNull(2)
+            )
+            assertEquals(1, cursor.count)
+        }
+
+        db.query(
+            "SELECT title, caloriesPerServing, proteinGramsPerServing FROM recipe_drafts"
+        ).use { cursor ->
+            assertTrue("the pre-existing draft row should survive the migration", cursor.moveToFirst())
+            assertEquals("Carbonara", cursor.getString(0))
+            assertEquals(
+                "drafts follow the table's form-input convention: blank, not null, means not entered",
+                "",
+                cursor.getString(1)
+            )
+            assertEquals("", cursor.getString(2))
+            assertEquals(1, cursor.count)
+        }
+
+        db.execSQL("UPDATE recipes SET caloriesPerServing = 350, proteinGramsPerServing = 12 WHERE uuid = ?", arrayOf(recipeId.toBlob()))
+        db.query(
+            "SELECT caloriesPerServing, proteinGramsPerServing FROM recipes WHERE uuid = ?",
+            arrayOf(recipeId.toBlob())
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(350, cursor.getInt(0))
+            assertEquals(12, cursor.getInt(1))
+        }
+    }
+
+    @Test
+    fun migrateAll1To8_succeeds() {
         helper.createDatabase(TEST_DB, 1).close()
 
         helper.runMigrationsAndValidate(
-            TEST_DB, 7, true,
-            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7
+            TEST_DB, 8, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8,
         )
     }
 }

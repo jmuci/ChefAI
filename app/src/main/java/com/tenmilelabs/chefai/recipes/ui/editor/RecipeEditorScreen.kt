@@ -177,6 +177,8 @@ fun RecipeEditorScreen(
                     onPrepTimeChange = { viewModel.dispatch(EditorAction.PrepTimeChanged(it)) },
                     onCookTimeChange = { viewModel.dispatch(EditorAction.CookTimeChanged(it)) },
                     onServingsChange = { viewModel.dispatch(EditorAction.ServingsChanged(it)) },
+                    onCaloriesChange = { viewModel.dispatch(EditorAction.CaloriesChanged(it)) },
+                    onProteinChange = { viewModel.dispatch(EditorAction.ProteinChanged(it)) },
                     onExternalUrlChange = { viewModel.dispatch(EditorAction.ExternalUrlChanged(it)) },
                 )
 
@@ -321,6 +323,8 @@ private fun CoreRecipeForm(
     onPrepTimeChange: (String) -> Unit,
     onCookTimeChange: (String) -> Unit,
     onServingsChange: (String) -> Unit,
+    onCaloriesChange: (String) -> Unit,
+    onProteinChange: (String) -> Unit,
     onExternalUrlChange: (String) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -381,6 +385,39 @@ private fun CoreRecipeForm(
                 onValueChange = onServingsChange,
                 label = { Text(stringResource(R.string.label_servings)) },
                 placeholder = { Text(stringResource(R.string.placeholder_servings)) },
+                modifier = Modifier.weight(1f),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Number,
+                    imeAction = ImeAction.Next,
+                ),
+                singleLine = true,
+            )
+        }
+
+        // Optional and per-serving — as published by the source or entered by hand, never computed
+        // from ingredients. Blank is a valid, common state, unlike prep/cook time and servings above.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedTextField(
+                value = recipeState.caloriesPerServing,
+                onValueChange = onCaloriesChange,
+                label = { Text(stringResource(R.string.label_calories)) },
+                placeholder = { Text(stringResource(R.string.placeholder_calories)) },
+                modifier = Modifier.weight(1f),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Number,
+                    imeAction = ImeAction.Next,
+                ),
+                singleLine = true,
+            )
+
+            OutlinedTextField(
+                value = recipeState.proteinGramsPerServing,
+                onValueChange = onProteinChange,
+                label = { Text(stringResource(R.string.label_protein)) },
+                placeholder = { Text(stringResource(R.string.placeholder_protein)) },
                 modifier = Modifier.weight(1f),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Number,

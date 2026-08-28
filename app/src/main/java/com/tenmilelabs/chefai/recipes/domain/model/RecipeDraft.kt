@@ -26,6 +26,10 @@ data class RecipeDraft(
     val prepTimeMinutes: String = "",
     val cookTimeMinutes: String = "",
     val servings: String = "",
+    /** Form-input string for [com.tenmilelabs.chefai.core.domain.model.Recipe.caloriesPerServing]; blank means not entered. */
+    val caloriesPerServing: String = "",
+    /** Form-input string for [com.tenmilelabs.chefai.core.domain.model.Recipe.proteinGramsPerServing]; blank means not entered. */
+    val proteinGramsPerServing: String = "",
     val externalUrl: String = "",
     /**
      * Defaults to [RecipePrivacy.PRIVATE]: a recipe the user writes stays theirs until they say

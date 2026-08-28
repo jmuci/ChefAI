@@ -46,7 +46,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         TagEntity::class,
         UserEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 @TypeConverters(UuidConverters::class)
@@ -212,5 +212,24 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
             "CREATE INDEX IF NOT EXISTS `index_shopping_list_checks_mealPlanId` " +
                 "ON `shopping_list_checks` (`mealPlanId`)"
         )
+    }
+}
+
+/**
+ * Adds calories/protein-per-serving to [com.tenmilelabs.chefai.core.data.local.room.RecipeEntity]
+ * and [com.tenmilelabs.chefai.core.data.local.room.RecipeDraftEntity] — lightweight nutrition,
+ * scraped from the source or entered by hand, never computed from ingredients.
+ *
+ * `recipes` columns are nullable with no default: `null` means unknown, which is the right state
+ * for every row that already exists. `recipe_drafts` columns follow that table's existing
+ * form-input convention (plain `TEXT NOT NULL`, blank means not entered yet), backfilled to `''`
+ * like every other required text column would need to be — no user-visible value is invented.
+ */
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE recipes ADD COLUMN caloriesPerServing INTEGER")
+        db.execSQL("ALTER TABLE recipes ADD COLUMN proteinGramsPerServing INTEGER")
+        db.execSQL("ALTER TABLE recipe_drafts ADD COLUMN caloriesPerServing TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE recipe_drafts ADD COLUMN proteinGramsPerServing TEXT NOT NULL DEFAULT ''")
     }
 }

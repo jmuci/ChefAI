@@ -15,6 +15,10 @@ data class RecipeFields(
     val prepTimeMinutes: String = "",
     val cookTimeMinutes: String = "",
     val servings: String = "",
+    /** Optional — blank means not entered, never validated as required. */
+    val caloriesPerServing: String = "",
+    /** Optional — blank means not entered, never validated as required. */
+    val proteinGramsPerServing: String = "",
     val externalUrl: String = "",
     val privacy: RecipePrivacy = RecipePrivacy.PRIVATE,
 )

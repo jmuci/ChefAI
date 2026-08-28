@@ -109,6 +109,8 @@ class DraftMapperTest {
             prepTimeMinutes = "10",
             cookTimeMinutes = "20",
             servings = "2",
+            caloriesPerServing = "620",
+            proteinGramsPerServing = "28",
             externalUrl = "https://recipes.example.com/carbonara",
             ingredients = listOf(
                 RecipeIngredient(
@@ -240,6 +242,44 @@ class DraftMapperTest {
         assertEquals(creator, recipe.creator)
         assertEquals(2, recipe.version)
         assertEquals(5000L, recipe.updatedAt)
+    }
+
+    @Test
+    fun `draft toRecipe maps blank nutrition fields to null, not zero`() {
+        val draft = RecipeDraft(
+            recipeId = UUID.randomUUID(),
+            isNewRecipe = true,
+            prepTimeMinutes = "1",
+            cookTimeMinutes = "1",
+            servings = "1",
+            updatedAt = 1L,
+        )
+
+        val creator = User(UUID.randomUUID(), "Chef", "chef@example.com", "")
+        val recipe = draft.toRecipe(creator)
+
+        assertNull(recipe.caloriesPerServing)
+        assertNull(recipe.proteinGramsPerServing)
+    }
+
+    @Test
+    fun `draft toRecipe parses populated nutrition fields to ints`() {
+        val draft = RecipeDraft(
+            recipeId = UUID.randomUUID(),
+            isNewRecipe = true,
+            prepTimeMinutes = "1",
+            cookTimeMinutes = "1",
+            servings = "1",
+            caloriesPerServing = "350",
+            proteinGramsPerServing = "12",
+            updatedAt = 1L,
+        )
+
+        val creator = User(UUID.randomUUID(), "Chef", "chef@example.com", "")
+        val recipe = draft.toRecipe(creator)
+
+        assertEquals(350, recipe.caloriesPerServing)
+        assertEquals(12, recipe.proteinGramsPerServing)
     }
 
     @Test

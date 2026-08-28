@@ -39,6 +39,8 @@ fun RecipeWithDetails.toDomain(ingredients: List<RecipeIngredient> = emptyList()
         prepTimeMinutes = recipe.prepTimeMinutes,
         cookTimeMinutes = recipe.cookTimeMinutes,
         servings = recipe.servings,
+        caloriesPerServing = recipe.caloriesPerServing,
+        proteinGramsPerServing = recipe.proteinGramsPerServing,
         creator = creator.toDomain(),
         recipeExternalUrl = recipe.recipeExternalUrl,
         privacy = recipe.privacy,
@@ -64,6 +66,8 @@ fun RecipeWithDetails.toPreviewDomain(): RecipePreview {
         prepTimeMinutes = recipe.prepTimeMinutes,
         cookTimeMinutes = recipe.cookTimeMinutes,
         servings = recipe.servings,
+        caloriesPerServing = recipe.caloriesPerServing,
+        proteinGramsPerServing = recipe.proteinGramsPerServing,
         creatorId = creator.uuid,
         privacy = recipe.privacy,
         tags = tags.map { it.toDomain() },
@@ -148,6 +152,10 @@ fun Recipe.toRoomEntity(): RecipeEntity = RecipeEntity(
     prepTimeMinutes = prepTimeMinutes,
     cookTimeMinutes = cookTimeMinutes,
     servings = servings,
+    // Threaded, not defaulted — see the imageBlobId comment above; the same full-row-write hazard
+    // applies to every field here.
+    caloriesPerServing = caloriesPerServing,
+    proteinGramsPerServing = proteinGramsPerServing,
     creatorId = creator.uuid,
     recipeExternalUrl = recipeExternalUrl,
     privacy = privacy,

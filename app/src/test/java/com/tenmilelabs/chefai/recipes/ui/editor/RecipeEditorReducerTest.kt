@@ -72,6 +72,72 @@ class RecipeEditorReducerTest {
         assertEquals("", result.recipeFields.servings)
     }
 
+    // --- Nutrition (optional, never required for form validity) ---
+
+    @Test
+    fun `CaloriesChanged accepts valid integer string`() {
+        val result = RecipeEditorReducer.reduce(emptyState, EditorAction.CaloriesChanged("350"))
+        assertEquals("350", result.recipeFields.caloriesPerServing)
+    }
+
+    @Test
+    fun `CaloriesChanged rejects non-numeric input`() {
+        val result = RecipeEditorReducer.reduce(emptyState, EditorAction.CaloriesChanged("lots"))
+        assertEquals("", result.recipeFields.caloriesPerServing) // unchanged
+    }
+
+    @Test
+    fun `CaloriesChanged accepts empty string`() {
+        val state = emptyState.copy(recipeFields = RecipeFields(caloriesPerServing = "350"))
+        val result = RecipeEditorReducer.reduce(state, EditorAction.CaloriesChanged(""))
+        assertEquals("", result.recipeFields.caloriesPerServing)
+    }
+
+    @Test
+    fun `ProteinChanged accepts valid integer string`() {
+        val result = RecipeEditorReducer.reduce(emptyState, EditorAction.ProteinChanged("12"))
+        assertEquals("12", result.recipeFields.proteinGramsPerServing)
+    }
+
+    @Test
+    fun `ProteinChanged rejects non-numeric input`() {
+        val result = RecipeEditorReducer.reduce(emptyState, EditorAction.ProteinChanged("some"))
+        assertEquals("", result.recipeFields.proteinGramsPerServing)
+    }
+
+    @Test
+    fun `blank nutrition fields do not block form validity`() {
+        val filled = RecipeEditorState(
+            recipeFields = RecipeFields(
+                title = "Pasta",
+                description = "Tasty",
+                prepTimeMinutes = "10",
+                cookTimeMinutes = "20",
+                servings = "2",
+            ),
+            ingredients = IngredientsFields(
+                selectedIngredients = listOf(
+                    RecipeIngredient(
+                        ingredientId = UUID.randomUUID(),
+                        ingredientDisplayName = "Salt",
+                        quantity = 1.0,
+                        unit = "tsp",
+                        allergenName = null,
+                        srcCategory = null,
+                        srcSubcategory = null,
+                    )
+                ),
+            ),
+            steps = StepsFields(
+                steps = listOf(RecipeStep(uuid = UUID.randomUUID(), orderIndex = 0, instruction = "Boil")),
+            ),
+        )
+
+        val result = RecipeEditorReducer.recomputeValidity(filled)
+
+        assertTrue(result.isFormValid)
+    }
+
     // --- Image ---
 
     @Test

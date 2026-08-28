@@ -49,6 +49,22 @@ object RecipeEditorReducer {
             } else state
         }
 
+        is EditorAction.CaloriesChanged -> {
+            if (action.calories.isEmpty() || action.calories.toIntOrNull() != null) {
+                state.copy(
+                    recipeFields = state.recipeFields.copy(caloriesPerServing = action.calories)
+                ).markDirty()
+            } else state
+        }
+
+        is EditorAction.ProteinChanged -> {
+            if (action.protein.isEmpty() || action.protein.toIntOrNull() != null) {
+                state.copy(
+                    recipeFields = state.recipeFields.copy(proteinGramsPerServing = action.protein)
+                ).markDirty()
+            } else state
+        }
+
         is EditorAction.ExternalUrlChanged -> state.copy(
             recipeFields = state.recipeFields.copy(externalUrl = action.url)
         ).markDirty()
@@ -296,6 +312,8 @@ fun RecipeEditorState.toRecipeDraft(): RecipeDraft = RecipeDraft(
     prepTimeMinutes = recipeFields.prepTimeMinutes,
     cookTimeMinutes = recipeFields.cookTimeMinutes,
     servings = recipeFields.servings,
+    caloriesPerServing = recipeFields.caloriesPerServing,
+    proteinGramsPerServing = recipeFields.proteinGramsPerServing,
     externalUrl = recipeFields.externalUrl,
     privacy = recipeFields.privacy,
     ingredients = ingredients.selectedIngredients,

@@ -193,6 +193,8 @@ class RecipeEditorViewModel @Inject constructor(
                         prepTimeMinutes = draft.prepTimeMinutes,
                         cookTimeMinutes = draft.cookTimeMinutes,
                         servings = draft.servings,
+                        caloriesPerServing = draft.caloriesPerServing,
+                        proteinGramsPerServing = draft.proteinGramsPerServing,
                         externalUrl = draft.externalUrl,
                         privacy = draft.privacy,
                     ),

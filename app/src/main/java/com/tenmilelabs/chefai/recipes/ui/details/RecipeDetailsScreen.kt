@@ -63,6 +63,7 @@ import com.tenmilelabs.chefai.core.ui.components.CookedToggleButton
 import com.tenmilelabs.chefai.core.ui.components.InfoChip
 import com.tenmilelabs.chefai.core.ui.components.InfoChipType
 import com.tenmilelabs.chefai.core.ui.components.RecipePrivacyBadge
+import com.tenmilelabs.chefai.core.ui.components.NutritionRow
 import com.tenmilelabs.chefai.core.ui.components.RecipeTimeRow
 import com.tenmilelabs.chefai.core.ui.preview.RecipeData
 import com.tenmilelabs.chefai.core.ui.recipeImageModel
@@ -238,6 +239,7 @@ fun RecipeDetailsContent(
             )
             Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_small)))
             RecipeTimeRow(recipe.prepTimeMinutes, recipe.cookTimeMinutes)
+            NutritionRow(recipe.caloriesPerServing, recipe.proteinGramsPerServing)
             Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_small)))
 
             FlowRow(
