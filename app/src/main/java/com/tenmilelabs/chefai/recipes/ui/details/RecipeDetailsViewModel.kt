@@ -8,6 +8,8 @@ import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.domain.model.Recipe
+import com.tenmilelabs.chefai.core.domain.repository.UserPreferencesRepository
+import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.core.util.Async
 import com.tenmilelabs.chefai.core.util.WhileUiSubscribed
@@ -51,6 +53,8 @@ data class RecipesDetailsUiState(
     val showCookedToggle: Boolean = false,
     val isCooked: Boolean = false,
     val servings: ServingsUiState = ServingsUiState.DEFAULT,
+    /** The units the ingredient list is read in — a display choice, never written to the recipe. */
+    val measurementSystem: MeasurementSystem = MeasurementSystem.DEFAULT,
 )
 
 /** What the portions stepper renders: the chosen count and the counts it may be moved between. */
@@ -141,6 +145,7 @@ class RecipeDetailsViewModel @Inject constructor(
     private val collectionsRepository: CollectionsRepository,
     private val sessionManager: SessionManager,
     private val mealPlanRepository: MealPlanRepository,
+    userPreferencesRepository: UserPreferencesRepository,
     private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -221,6 +226,9 @@ class RecipeDetailsViewModel @Inject constructor(
     private val _selectedServings: StateFlow<Int> =
         savedStateHandle.getStateFlow(SELECTED_SERVINGS_KEY, SERVINGS_UNSET)
 
+    private val _measurementSystem: Flow<MeasurementSystem> =
+        userPreferencesRepository.measurementSystem
+
     private val _combinedState = combine(
         _isLoading, _recipeAsync, _userMessage, _isBookmarked, _deleteUi
     ) { isLoading, recipeAsync, userMessage, isBookmarked, deleteUi ->
@@ -228,8 +236,8 @@ class RecipeDetailsViewModel @Inject constructor(
     }
 
     val uiState: StateFlow<RecipesDetailsUiState> = combine(
-        _combinedState, _isCooked, _selectedServings, _currentUserId
-    ) { combined, isCooked, selectedServings, currentUserId ->
+        _combinedState, _isCooked, _selectedServings, _currentUserId, _measurementSystem
+    ) { combined, isCooked, selectedServings, currentUserId, measurementSystem ->
         when (val recipeAsync = combined.recipeAsync) {
             Async.Loading -> {
                 RecipesDetailsUiState(isLoading = true)
@@ -264,6 +272,7 @@ class RecipeDetailsViewModel @Inject constructor(
                     showCookedToggle = mealPlanSlotRef != null,
                     isCooked = isCooked,
                     servings = servings,
+                    measurementSystem = measurementSystem,
                 )
             }
         }

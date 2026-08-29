@@ -24,13 +24,16 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
+import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 
 /** How much of its normal opacity a picked-up row keeps. Matches MealPlanMealRow's COOKED_ALPHA. */
@@ -50,6 +53,7 @@ fun ShoppingListRow(
     quantityLabel: String?,
     isChecked: Boolean,
     onToggle: () -> Unit,
+    isApproximate: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     // Held as State, not unwrapped with `by`: nothing else in the composition reads .value, so
@@ -104,10 +108,22 @@ fun ShoppingListRow(
                 modifier = Modifier.sweepingStrikeThrough(contentColor) { strike.value },
             )
             if (quantityLabel != null) {
+                // "≈" marks a total that rests on an assumed density, exactly as the recipe
+                // screen marks one; a screen reader gets the word, which it would skip as a glyph.
+                val spokenAmount = if (isApproximate) {
+                    stringResource(R.string.ingredient_amount_approximate, quantityLabel)
+                } else {
+                    null
+                }
                 Text(
-                    text = quantityLabel,
+                    text = if (isApproximate) "≈ $quantityLabel" else quantityLabel,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = if (spokenAmount != null) {
+                        Modifier.semantics { contentDescription = spokenAmount }
+                    } else {
+                        Modifier
+                    },
                 )
             }
         }

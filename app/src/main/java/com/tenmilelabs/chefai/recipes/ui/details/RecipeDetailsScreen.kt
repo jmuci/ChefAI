@@ -48,6 +48,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -56,7 +58,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.tenmilelabs.chefai.R
-import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.Recipe
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
@@ -71,7 +72,8 @@ import com.tenmilelabs.chefai.core.ui.recipeImageModel
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.core.util.EmptyContent
 import com.tenmilelabs.chefai.core.util.LoadingContent
-import com.tenmilelabs.chefai.core.util.QuantityFormat
+import com.tenmilelabs.chefai.core.domain.units.IngredientAmountFormatter
+import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
 import com.tenmilelabs.chefai.recipes.domain.scaling.RecipeScaling
 import com.tenmilelabs.chefai.recipes.ui.components.DeleteConfirmationDialog
 import com.tenmilelabs.chefai.recipes.ui.details.components.ServingsStepper
@@ -129,6 +131,7 @@ fun RecipeDetailsScreen(
                 canDelete = onNavigateBack != null && uiState.canDelete,
                 showDeleteConfirmation = uiState.showDeleteConfirmation,
                 isDeleting = uiState.isDeleting,
+                measurementSystem = uiState.measurementSystem,
                 showCookedToggle = uiState.showCookedToggle,
                 isCooked = uiState.isCooked,
             )
@@ -161,6 +164,8 @@ fun RecipeDetailsScreen(
  * @param servings the portions the ingredient list is shown at; the quantities are scaled from
  *   [recipe] to match, here rather than by the caller, so the stepper and the list can never
  *   disagree about what they are showing.
+ * @param measurementSystem the units the ingredient list is read in. Applied here, after scaling,
+ *   for the same reason scaling itself is: it is a way of reading the recipe, never an edit to it.
  * @param canEdit whether the caller has somewhere for the edit FAB to go.
  * @param canDelete whether the caller has somewhere to navigate after a delete, and the current
  *   user owns [recipe] (created or imported it themselves).
@@ -170,6 +175,7 @@ fun RecipeDetailsContent(
     recipe: Recipe,
     onAction: (RecipeDetailsAction) -> Unit = {},
     servings: ServingsUiState = ServingsUiState.forRecipeServings(recipe.servings),
+    measurementSystem: MeasurementSystem = MeasurementSystem.DEFAULT,
     isBookmarked: Boolean = false,
     canEdit: Boolean = false,
     canDelete: Boolean = false,
@@ -185,12 +191,28 @@ fun RecipeDetailsContent(
         )
     }
 
-    val ingredients = remember(recipe.ingredients, servings.base, servings.current) {
+    // Scale first and convert second, never the other way round: scaling arithmetic run on an
+    // already-converted, already-rounded value compounds the rounding.
+    val ingredients = remember(
+        recipe.ingredients, servings.base, servings.current, measurementSystem,
+    ) {
         RecipeScaling.scale(
             ingredients = recipe.ingredients,
             baseServings = servings.base,
             targetServings = servings.current,
-        )
+        ).map { ingredient ->
+            val amount = IngredientAmountFormatter.format(
+                quantity = ingredient.quantity,
+                unit = ingredient.unit,
+                ingredientName = ingredient.ingredientDisplayName,
+                system = measurementSystem,
+            )
+            IngredientRowUi(
+                name = ingredient.ingredientDisplayName,
+                amountLabel = amount.text,
+                isApproximate = amount.isApproximate,
+            )
+        }
     }
 
     val tabTitles = listOf(stringResource(R.string.ingredients), stringResource(R.string.steps))
@@ -365,8 +387,16 @@ private fun RecipeDescription(description: String) {
     }
 }
 
+/** One ingredient row, already scaled, converted and rendered. */
+data class IngredientRowUi(
+    val name: String,
+    val amountLabel: String,
+    /** True when the amount rests on an assumed density; the row prefixes it with "≈". */
+    val isApproximate: Boolean = false,
+)
+
 @Composable
-fun IngredientsList(ingredients: List<RecipeIngredient>) {
+fun IngredientsList(ingredients: List<IngredientRowUi>) {
     if (ingredients.isEmpty()) {
         Text(
             text = stringResource(R.string.no_ingredients_listed),
@@ -380,19 +410,30 @@ fun IngredientsList(ingredients: List<RecipeIngredient>) {
         ingredients.forEach { ingredient ->
             Row {
                 Text(
-                    text = ingredient.ingredientDisplayName,
+                    text = ingredient.name,
                     modifier = Modifier
                         .weight(1f)
                         .padding(vertical = dimensionResource(id = R.dimen.padding_small)),
                     style = MaterialTheme.typography.bodyLarge
                 )
-                val amount = QuantityFormat.cooking(ingredient.quantity, ingredient.unit)
+                // "≈" marks a weight arrived at through a typical density rather than measured.
+                // A screen reader gets the word rather than the glyph, which it would skip.
+                val spokenAmount = if (ingredient.isApproximate) {
+                    stringResource(R.string.ingredient_amount_approximate, ingredient.amountLabel)
+                } else {
+                    null
+                }
                 Text(
-                    // A unitless ingredient reads "2", not "2 " — the shopping list's renderer
-                    // makes the same distinction.
-                    text = if (ingredient.unit.isBlank()) amount else "$amount ${ingredient.unit}",
+                    text = if (ingredient.isApproximate) "≈ ${ingredient.amountLabel}" else ingredient.amountLabel,
                     modifier = Modifier
-                        .padding(vertical = dimensionResource(id = R.dimen.padding_small)),
+                        .padding(vertical = dimensionResource(id = R.dimen.padding_small))
+                        .then(
+                            if (spokenAmount != null) {
+                                Modifier.semantics { contentDescription = spokenAmount }
+                            } else {
+                                Modifier
+                            }
+                        ),
                     textAlign = TextAlign.End,
                     style = MaterialTheme.typography.bodyLarge
                 )

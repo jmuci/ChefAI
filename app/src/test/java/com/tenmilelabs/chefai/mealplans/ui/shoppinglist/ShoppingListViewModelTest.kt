@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.mealplans.ui.shoppinglist
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.core.data.repository.FakeUserPreferencesRepository
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import com.tenmilelabs.chefai.mealplans.data.repository.FakeMealPlanRepository
@@ -31,6 +32,7 @@ class ShoppingListViewModelTest {
 
     private lateinit var mealPlanRepository: FakeMealPlanRepository
     private lateinit var shoppingListRepository: FakeShoppingListRepository
+    private lateinit var userPreferencesRepository: FakeUserPreferencesRepository
 
     private val planId = UUID.randomUUID()
     private val recipeId = UUID.randomUUID()
@@ -39,6 +41,7 @@ class ShoppingListViewModelTest {
     fun setup() {
         mealPlanRepository = FakeMealPlanRepository()
         shoppingListRepository = FakeShoppingListRepository()
+        userPreferencesRepository = FakeUserPreferencesRepository()
     }
 
     @Test
@@ -145,6 +148,7 @@ class ShoppingListViewModelTest {
         },
         mealPlanRepository = mealPlanRepository,
         shoppingListRepository = shoppingListRepository,
+        userPreferencesRepository = userPreferencesRepository,
     )
 
     private fun fullDay() = MealPlanDay(
