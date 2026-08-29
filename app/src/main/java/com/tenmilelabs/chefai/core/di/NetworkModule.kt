@@ -67,6 +67,13 @@ object NetworkModule {
         ignoreUnknownKeys = true
     }
 
+    /**
+     * Still CIO, not OkHttp: this client only ever talks to ChefAI's own backend, which doesn't
+     * trigger the hostname-aware-trust-manager bug [provideScraperHttpClient] works around (that's
+     * a third-party-TLS-config problem). Bundling OkHttp as well as CIO — rather than switching
+     * both clients to OkHttp — was a deliberate scoped fix: it keeps this change limited to the
+     * client actually affected, at the cost of two HTTP engines shipping in the APK instead of one.
+     */
     @Provides
     @Singleton
     fun provideHttpClient(tokenProvider: TokenProvider, json: Json) = HttpClient(CIO) {
