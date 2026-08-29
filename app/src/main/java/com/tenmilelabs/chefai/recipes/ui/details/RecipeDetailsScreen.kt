@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.CircularProgressIndicator
@@ -61,6 +62,8 @@ import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.Recipe
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
+import com.tenmilelabs.chefai.core.domain.units.IngredientAmountFormatter
+import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
 import com.tenmilelabs.chefai.core.ui.components.CookedToggleButton
 import com.tenmilelabs.chefai.core.ui.components.InfoChip
 import com.tenmilelabs.chefai.core.ui.components.InfoChipType
@@ -70,10 +73,11 @@ import com.tenmilelabs.chefai.core.ui.components.RecipeTimeRow
 import com.tenmilelabs.chefai.core.ui.preview.RecipeData
 import com.tenmilelabs.chefai.core.ui.recipeImageModel
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
+import com.tenmilelabs.chefai.core.ui.timer.RecipeTimerViewModel
+import com.tenmilelabs.chefai.core.ui.timer.rememberNotificationPermissionRequester
 import com.tenmilelabs.chefai.core.util.EmptyContent
 import com.tenmilelabs.chefai.core.util.LoadingContent
-import com.tenmilelabs.chefai.core.domain.units.IngredientAmountFormatter
-import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
+import com.tenmilelabs.chefai.core.util.parseStepDurationSeconds
 import com.tenmilelabs.chefai.recipes.domain.scaling.RecipeScaling
 import com.tenmilelabs.chefai.recipes.ui.components.DeleteConfirmationDialog
 import com.tenmilelabs.chefai.recipes.ui.details.components.ServingsStepper
@@ -444,7 +448,7 @@ fun IngredientsList(ingredients: List<IngredientRowUi>) {
 }
 
 @Composable
-fun StepsList(steps: List<RecipeStep>) {
+fun StepsList(steps: List<RecipeStep>, timerViewModel: RecipeTimerViewModel = hiltViewModel()) {
     if (steps.isEmpty()) {
         Text(
             text = stringResource(R.string.no_steps_listed),
@@ -454,23 +458,52 @@ fun StepsList(steps: List<RecipeStep>) {
         )
         return
     }
+    val requestNotificationPermission = rememberNotificationPermissionRequester()
     Column(modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_medium))) {
         steps.sortedBy { it.orderIndex }.forEach { step ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = dimensionResource(id = R.dimen.padding_medium)),
-                verticalAlignment = Alignment.Top
-            ) {
-                Text(
-                    text = "${step.orderIndex + 1}.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(end = dimensionResource(id = R.dimen.padding_small))
-                )
-                Text(text = step.instruction, style = MaterialTheme.typography.bodyLarge)
-            }
+            StepListItem(
+                step = step,
+                onStartTimer = { totalSeconds ->
+                    requestNotificationPermission()
+                    timerViewModel.start(
+                        stepLabel = "Step ${step.orderIndex + 1}",
+                        totalSeconds = totalSeconds,
+                    )
+                },
+            )
             HorizontalDivider()
+        }
+    }
+}
+
+@Composable
+private fun StepListItem(step: RecipeStep, onStartTimer: (Long) -> Unit) {
+    val durationSeconds = remember(step.instruction) { parseStepDurationSeconds(step.instruction) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = dimensionResource(id = R.dimen.padding_medium)),
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = "${step.orderIndex + 1}.",
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(end = dimensionResource(id = R.dimen.padding_small))
+        )
+        Text(
+            text = step.instruction,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f),
+        )
+        if (durationSeconds != null) {
+            IconButton(onClick = { onStartTimer(durationSeconds) }) {
+                Icon(
+                    imageVector = Icons.Default.Timer,
+                    contentDescription = stringResource(R.string.start_step_timer_content_description),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
     }
 }
