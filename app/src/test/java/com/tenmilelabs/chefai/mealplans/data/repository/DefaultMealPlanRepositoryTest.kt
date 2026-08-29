@@ -2,11 +2,17 @@ package com.tenmilelabs.chefai.mealplans.data.repository
 
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeMealPlanDao
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
+import com.tenmilelabs.chefai.core.data.sync.SyncOrchestrator
 import com.tenmilelabs.chefai.core.data.sync.network.dto.GenerateMealPlanResponse
+import com.tenmilelabs.chefai.core.data.sync.network.dto.GenerateMealPlanStatelessResponseDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDayDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncReferenceDataDto
 import com.tenmilelabs.chefai.mealplans.data.network.FakeMealPlanNetworkDataSource
+import com.tenmilelabs.chefai.mealplans.data.network.GenerateStatelessResult
 import com.tenmilelabs.chefai.mealplans.domain.model.DietaryRestriction
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay
@@ -16,6 +22,8 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
+import io.mockk.coVerify
+import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -29,6 +37,7 @@ class DefaultMealPlanRepositoryTest {
     private lateinit var mealPlanDao: FakeMealPlanDao
     private lateinit var networkDataSource: FakeMealPlanNetworkDataSource
     private lateinit var syncScheduler: FakeSyncManager
+    private lateinit var syncOrchestrator: SyncOrchestrator
     private lateinit var repository: DefaultMealPlanRepository
 
     @Before
@@ -36,7 +45,10 @@ class DefaultMealPlanRepositoryTest {
         mealPlanDao = FakeMealPlanDao()
         networkDataSource = FakeMealPlanNetworkDataSource()
         syncScheduler = FakeSyncManager()
-        repository = DefaultMealPlanRepository(mealPlanDao, networkDataSource, syncScheduler)
+        syncOrchestrator = mockk(relaxed = true)
+        repository = DefaultMealPlanRepository(
+            mealPlanDao, networkDataSource, syncScheduler, syncOrchestrator, FakeTransactionRunner(),
+        )
     }
 
     // --- observeMealPlan / observeMealPlansForUser reactivity ---
@@ -209,6 +221,161 @@ class DefaultMealPlanRepositoryTest {
         assertThat(result.isFailure).isTrue()
         val untouched = mealPlanDao.getMealPlanById(plan.uuid)!!
         assertThat(untouched.status).isEqualTo(MealPlanStatus.DRAFT.name)
+    }
+
+    // --- generateStatelessAndSave ---
+
+    @Test
+    fun `generateStatelessAndSave persists returned recipes and days, and marks the plan ready`() = runTest {
+        val plan = plan(days = emptyList())
+        repository.createMealPlan(plan)
+        val recipeId = UUID.randomUUID()
+        val response = GenerateMealPlanStatelessResponseDto(
+            days = listOf(
+                SyncMealPlanDayDto(
+                    uuid = UUID.randomUUID().toString(),
+                    dayIndex = 0,
+                    dinnerRecipeId = recipeId.toString(),
+                    lunchRecipeId = null,
+                )
+            ),
+            recipes = emptyList(),
+            referenceData = SyncReferenceDataDto(),
+            creators = emptyList(),
+        )
+        networkDataSource.statelessResult = GenerateStatelessResult.Success(response)
+        val syncCountBefore = syncScheduler.mutationSyncCount
+
+        val result = repository.generateStatelessAndSave(plan.uuid, plan.preferences)
+
+        assertThat(result).isEqualTo(Result.success(1))
+        coVerify { syncOrchestrator.persistGeneratedRecipes(response) }
+        val saved = requireNotNull(mealPlanDao.getMealPlanById(plan.uuid))
+        assertThat(saved.status).isEqualTo(MealPlanStatus.READY.name)
+        assertThat(saved.syncState).isEqualTo(SyncState.PENDING)
+        assertThat(mealPlanDao.getDaysForMealPlan(plan.uuid).single().dinnerRecipeId).isEqualTo(recipeId)
+        assertThat(syncScheduler.mutationSyncCount).isEqualTo(syncCountBefore + 1)
+    }
+
+    @Test
+    fun `generateStatelessAndSave sends the plan's own preferences to the network layer`() = runTest {
+        val plan = plan(days = emptyList())
+        repository.createMealPlan(plan)
+
+        repository.generateStatelessAndSave(plan.uuid, plan.preferences)
+
+        assertThat(networkDataSource.statelessRequestedPreferences).hasSize(1)
+        assertThat(networkDataSource.statelessRequestedPreferences.single())
+            .contains(plan.preferences.recipeSource.name)
+    }
+
+    @Test
+    fun `generateStatelessAndSave returns failure without touching Room when the network call fails`() = runTest {
+        val plan = plan(days = emptyList())
+        repository.createMealPlan(plan)
+        networkDataSource.statelessResult = GenerateStatelessResult.Error("boom")
+
+        val result = repository.generateStatelessAndSave(plan.uuid, plan.preferences)
+
+        assertThat(result.isFailure).isTrue()
+        val untouched = requireNotNull(mealPlanDao.getMealPlanById(plan.uuid))
+        assertThat(untouched.status).isEqualTo(MealPlanStatus.DRAFT.name)
+    }
+
+    @Test
+    fun `generateStatelessAndSave returns failure for a plan that does not exist locally`() = runTest {
+        val result = repository.generateStatelessAndSave(UUID.randomUUID(), plan(days = emptyList()).preferences)
+
+        assertThat(result.isFailure).isTrue()
+    }
+
+    @Test
+    fun `generateStatelessAndSave leaves an existing schedule untouched when the response has no days`() = runTest {
+        val existingDays = listOf(day(dayIndex = 0), day(dayIndex = 1))
+        val plan = plan(days = existingDays)
+        repository.createMealPlan(plan)
+        networkDataSource.statelessResult = GenerateStatelessResult.Success(
+            GenerateMealPlanStatelessResponseDto(
+                days = emptyList(),
+                recipes = emptyList(),
+                referenceData = SyncReferenceDataDto(),
+                creators = emptyList(),
+            )
+        )
+
+        val result = repository.generateStatelessAndSave(plan.uuid, plan.preferences)
+
+        assertThat(result).isEqualTo(Result.success(0))
+        val untouched = requireNotNull(mealPlanDao.getMealPlanById(plan.uuid))
+        // Must not have been flipped to READY off the back of an empty response.
+        assertThat(untouched.status).isEqualTo(MealPlanStatus.DRAFT.name)
+        assertThat(mealPlanDao.getDaysForMealPlan(plan.uuid).map { it.uuid })
+            .containsExactlyElementsIn(existingDays.map { it.uuid })
+    }
+
+    @Test
+    fun `generateStatelessAndSave carries a cooked mark forward when the same recipe fills the same day`() = runTest {
+        val recipeId = UUID.randomUUID()
+        val existingDay = MealPlanDay(
+            uuid = UUID.randomUUID(),
+            dayIndex = 0,
+            dinnerRecipeId = recipeId,
+            lunchRecipeId = null,
+            dinnerCookedAt = 1_000L,
+        )
+        val plan = plan(days = listOf(existingDay))
+        repository.createMealPlan(plan)
+        networkDataSource.statelessResult = GenerateStatelessResult.Success(
+            GenerateMealPlanStatelessResponseDto(
+                days = listOf(
+                    SyncMealPlanDayDto(
+                        uuid = UUID.randomUUID().toString(),
+                        dayIndex = 0,
+                        dinnerRecipeId = recipeId.toString(),
+                        lunchRecipeId = null,
+                    )
+                ),
+                recipes = emptyList(),
+                referenceData = SyncReferenceDataDto(),
+                creators = emptyList(),
+            )
+        )
+
+        repository.generateStatelessAndSave(plan.uuid, plan.preferences)
+
+        assertThat(mealPlanDao.getDaysForMealPlan(plan.uuid).single().dinnerCookedAt).isEqualTo(1_000L)
+    }
+
+    @Test
+    fun `generateStatelessAndSave does not carry a cooked mark forward when the day's recipe changed`() = runTest {
+        val existingDay = MealPlanDay(
+            uuid = UUID.randomUUID(),
+            dayIndex = 0,
+            dinnerRecipeId = UUID.randomUUID(),
+            lunchRecipeId = null,
+            dinnerCookedAt = 1_000L,
+        )
+        val plan = plan(days = listOf(existingDay))
+        repository.createMealPlan(plan)
+        networkDataSource.statelessResult = GenerateStatelessResult.Success(
+            GenerateMealPlanStatelessResponseDto(
+                days = listOf(
+                    SyncMealPlanDayDto(
+                        uuid = UUID.randomUUID().toString(),
+                        dayIndex = 0,
+                        dinnerRecipeId = UUID.randomUUID().toString(), // a different recipe now fills day 0
+                        lunchRecipeId = null,
+                    )
+                ),
+                recipes = emptyList(),
+                referenceData = SyncReferenceDataDto(),
+                creators = emptyList(),
+            )
+        )
+
+        repository.generateStatelessAndSave(plan.uuid, plan.preferences)
+
+        assertThat(mealPlanDao.getDaysForMealPlan(plan.uuid).single().dinnerCookedAt).isNull()
     }
 
     // --- Helpers ---

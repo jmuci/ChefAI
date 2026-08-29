@@ -37,3 +37,25 @@ data class MealPlanDayEntity(
     /** Epoch millis the user marked lunch cooked. See [dinnerCookedAt]. */
     val lunchCookedAt: Long? = null,
 )
+
+/**
+ * Carries this day's cooked marks forward from [previousByDayIndex] onto a freshly-assigned day,
+ * keyed by [MealPlanDayEntity.dayIndex] rather than [MealPlanDayEntity.uuid] — a regenerated
+ * schedule reissues day rows with new ids, but the position in the week is what the user marked
+ * cooked. A mark only survives if the slot still holds the *same* recipe: when regeneration assigns
+ * a different meal to a day, that meal has not been cooked.
+ *
+ * Shared by every place a plan's days get wholesale-replaced:
+ * [com.tenmilelabs.chefai.core.data.sync.SyncOrchestrator]'s pull-applied regeneration and
+ * [com.tenmilelabs.chefai.mealplans.data.repository.DefaultMealPlanRepository]'s stateless-generation
+ * path.
+ */
+fun MealPlanDayEntity.carryForwardCookedMarks(
+    previousByDayIndex: Map<Int, MealPlanDayEntity>
+): MealPlanDayEntity {
+    val previous = previousByDayIndex[dayIndex] ?: return this
+    return copy(
+        dinnerCookedAt = previous.dinnerCookedAt.takeIf { previous.dinnerRecipeId == dinnerRecipeId },
+        lunchCookedAt = previous.lunchCookedAt.takeIf { previous.lunchRecipeId == lunchRecipeId },
+    )
+}

@@ -240,3 +240,22 @@ data class GenerateMealPlanResponse(
     val status: String,
     val updatedAt: Long
 )
+
+@Serializable
+data class GenerateMealPlanStatelessRequest(val preferencesJson: String)
+
+/**
+ * Response body for `POST /api/v1/meal-plans/generate` — the anonymous-capable, stateless
+ * counterpart to `POST /meal-plans/{id}/generate`. Shaped like [RecipeDetailResponseDto] plus a
+ * day list rather than a bare day list alone: an anonymous device has typically never received the
+ * assigned recipes, so the server bundles every recipe aggregate the days reference in the same
+ * round trip. [creators] sits outside [referenceData] for the same FK-safety reason as
+ * [RecipeDetailResponseDto.creators].
+ */
+@Serializable
+data class GenerateMealPlanStatelessResponseDto(
+    val days: List<SyncMealPlanDayDto>,
+    val recipes: List<SyncRecipeDto>,
+    val referenceData: SyncReferenceDataDto,
+    val creators: List<SyncCreatorDto>
+)

@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.core.data.sync
 
 import com.tenmilelabs.chefai.core.data.local.room.BookmarkedRecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.MealPlanDayEntity
+import com.tenmilelabs.chefai.core.data.local.room.carryForwardCookedMarks
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.SyncMetadataEntity
 import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
@@ -36,8 +37,11 @@ import com.tenmilelabs.chefai.core.data.sync.mapper.toTagCrossRefs
 import com.tenmilelabs.chefai.core.data.sync.mapper.toTagEntity
 import com.tenmilelabs.chefai.core.data.sync.mapper.toUserEntity
 import com.tenmilelabs.chefai.core.data.sync.network.SyncNetworkDataSource
+import com.tenmilelabs.chefai.core.data.sync.network.dto.GenerateMealPlanStatelessResponseDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncBookmarkPushDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncCreatorDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncReferenceDataDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPushRequest
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPushResponse
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeDto
@@ -353,18 +357,23 @@ class SyncOrchestrator @Inject constructor(
      * only transaction in this call path, so nesting isn't a concern even though
      * [upsertRecipeAggregate]'s other two callers each wrap it in their own.
      */
+    /**
+     * Persists the recipes carried by a stateless meal-plan generation response — see
+     * [com.tenmilelabs.chefai.mealplans.data.network.GenerateStatelessResult]. Same FK-order
+     * upsert as [fetchAndPersistRecipe], applied to every recipe in the response inside one
+     * transaction rather than one recipe at a time.
+     */
+    suspend fun persistGeneratedRecipes(response: GenerateMealPlanStatelessResponseDto): Unit =
+        transactionRunner {
+            persistReferenceData(response.creators, response.referenceData)
+            response.recipes.forEach { upsertRecipeAggregate(it) }
+        }
+
     suspend fun fetchAndPersistRecipe(recipeId: UUID): RecipeFetchOutcome =
         when (val result = recipeDetailNetworkDataSource.fetchRecipe(recipeId)) {
             is RecipeDetailNetworkResult.Success -> {
                 transactionRunner {
-                    userDao.upsertAll(result.response.creators.map { it.toUserEntity() })
-                    allergenDao.upsertAll(result.response.referenceData.allergens.map { it.toAllergenEntity() })
-                    sourceClassificationDao.upsertAll(
-                        result.response.referenceData.sourceClassifications.map { it.toSourceClassificationEntity() }
-                    )
-                    ingredientDao.upsertAll(result.response.referenceData.ingredients.map { it.toIngredientEntity() })
-                    tagDao.upsertAll(result.response.referenceData.tags.map { it.toTagEntity() })
-                    labelDao.upsertAll(result.response.referenceData.labels.map { it.toLabelEntity() })
+                    persistReferenceData(result.response.creators, result.response.referenceData)
                     upsertRecipeAggregate(result.response.recipe)
                 }
                 RecipeFetchOutcome.PERSISTED
@@ -375,6 +384,26 @@ class SyncOrchestrator @Inject constructor(
                 RecipeFetchOutcome.NETWORK_ERROR
             }
         }
+
+    /**
+     * Upserts reference data in the FK dependency order [pull] and both callers above rely on:
+     * creators (leaf) -> recipes.creatorId (CASCADE); allergens/source classifications (leaf) ->
+     * ingredients (RESTRICT/SET_NULL); ingredients -> recipe_ingredients (RESTRICT); tags/labels
+     * (leaf) -> their cross-refs (RESTRICT). Must run inside the caller's own [transactionRunner].
+     */
+    private suspend fun persistReferenceData(
+        creators: List<SyncCreatorDto>,
+        referenceData: SyncReferenceDataDto,
+    ) {
+        userDao.upsertAll(creators.map { it.toUserEntity() })
+        allergenDao.upsertAll(referenceData.allergens.map { it.toAllergenEntity() })
+        sourceClassificationDao.upsertAll(
+            referenceData.sourceClassifications.map { it.toSourceClassificationEntity() }
+        )
+        ingredientDao.upsertAll(referenceData.ingredients.map { it.toIngredientEntity() })
+        tagDao.upsertAll(referenceData.tags.map { it.toTagEntity() })
+        labelDao.upsertAll(referenceData.labels.map { it.toLabelEntity() })
+    }
 
     private suspend fun applyPulledRecipe(syncRecipe: SyncRecipeDto): ApplyResult {
         val recipeUuid = UUID.fromString(syncRecipe.uuid)
@@ -546,16 +575,8 @@ class SyncOrchestrator @Inject constructor(
         if (dto.days.isNotEmpty()) {
             mealPlanDao.upsertDays(
                 dto.days.map { dayDto ->
-                    val day = dropUnknownRecipes(dayDto.toMealPlanDayEntity(planUuid))
-                    val previous = previousDays[day.dayIndex] ?: return@map day
-                    // A mark only survives if the slot still holds the *same* recipe: when the
-                    // server regenerates a day with a different meal, that meal has not been cooked.
-                    day.copy(
-                        dinnerCookedAt = previous.dinnerCookedAt
-                            .takeIf { previous.dinnerRecipeId == day.dinnerRecipeId },
-                        lunchCookedAt = previous.lunchCookedAt
-                            .takeIf { previous.lunchRecipeId == day.lunchRecipeId },
-                    )
+                    dropUnknownRecipes(dayDto.toMealPlanDayEntity(planUuid))
+                        .carryForwardCookedMarks(previousDays)
                 }
             )
         }

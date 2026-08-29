@@ -38,6 +38,7 @@ import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDayDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPullResponse
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPushResponse
+import com.tenmilelabs.chefai.core.data.sync.network.dto.GenerateMealPlanStatelessResponseDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.RecipeDetailResponseDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncIngredientDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncLabelDto
@@ -1053,5 +1054,88 @@ class SyncOrchestratorTest {
 
             assertThat(outcome).isEqualTo(RecipeFetchOutcome.NETWORK_ERROR)
             assertThat(recipeDao.getRecipeById(recipeId1)).isNull()
+        }
+
+    // ============ persistGeneratedRecipes (anonymous-capable stateless meal-plan generation) ============
+
+    @Test
+    fun `persistGeneratedRecipes writes every recipe and its reference data`() = runTest(testDispatcher) {
+        val response = GenerateMealPlanStatelessResponseDto(
+            days = emptyList(),
+            recipes = listOf(
+                createSyncRecipeDto(uuid = recipeId1, title = "Stateless Recipe 1"),
+                createSyncRecipeDto(uuid = recipeId2, title = "Stateless Recipe 2"),
+            ),
+            referenceData = SyncReferenceDataDto(
+                ingredients = listOf(
+                    SyncIngredientDto(
+                        uuid = ingredientId1.toString(),
+                        displayName = "Flour",
+                        allergenId = null,
+                        sourcePrimaryId = null,
+                        updatedAt = 100L,
+                        deletedAt = null,
+                    )
+                ),
+                tags = listOf(SyncTagDto(uuid = tagId1.toString(), displayName = "Quick", updatedAt = 100L, deletedAt = null)),
+                labels = listOf(SyncLabelDto(uuid = labelId1.toString(), displayName = "Vegan", updatedAt = 100L, deletedAt = null)),
+            ),
+            creators = listOf(
+                SyncCreatorDto(
+                    uuid = creatorId.toString(),
+                    displayName = "Chef Jane",
+                    email = "jane@example.com",
+                    avatarUrl = "",
+                    updatedAt = 100L,
+                    deletedAt = null,
+                )
+            ),
+        )
+
+        syncOrchestrator.persistGeneratedRecipes(response)
+
+        assertThat(recipeDao.getRecipeById(recipeId1)?.title).isEqualTo("Stateless Recipe 1")
+        assertThat(recipeDao.getRecipeById(recipeId2)?.title).isEqualTo("Stateless Recipe 2")
+        assertThat(ingredientDao.getIngredientById(ingredientId1)?.displayName).isEqualTo("Flour")
+        assertThat(tagDao.getTagById(tagId1)?.displayName).isEqualTo("Quick")
+        assertThat(labelDao.getLabelById(labelId1)?.displayName).isEqualTo("Vegan")
+        // The recipe's own creatorId FK must resolve — a fresh anonymous device has never seen
+        // this author, same reasoning as fetchAndPersistRecipe's ChefAI#186 fix above.
+        assertThat(userDao.getUserById(creatorId)?.displayName).isEqualTo("Chef Jane")
+    }
+
+    @Test
+    fun `persistGeneratedRecipes updates a recipe already present locally rather than duplicating it`() =
+        runTest(testDispatcher) {
+            recipeDao.upsertRecipe(
+                RecipeEntity(
+                    uuid = recipeId1,
+                    title = "Stale Local Title",
+                    description = "",
+                    imageUrl = "",
+                    imageUrlThumbnail = "",
+                    imageBlobId = null,
+                    prepTimeMinutes = 5,
+                    cookTimeMinutes = 5,
+                    servings = 2,
+                    creatorId = creatorId,
+                    recipeExternalUrl = null,
+                    privacy = RecipePrivacy.PUBLIC,
+                    version = 1,
+                    updatedAt = 1L,
+                    deletedAt = null,
+                    syncState = SyncState.SYNCED,
+                )
+            )
+            val response = GenerateMealPlanStatelessResponseDto(
+                days = emptyList(),
+                recipes = listOf(createSyncRecipeDto(uuid = recipeId1, title = "Fresh Server Title", updatedAt = 500L)),
+                referenceData = SyncReferenceDataDto(),
+                creators = emptyList(),
+            )
+
+            syncOrchestrator.persistGeneratedRecipes(response)
+
+            assertThat(recipeDao.getRecipeById(recipeId1)?.title).isEqualTo("Fresh Server Title")
         }
 }

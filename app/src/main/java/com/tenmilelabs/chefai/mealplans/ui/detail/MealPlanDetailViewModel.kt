@@ -3,7 +3,6 @@ package com.tenmilelabs.chefai.mealplans.ui.detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.tenmilelabs.chefai.core.data.sync.SyncExecutor
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
@@ -12,7 +11,7 @@ import com.tenmilelabs.chefai.mealplans.domain.print.MealPlanPrintDocument
 import com.tenmilelabs.chefai.mealplans.domain.print.MealPlanPrintDocumentBuilder
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.repository.ShoppingListRepository
-import com.tenmilelabs.chefai.mealplans.domain.usecase.LocalMealPlanGenerator
+import com.tenmilelabs.chefai.mealplans.domain.usecase.GenerateMealPlanUseCase
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -29,7 +28,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.UUID
@@ -68,8 +66,7 @@ class MealPlanDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val mealPlanRepository: MealPlanRepository,
     private val recipesRepository: RecipesRepository,
-    private val syncExecutor: SyncExecutor,
-    private val localMealPlanGenerator: LocalMealPlanGenerator,
+    private val generateMealPlanUseCase: GenerateMealPlanUseCase,
     private val shoppingListRepository: ShoppingListRepository,
 ) : ViewModel() {
 
@@ -157,12 +154,9 @@ class MealPlanDetailViewModel @Inject constructor(
     }
 
     /**
-     * Fills the plan with recipes: the backend generator first, the on-device scheduler if that
-     * cannot deliver.
-     *
-     * The local fallback runs both when the remote attempt throws and when it returns without the
-     * plan actually gaining days — an anonymous session pushes nothing and has its pulled meal
-     * plans skipped, so the round trip can "succeed" and still leave the plan empty.
+     * Fills the plan with recipes via [GenerateMealPlanUseCase] — which path runs depends on
+     * session type and `recipeSource`, with the on-device scheduler as the universal fallback; see
+     * that use case's doc.
      */
     fun onGenerate() {
         if (isGenerating.value) return
@@ -170,27 +164,20 @@ class MealPlanDetailViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val remoteFilled = runCatching { generateRemotely() }
-                    .onFailure { Timber.w(it, "onGenerate: remote generation failed for $mealPlanId") }
-                    .getOrDefault(false)
-
-                if (remoteFilled) return@launch
-
-                Timber.d("onGenerate: falling back to on-device generation for $mealPlanId")
                 val plan = mealPlanRepository.observeMealPlan(mealPlanId).first()
                 if (plan == null) {
                     _events.emit(MealPlanDetailEvent.ShowError("Meal plan not found"))
                     return@launch
                 }
 
-                localMealPlanGenerator(plan)
-                    .onFailure {
-                        _events.emit(
-                            MealPlanDetailEvent.ShowError(
-                                "Save a few recipes first — we build plans from your collection."
-                            )
+                val filled = generateMealPlanUseCase(mealPlanId, plan.preferences)
+                if (!filled) {
+                    _events.emit(
+                        MealPlanDetailEvent.ShowError(
+                            "Save a few recipes first — we build plans from your collection."
                         )
-                    }
+                    )
+                }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 Timber.e(e, "onGenerate: failed for plan $mealPlanId")
@@ -201,24 +188,7 @@ class MealPlanDetailViewModel @Inject constructor(
         }
     }
 
-    /** Runs the server round trip. Returns whether the plan actually came back with days. */
-    private suspend fun generateRemotely(): Boolean {
-        Timber.d("generateRemotely: pushing meal plan $mealPlanId")
-        syncExecutor.sync()
-
-        mealPlanRepository.requestGeneration(mealPlanId).getOrThrow()
-
-        // Generation is async on the server; give it a beat before pulling the result back.
-        delay(GENERATION_POLL_DELAY_MS)
-        syncExecutor.sync()
-
-        return mealPlanRepository.observeMealPlan(mealPlanId).first()?.days?.isNotEmpty() == true
-    }
-
     companion object {
-        /** Delay before pulling to let server-side generation finish. */
-        private const val GENERATION_POLL_DELAY_MS = 2_000L
-
         /** Wraps [MealPlanBoard.from] in the screen's success state. */
         internal fun buildState(
             mealPlan: MealPlan,

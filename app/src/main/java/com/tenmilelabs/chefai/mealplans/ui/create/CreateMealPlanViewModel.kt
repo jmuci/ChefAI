@@ -5,27 +5,23 @@ import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
-import com.tenmilelabs.chefai.core.data.sync.SyncExecutor
 import com.tenmilelabs.chefai.mealplans.domain.model.DietaryRestriction
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
-import com.tenmilelabs.chefai.mealplans.domain.usecase.LocalMealPlanGenerator
+import com.tenmilelabs.chefai.mealplans.domain.usecase.GenerateMealPlanUseCase
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import timber.log.Timber
 import java.util.UUID
 import java.util.concurrent.CancellationException
 import javax.inject.Inject
@@ -34,9 +30,8 @@ import javax.inject.Inject
 class CreateMealPlanViewModel @Inject constructor(
     private val mealPlanRepository: MealPlanRepository,
     private val sessionManager: SessionManager,
-    private val syncExecutor: SyncExecutor,
     private val recipesRepository: RecipesRepository,
-    private val localMealPlanGenerator: LocalMealPlanGenerator,
+    private val generateMealPlanUseCase: GenerateMealPlanUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CreateMealPlanUiState())
@@ -105,6 +100,18 @@ class CreateMealPlanViewModel @Inject constructor(
 
         _uiState.update { it.copy(isSaving = true) }
 
+        val preferences = MealPlanPreferences(
+            planLengthDays = state.planLengthDays,
+            mealType = state.mealType,
+            dietaryRestrictions = state.dietaryRestrictions,
+            recipeSource = state.recipeSource,
+            maxPrepTimeMinutes = state.maxPrepTimeMinutes,
+            servingsPerMeal = state.servingsPerMeal,
+            batchCooking = state.batchCooking,
+            leftoverFriendly = state.leftoverFriendly,
+            varietyPreference = state.varietyPreference,
+        )
+
         viewModelScope.launch {
             val mealPlanId: UUID
             try {
@@ -114,17 +121,7 @@ class CreateMealPlanViewModel @Inject constructor(
                     uuid = mealPlanId,
                     userId = userId,
                     name = "${state.planLengthDays}-day meal plan",
-                    preferences = MealPlanPreferences(
-                        planLengthDays = state.planLengthDays,
-                        mealType = state.mealType,
-                        dietaryRestrictions = state.dietaryRestrictions,
-                        recipeSource = state.recipeSource,
-                        maxPrepTimeMinutes = state.maxPrepTimeMinutes,
-                        servingsPerMeal = state.servingsPerMeal,
-                        batchCooking = state.batchCooking,
-                        leftoverFriendly = state.leftoverFriendly,
-                        varietyPreference = state.varietyPreference,
-                    ),
+                    preferences = preferences,
                     status = MealPlanStatus.DRAFT,
                     createdAt = now,
                     updatedAt = now,
@@ -138,9 +135,10 @@ class CreateMealPlanViewModel @Inject constructor(
                 return@launch
             }
 
-            // Plan saved locally — now attempt immediate generation (sync → generate → pull), then
-            // the on-device generator, then DRAFT so the user can retry from the detail screen.
-            val filled = generateRemotely(mealPlanId) || generateLocally(mealPlanId)
+            // Plan saved locally — now attempt immediate generation, then DRAFT so the user can
+            // retry from the detail screen. Which generation path runs depends on session type and
+            // recipeSource: see GenerateMealPlanUseCase's doc.
+            val filled = generateMealPlanUseCase(mealPlanId, preferences)
 
             _uiState.update { it.copy(isSaving = false) }
             _uiEvent.emit(
@@ -153,43 +151,7 @@ class CreateMealPlanViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Runs the server round trip for [mealPlanId].
-     *
-     * @return whether the plan actually came back with days — a call that succeeds without
-     *   delivering a schedule (an anonymous session has its pulled meal plans skipped) still counts
-     *   as unfilled, so the caller moves on to the local generator.
-     */
-    private suspend fun generateRemotely(mealPlanId: UUID): Boolean = try {
-        Timber.d("saveMealPlan: pushing plan $mealPlanId to server")
-        syncExecutor.sync()
-
-        Timber.d("saveMealPlan: calling generate API for $mealPlanId")
-        mealPlanRepository.requestGeneration(mealPlanId).getOrThrow()
-
-        delay(GENERATION_POLL_DELAY_MS)
-        Timber.d("saveMealPlan: pulling generated results for $mealPlanId")
-        syncExecutor.sync()
-
-        mealPlanRepository.observeMealPlan(mealPlanId).first()?.days?.isNotEmpty() == true
-    } catch (e: Exception) {
-        if (e is CancellationException) throw e
-        Timber.w(e, "saveMealPlan: remote generation failed for $mealPlanId")
-        false
-    }
-
-    /** Fills [mealPlanId] from the recipes on this device. @return whether it produced a schedule. */
-    private suspend fun generateLocally(mealPlanId: UUID): Boolean = try {
-        val plan = mealPlanRepository.observeMealPlan(mealPlanId).first()
-        plan != null && localMealPlanGenerator(plan).isSuccess
-    } catch (e: Exception) {
-        if (e is CancellationException) throw e
-        Timber.w(e, "saveMealPlan: on-device generation failed for $mealPlanId")
-        false
-    }
-
     companion object {
-        private const val GENERATION_POLL_DELAY_MS = 2_000L
         internal const val MIN_COLLECTION_RECIPES = 20
     }
 }

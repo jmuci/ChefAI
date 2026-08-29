@@ -4,8 +4,10 @@ import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.auth.domain.model.AuthToken
+import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncExecutor
-import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
+import com.tenmilelabs.chefai.core.domain.model.User
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import com.tenmilelabs.chefai.mealplans.data.repository.FakeMealPlanRepository
 import com.tenmilelabs.chefai.core.testutil.recipePreview1
@@ -17,10 +19,13 @@ import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
+import com.tenmilelabs.chefai.mealplans.domain.usecase.GenerateMealPlanUseCase
 import com.tenmilelabs.chefai.mealplans.domain.usecase.LocalMealPlanGenerator
+import io.mockk.every
+import io.mockk.mockk
 import java.util.UUID
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -39,6 +44,8 @@ class CreateMealPlanViewModelTest {
     private lateinit var syncExecutor: FakeSyncExecutor
     private lateinit var viewModel: CreateMealPlanViewModel
 
+    private val testUserId = UUID.randomUUID()
+
     @Before
     fun setup() {
         repository = FakeMealPlanRepository()
@@ -47,21 +54,45 @@ class CreateMealPlanViewModelTest {
         // No local recipes by default, so the on-device fallback cannot fill a plan and the
         // remote path alone decides the outcome. Tests that exercise the fallback seed this.
         recipesRepository.setRecipePreviewsToEmit(emptyList())
-        sessionManager = createTestSessionManager(CoroutineScope(mainCoroutineRule.testDispatcher))
+        sessionManager = mockk()
+        // Default to authenticated: most of this file's SaveMealPlan tests exercise the server
+        // round trip (requestGeneration/daysFromServer), which only an authenticated session
+        // takes — see generateForSession. Anonymous routing has its own dedicated tests below.
+        authenticatedSession()
         syncExecutor = FakeSyncExecutor()
         viewModel = createViewModel()
+    }
+
+    private fun anonymousSession() {
+        every { sessionManager.getCurrentUserId() } returns testUserId
+        every { sessionManager.userSession } returns MutableStateFlow(UserSession.Anonymous(testUserId))
+    }
+
+    private fun authenticatedSession() {
+        every { sessionManager.getCurrentUserId() } returns testUserId
+        every { sessionManager.userSession } returns MutableStateFlow(
+            UserSession.Authenticated(
+                user = User(testUserId, "Test", "t@example.com", ""),
+                authToken = AuthToken("token", "refresh", Long.MAX_VALUE),
+            )
+        )
     }
 
     private fun createViewModel(
         recipeCount: Int = recipesRepository.fakeRecipeCount,
     ): CreateMealPlanViewModel {
         recipesRepository.fakeRecipeCount = recipeCount
-        return CreateMealPlanViewModel(
+        val generateMealPlanUseCase = GenerateMealPlanUseCase(
             mealPlanRepository = repository,
             sessionManager = sessionManager,
             syncExecutor = syncExecutor,
-            recipesRepository = recipesRepository,
             localMealPlanGenerator = LocalMealPlanGenerator(recipesRepository, repository),
+        )
+        return CreateMealPlanViewModel(
+            mealPlanRepository = repository,
+            sessionManager = sessionManager,
+            recipesRepository = recipesRepository,
+            generateMealPlanUseCase = generateMealPlanUseCase,
         )
     }
 
@@ -205,8 +236,9 @@ class CreateMealPlanViewModelTest {
 
     @Test
     fun `SaveMealPlan emits MealPlanSavedAsDraft when the server accepts but returns no days`() = runTest {
-        // The anonymous case: the call succeeds, but pulled meal plans are skipped, so the plan
-        // gains nothing. With no local recipes either, there is nothing left to fall back to.
+        // The server accepts generation but the pull doesn't come back with any days (e.g. a
+        // race, or an empty candidate pool). With no local recipes either, there is nothing left
+        // to fall back to.
         viewModel.uiEvents.test {
             viewModel.onAction(WizardAction.SaveMealPlan)
             val event = awaitItem()
@@ -345,6 +377,93 @@ class CreateMealPlanViewModelTest {
         val vm = createViewModel(recipeCount = 5)
         vm.onAction(WizardAction.SetRecipeSource(RecipeSource.COLLECTION_ONLY))
         assertThat(vm.uiState.value.recipeSource).isEqualTo(RecipeSource.INCLUDE_PUBLIC)
+    }
+
+    // --- Session-based generation routing ---
+    // See GenerateMealPlanUseCase: the path taken depends on session type (Anonymous vs
+    // Authenticated) *and* recipeSource, not just one or the other.
+
+    @Test
+    fun `anonymous plus COLLECTION_ONLY never calls the network, goes straight to local generation`() = runTest {
+        anonymousSession()
+        recipesRepository.setRecipePreviewsToEmit(listOf(recipePreview1, recipePreview2))
+        val vm = createViewModel() // default recipeSource is COLLECTION_ONLY
+
+        vm.uiEvents.test {
+            vm.onAction(WizardAction.SaveMealPlan)
+            val event = awaitItem()
+            assertThat(event).isInstanceOf(CreateMealPlanEvent.MealPlanReady::class.java)
+        }
+
+        assertThat(repository.generationRequestedIds).isEmpty()
+        assertThat(repository.statelessGenerationRequestedIds).isEmpty()
+        assertThat(repository.locallyGeneratedIds).hasSize(1)
+    }
+
+    @Test
+    fun `anonymous plus COLLECTION_ONLY with no local recipes saves as draft without any network call`() = runTest {
+        anonymousSession()
+        val vm = createViewModel() // no local recipes seeded (setup default)
+
+        vm.uiEvents.test {
+            vm.onAction(WizardAction.SaveMealPlan)
+            val event = awaitItem()
+            assertThat(event).isInstanceOf(CreateMealPlanEvent.MealPlanSavedAsDraft::class.java)
+        }
+
+        assertThat(repository.generationRequestedIds).isEmpty()
+        assertThat(repository.statelessGenerationRequestedIds).isEmpty()
+    }
+
+    @Test
+    fun `anonymous plus INCLUDE_PUBLIC uses the stateless endpoint, not requestGeneration`() = runTest {
+        anonymousSession()
+        repository.daysFromStatelessServer = listOf(serverDay())
+        val vm = createViewModel()
+        vm.onAction(WizardAction.SetRecipeSource(RecipeSource.INCLUDE_PUBLIC))
+
+        vm.uiEvents.test {
+            vm.onAction(WizardAction.SaveMealPlan)
+            val event = awaitItem()
+            assertThat(event).isInstanceOf(CreateMealPlanEvent.MealPlanReady::class.java)
+        }
+
+        assertThat(repository.statelessGenerationRequestedIds).hasSize(1)
+        assertThat(repository.generationRequestedIds).isEmpty()
+        assertThat(syncExecutor.syncCount).isEqualTo(0)
+    }
+
+    @Test
+    fun `anonymous plus INCLUDE_PUBLIC falls back to local generation when the stateless call fails`() = runTest {
+        anonymousSession()
+        repository.shouldFailStatelessGeneration = true
+        recipesRepository.setRecipePreviewsToEmit(listOf(recipePreview1, recipePreview2))
+        val vm = createViewModel()
+        vm.onAction(WizardAction.SetRecipeSource(RecipeSource.INCLUDE_PUBLIC))
+
+        vm.uiEvents.test {
+            vm.onAction(WizardAction.SaveMealPlan)
+            val event = awaitItem()
+            assertThat(event).isInstanceOf(CreateMealPlanEvent.MealPlanReady::class.java)
+        }
+
+        assertThat(repository.statelessGenerationRequestedIds).hasSize(1)
+        assertThat(repository.locallyGeneratedIds).hasSize(1)
+    }
+
+    @Test
+    fun `authenticated session never calls the stateless endpoint, regardless of recipeSource`() = runTest {
+        // authenticatedSession() is the default from setup()
+        repository.daysFromServer = listOf(serverDay())
+        viewModel.onAction(WizardAction.SetRecipeSource(RecipeSource.INCLUDE_PUBLIC))
+
+        viewModel.uiEvents.test {
+            viewModel.onAction(WizardAction.SaveMealPlan)
+            awaitItem()
+        }
+
+        assertThat(repository.generationRequestedIds).hasSize(1)
+        assertThat(repository.statelessGenerationRequestedIds).isEmpty()
     }
 
     /** A day standing in for one the backend generator produced. */

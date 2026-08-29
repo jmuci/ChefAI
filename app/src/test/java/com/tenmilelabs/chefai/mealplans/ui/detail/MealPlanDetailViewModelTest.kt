@@ -3,7 +3,11 @@ package com.tenmilelabs.chefai.mealplans.ui.detail
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.auth.domain.model.AuthToken
+import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncExecutor
+import com.tenmilelabs.chefai.core.domain.model.User
 import com.tenmilelabs.chefai.core.testutil.recipePreview1
 import com.tenmilelabs.chefai.core.testutil.recipePreview2
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
@@ -20,9 +24,13 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.PlannedIngredient
+import com.tenmilelabs.chefai.mealplans.domain.usecase.GenerateMealPlanUseCase
 import com.tenmilelabs.chefai.mealplans.domain.usecase.LocalMealPlanGenerator
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -41,9 +49,11 @@ class MealPlanDetailViewModelTest {
     private lateinit var recipesRepository: FakeRecipesRepository
     private lateinit var syncExecutor: FakeSyncExecutor
     private lateinit var shoppingListRepository: FakeShoppingListRepository
+    private lateinit var sessionManager: SessionManager
 
     private val planId = UUID.randomUUID()
     private val dayId = UUID.randomUUID()
+    private val testUserId = UUID.randomUUID()
 
     @Before
     fun setup() {
@@ -52,6 +62,26 @@ class MealPlanDetailViewModelTest {
         recipesRepository.setRecipePreviewsToEmit(listOf(recipePreview1, recipePreview2))
         syncExecutor = FakeSyncExecutor()
         shoppingListRepository = FakeShoppingListRepository()
+        sessionManager = mockk()
+        // Default to authenticated: the existing generation tests below exercise the server round
+        // trip (requestGeneration/daysFromServer), which only an authenticated session takes — see
+        // GenerateMealPlanUseCase. Anonymous routing has its own tests below.
+        authenticatedSession()
+    }
+
+    private fun anonymousSession() {
+        every { sessionManager.getCurrentUserId() } returns testUserId
+        every { sessionManager.userSession } returns MutableStateFlow(UserSession.Anonymous(testUserId))
+    }
+
+    private fun authenticatedSession() {
+        every { sessionManager.getCurrentUserId() } returns testUserId
+        every { sessionManager.userSession } returns MutableStateFlow(
+            UserSession.Authenticated(
+                user = User(testUserId, "Test", "t@example.com", ""),
+                authToken = AuthToken("token", "refresh", Long.MAX_VALUE),
+            )
+        )
     }
 
     // --- State ---
@@ -191,7 +221,8 @@ class MealPlanDetailViewModelTest {
 
     @Test
     fun `onGenerate falls back when the server accepts but delivers no days`() = runTest {
-        // The anonymous case: the request succeeds but pulled meal plans are skipped.
+        // The server accepts generation but the pull doesn't come back with any days (e.g. a
+        // race, or an empty candidate pool).
         mealPlanRepository.emitPlans(emptyPlan())
 
         createViewModel().onGenerate()
@@ -213,6 +244,64 @@ class MealPlanDetailViewModelTest {
             assertThat(awaitItem()).isInstanceOf(MealPlanDetailEvent.ShowError::class.java)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    // --- Session-based generation routing ---
+    // See GenerateMealPlanUseCase: the path taken depends on session type (Anonymous vs
+    // Authenticated) *and* the plan's own recipeSource.
+
+    @Test
+    fun `anonymous plus COLLECTION_ONLY never calls the network, goes straight to local generation`() = runTest {
+        anonymousSession()
+        mealPlanRepository.emitPlans(emptyPlan(recipeSource = RecipeSource.COLLECTION_ONLY))
+
+        createViewModel().onGenerate()
+        advanceUntilIdle()
+
+        assertThat(mealPlanRepository.generationRequestedIds).isEmpty()
+        assertThat(mealPlanRepository.statelessGenerationRequestedIds).isEmpty()
+        assertThat(mealPlanRepository.locallyGeneratedIds).containsExactly(planId)
+    }
+
+    @Test
+    fun `anonymous plus INCLUDE_PUBLIC uses the stateless endpoint, not requestGeneration`() = runTest {
+        anonymousSession()
+        mealPlanRepository.emitPlans(emptyPlan(recipeSource = RecipeSource.INCLUDE_PUBLIC))
+        mealPlanRepository.daysFromStatelessServer = listOf(fullDay())
+
+        createViewModel().onGenerate()
+        advanceUntilIdle()
+
+        assertThat(mealPlanRepository.statelessGenerationRequestedIds).containsExactly(planId)
+        assertThat(mealPlanRepository.generationRequestedIds).isEmpty()
+        assertThat(syncExecutor.syncCount).isEqualTo(0)
+        assertThat(requireNotNull(mealPlanRepository.observeMealPlan(planId).first()).days).hasSize(1)
+    }
+
+    @Test
+    fun `anonymous plus INCLUDE_PUBLIC falls back to local generation when the stateless call fails`() = runTest {
+        anonymousSession()
+        mealPlanRepository.emitPlans(emptyPlan(recipeSource = RecipeSource.INCLUDE_PUBLIC))
+        mealPlanRepository.shouldFailStatelessGeneration = true
+
+        createViewModel().onGenerate()
+        advanceUntilIdle()
+
+        assertThat(mealPlanRepository.statelessGenerationRequestedIds).containsExactly(planId)
+        assertThat(mealPlanRepository.locallyGeneratedIds).containsExactly(planId)
+    }
+
+    @Test
+    fun `authenticated session never calls the stateless endpoint, regardless of recipeSource`() = runTest {
+        // authenticatedSession() is the default from setup()
+        mealPlanRepository.emitPlans(emptyPlan(recipeSource = RecipeSource.INCLUDE_PUBLIC))
+        mealPlanRepository.daysFromServer = listOf(fullDay())
+
+        createViewModel().onGenerate()
+        advanceUntilIdle()
+
+        assertThat(mealPlanRepository.generationRequestedIds).containsExactly(planId)
+        assertThat(mealPlanRepository.statelessGenerationRequestedIds).isEmpty()
     }
 
     // --- Printing ---
@@ -280,16 +369,23 @@ class MealPlanDetailViewModelTest {
 
     // --- Helpers ---
 
-    private fun createViewModel() = MealPlanDetailViewModel(
-        savedStateHandle = SavedStateHandle().apply {
-            set(AppDestinationArgs.MEAL_PLAN_ID_ARG, planId.toString())
-        },
-        mealPlanRepository = mealPlanRepository,
-        recipesRepository = recipesRepository,
-        syncExecutor = syncExecutor,
-        localMealPlanGenerator = LocalMealPlanGenerator(recipesRepository, mealPlanRepository),
-        shoppingListRepository = shoppingListRepository,
-    )
+    private fun createViewModel(): MealPlanDetailViewModel {
+        val generateMealPlanUseCase = GenerateMealPlanUseCase(
+            mealPlanRepository = mealPlanRepository,
+            sessionManager = sessionManager,
+            syncExecutor = syncExecutor,
+            localMealPlanGenerator = LocalMealPlanGenerator(recipesRepository, mealPlanRepository),
+        )
+        return MealPlanDetailViewModel(
+            savedStateHandle = SavedStateHandle().apply {
+                set(AppDestinationArgs.MEAL_PLAN_ID_ARG, planId.toString())
+            },
+            mealPlanRepository = mealPlanRepository,
+            recipesRepository = recipesRepository,
+            generateMealPlanUseCase = generateMealPlanUseCase,
+            shoppingListRepository = shoppingListRepository,
+        )
+    }
 
     private fun fullDay(lunchCookedAt: Long? = null, dinnerCookedAt: Long? = null) = MealPlanDay(
         uuid = dayId,
@@ -300,7 +396,8 @@ class MealPlanDetailViewModelTest {
         lunchCookedAt = lunchCookedAt,
     )
 
-    private fun emptyPlan() = planWith(days = emptyList())
+    private fun emptyPlan(recipeSource: RecipeSource = RecipeSource.INCLUDE_PUBLIC) =
+        planWith(days = emptyList(), recipeSource = recipeSource)
 
     private fun planWith(
         day: MealPlanDay,
@@ -310,6 +407,7 @@ class MealPlanDetailViewModelTest {
     private fun planWith(
         days: List<MealPlanDay>,
         mealType: MealType = MealType.DINNER_AND_LUNCH,
+        recipeSource: RecipeSource = RecipeSource.INCLUDE_PUBLIC,
     ) = MealPlan(
         uuid = planId,
         userId = UUID.randomUUID(),
@@ -318,7 +416,7 @@ class MealPlanDetailViewModelTest {
             planLengthDays = 3,
             mealType = mealType,
             dietaryRestrictions = setOf(DietaryRestriction.NONE),
-            recipeSource = RecipeSource.INCLUDE_PUBLIC,
+            recipeSource = recipeSource,
             maxPrepTimeMinutes = null,
             servingsPerMeal = 2,
             batchCooking = false,

@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.mealplans.data.repository
 
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay
+import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
 import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
@@ -26,6 +27,13 @@ class FakeMealPlanRepository : MealPlanRepository {
 
     /** Days [requestGeneration] pretends the server produced, applied on a successful call. */
     var daysFromServer: List<MealPlanDay> = emptyList()
+
+    var shouldFailStatelessGeneration: Boolean = false
+    var statelessGenerationRequestedIds: MutableList<UUID> = mutableListOf()
+    var lastStatelessPreferences: MealPlanPreferences? = null
+
+    /** Days [generateStatelessAndSave] pretends the server produced, applied on a successful call. */
+    var daysFromStatelessServer: List<MealPlanDay> = emptyList()
 
     override fun observeMealPlan(uuid: UUID): Flow<MealPlan?> {
         return plans.map { list -> list.find { it.uuid == uuid } }
@@ -63,6 +71,22 @@ class FakeMealPlanRepository : MealPlanRepository {
             }
         }
         return Result.success(Unit)
+    }
+
+    override suspend fun generateStatelessAndSave(planId: UUID, preferences: MealPlanPreferences): Result<Int> {
+        statelessGenerationRequestedIds.add(planId)
+        lastStatelessPreferences = preferences
+        if (shouldFailStatelessGeneration) return Result.failure(RuntimeException("Fake stateless generation error"))
+        if (daysFromStatelessServer.isNotEmpty()) {
+            plans.value = plans.value.map { plan ->
+                if (plan.uuid == planId) {
+                    plan.copy(days = daysFromStatelessServer, status = MealPlanStatus.READY)
+                } else {
+                    plan
+                }
+            }
+        }
+        return Result.success(daysFromStatelessServer.size)
     }
 
     override suspend fun setMealCooked(dayId: UUID, slot: MealSlot, cooked: Boolean) {
