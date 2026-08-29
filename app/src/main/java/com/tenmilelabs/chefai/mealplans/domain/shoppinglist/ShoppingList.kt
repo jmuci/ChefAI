@@ -1,5 +1,7 @@
 package com.tenmilelabs.chefai.mealplans.domain.shoppinglist
 
+import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
+import com.tenmilelabs.chefai.core.domain.units.UnitConversion
 import com.tenmilelabs.chefai.core.util.QuantityFormat
 import com.tenmilelabs.chefai.recipes.domain.scaling.RecipeScaling
 import java.util.UUID
@@ -50,12 +52,16 @@ object ShoppingListBuilder {
      *   A recipe that published no yield of its own is scaled from
      *   [RecipeScaling.DEFAULT_SERVINGS] rather than left alone, matching the details screen.
      * @param checkedKeys item keys already ticked off, from `shopping_list_checks`.
+     * @param measurementSystem the units to shop in. Converting before the amounts are grouped is
+     *   what lets a cup of flour from one recipe and 125 g of it from another add up to one line
+     *   instead of two joined by "+".
      */
     fun build(
         ingredients: List<PlannedIngredient>,
         slotCountByRecipe: Map<UUID, Int>,
         plannedServings: Int,
         checkedKeys: Set<String>,
+        measurementSystem: MeasurementSystem = MeasurementSystem.DEFAULT,
     ): ShoppingList {
         data class ScaledRow(val displayName: String, val unit: String, val amount: Double)
 
@@ -71,10 +77,18 @@ object ShoppingListBuilder {
                     1.0
                 }
                 val slots = slotCountByRecipe[row.recipeId] ?: 1
+                // Scale first, convert second — converting first would put the multiplication on
+                // top of a rounded value. Same order the recipe details screen applies them in.
+                val converted = UnitConversion.convert(
+                    quantity = row.quantity * servingsFactor * slots,
+                    unit = row.unit,
+                    ingredientName = row.displayName,
+                    target = measurementSystem,
+                )
                 ScaledRow(
                     displayName = row.displayName,
-                    unit = row.unit,
-                    amount = row.quantity * servingsFactor * slots,
+                    unit = converted.unit,
+                    amount = converted.quantity,
                 )
             }
 

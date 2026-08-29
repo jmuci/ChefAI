@@ -9,6 +9,8 @@ import com.tenmilelabs.chefai.collections.data.repository.FakeCollectionsReposit
 import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
 import com.tenmilelabs.chefai.core.testutil.recipe1
 import com.tenmilelabs.chefai.core.testutil.recipeId1
+import com.tenmilelabs.chefai.core.data.repository.FakeUserPreferencesRepository
+import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import com.tenmilelabs.chefai.auth.domain.SessionManager
@@ -42,6 +44,7 @@ class RecipeDetailsViewModelTest {
     private lateinit var collectionsRepository: FakeCollectionsRepository
     private lateinit var sessionManager: SessionManager
     private lateinit var mealPlanRepository: FakeMealPlanRepository
+    private lateinit var userPreferencesRepository: FakeUserPreferencesRepository
     private lateinit var savedStateHandle: SavedStateHandle
 
     @Before
@@ -52,6 +55,7 @@ class RecipeDetailsViewModelTest {
             testScope = CoroutineScope(mainCoroutineRule.testDispatcher)
         )
         mealPlanRepository = FakeMealPlanRepository()
+        userPreferencesRepository = FakeUserPreferencesRepository()
         savedStateHandle = SavedStateHandle().apply {
             set(AppDestinationArgs.RECIPE_ID_ARG, recipeId1.toString())
         }
@@ -59,7 +63,8 @@ class RecipeDetailsViewModelTest {
 
     private fun initializeViewModel() {
         viewModel = RecipeDetailsViewModel(
-            recipesRepository, collectionsRepository, sessionManager, mealPlanRepository, savedStateHandle
+            recipesRepository, collectionsRepository, sessionManager, mealPlanRepository,
+            userPreferencesRepository, savedStateHandle
         )
     }
 
@@ -442,6 +447,40 @@ class RecipeDetailsViewModelTest {
             viewModel.onToggleCooked() // no dayId/slot in the saved state — should be a no-op
 
             expectNoEvents()
+        }
+    }
+
+    // --- Measurement units ----------------------------------------------------------------------
+
+    @Test
+    fun `measurement units - defaults to as-written`() = runTest {
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+
+            assertThat(awaitItem().measurementSystem).isEqualTo(MeasurementSystem.AS_WRITTEN)
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `measurement units - the stored preference reaches the screen and changes with it`() = runTest {
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+            assertThat(awaitItem().measurementSystem).isEqualTo(MeasurementSystem.AS_WRITTEN)
+
+            userPreferencesRepository.setMeasurementSystem(MeasurementSystem.METRIC)
+
+            val state = awaitItem()
+            assertThat(state.measurementSystem).isEqualTo(MeasurementSystem.METRIC)
+            // The recipe itself is untouched — the setting changes how it reads, not what it says.
+            assertThat(state.recipe).isEqualTo(recipe1)
+            cancelAndConsumeRemainingEvents()
         }
     }
 

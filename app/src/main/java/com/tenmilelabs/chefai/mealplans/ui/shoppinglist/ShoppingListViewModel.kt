@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.mealplans.ui.shoppinglist
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tenmilelabs.chefai.core.domain.repository.UserPreferencesRepository
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
@@ -46,6 +47,7 @@ class ShoppingListViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val mealPlanRepository: MealPlanRepository,
     private val shoppingListRepository: ShoppingListRepository,
+    private val userPreferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
     private val mealPlanId: UUID = UUID.fromString(
@@ -71,7 +73,8 @@ class ShoppingListViewModel @Inject constructor(
                 combine(
                     shoppingListRepository.observeIngredientsForRecipes(slotCounts.keys.toList()),
                     shoppingListRepository.observeCheckedItems(mealPlanId),
-                ) { ingredients, checked ->
+                    userPreferencesRepository.measurementSystem,
+                ) { ingredients, checked, measurementSystem ->
                     ShoppingListUiState.Success(
                         planName = plan.name,
                         list = ShoppingListBuilder.build(
@@ -79,6 +82,7 @@ class ShoppingListViewModel @Inject constructor(
                             slotCountByRecipe = slotCounts,
                             plannedServings = plan.preferences.servingsPerMeal,
                             checkedKeys = checked,
+                            measurementSystem = measurementSystem,
                         ),
                     )
                 }

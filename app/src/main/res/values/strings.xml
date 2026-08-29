@@ -272,4 +272,17 @@
     <string name="import_recipe_browser_gave_up">We still couldn\'t read a recipe from that page</string>
     <string name="import_recipe_browser_cancel">Cancel</string>
 
+    <!-- Settings: measurement units -->
+    <string name="settings_measurement_units_title">Measurement units</string>
+    <string name="settings_measurement_units_subtitle">How ingredient amounts are shown to you. Recipes themselves are never changed.</string>
+    <string name="settings_units_as_written">As written</string>
+    <string name="settings_units_as_written_example">Exactly what the recipe says</string>
+    <string name="settings_units_metric">Metric</string>
+    <string name="settings_units_metric_example">Grams, kilograms, millilitres, litres</string>
+    <string name="settings_units_imperial">Imperial</string>
+    <string name="settings_units_imperial_example">Ounces, pounds, cups, spoons</string>
+    <string name="settings_measurement_units_footnote">Weights marked \u2248 are estimated from a typical density, so they\'re a good guide rather than an exact figure. Amounts counted rather than measured \u2014 cloves, cans, slices \u2014 are never converted.</string>
+    <string name="settings_menu_item">Settings</string>
+    <string name="ingredient_amount_approximate">Approximately %1$s</string>
+
 </resources>

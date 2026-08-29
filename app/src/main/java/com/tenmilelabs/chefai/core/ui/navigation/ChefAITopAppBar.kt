@@ -30,6 +30,7 @@ fun ChefAITopAppBar(
     onNavigationClick: (() -> Unit)? = null,
     onLogin: () -> Unit = {},
     onLogout: () -> Unit = {},
+    onSettings: () -> Unit = {},
     extraActions: @Composable RowScope.() -> Unit = {},
 ) {
 
@@ -67,7 +68,8 @@ fun ChefAITopAppBar(
             // User profile menu on the right side
             UserProfileMenu(
                 onLogin = onLogin,
-                onLogout = onLogout
+                onLogout = onLogout,
+                onSettings = onSettings,
             )
         },
         scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())

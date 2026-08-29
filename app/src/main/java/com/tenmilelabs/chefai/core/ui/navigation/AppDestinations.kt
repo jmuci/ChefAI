@@ -200,6 +200,12 @@ class NavigationActions(private val navController: NavHostController) {
         navController.navigate(ScreenBaseRoutes.REGISTER)
     }
 
+    fun navigateToSettings() {
+        navController.navigate(ScreenBaseRoutes.SETTINGS) {
+            launchSingleTop = true
+        }
+    }
+
     fun navigateToMealPlanDetail(mealPlanId: UUID) {
         navController.navigate("${ScreenBaseRoutes.MEAL_PLAN_DETAIL}/$mealPlanId")
     }

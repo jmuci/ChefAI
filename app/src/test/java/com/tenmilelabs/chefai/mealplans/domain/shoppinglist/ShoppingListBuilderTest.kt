@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.mealplans.domain.shoppinglist
 
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
 import com.tenmilelabs.chefai.recipes.domain.scaling.RecipeScaling
 import org.junit.Test
 import java.util.UUID
@@ -16,6 +17,42 @@ class ShoppingListBuilderTest {
     ) = PlannedIngredient(recipeId, recipeServings, name, quantity, unit)
 
     private fun ShoppingList.allItems() = sections.flatMap { it.items }
+
+    // --- Measurement system ---
+
+    @Test
+    fun `converting before grouping merges what would otherwise be two lines`() {
+        // The recipes measure the same ingredient differently, which is the whole reason a mixed
+        // library needs this: as written they produce "1 cup + 125 g", which is not a shopping
+        // instruction anyone can act on.
+        val american = UUID.randomUUID()
+        val european = UUID.randomUUID()
+        val ingredients = listOf(
+            ingredient(american, 0, "all-purpose flour", 1.0, "cup"),
+            ingredient(european, 0, "all-purpose flour", 125.0, "g"),
+        )
+        val slots = mapOf(american to 1, european to 1)
+
+        val asWritten = ShoppingListBuilder.build(ingredients, slots, 0, emptySet())
+        val metric = ShoppingListBuilder.build(
+            ingredients, slots, 0, emptySet(), MeasurementSystem.METRIC,
+        )
+
+        assertThat(asWritten.allItems().single().quantityLabel).isEqualTo("1 cup + 125 g")
+        assertThat(metric.allItems().single().quantityLabel).isEqualTo("245 g")
+    }
+
+    @Test
+    fun `an ingredient counted rather than measured is never converted`() {
+        val recipeId = UUID.randomUUID()
+        val ingredients = listOf(ingredient(recipeId, 0, "garlic", 3.0, "cloves"))
+
+        val list = ShoppingListBuilder.build(
+            ingredients, mapOf(recipeId to 1), 0, emptySet(), MeasurementSystem.METRIC,
+        )
+
+        assertThat(list.allItems().single().quantityLabel).isEqualTo("3 cloves")
+    }
 
     // --- Aggregation ---
 

@@ -22,8 +22,10 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_4_5
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_5_6
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_6_7
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_7_8
+import com.tenmilelabs.chefai.core.data.repository.DataStoreUserPreferencesRepository
 import com.tenmilelabs.chefai.core.data.repository.DefaultMetadataRepository
 import com.tenmilelabs.chefai.core.domain.repository.MetadataRepository
+import com.tenmilelabs.chefai.core.domain.repository.UserPreferencesRepository
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeImporter
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeRepository
 import com.tenmilelabs.chefai.recipes.data.network.SystemHostResolver
@@ -58,6 +60,12 @@ abstract class RepositoryModule {
     @Singleton
     @Binds
     abstract fun bindSecurePreferences(securePreferences: SecurePreferences): SecurePreferencesInterface
+
+    @Singleton
+    @Binds
+    abstract fun bindUserPreferencesRepository(
+        repository: DataStoreUserPreferencesRepository
+    ): UserPreferencesRepository
 
     @Singleton
     @Binds
