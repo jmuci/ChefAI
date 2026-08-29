@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.core.data.timer
 
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -11,6 +12,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
 /**
@@ -19,14 +21,23 @@ import org.junit.Test
  * strictly before it. Since [RecipeTimerController] ticks via a repeated `delay(1_000)`, advancing
  * by an exact multiple of a second lands right on a pending tick, so an explicit `runCurrent()` is
  * needed to actually execute it.
+ *
+ * [RecipeTimerController] deliberately launches its tick loop on `Dispatchers.Main` (see its KDoc),
+ * so [mainCoroutineRule] wires that to the *same* [testDispatcher] instance backing [testScope] —
+ * one shared virtual clock, so `advanceTimeBy`/`runCurrent` on the scope also drive the
+ * Main-dispatched tick coroutine deterministically.
  */
 @ExperimentalCoroutinesApi
 class RecipeTimerControllerTest {
 
+    private val testDispatcher = StandardTestDispatcher()
+
+    @get:Rule
+    val mainCoroutineRule = MainCoroutineRule(testDispatcher)
+
     private lateinit var controller: RecipeTimerController
     private lateinit var notifier: RecipeTimerNotifier
     private lateinit var testScope: TestScope
-    private val testDispatcher = StandardTestDispatcher()
 
     @Before
     fun setup() {
@@ -51,6 +62,15 @@ class RecipeTimerControllerTest {
         controller.start(stepLabel = "Bake", totalSeconds = 0)
 
         assertThat(controller.state.value).isNull()
+    }
+
+    @Test
+    fun `start reports the previous timer it replaced, if any`() {
+        assertThat(controller.start(stepLabel = "Bake", totalSeconds = 10)).isNull()
+
+        val replaced = controller.start(stepLabel = "Simmer", totalSeconds = 20)
+
+        assertThat(replaced?.stepLabel).isEqualTo("Bake")
     }
 
     @Test

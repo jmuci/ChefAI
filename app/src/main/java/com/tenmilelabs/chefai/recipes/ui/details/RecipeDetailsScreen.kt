@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.recipes.ui.details
 
 import android.content.res.Configuration
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -47,6 +48,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.semantics.contentDescription
@@ -448,7 +451,7 @@ fun IngredientsList(ingredients: List<IngredientRowUi>) {
 }
 
 @Composable
-fun StepsList(steps: List<RecipeStep>, timerViewModel: RecipeTimerViewModel = hiltViewModel()) {
+fun StepsList(steps: List<RecipeStep>) {
     if (steps.isEmpty()) {
         Text(
             text = stringResource(R.string.no_steps_listed),
@@ -458,17 +461,28 @@ fun StepsList(steps: List<RecipeStep>, timerViewModel: RecipeTimerViewModel = hi
         )
         return
     }
+    // hiltViewModel() has no Hilt component to resolve against in Compose Preview and crashes
+    // there; steps.forEach below still renders the list (minus a working timer button) in previews.
+    val timerViewModel: RecipeTimerViewModel? =
+        if (LocalInspectionMode.current) null else hiltViewModel()
     val requestNotificationPermission = rememberNotificationPermissionRequester()
+    val context = LocalContext.current
+    val timerReplacedMessage = stringResource(R.string.step_timer_replaced_message)
     Column(modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_medium))) {
         steps.sortedBy { it.orderIndex }.forEach { step ->
+            val stepLabel = stringResource(R.string.step_timer_label_format, step.orderIndex + 1)
             StepListItem(
                 step = step,
                 onStartTimer = { totalSeconds ->
                     requestNotificationPermission()
-                    timerViewModel.start(
-                        stepLabel = "Step ${step.orderIndex + 1}",
+                    val replaced = timerViewModel?.start(
+                        stepLabel = stepLabel,
                         totalSeconds = totalSeconds,
                     )
+                    if (replaced != null) {
+                        val message = timerReplacedMessage.format(replaced.stepLabel)
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    }
                 },
             )
             HorizontalDivider()
@@ -589,5 +603,24 @@ fun RecipeDetailsPrivatePreview() {
             recipe = RecipeData.recipe.copy(privacy = RecipePrivacy.PRIVATE),
             isBookmarked = false,
         )
+    }
+}
+
+private val stepsListPreviewSteps = listOf(
+    RecipeStep(java.util.UUID.randomUUID(), 0, "Preheat the oven to 220°C."),
+    RecipeStep(java.util.UUID.randomUUID(), 1, "Bake for 30 minutes, until golden brown."),
+    RecipeStep(java.util.UUID.randomUUID(), 2, "Let rest for 5 minutes before serving."),
+)
+
+@Preview(name = "Steps tab", showBackground = true)
+@Preview(
+    name = "Steps tab — dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+fun StepsListPreview() {
+    ChefAITheme {
+        StepsList(steps = stepsListPreviewSteps)
     }
 }

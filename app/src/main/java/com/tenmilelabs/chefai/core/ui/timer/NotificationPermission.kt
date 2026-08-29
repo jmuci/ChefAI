@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.core.content.ContextCompat
 
 /**
@@ -15,9 +16,13 @@ import androidx.core.content.ContextCompat
  * hasn't been granted yet, and is a no-op otherwise (including on older APIs, where the permission
  * doesn't exist). Call it right before starting a timer so the completion notification has a
  * chance of being shown, without gating the timer itself on the permission being granted.
+ *
+ * A no-op in Compose Preview too — `rememberLauncherForActivityResult` requires an
+ * `ActivityResultRegistryOwner`, which previews don't provide, so calling it there would crash.
  */
 @Composable
 fun rememberNotificationPermissionRequester(): () -> Unit {
+    if (LocalInspectionMode.current) return {}
     val context = LocalContext.current
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     return remember(context, launcher) {
