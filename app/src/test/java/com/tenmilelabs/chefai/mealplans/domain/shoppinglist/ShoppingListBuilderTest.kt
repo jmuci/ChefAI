@@ -43,6 +43,34 @@ class ShoppingListBuilderTest {
     }
 
     @Test
+    fun `two spellings of the same unit add up instead of sitting side by side`() {
+        // Scraped rows say whatever their page said. "300 g + 200 gram" is not a shopping
+        // instruction, and it happens without any conversion being involved at all.
+        val recipeA = UUID.randomUUID()
+        val recipeB = UUID.randomUUID()
+        val ingredients = listOf(
+            ingredient(recipeA, 0, "flour", 300.0, "g"),
+            ingredient(recipeB, 0, "flour", 200.0, "gram"),
+        )
+
+        val list = ShoppingListBuilder.build(
+            ingredients, mapOf(recipeA to 1, recipeB to 1), 0, emptySet(),
+        )
+
+        assertThat(list.allItems().single().quantityLabel).isEqualTo("500 g")
+    }
+
+    @Test
+    fun `a unit with no canonical form keeps its own wording`() {
+        val recipeId = UUID.randomUUID()
+        val ingredients = listOf(ingredient(recipeId, 0, "garlic", 3.0, "cloves"))
+
+        val list = ShoppingListBuilder.build(ingredients, mapOf(recipeId to 1), 0, emptySet())
+
+        assertThat(list.allItems().single().quantityLabel).isEqualTo("3 cloves")
+    }
+
+    @Test
     fun `a total resting on an assumed density is flagged as approximate`() {
         val recipeId = UUID.randomUUID()
         val flour = listOf(ingredient(recipeId, 0, "all-purpose flour", 1.0, "cup"))

@@ -82,9 +82,13 @@ Density-derived amounts are marked `isApproximate` and render with a leading `�
 figure that rests on an assumption is the one class the user can see resting on it. The alternative —
 converting silently — would make the app's least trustworthy numbers indistinguishable from its most.
 
-The table is matched by normalised name with longest-phrase-wins, mirroring `GrocerySectionClassifier`
-so that "almond flour" resolves to almond flour rather than to plain flour, and "all-purpose flour,
-sifted" resolves at all. A full density database (USDA FoodData Central's portion weights are public
+The table is matched on the **head noun** of the ingredient name — the key has to sit at the end,
+after trailing qualifiers ("…, sifted", "… (softened)") are dropped, with longest match winning so
+"almond flour" beats "flour". Matching a staple *anywhere* in the name is not good enough: sugar snap
+peas are peas, butter lettuce is lettuce and cream of tartar is a powdered acid, and pricing any of
+them by the staple named inside is wrong by roughly a factor of two — invisibly, since the result
+carries the same `≈` as a real match. Anything the head-noun rule rejects falls back to an exact
+volume conversion, which is the safer failure. A full density database (USDA FoodData Central's portion weights are public
 domain) was considered and rejected for now: it adds a data pipeline and a fuzzy-matching problem, and
 it is still wrong about chopped onion.
 
@@ -114,6 +118,11 @@ Rounding is deliberately coarse and dimension-aware, because a converted amount 
 mass keeps a finer grid (5 g above 100 g) because 5 g matters where 5 ml does not; and imperial
 amounts snap to the exact set of fractions `QuantityFormat.cooking` has glyphs for, so a converted
 value renders `¾ cup` rather than `0.78 cup`.
+
+Promotion to the larger unit is decided on the **rounded** figure rather than the raw one. 2.2 lb is
+997.9 g, which rounds to 1000; deciding on the raw value left that reading "1000 g" in a list where
+every other amount promotes, looking as though the promotion had failed at the one boundary it exists
+for.
 
 Every grid has a floor rule: **a real amount is never allowed to round to zero.** 1 g of saffron is
 0.035 oz, and snapping that to the nearest measurable fraction gives a flat `0 oz` — which tells the
@@ -163,6 +172,9 @@ including recipes they typed in themselves, in the units they chose.
   always what the user hoped for.
 - **The cup assumption is wrong for Australian and British sources**, by 6% and 20% respectively.
   Detecting the source's locale from `recipeExternalUrl` would fix most of it and is not attempted.
+- **A line can carry one `≈` covering a total that is only partly estimated** — "500 g + 2 cup" where
+  just the first half came from a density. Over-marking is the safe direction (it claims less
+  precision than it has), and per-part marking would clutter the label, so it stands.
 - **The shopping list rounds each row before summing it.** Five recipes each wanting 40 ml of milk
   round to `2⅔ tbsp` apiece and total `13.33 tbsp` against a true `13.53` — about 1.4% low, and it
   grows with the number of rows sharing a bucket. Summing raw amounts in base units and rounding once

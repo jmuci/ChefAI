@@ -177,6 +177,27 @@ class UnitConversionTest {
     }
 
     @Test
+    fun `rounding up to the next unit promotes rather than printing a full thousand`() {
+        // 2.2 lb is 997.9 g, which rounds to 1000. Deciding the promotion on the raw value left
+        // that reading "1000 g" in a list where everything else says kg.
+        assertThat(label(convert(2.2, "lb", target = METRIC))).isEqualTo("1 kg")
+        assertThat(label(convert(4.22, "cups", target = METRIC))).isEqualTo("1 l")
+        assertThat(label(convert(452.0, "g", target = IMPERIAL))).isEqualTo("1 lb")
+
+        // Values genuinely below the threshold still keep the smaller unit.
+        assertThat(label(convert(2.0, "lb", target = METRIC))).isEqualTo("905 g")
+        assertThat(label(convert(400.0, "g", target = IMPERIAL))).isEqualTo("14⅛ oz")
+    }
+
+    @Test
+    fun `no converted amount ever prints a whole thousand of the smaller unit`() {
+        for (pounds in 200..250) {
+            val amount = convert(pounds / 100.0, "lb", target = METRIC)
+            assertThat("${amount.quantity} ${amount.unit}").isNotEqualTo("1000.0 g")
+        }
+    }
+
+    @Test
     fun `a real amount never rounds away to zero`() {
         // 1 g of saffron is 0.035 oz. Snapping that to the nearest measurable fraction gives zero,
         // which would tell the cook they need none of it — so the rounding stands down and lets

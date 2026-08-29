@@ -88,26 +88,36 @@ object UnitConversion {
         }
     }
 
-    private fun metricMass(grams: Double, isApproximate: Boolean): ConvertedAmount =
-        if (grams >= MeasurementUnit.KILOGRAM.inBaseUnits) {
+    /**
+     * Whether to step up to the larger unit is decided on the **rounded** figure, not the raw one.
+     * 2.2 lb is 997.9 g, which rounds to 1000 — and "1000 g" sitting in a list where everything
+     * else promotes reads as though the promotion had silently failed at the one boundary it
+     * exists for. The larger unit is then computed from the raw value, so nothing is rounded twice.
+     */
+    private fun metricMass(grams: Double, isApproximate: Boolean): ConvertedAmount {
+        val rounded = roundGrams(grams)
+        return if (rounded >= MeasurementUnit.KILOGRAM.inBaseUnits) {
             ConvertedAmount(roundLarge(grams / MeasurementUnit.KILOGRAM.inBaseUnits), MeasurementUnit.KILOGRAM.canonical, isApproximate)
         } else {
-            ConvertedAmount(roundGrams(grams), MeasurementUnit.GRAM.canonical, isApproximate)
+            ConvertedAmount(rounded, MeasurementUnit.GRAM.canonical, isApproximate)
         }
+    }
 
-    private fun metricVolume(millilitres: Double): ConvertedAmount =
-        if (millilitres >= MeasurementUnit.LITRE.inBaseUnits) {
+    private fun metricVolume(millilitres: Double): ConvertedAmount {
+        val rounded = roundMillilitres(millilitres)
+        return if (rounded >= MeasurementUnit.LITRE.inBaseUnits) {
             ConvertedAmount(roundLarge(millilitres / MeasurementUnit.LITRE.inBaseUnits), MeasurementUnit.LITRE.canonical, false)
         } else {
-            ConvertedAmount(roundMillilitres(millilitres), MeasurementUnit.MILLILITRE.canonical, false)
+            ConvertedAmount(rounded, MeasurementUnit.MILLILITRE.canonical, false)
         }
+    }
 
     private fun imperialMass(grams: Double): ConvertedAmount {
-        val ounces = grams / MeasurementUnit.OUNCE.inBaseUnits
-        return if (ounces >= OUNCES_PER_POUND) {
+        val rounded = roundCookingFraction(grams / MeasurementUnit.OUNCE.inBaseUnits)
+        return if (rounded >= OUNCES_PER_POUND) {
             ConvertedAmount(roundCookingFraction(grams / MeasurementUnit.POUND.inBaseUnits), MeasurementUnit.POUND.canonical, false)
         } else {
-            ConvertedAmount(roundCookingFraction(ounces), MeasurementUnit.OUNCE.canonical, false)
+            ConvertedAmount(rounded, MeasurementUnit.OUNCE.canonical, false)
         }
     }
 
