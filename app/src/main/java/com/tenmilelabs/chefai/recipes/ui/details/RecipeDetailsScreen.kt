@@ -124,8 +124,9 @@ fun RecipeDetailsScreen(
                 servings = uiState.servings,
                 isBookmarked = uiState.isBookmarked,
                 canEdit = onEditClick != null,
-                // Deleting navigates away, so the button is only offered when there is somewhere to go.
-                canDelete = onNavigateBack != null,
+                // Deleting navigates away, so the button is only offered when there is somewhere to
+                // go — and even then, only for a recipe the user owns (uiState.canDelete).
+                canDelete = onNavigateBack != null && uiState.canDelete,
                 showDeleteConfirmation = uiState.showDeleteConfirmation,
                 isDeleting = uiState.isDeleting,
                 showCookedToggle = uiState.showCookedToggle,
@@ -161,7 +162,8 @@ fun RecipeDetailsScreen(
  *   [recipe] to match, here rather than by the caller, so the stepper and the list can never
  *   disagree about what they are showing.
  * @param canEdit whether the caller has somewhere for the edit FAB to go.
- * @param canDelete whether the caller has somewhere to navigate after a delete.
+ * @param canDelete whether the caller has somewhere to navigate after a delete, and the current
+ *   user owns [recipe] (created or imported it themselves).
  */
 @Composable
 fun RecipeDetailsContent(
