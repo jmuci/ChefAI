@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.mealplans.domain.shoppinglist
 
 import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
 import com.tenmilelabs.chefai.core.domain.units.UnitConversion
+import com.tenmilelabs.chefai.core.domain.units.UnitNormalizer
 import com.tenmilelabs.chefai.core.util.QuantityFormat
 import com.tenmilelabs.chefai.recipes.domain.scaling.RecipeScaling
 import java.util.UUID
@@ -112,9 +113,15 @@ object ShoppingListBuilder {
                     .first().key
 
                 val quantityLabel = rows
-                    .groupBy { it.unit.trim().lowercase() }
+                    // Bucket by the unit a spelling *means*, not the spelling itself: two recipes
+                    // can say "300 g" and "200 gram" for the same thing, and "300 g + 200 gram" is
+                    // not something anyone can shop from. Unrecognised units (cloves, cans) have no
+                    // canonical form and keep their own wording.
+                    .groupBy { UnitNormalizer.normalize(it.unit)?.canonical ?: it.unit.trim().lowercase() }
                     .mapValues { (_, unitRows) ->
-                        unitRows.first().unit.trim() to unitRows.sumOf { it.amount }
+                        val spelling = unitRows.first().unit.trim()
+                        val display = UnitNormalizer.normalize(spelling)?.canonical ?: spelling
+                        display to unitRows.sumOf { it.amount }
                     }
                     .entries
                     .sortedWith(compareBy({ it.key.isEmpty() }, { it.key }))

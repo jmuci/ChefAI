@@ -42,6 +42,22 @@ class IngredientDensityTest {
     }
 
     @Test
+    fun `a staple named inside an ingredient does not price it`() {
+        // The word has to be what the thing IS. Sugar snap peas are peas; butter lettuce is
+        // lettuce; cream of tartar is a powdered acid. Pricing any of them by the staple named
+        // inside would be wrong by roughly a factor of two, and wrong invisibly.
+        val misleading = listOf(
+            "sugar snap peas", "butter lettuce", "cream of tartar", "oil-cured olives",
+            "milk chocolate", "buttermilk pancakes", "flour tortillas", "oil packed tuna",
+            "salt cod", "egg noodles",
+        )
+
+        for (name in misleading) {
+            assertThat(IngredientDensity.gramsPerMillilitre(name)).isNull()
+        }
+    }
+
+    @Test
     fun `matching respects word boundaries`() {
         // "oats" must not be found inside "goats cheese".
         assertThat(IngredientDensity.gramsPerMillilitre("goats cheese")).isNull()

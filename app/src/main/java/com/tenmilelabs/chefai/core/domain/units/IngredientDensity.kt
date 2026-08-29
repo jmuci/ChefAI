@@ -23,18 +23,26 @@ object IngredientDensity {
     /**
      * Grams per millilitre for [ingredientName], or `null` when there is no honest answer.
      *
-     * Matching mirrors `GrocerySectionClassifier`: normalise, try the whole name, then the longest
-     * known phrase it contains — so "almond flour" resolves to almond flour rather than to plain
-     * flour, and "all-purpose flour, sifted" resolves at all.
+     * The table entry has to be what the ingredient *is*, not merely a word the name happens to
+     * contain. "Sugar snap peas" are peas, "butter lettuce" is lettuce and "cream of tartar" is a
+     * powdered acid — pricing any of those by the staple named inside them is wrong by a factor of
+     * two, and wrong invisibly, since the result carries the same "≈" as a real match. So the key
+     * must sit at the **end** of the name, where English puts the head noun, after trailing
+     * qualifiers ("…, sifted", "… (softened)") are dropped. Longest match wins, so "almond flour"
+     * beats "flour".
+     *
+     * Anything this rejects converts volume-to-volume instead, which is exact. Failing to weigh is
+     * always the safer failure.
      */
     fun gramsPerMillilitre(ingredientName: String): Double? {
         val normalized = normalize(ingredientName)
         if (normalized.isBlank()) return null
         if (PREPARATION_WORDS.any { normalized.contains(it) }) return null
 
-        val gramsPerCup = GRAMS_PER_CUP[normalized]
+        val head = headNoun(ingredientName)
+        val gramsPerCup = GRAMS_PER_CUP[head]
             ?: GRAMS_PER_CUP.keys
-                .filter { normalized.containsWord(it) }
+                .filter { head.endsWith(" $it") }
                 .maxByOrNull { it.length }
                 ?.let { GRAMS_PER_CUP.getValue(it) }
             ?: return null
@@ -50,13 +58,11 @@ object IngredientDensity {
             .trim()
 
     /**
-     * Whether [phrase] appears in this name on word boundaries, so "flour" matches "plain flour"
-     * but "oat" does not match "goat cheese".
+     * The name with trailing qualifiers removed and normalised — "All-Purpose Flour, sifted" and
+     * "plain flour (sifted)" both become the head phrase the table is matched against.
      */
-    private fun String.containsWord(phrase: String): Boolean {
-        val padded = " $this "
-        return padded.contains(" $phrase ")
-    }
+    private fun headNoun(raw: String): String =
+        normalize(raw.substringBefore(',').substringBefore('('))
 
     /**
      * A name carrying one of these describes a cut, not a substance, and its packed density is
