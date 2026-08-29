@@ -62,6 +62,7 @@ import com.tenmilelabs.chefai.recipes.ui.editor.RecipeEditorScreen
 import com.tenmilelabs.chefai.recipes.ui.urlimport.ImportRecipeRoute
 import com.tenmilelabs.chefai.recipes.ui.urlimport.browser.BrowserImportRoute
 import com.tenmilelabs.chefai.search.ui.SearchScreen
+import com.tenmilelabs.chefai.settings.ui.SettingsScreen
 import timber.log.Timber
 import java.util.UUID
 
@@ -275,6 +276,9 @@ fun ChefAINavGraph(
                 onNavigateBack = { navController.popBackStack() },
             )
         }
+        composable(route = AppDestinations.SETTINGS.route) {
+            SettingsScreen()
+        }
         composable(route = AppDestinations.LOGIN.route) {
             LoginScreen(
                 snackbarHostState = snackbarHostState,
@@ -375,6 +379,9 @@ fun ChefAINavGraph(
                     onLogout = {},
                     onLogin = {
                         navActions.navigateToLogin()
+                    },
+                    onSettings = {
+                        navActions.navigateToSettings()
                     },
                     extraActions = {
                         if (currentRoute == AppDestinations.MEAL_PLAN_DETAIL.route) {

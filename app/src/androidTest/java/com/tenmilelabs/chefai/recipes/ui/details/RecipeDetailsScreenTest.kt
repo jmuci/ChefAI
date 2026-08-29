@@ -11,6 +11,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.platform.app.InstrumentationRegistry
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
 import com.tenmilelabs.chefai.core.ui.preview.RecipeData
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.recipes.domain.scaling.RecipeScaling
@@ -320,6 +321,71 @@ class RecipeDetailsScreenTest {
             .assertIsDisplayed()
         composeTestRule.onNodeWithText("${eggs.quantity.toInt()} ${eggs.unit}")
             .assertDoesNotExist()
+    }
+
+    // --- Measurement units ----------------------------------------------------------------------
+
+    @Test
+    fun ingredientsTab_asWritten_showsTheRecipesOwnUnits() {
+        val spaghetti = RecipeData.recipe.ingredients.single { it.ingredientDisplayName == "Spaghetti" }
+
+        composeTestRule.setContent {
+            ChefAITheme {
+                RecipeDetailsContent(
+                    recipe = RecipeData.recipe,
+                    measurementSystem = MeasurementSystem.AS_WRITTEN,
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("${spaghetti.quantity.toInt()} ${spaghetti.unit}")
+            .performScrollTo()
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun ingredientsTab_imperial_reExpressesWeightsAndLeavesCountedThingsAlone() {
+        // The fixture is written in grams, plus eggs counted in "units" — the two cases that have
+        // to behave differently. This is the only place the scale -> convert -> format chain is
+        // exercised as the screen actually wires it; the arithmetic itself is covered by
+        // UnitConversionTest.
+        composeTestRule.setContent {
+            ChefAITheme {
+                RecipeDetailsContent(
+                    recipe = RecipeData.recipe,
+                    measurementSystem = MeasurementSystem.IMPERIAL,
+                )
+            }
+        }
+
+        // 500 g of spaghetti is re-expressed, so its own wording is gone...
+        composeTestRule.onNodeWithText("500 gr").assertDoesNotExist()
+        composeTestRule.onNodeWithText("1⅛ lb").performScrollTo().assertIsDisplayed()
+
+        // ...but 2 eggs are counted, not measured, and there is nothing to convert.
+        composeTestRule.onNodeWithText("2 units").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun ingredientsTab_scalingAndConversionCompose() {
+        // Doubling then converting must give exactly twice the converted single amount — the
+        // guarantee that scaling runs before conversion rather than on top of a rounded value.
+        composeTestRule.setContent {
+            ChefAITheme {
+                RecipeDetailsContent(
+                    recipe = RecipeData.recipe,
+                    servings = servingsState(current = RecipeData.recipe.servings * 2),
+                    measurementSystem = MeasurementSystem.IMPERIAL,
+                )
+            }
+        }
+
+        // Guanciale, not spaghetti: doubled Pecorino (250 -> 500 gr) converts to the same "1⅛ lb"
+        // as unscaled spaghetti, which would make the negative assertion meaningless — the same
+        // collision the scaling test above sidesteps.
+        // 200 g -> 7 oz; 400 g -> 14⅛ oz.
+        composeTestRule.onNodeWithText("14⅛ oz").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("7 oz").assertDoesNotExist()
     }
 
     /** The recipe fixture's own yield, with [current] selected on top of it. */
