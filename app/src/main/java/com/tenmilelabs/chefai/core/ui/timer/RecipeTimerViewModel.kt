@@ -21,7 +21,8 @@ class RecipeTimerViewModel @Inject constructor(
 
     val state: StateFlow<RecipeTimerState?> = controller.state
 
-    fun start(stepLabel: String, totalSeconds: Long) = controller.start(stepLabel, totalSeconds)
+    fun start(stepLabel: String, totalSeconds: Long): RecipeTimerState? =
+        controller.start(stepLabel, totalSeconds)
     fun pause() = controller.pause()
     fun resume() = controller.resume()
     fun cancel() = controller.cancel()

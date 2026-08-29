@@ -146,8 +146,10 @@
     <string name="snackbar_save_error">Failed to save recipe.</string>
     <string name="start_step_timer_content_description">Start timer for this step</string>
     <string name="step_number_format">%1$d.</string>
+    <string name="step_timer_label_format">Step %1$d</string>
     <string name="step_timer_cancel_content_description">Cancel timer</string>
     <string name="step_timer_pause_content_description">Pause timer</string>
+    <string name="step_timer_replaced_message">Replaced the timer for %1$s</string>
     <string name="step_timer_resume_content_description">Resume timer</string>
     <string name="steps">Steps</string>
     <string name="title_home">Home</string>

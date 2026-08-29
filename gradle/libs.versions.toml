@@ -24,6 +24,7 @@ logbackClassic = "1.5.24"
 material = "1.13.0"
 navigationCompose = "2.9.6"
 navigationUiKtx = "2.9.6"
+robolectric = "4.15.1"
 roomRuntime = "2.8.4"
 slf4jAndroid = "1.7.36"
 timber = "5.0.1"
@@ -88,6 +89,7 @@ material = { group = "com.google.android.material", name = "material", version.r
 slf4j-android = { module = "org.slf4j:slf4j-android", version.ref = "slf4jAndroid" }
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workManager" }
 androidx-work-testing = { module = "androidx.work:work-testing", version.ref = "workManager" }

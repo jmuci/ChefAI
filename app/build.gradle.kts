@@ -72,6 +72,7 @@ android {
         }
     }
     testOptions {
+        unitTests.isIncludeAndroidResources = true
         unitTests.all {
             it.testLogging {
                 events(TestLogEvent.FAILED, TestLogEvent.STANDARD_ERROR)
@@ -202,6 +203,7 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.ktor.client.mock)
     testImplementation(libs.androidx.work.testing)
+    testImplementation(libs.robolectric)
     kspTest(libs.hilt.android.compiler)
 
 
