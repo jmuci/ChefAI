@@ -43,6 +43,12 @@ data class RecipesDetailsUiState(
     val userMessage: Int? = null,
     val showDeleteConfirmation: Boolean = false,
     val isDeleting: Boolean = false,
+    /**
+     * True when the current user created or imported this recipe. Delete is destructive and only
+     * makes sense for a recipe the user owns — someone else's public recipe (found via search, or
+     * any other entry point) never offers it, regardless of where it was opened from.
+     */
+    val canDelete: Boolean = false,
     /** True when this recipe was opened from a meal plan slot, so a cooked toggle applies. */
     val showCookedToggle: Boolean = false,
     val isCooked: Boolean = false,
@@ -195,6 +201,15 @@ class RecipeDetailsViewModel @Inject constructor(
             collectionsRepository.observeBookmarkedRecipeIds(userId).map { ids -> recipeUuid in ids }
         }
 
+    /** Current user's id regardless of session type, so ownership can be checked reactively. */
+    private val _currentUserId: Flow<UUID?> = sessionManager.userSession.map { session ->
+        when (session) {
+            is UserSession.Loading -> null
+            is UserSession.Anonymous -> session.localUserId
+            is UserSession.Authenticated -> session.user.uuid
+        }
+    }
+
     private val _isCooked: Flow<Boolean> = mealPlanSlotRef?.let { ref ->
         mealPlanRepository.observeMealPlanDay(ref.dayId).map { day -> day?.cookedAtFor(ref.slot) != null }
     } ?: flowOf(false)
@@ -221,8 +236,8 @@ class RecipeDetailsViewModel @Inject constructor(
     }
 
     val uiState: StateFlow<RecipesDetailsUiState> = combine(
-        _combinedState, _isCooked, _selectedServings, _measurementSystem
-    ) { combined, isCooked, selectedServings, measurementSystem ->
+        _combinedState, _isCooked, _selectedServings, _currentUserId, _measurementSystem
+    ) { combined, isCooked, selectedServings, currentUserId, measurementSystem ->
         when (val recipeAsync = combined.recipeAsync) {
             Async.Loading -> {
                 RecipesDetailsUiState(isLoading = true)
@@ -253,6 +268,7 @@ class RecipeDetailsViewModel @Inject constructor(
                     userMessage = combined.userMessage,
                     showDeleteConfirmation = combined.deleteUi.showConfirmation,
                     isDeleting = combined.deleteUi.isDeleting,
+                    canDelete = currentUserId != null && recipe.creator.uuid == currentUserId,
                     showCookedToggle = mealPlanSlotRef != null,
                     isCooked = isCooked,
                     servings = servings,

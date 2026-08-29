@@ -219,6 +219,37 @@ class RecipeDetailsViewModelTest {
     }
 
     @Test
+    fun `canDelete is false for a recipe the current user did not create or import`() = runTest {
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            // recipe1's creator is a fixture user distinct from this session's own id.
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+
+            assertThat(awaitItem().canDelete).isFalse()
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `canDelete is true for a recipe the current user created or imported`() = runTest {
+        initializeViewModel()
+        val currentUserId = sessionManager.getCurrentUserId()!!
+        val ownRecipe = recipe1.copy(creator = recipe1.creator.copy(uuid = currentUserId))
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, ownRecipe)
+
+            assertThat(awaitItem().canDelete).isTrue()
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
     fun `toggleBookmark - adds bookmark when not bookmarked`() = runTest {
         val userId = sessionManager.getCurrentUserId()!!
         initializeViewModel()
