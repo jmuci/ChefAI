@@ -16,6 +16,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -104,11 +105,18 @@ object NetworkModule {
      * and [com.tenmilelabs.chefai.recipes.domain.usecase.CacheRecipeImage]) rather than by the
      * client, so every hop can be re-validated against the SSRF guard before it's followed — a
      * page can 3xx to an internal address just as easily as it can host one directly.
+     *
+     * Engine is OkHttp, not CIO: CIO's TLS handshake on Android calls the legacy 2-arg
+     * `checkServerTrusted`, which `TrustManagerImpl` rejects with a `CertificateException` for any
+     * server needing hostname-aware validation — no CIO-side fix exists (see
+     * https://github.com/ktorio/ktor/issues/1029). Third-party recipe sites are exactly the
+     * population this hits. OkHttp is already on the classpath transitively via
+     * `coil-network-okhttp`.
      */
     @Provides
     @Singleton
     @ScraperHttpClient
-    fun provideScraperHttpClient(): HttpClient = HttpClient(CIO) {
+    fun provideScraperHttpClient(): HttpClient = HttpClient(OkHttp) {
         expectSuccess = true
         followRedirects = false
 
