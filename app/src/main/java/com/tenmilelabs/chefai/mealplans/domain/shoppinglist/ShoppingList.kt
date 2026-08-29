@@ -15,6 +15,12 @@ data class ShoppingListItem(
     val quantityLabel: String?,
     val section: GrocerySection,
     val isChecked: Boolean,
+    /**
+     * True when any part of [quantityLabel] was reached by assuming a density. The list is where
+     * a number is most likely to be taken literally — it is what you buy — so an estimate has to
+     * announce itself here at least as loudly as it does on the recipe screen.
+     */
+    val isApproximate: Boolean = false,
 )
 
 /** One aisle's worth of items, alphabetical. */
@@ -63,7 +69,12 @@ object ShoppingListBuilder {
         checkedKeys: Set<String>,
         measurementSystem: MeasurementSystem = MeasurementSystem.DEFAULT,
     ): ShoppingList {
-        data class ScaledRow(val displayName: String, val unit: String, val amount: Double)
+        data class ScaledRow(
+            val displayName: String,
+            val unit: String,
+            val amount: Double,
+            val isApproximate: Boolean,
+        )
 
         val scaledRows = ingredients
             .filter { it.displayName.isNotBlank() }
@@ -89,6 +100,7 @@ object ShoppingListBuilder {
                     displayName = row.displayName,
                     unit = converted.unit,
                     amount = converted.quantity,
+                    isApproximate = converted.isApproximate,
                 )
             }
 
@@ -118,6 +130,8 @@ object ShoppingListBuilder {
                     key = key,
                     displayName = displayName,
                     quantityLabel = quantityLabel,
+                    // One estimated contributor makes the whole total an estimate.
+                    isApproximate = rows.any { it.isApproximate },
                     section = GrocerySectionClassifier.classify(displayName),
                     isChecked = key in checkedKeys,
                 )

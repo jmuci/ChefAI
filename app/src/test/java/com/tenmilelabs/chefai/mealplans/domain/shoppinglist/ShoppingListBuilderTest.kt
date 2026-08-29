@@ -43,6 +43,21 @@ class ShoppingListBuilderTest {
     }
 
     @Test
+    fun `a total resting on an assumed density is flagged as approximate`() {
+        val recipeId = UUID.randomUUID()
+        val flour = listOf(ingredient(recipeId, 0, "all-purpose flour", 1.0, "cup"))
+        val stock = listOf(ingredient(recipeId, 0, "chicken stock", 1.0, "cup"))
+        val slots = mapOf(recipeId to 1)
+
+        val flourList = ShoppingListBuilder.build(flour, slots, 0, emptySet(), MeasurementSystem.METRIC)
+        val stockList = ShoppingListBuilder.build(stock, slots, 0, emptySet(), MeasurementSystem.METRIC)
+
+        // A weight guessed from a density is an estimate; a volume-to-volume conversion is exact.
+        assertThat(flourList.allItems().single().isApproximate).isTrue()
+        assertThat(stockList.allItems().single().isApproximate).isFalse()
+    }
+
+    @Test
     fun `an ingredient counted rather than measured is never converted`() {
         val recipeId = UUID.randomUUID()
         val ingredients = listOf(ingredient(recipeId, 0, "garlic", 3.0, "cloves"))

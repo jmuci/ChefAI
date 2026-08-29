@@ -97,7 +97,8 @@ object IngredientDensity {
 
         // Fats and dairy
         entry(227.0, "butter", "unsalted butter", "salted butter", "margarine")
-        entry(198.0, "oil", "olive oil", "vegetable oil", "sunflower oil", "canola oil", "rapeseed oil", "coconut oil", "sesame oil")
+        // Cooking oils sit at about 0.91 g/ml; 236.588 ml x 0.91 = 216 g.
+        entry(216.0, "oil", "olive oil", "vegetable oil", "sunflower oil", "canola oil", "rapeseed oil", "coconut oil", "sesame oil")
         entry(242.0, "milk", "whole milk", "skim milk", "semi skimmed milk", "almond milk", "oat milk", "soy milk")
         entry(227.0, "buttermilk", "yogurt", "yoghurt", "greek yogurt", "greek yoghurt", "sour cream", "cream cheese", "creme fraiche")
         entry(232.0, "cream", "heavy cream", "double cream", "single cream", "whipping cream")

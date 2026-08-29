@@ -131,17 +131,21 @@ object UnitConversion {
      * and what every conversion chart says. Metric mass keeps a finer grid than metric volume
      * because 5 g matters in a way 5 ml does not.
      */
-    internal fun roundGrams(grams: Double): Double = when {
-        grams >= 100.0 -> roundToNearest(grams, 5.0)
-        grams >= 10.0 -> roundToNearest(grams, 1.0)
-        else -> roundToNearest(grams, 0.5)
+    internal fun roundGrams(grams: Double): Double = notToZero(grams) {
+        when {
+            grams >= 100.0 -> roundToNearest(grams, 5.0)
+            grams >= 10.0 -> roundToNearest(grams, 1.0)
+            else -> roundToNearest(grams, 0.5)
+        }
     }
 
-    internal fun roundMillilitres(millilitres: Double): Double = when {
-        millilitres >= 100.0 -> roundToNearest(millilitres, 10.0)
-        millilitres >= 20.0 -> roundToNearest(millilitres, 5.0)
-        millilitres >= 10.0 -> roundToNearest(millilitres, 1.0)
-        else -> roundToNearest(millilitres, 0.5)
+    internal fun roundMillilitres(millilitres: Double): Double = notToZero(millilitres) {
+        when {
+            millilitres >= 100.0 -> roundToNearest(millilitres, 10.0)
+            millilitres >= 20.0 -> roundToNearest(millilitres, 5.0)
+            millilitres >= 10.0 -> roundToNearest(millilitres, 1.0)
+            else -> roundToNearest(millilitres, 0.5)
+        }
     }
 
     /** Kilograms and litres, where two decimals is already more precision than the source had. */
@@ -152,12 +156,31 @@ object UnitConversion {
      * [com.tenmilelabs.chefai.core.util.QuantityFormat.cooking] renders "¾ cup" rather than
      * "0.78 cup". Above the point where it stops drawing fractions, whole units read better.
      */
-    internal fun roundCookingFraction(value: Double): Double {
-        if (value >= FRACTION_CEILING) return roundToNearest(value, 1.0)
-        val whole = kotlin.math.floor(value)
-        val remainder = value - whole
-        val nearest = MEASURABLE_FRACTIONS.minBy { kotlin.math.abs(remainder - it) }
-        return whole + nearest
+    internal fun roundCookingFraction(value: Double): Double = notToZero(value) {
+        if (value >= FRACTION_CEILING) {
+            roundToNearest(value, 1.0)
+        } else {
+            val whole = kotlin.math.floor(value)
+            val remainder = value - whole
+            val nearest = MEASURABLE_FRACTIONS.minBy { kotlin.math.abs(remainder - it) }
+            whole + nearest
+        }
+    }
+
+    /**
+     * Applies [round] but never lets a real amount vanish.
+     *
+     * Every grid here has a step, and an amount smaller than half a step would otherwise snap to
+     * zero — 1 g of saffron read in Imperial is 0.035 oz, which rounds to a flat "0 oz" and tells
+     * the cook they need none of it. Falling back to the unrounded value hands the number to
+     * [com.tenmilelabs.chefai.core.util.QuantityFormat], which renders "0.04 oz": ungainly, but
+     * true, and a signal that the unit is the wrong size for the amount rather than that the
+     * amount is nothing. This is the same trap `QuantityFormat.cooking` avoids by leaving whole
+     * numbers out of its own fraction table.
+     */
+    private inline fun notToZero(value: Double, round: () -> Double): Double {
+        val rounded = round()
+        return if (rounded == 0.0 && value > 0.0) value else rounded
     }
 
     private fun roundToNearest(value: Double, step: Double): Double = round(value / step) * step

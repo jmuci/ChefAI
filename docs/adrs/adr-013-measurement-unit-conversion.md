@@ -115,6 +115,13 @@ mass keeps a finer grid (5 g above 100 g) because 5 g matters where 5 ml does no
 amounts snap to the exact set of fractions `QuantityFormat.cooking` has glyphs for, so a converted
 value renders `¾ cup` rather than `0.78 cup`.
 
+Every grid has a floor rule: **a real amount is never allowed to round to zero.** 1 g of saffron is
+0.035 oz, and snapping that to the nearest measurable fraction gives a flat `0 oz` — which tells the
+cook they need none of it. When rounding would zero out a positive amount the unrounded value is let
+through instead, so it renders `0.04 oz`: ungainly, but true, and a signal that the unit is the wrong
+size for the amount rather than that the amount is nothing. `QuantityFormat.cooking` avoids the same
+trap by keeping whole numbers out of its own fraction table.
+
 ---
 
 ## Decision 5: The preference is device-local
@@ -156,3 +163,13 @@ including recipes they typed in themselves, in the units they chose.
   always what the user hoped for.
 - **The cup assumption is wrong for Australian and British sources**, by 6% and 20% respectively.
   Detecting the source's locale from `recipeExternalUrl` would fix most of it and is not attempted.
+- **The shopping list rounds each row before summing it.** Five recipes each wanting 40 ml of milk
+  round to `2⅔ tbsp` apiece and total `13.33 tbsp` against a true `13.53` — about 1.4% low, and it
+  grows with the number of rows sharing a bucket. Summing raw amounts in base units and rounding once
+  would fix it, but that means restructuring the aggregation to group by dimension before choosing an
+  output unit. Left alone deliberately: a shopping-list total answers "how much do I buy", where 1.4%
+  is below the granularity of what a shop sells.
+- **A generic table entry can be matched in preference to no entry at all.** "Condensed milk" resolves
+  through the bare `milk` entry (242 g/cup) and is really nearer 306 g/cup. The longest-phrase match
+  is doing its job; the table simply lacks the more specific row. Adding entries is the fix, and the
+  approximation is marked `≈` either way.

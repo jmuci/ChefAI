@@ -18,6 +18,15 @@ class IngredientDensityTest {
     }
 
     @Test
+    fun `cooking oil is not priced like sugar`() {
+        // Oils sit near 0.91 g/ml; anything close to sugar's 198 g/cup is a transcription slip.
+        val oil = IngredientDensity.gramsPerMillilitre("olive oil")
+
+        assertThat(oil).isNotNull()
+        assertThat(oil!!).isWithin(0.03).of(0.91)
+    }
+
+    @Test
     fun `a name resolves through the qualifiers recipes actually carry`() {
         assertThat(gramsPerCup("All-Purpose Flour, sifted")).isWithin(TOLERANCE).of(120.0)
         assertThat(gramsPerCup("unsalted butter, softened")).isWithin(TOLERANCE).of(227.0)

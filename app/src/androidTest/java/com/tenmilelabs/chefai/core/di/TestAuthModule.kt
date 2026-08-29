@@ -8,8 +8,10 @@ import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.TokenProvider
 import com.tenmilelabs.chefai.collections.data.repository.DefaultCollectionsRepository
 import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
+import com.tenmilelabs.chefai.core.data.repository.DataStoreUserPreferencesRepository
 import com.tenmilelabs.chefai.core.data.repository.DefaultMetadataRepository
 import com.tenmilelabs.chefai.core.domain.repository.MetadataRepository
+import com.tenmilelabs.chefai.core.domain.repository.UserPreferencesRepository
 import com.tenmilelabs.chefai.mealplans.data.network.MealPlanApiService
 import com.tenmilelabs.chefai.mealplans.data.network.MealPlanNetworkDataSource
 import com.tenmilelabs.chefai.mealplans.data.repository.DefaultMealPlanRepository
@@ -114,6 +116,17 @@ abstract class TestRepositoryModule {
     @Binds
     @Singleton
     abstract fun bindMetadataRepository(repository: DefaultMetadataRepository): MetadataRepository
+
+    /**
+     * Binds the user preferences repository (same as production) — required because this module
+     * replaces [RepositoryModule] wholesale, so every binding it declares has to be re-declared
+     * here. See docs/claude/gotchas.md #21.
+     */
+    @Binds
+    @Singleton
+    abstract fun bindUserPreferencesRepository(
+        repository: DataStoreUserPreferencesRepository
+    ): UserPreferencesRepository
 
     /**
      * Binds the collections repository (same as production).

@@ -177,6 +177,28 @@ class UnitConversionTest {
     }
 
     @Test
+    fun `a real amount never rounds away to zero`() {
+        // 1 g of saffron is 0.035 oz. Snapping that to the nearest measurable fraction gives zero,
+        // which would tell the cook they need none of it — so the rounding stands down and lets
+        // the true value through instead.
+        val saffron = convert(1.0, "g", "saffron threads", IMPERIAL)
+        assertThat(saffron.quantity).isGreaterThan(0.0)
+        assertThat(label(saffron)).isEqualTo("0.04 oz")
+
+        val trace = convert(0.05, "tsp", "vanilla extract", METRIC)
+        assertThat(trace.quantity).isGreaterThan(0.0)
+
+        // Across the whole range where the grids could swallow a value, nothing reaches zero.
+        for (milligrams in 1..2000 step 7) {
+            val amount = convert(milligrams / 1000.0, "g", "salt", IMPERIAL)
+            assertThat(amount.quantity).isGreaterThan(0.0)
+        }
+        assertThat(UnitConversion.roundGrams(0.2)).isGreaterThan(0.0)
+        assertThat(UnitConversion.roundMillilitres(0.1)).isGreaterThan(0.0)
+        assertThat(UnitConversion.roundCookingFraction(0.01)).isGreaterThan(0.0)
+    }
+
+    @Test
     fun `converted metric amounts round to figures a person would write down`() {
         assertThat(UnitConversion.roundGrams(236.588)).isEqualTo(235.0)
         assertThat(UnitConversion.roundGrams(28.349)).isEqualTo(28.0)
