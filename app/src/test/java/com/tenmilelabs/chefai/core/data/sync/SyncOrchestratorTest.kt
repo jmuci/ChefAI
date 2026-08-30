@@ -846,6 +846,37 @@ class SyncOrchestratorTest {
         }
 
     @Test
+    fun `pull fetches a meal-plan day's recipe on demand instead of dropping it when it's missing from the delta feed`() =
+        runTest(testDispatcher) {
+            val planId = UuidV7Generator.newId()
+            val missingRecipeId = UuidV7Generator.newId()
+            recipeDetailNetworkDataSource.resultToReturn =
+                RecipeDetailNetworkResult.Success(createRecipeDetailResponseDto(uuid = missingRecipeId))
+            val serverPlan = createSyncMealPlanDto(
+                uuid = planId,
+                days = listOf(createSyncMealPlanDayDto(dayIndex = 0, dinnerRecipeId = missingRecipeId)),
+            )
+            syncNetworkDataSource.pullResponses.addLast(
+                SyncPullResponse(
+                    recipes = emptyList(),
+                    serverTimestamp = 5000L,
+                    hasMore = false,
+                    mealPlans = listOf(serverPlan),
+                )
+            )
+
+            syncOrchestrator.sync()
+
+            // A recipe the server picked (e.g. a public recipe for INCLUDE_PUBLIC) that never
+            // rides the user's own delta feed must still be fetched on demand — see ChefAI's
+            // "meal plan missing a day" bug — rather than silently nulling the day's reference.
+            assertThat(recipeDetailNetworkDataSource.requestedRecipeIds).contains(missingRecipeId)
+            assertThat(recipeDao.getRecipeById(missingRecipeId)?.title).isEqualTo("Fetched Recipe")
+            val savedDay = mealPlanDao.getDaysForMealPlan(planId).single()
+            assertThat(savedDay.dinnerRecipeId).isEqualTo(missingRecipeId)
+        }
+
+    @Test
     fun `pull carries a cooked mark forward when the day still holds the same recipe`() = runTest(testDispatcher) {
         val planId = UuidV7Generator.newId()
         val dinnerRecipeId = UuidV7Generator.newId()
