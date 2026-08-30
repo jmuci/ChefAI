@@ -289,7 +289,8 @@ class SyncOrchestrator @Inject constructor(
             Timber.d("Pull: received ${response.recipes.size} recipes, ${response.mealPlans.size} meal plans, hasMore=${response.hasMore}")
 
             if (authenticatedUserId != null && response.mealPlans.isNotEmpty()) {
-                resolveMissingMealPlanRecipes(response.mealPlans)
+                val idsArrivingThisPage = response.recipes.mapTo(mutableSetOf()) { it.uuid }
+                resolveMissingMealPlanRecipes(response.mealPlans, idsArrivingThisPage)
             }
 
             transactionRunner {
@@ -563,12 +564,20 @@ class SyncOrchestrator @Inject constructor(
      * the user, not every recipe a meal plan might reference). Runs before [pull]'s own
      * transaction opens, same as that page's network call, so [dropUnknownRecipes] finds the
      * recipe on disk instead of permanently nulling the day's reference to it.
+     *
+     * @param idsArrivingThisPage this page's own `response.recipes` ids, skipped here since
+     *   they're about to be upserted by the ordinary recipe loop a moment later in the same
+     *   transaction — fetching them individually first would just be a redundant network call.
      */
-    private suspend fun resolveMissingMealPlanRecipes(mealPlans: List<SyncMealPlanDto>) {
+    private suspend fun resolveMissingMealPlanRecipes(
+        mealPlans: List<SyncMealPlanDto>,
+        idsArrivingThisPage: Set<String>,
+    ) {
         val referencedIds = mealPlans
             .flatMap { it.days }
             .flatMap { listOfNotNull(it.dinnerRecipeId, it.lunchRecipeId) }
             .distinct()
+            .filterNot { it in idsArrivingThisPage }
             .map(UUID::fromString)
 
         for (recipeId in referencedIds) {

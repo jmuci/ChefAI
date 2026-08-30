@@ -877,6 +877,108 @@ class SyncOrchestratorTest {
         }
 
     @Test
+    fun `pull does not make a redundant on-demand fetch when the meal-plan's recipe already arrives in the same page`() =
+        runTest(testDispatcher) {
+            val planId = UuidV7Generator.newId()
+            val recipeId = UuidV7Generator.newId()
+            val serverPlan = createSyncMealPlanDto(
+                uuid = planId,
+                days = listOf(createSyncMealPlanDayDto(dayIndex = 0, dinnerRecipeId = recipeId)),
+            )
+            syncNetworkDataSource.pullResponses.addLast(
+                SyncPullResponse(
+                    // The plan's recipe rides this same page's ordinary delta feed — a common
+                    // case when the server just generated both together.
+                    recipes = listOf(createSyncRecipeDto(uuid = recipeId, title = "From Same Page")),
+                    serverTimestamp = 5000L,
+                    hasMore = false,
+                    mealPlans = listOf(serverPlan),
+                )
+            )
+
+            syncOrchestrator.sync()
+
+            // No on-demand GET was needed — the recipe was already about to be upserted by the
+            // page's own recipe loop. Firing one anyway would be a wasted network round trip.
+            assertThat(recipeDetailNetworkDataSource.requestedRecipeIds).isEmpty()
+            assertThat(recipeDao.getRecipeById(recipeId)?.title).isEqualTo("From Same Page")
+            val savedDay = mealPlanDao.getDaysForMealPlan(planId).single()
+            assertThat(savedDay.dinnerRecipeId).isEqualTo(recipeId)
+        }
+
+    @Test
+    fun `pull fetches a recipe referenced by multiple days only once`() = runTest(testDispatcher) {
+        val planId = UuidV7Generator.newId()
+        val missingRecipeId = UuidV7Generator.newId()
+        recipeDetailNetworkDataSource.resultToReturn =
+            RecipeDetailNetworkResult.Success(createRecipeDetailResponseDto(uuid = missingRecipeId))
+        val serverPlan = createSyncMealPlanDto(
+            uuid = planId,
+            days = listOf(
+                createSyncMealPlanDayDto(dayIndex = 0, dinnerRecipeId = missingRecipeId),
+                createSyncMealPlanDayDto(dayIndex = 1, lunchRecipeId = missingRecipeId),
+            ),
+        )
+        syncNetworkDataSource.pullResponses.addLast(
+            SyncPullResponse(
+                recipes = emptyList(),
+                serverTimestamp = 5000L,
+                hasMore = false,
+                mealPlans = listOf(serverPlan),
+            )
+        )
+
+        syncOrchestrator.sync()
+
+        assertThat(recipeDetailNetworkDataSource.requestedRecipeIds.count { it == missingRecipeId })
+            .isEqualTo(1)
+        val savedDays = mealPlanDao.getDaysForMealPlan(planId).sortedBy { it.dayIndex }
+        assertThat(savedDays[0].dinnerRecipeId).isEqualTo(missingRecipeId)
+        assertThat(savedDays[1].lunchRecipeId).isEqualTo(missingRecipeId)
+    }
+
+    @Test
+    fun `pull recovers a previously-dropped recipe reference once it becomes fetchable on a later sync`() =
+        runTest(testDispatcher) {
+            val planId = UuidV7Generator.newId()
+            val recipeId = UuidV7Generator.newId()
+            val serverPlan = createSyncMealPlanDto(
+                uuid = planId,
+                days = listOf(createSyncMealPlanDayDto(dayIndex = 0, dinnerRecipeId = recipeId)),
+            )
+
+            // First sync: the on-demand fetch fails (e.g. transient network error), so the
+            // reference is dropped rather than persisted as a dangling id.
+            recipeDetailNetworkDataSource.resultToReturn = RecipeDetailNetworkResult.Error("boom")
+            syncNetworkDataSource.pullResponses.addLast(
+                SyncPullResponse(
+                    recipes = emptyList(),
+                    serverTimestamp = 5000L,
+                    hasMore = false,
+                    mealPlans = listOf(serverPlan),
+                )
+            )
+            syncOrchestrator.sync()
+            assertThat(mealPlanDao.getDaysForMealPlan(planId).single().dinnerRecipeId).isNull()
+
+            // Second sync: same day comes down again (e.g. server re-sends on the next poll) and
+            // the fetch now succeeds — nothing should keep the recipe permanently unresolvable.
+            recipeDetailNetworkDataSource.resultToReturn =
+                RecipeDetailNetworkResult.Success(createRecipeDetailResponseDto(uuid = recipeId))
+            syncNetworkDataSource.pullResponses.addLast(
+                SyncPullResponse(
+                    recipes = emptyList(),
+                    serverTimestamp = 6000L,
+                    hasMore = false,
+                    mealPlans = listOf(serverPlan.copy(updatedAt = 6000L)),
+                )
+            )
+            syncOrchestrator.sync()
+
+            assertThat(mealPlanDao.getDaysForMealPlan(planId).single().dinnerRecipeId).isEqualTo(recipeId)
+        }
+
+    @Test
     fun `pull carries a cooked mark forward when the day still holds the same recipe`() = runTest(testDispatcher) {
         val planId = UuidV7Generator.newId()
         val dinnerRecipeId = UuidV7Generator.newId()
