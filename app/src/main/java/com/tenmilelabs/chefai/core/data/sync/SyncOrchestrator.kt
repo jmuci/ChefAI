@@ -288,6 +288,11 @@ class SyncOrchestrator @Inject constructor(
             val response = syncNetworkDataSource.pullRecipes(since = since, limit = 100)
             Timber.d("Pull: received ${response.recipes.size} recipes, ${response.mealPlans.size} meal plans, hasMore=${response.hasMore}")
 
+            if (authenticatedUserId != null && response.mealPlans.isNotEmpty()) {
+                val idsArrivingThisPage = response.recipes.mapTo(mutableSetOf()) { it.uuid }
+                resolveMissingMealPlanRecipes(response.mealPlans, idsArrivingThisPage)
+            }
+
             transactionRunner {
                 // Upsert reference data in FK dependency order before recipes:
                 //   creators (leaf) → recipes.creatorId (CASCADE)
@@ -552,6 +557,36 @@ class SyncOrchestrator @Inject constructor(
         }
     }
 
+    /**
+     * Fetches any recipe a pulled meal plan's days reference but this device hasn't synced —
+     * e.g. a public recipe the server's generator picked for `INCLUDE_PUBLIC` that was never
+     * part of this user's own delta feed (`response.recipes` is scoped to recipes relevant to
+     * the user, not every recipe a meal plan might reference). Runs before [pull]'s own
+     * transaction opens, same as that page's network call, so [dropUnknownRecipes] finds the
+     * recipe on disk instead of permanently nulling the day's reference to it.
+     *
+     * @param idsArrivingThisPage this page's own `response.recipes` ids, skipped here since
+     *   they're about to be upserted by the ordinary recipe loop a moment later in the same
+     *   transaction — fetching them individually first would just be a redundant network call.
+     */
+    private suspend fun resolveMissingMealPlanRecipes(
+        mealPlans: List<SyncMealPlanDto>,
+        idsArrivingThisPage: Set<String>,
+    ) {
+        val referencedIds = mealPlans
+            .flatMap { it.days }
+            .flatMap { listOfNotNull(it.dinnerRecipeId, it.lunchRecipeId) }
+            .distinct()
+            .filterNot { it in idsArrivingThisPage }
+            .map(UUID::fromString)
+
+        for (recipeId in referencedIds) {
+            if (recipeDao.getRecipeById(recipeId) == null) {
+                fetchAndPersistRecipe(recipeId)
+            }
+        }
+    }
+
     private suspend fun applyPulledMealPlan(dto: SyncMealPlanDto, userId: UUID, serverTimestamp: Long) {
         val planUuid = UUID.fromString(dto.uuid)
         val localPlan = mealPlanDao.getMealPlanById(planUuid)
@@ -583,15 +618,16 @@ class SyncOrchestrator @Inject constructor(
     }
 
     /**
-     * Nulls out a day's recipe reference(s) that don't resolve on this device.
+     * Nulls out a day's recipe reference(s) that still don't resolve on this device after
+     * [resolveMissingMealPlanRecipes] already tried to fetch them.
      *
      * `meal_plan_days.dinnerRecipeId`/`lunchRecipeId` carry no local FK (see
-     * [MealPlanDayEntity]), so a pulled day can reference a recipe this device never receives —
-     * e.g. a server-generated plan whose candidate query picked something outside what the
-     * client's pull is scoped to deliver. Left alone, that produces a permanently unresolvable
-     * "Recipe not available" row (`MealPlanMealRow`) that no future sync can fix. Dropping the
-     * reference instead makes the slot behave like any other unfilled one — [MealPlanBoard]
-     * already skips a day/slot with no recipe assigned.
+     * [MealPlanDayEntity]), so a pulled day can reference a recipe this device never receives via
+     * the ordinary delta feed — e.g. a server-generated plan whose candidate query picked a public
+     * recipe outside what the client's own pull is scoped to deliver. This is only reached when
+     * that on-demand fetch came back `NOT_AVAILABLE` (recipe genuinely gone) or `NETWORK_ERROR`;
+     * the latter will retry on the next pull. Dropping the reference makes the slot behave like
+     * any other unfilled one — [MealPlanBoard] already skips a day/slot with no recipe assigned.
      */
     private suspend fun dropUnknownRecipes(day: MealPlanDayEntity): MealPlanDayEntity {
         val dinner = day.dinnerRecipeId?.takeIf { recipeDao.getRecipeById(it) != null }
