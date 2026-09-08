@@ -26,7 +26,6 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import java.util.concurrent.CancellationException
 import javax.inject.Inject
 
@@ -74,6 +73,10 @@ class RecipesViewModel @Inject constructor(
         .map { Async.Success(it) }
         .catch<Async<List<RecipePreview>>> { e ->
             if (e is CancellationException) throw e
+            // Emitted here rather than from the combine below: that transform re-runs on every
+            // emission of *any* of its sources, so raising the snackbar from it repeated the same
+            // error for each unrelated isLoading/syncStatus change while the failure persisted.
+            _uiEvent.emit(RecipesUiEvent.ShowSnackbar(R.string.loading_recipes_error))
             emit(Async.Error(R.string.loading_recipes_error))
         }
 
@@ -86,10 +89,6 @@ class RecipesViewModel @Inject constructor(
                 RecipesUiState(isLoading = true, isRefreshing = isRefreshing)
             }
             is Async.Error -> {
-                // Emit error event asynchronously
-                viewModelScope.launch {
-                    _uiEvent.emit(RecipesUiEvent.ShowSnackbar(recipesAsync.errorMessage))
-                }
                 RecipesUiState(isLoading = false, isRefreshing = isRefreshing)
             }
             is Async.Success -> {

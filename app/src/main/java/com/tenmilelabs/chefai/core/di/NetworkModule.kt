@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.core.di
 
+import com.tenmilelabs.chefai.BuildConfig
 import com.tenmilelabs.chefai.auth.data.network.AuthInterceptor
 import com.tenmilelabs.chefai.auth.domain.TokenProvider
 import com.tenmilelabs.chefai.recipes.data.network.ChefAIApiService
@@ -87,9 +88,17 @@ object NetworkModule {
             socketTimeoutMillis = 10_000
         }
 
+        // Logger.SIMPLE writes with println, which Android routes to logcat regardless of the
+        // Timber tree planted in ChefAIApplication — so this has to be gated on the build type
+        // itself, not on Timber. LogLevel.HEADERS logs every request header, and AuthInterceptor
+        // has already added `Authorization: Bearer <jwt>` by the time this plugin sees the request
+        // (it hooks HttpSendPipeline.Monitoring, downstream of the request pipeline). Ktor's
+        // sanitizedHeaders list is empty until something fills it — there is no redaction by
+        // default — so the header is sanitized explicitly, belt and braces with the level gate.
         install(Logging) {
             logger = Logger.SIMPLE
-            level = LogLevel.HEADERS
+            level = if (BuildConfig.DEBUG) LogLevel.HEADERS else LogLevel.NONE
+            sanitizeHeader { header -> header.equals(HttpHeaders.Authorization, ignoreCase = true) }
         }
 
         install(ContentNegotiation) {

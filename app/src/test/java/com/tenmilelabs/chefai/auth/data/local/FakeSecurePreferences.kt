@@ -110,10 +110,14 @@ class FakeSecurePreferences : SecurePreferencesInterface {
         }
     }
 
+    /** Test hook: notified on every [saveLocalUserId] write, so callers can count them. */
+    var onSaveLocalUserId: ((UUID) -> Unit)? = null
+
     override suspend fun saveLocalUserId(uuid: UUID) {
         storage.value = storage.value.toMutableMap().apply {
             put(KEY_LOCAL_USER_ID, uuid.toString())
         }
+        onSaveLocalUserId?.invoke(uuid)
     }
 
     override fun getLocalUserId(): Flow<UUID?> = storage.map { prefs ->

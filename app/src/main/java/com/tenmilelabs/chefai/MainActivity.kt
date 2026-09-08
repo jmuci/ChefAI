@@ -52,9 +52,18 @@ class MainActivity : ComponentActivity() {
         consumeShareIntent(intent)
     }
 
-    /** Handles a `Share` from another app (e.g. Chrome's share sheet) landing on this activity. */
+    /**
+     * Handles a `Share` from another app (e.g. Chrome's share sheet) landing on this activity.
+     *
+     * The intent is emptied as it is read. `getIntent()` keeps returning the launching intent for
+     * the life of the task, so every activity recreation — a rotation, a theme change, coming back
+     * after process death — re-runs [onCreate] against the same shared text; without this, a URL
+     * the user had already imported or dismissed would re-open the import screen underneath them
+     * each time.
+     */
     private fun consumeShareIntent(intent: Intent) {
         if (intent.action != Intent.ACTION_SEND || intent.type != "text/plain") return
         pendingSharedUrl = extractSharedRecipeUrl(intent.getStringExtra(Intent.EXTRA_TEXT))
+        intent.removeExtra(Intent.EXTRA_TEXT)
     }
 }

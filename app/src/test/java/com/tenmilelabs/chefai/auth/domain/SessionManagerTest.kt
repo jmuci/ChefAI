@@ -159,6 +159,24 @@ class SessionManagerTest {
     }
 
     @Test
+    fun `restoring an anonymous session re-saves its localUserId`() = testScope.runTest {
+        // Given: an id stored by an older build, which wrote it encrypted
+        val storedId = UUID.randomUUID()
+        fakeSecurePreferences.saveLocalUserId(storedId)
+        var writes = 0
+        fakeSecurePreferences.onSaveLocalUserId = { writes++ }
+
+        // When: an anonymous session is restored from it
+        sessionManager.loadSession()
+
+        // Then: it is written back, which is what migrates the legacy encrypted form to plaintext
+        // so a backup restore onto a new device can still read it (SecurePreferences.saveLocalUserId)
+        assertThat((sessionManager.userSession.first() as UserSession.Anonymous).localUserId)
+            .isEqualTo(storedId)
+        assertThat(writes).isEqualTo(1)
+    }
+
+    @Test
     fun `login with valid credentials returns user and saves session`() = testScope.runTest {
         // Given: Valid credentials
         val email = "test@example.com"

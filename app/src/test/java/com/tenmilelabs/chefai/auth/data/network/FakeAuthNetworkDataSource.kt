@@ -63,7 +63,7 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
         }
 
         if (shouldThrowError) {
-            throw Exception("Simulated network error during login")
+            throw errorToThrow ?: Exception("Simulated network error during login")
         }
 
         return authResponse ?: createDefaultAuthResponse(

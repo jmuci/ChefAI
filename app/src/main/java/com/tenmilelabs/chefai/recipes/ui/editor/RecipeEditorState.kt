@@ -61,6 +61,9 @@ sealed interface EditorAction {
     data object ConfirmDelete : EditorAction
     data object DismissDeleteDialog : EditorAction
     data object ClearError : EditorAction
+
+    /** The user chose "Discard" on the unsaved-changes dialog: drop the auto-saved draft too. */
+    data object DiscardDraft : EditorAction
 }
 
 /**

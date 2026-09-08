@@ -112,6 +112,7 @@ class RecipeEditorViewModel @Inject constructor(
         when (action) {
             is EditorAction.Save -> save()
             is EditorAction.ConfirmDelete -> delete()
+            is EditorAction.DiscardDraft -> discardDraft()
             is EditorAction.ImageSelected -> storePickedImage(action.uri)
             is EditorAction.IngredientInputChanged -> updateIngredientSuggestions(action.input)
             is EditorAction.TagInputChanged -> updateTagSuggestions(action.input)
@@ -380,6 +381,31 @@ class RecipeEditorViewModel @Inject constructor(
                     )
                 }
             }
+        }
+    }
+
+    // --- Discard ---
+
+    /**
+     * Throws away the auto-saved draft the user just chose to discard, then navigates back.
+     *
+     * Without this the draft row outlives the discard: [loadRecipe] and [restoreDraftIfExists]
+     * both prefer a stored draft over the saved recipe, so the next time this recipe is opened the
+     * edits the user explicitly threw away would come straight back. [autoSaveJob] is cancelled
+     * first because the state is still dirty — a tick landing between the delete and this
+     * ViewModel being cleared would write the draft back out.
+     */
+    private fun discardDraft() {
+        autoSaveJob?.cancel()
+        viewModelScope.launch {
+            try {
+                withContext(ioDispatcher) {
+                    recipeDraftDao.deleteDraft(_state.value.recipeId)
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to discard draft")
+            }
+            _effects.send(EditorEffect.NavigateBack)
         }
     }
 

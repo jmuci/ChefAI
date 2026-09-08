@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import timber.log.Timber
 import java.util.UUID
 import javax.inject.Inject
@@ -50,6 +52,9 @@ class SessionManager @Inject constructor(
 
     private val _userSession = MutableStateFlow<UserSession>(UserSession.Loading)
     val userSession: StateFlow<UserSession> = _userSession.asStateFlow()
+
+    /** Serializes [refreshToken] so concurrent 401s spend the refresh token once, not twice. */
+    private val refreshMutex = Mutex()
 
     init {
         // Load session on initialization
@@ -145,6 +150,11 @@ class SessionManager @Inject constructor(
         val existingLocalId = securePreferences.getLocalUserId().first()
         val localUserId = if (existingLocalId != null) {
             Timber.d("Restoring anonymous session with existing localUserId: $existingLocalId")
+            // Re-saved rather than just used: installs created before the id moved out of the
+            // encrypted blob (see SecurePreferences.saveLocalUserId) still hold the encrypted
+            // form, which a backup restore cannot decrypt. Writing it back on the way through is
+            // what migrates them; for an id that is already plaintext this is a no-op write.
+            securePreferences.saveLocalUserId(existingLocalId)
             existingLocalId
         } else {
             val newId = uuidGenerator()
@@ -223,6 +233,21 @@ class SessionManager @Inject constructor(
 
             val authToken = response.toAuthToken()
             val user = response.toUser()
+
+            // Persisted before the account switch and upgrade below, not after. Those two rewrite
+            // local ownership — the upgrade reassigns every anonymous recipe, bookmark and meal
+            // plan to user.uuid — so a throw between them and this write used to leave the catch
+            // dropping back to an anonymous session whose id no longer owns any of it.
+            securePreferences.saveAuthData(
+                userUuid = user.uuid,
+                displayName = user.displayName,
+                email = user.email,
+                avatarUrl = user.avatarUrl,
+                accessToken = authToken.accessToken,
+                refreshToken = authToken.refreshToken,
+                tokenExpiry = authToken.expiresAt
+            )
+
             val accountSwitchOutcome = accountSwitchHandler.handleLogin(
                 newUserId = user.uuid,
                 anonymousUserId = anonymousUserId
@@ -240,17 +265,6 @@ class SessionManager @Inject constructor(
             } else if (accountSwitchOutcome == AccountSwitchOutcome.CLEARED_DATABASE) {
                 Timber.d("Skipped anonymous data upgrade because local database was cleared for account switch")
             }
-
-            // Save to secure storage
-            securePreferences.saveAuthData(
-                userUuid = user.uuid,
-                displayName = user.displayName,
-                email = user.email,
-                avatarUrl = user.avatarUrl,
-                accessToken = authToken.accessToken,
-                refreshToken = authToken.refreshToken,
-                tokenExpiry = authToken.expiresAt
-            )
 
             _userSession.value = UserSession.Authenticated(
                 user = user,
@@ -302,6 +316,18 @@ class SessionManager @Inject constructor(
             } else {
                 responseUser
             }
+
+            // Persisted before the upgrade below for the same reason as in [login].
+            securePreferences.saveAuthData(
+                userUuid = user.uuid,
+                displayName = user.displayName,
+                email = user.email,
+                avatarUrl = user.avatarUrl,
+                accessToken = authToken.accessToken,
+                refreshToken = authToken.refreshToken,
+                tokenExpiry = authToken.expiresAt
+            )
+
             val accountSwitchOutcome = accountSwitchHandler.handleLogin(
                 newUserId = user.uuid,
                 anonymousUserId = anonymousUserId
@@ -319,17 +345,6 @@ class SessionManager @Inject constructor(
             } else if (accountSwitchOutcome == AccountSwitchOutcome.CLEARED_DATABASE) {
                 Timber.d("Skipped anonymous data upgrade because local database was cleared for account switch")
             }
-
-            // Save to secure storage
-            securePreferences.saveAuthData(
-                userUuid = user.uuid,
-                displayName = user.displayName,
-                email = user.email,
-                avatarUrl = user.avatarUrl,
-                accessToken = authToken.accessToken,
-                refreshToken = authToken.refreshToken,
-                tokenExpiry = authToken.expiresAt
-            )
 
             _userSession.value = UserSession.Authenticated(
                 user = user,
@@ -389,12 +404,30 @@ class SessionManager @Inject constructor(
 
     /**
      * Refreshes the access token using the refresh token.
+     *
+     * Serialized, because there is more than one caller — `SyncWorker` on a 401 and
+     * `DefaultRecipeSearchRepository` on its own — and they can 401 at the same moment. Two
+     * concurrent refreshes would spend the same refresh token twice; with rotation the second
+     * response overwrites the first, orphaning a token that was just issued, and a backend that
+     * treats a replayed refresh token as reuse revokes the session outright. Callers that queue
+     * behind the lock find the token already replaced and return without a second round trip.
      */
     suspend fun refreshToken(): Result<Unit> {
+        // Read before the lock is taken, so a caller that queued behind another refresh can tell
+        // that the token it was about to replace has already been replaced for it.
+        val tokenBeforeLock = (_userSession.value as? UserSession.Authenticated)?.authToken?.accessToken
+        return refreshMutex.withLock { refreshTokenLocked(tokenBeforeLock) }
+    }
+
+    private suspend fun refreshTokenLocked(tokenBeforeLock: String?): Result<Unit> {
         return try {
             val currentSession = _userSession.value
             if (currentSession !is UserSession.Authenticated) {
                 return Result.failure(IllegalStateException("No active session to refresh"))
+            }
+            if (tokenBeforeLock != null && currentSession.authToken.accessToken != tokenBeforeLock) {
+                Timber.d("Access token was refreshed while waiting for the lock, reusing it")
+                return Result.success(Unit)
             }
 
             Timber.d("Refreshing access token...")
