@@ -21,6 +21,7 @@ import com.tenmilelabs.chefai.recipes.domain.usecase.CachePickedImage
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -432,6 +433,35 @@ class RecipeEditorViewModelTest {
         assertEquals(recipe1.uuid, recipesRepository.lastSoftDeletedId)
         assertNull(recipeDraftDao.getDraft(recipe1.uuid))
         assertFalse(vm.state.value.isDeleting)
+        vm.viewModelScope.cancel()
+    }
+
+    // --- Discard ---
+
+    @Test
+    fun `discarding unsaved changes removes the auto-saved draft`() = runTest {
+        recipesRepository.addStoredRecipe(recipe1)
+
+        val vm = createViewModel(recipeId = recipe1.uuid.toString())
+        val draft = RecipeDraft(
+            recipeId = recipe1.uuid, isNewRecipe = false, title = "Half-typed edit", updatedAt = 1L
+        )
+        recipeDraftDao.saveDraft(draft.toRecipeDraftEntity())
+
+        vm.dispatch(EditorAction.DiscardDraft)
+
+        // Left behind, the draft outlives the discard and repopulates the editor on the next open.
+        assertNull(recipeDraftDao.getDraft(recipe1.uuid))
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `discarding navigates back`() = runTest {
+        val vm = createViewModel()
+
+        vm.dispatch(EditorAction.DiscardDraft)
+
+        assertEquals(EditorEffect.NavigateBack, vm.effects.first())
         vm.viewModelScope.cancel()
     }
 

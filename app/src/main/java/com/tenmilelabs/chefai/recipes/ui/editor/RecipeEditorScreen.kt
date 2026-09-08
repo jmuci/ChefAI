@@ -109,7 +109,7 @@ fun RecipeEditorScreen(
 
     if (showUnsavedDialog) {
         UnsavedChangesDialog(
-            onDiscard = onNavigateBack,
+            onDiscard = { viewModel.dispatch(EditorAction.DiscardDraft) },
             onKeepEditing = { showUnsavedDialog = false },
         )
     }

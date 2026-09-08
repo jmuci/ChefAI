@@ -14,6 +14,8 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TestTimeSource
 
 /**
  * Note on the `advanceTimeBy` + `runCurrent()` pairing below: [kotlinx.coroutines.test.TestScope]'s
@@ -43,7 +45,11 @@ class RecipeTimerControllerTest {
     fun setup() {
         testScope = TestScope(testDispatcher)
         notifier = mockk(relaxed = true)
-        controller = RecipeTimerController(applicationScope = testScope, notifier = notifier)
+        controller = RecipeTimerController(applicationScope = testScope, notifier = notifier).apply {
+            // The countdown reads a deadline rather than decrementing, so it needs a clock that
+            // moves with `advanceTimeBy` — the scheduler's own, not the real monotonic one.
+            timeSource = testDispatcher.scheduler.timeSource
+        }
     }
 
     @Test
@@ -92,6 +98,40 @@ class RecipeTimerControllerTest {
         val state = controller.state.value
         assertThat(state?.remainingSeconds).isEqualTo(0)
         assertThat(state?.isRunning).isFalse()
+        verify(exactly = 1) { notifier.notifyTimerComplete("Bake") }
+    }
+
+    @Test
+    fun `a stalled countdown catches up from the clock rather than counting ticks`() = testScope.runTest {
+        // A process frozen in the background stops ticking; the clock keeps going.
+        val clock = TestTimeSource()
+        controller.timeSource = clock
+        controller.start(stepLabel = "Bake", totalSeconds = 60)
+
+        clock += 30.seconds
+        advanceTimeBy(1_000)
+        runCurrent()
+
+        // Decrementing per tick would report 59 here — a value half a minute out of date.
+        assertThat(controller.state.value?.remainingSeconds).isEqualTo(30)
+
+        // The clock this test owns never reaches the deadline on its own, so the tick loop would
+        // outlive the test body and runTest would fail waiting on it.
+        controller.cancel()
+    }
+
+    @Test
+    fun `a deadline that passed while stalled completes on the next tick`() = testScope.runTest {
+        val clock = TestTimeSource()
+        controller.timeSource = clock
+        controller.start(stepLabel = "Bake", totalSeconds = 60)
+
+        clock += 70.seconds
+        advanceTimeBy(1_000)
+        runCurrent()
+
+        assertThat(controller.state.value?.remainingSeconds).isEqualTo(0)
+        assertThat(controller.state.value?.isRunning).isFalse()
         verify(exactly = 1) { notifier.notifyTimerComplete("Bake") }
     }
 

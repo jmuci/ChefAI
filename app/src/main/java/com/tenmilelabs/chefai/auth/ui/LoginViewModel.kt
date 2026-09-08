@@ -201,12 +201,20 @@ class LoginViewModel @Inject constructor(
             is AuthHttpException -> {
                 when (exception.statusCode) {
                     400, 401, 404 -> {
-                        // Bad Request, Unauthorized, Not Found - show as field errors
+                        // Bad Request, Unauthorized, Not Found - show as field errors.
+                        // A status whose message names neither field (400's does not) still has to
+                        // reach the user, or the spinner just stops and nothing is said.
                         val errorMessage = getHttpErrorMessage(exception.statusCode)
-                        _uiState.value = _uiState.value.copy(
-                            emailError = if (errorMessage.contains("email")) errorMessage else null,
-                            passwordError = if (errorMessage.contains("password")) errorMessage else null
-                        )
+                        val emailError = errorMessage.takeIf { it.contains("email") }
+                        val passwordError = errorMessage.takeIf { it.contains("password") }
+                        if (emailError == null && passwordError == null) {
+                            _uiEvent.emit(LoginUiEvent.ShowSnackbar(R.string.error_login_failed))
+                        } else {
+                            _uiState.value = _uiState.value.copy(
+                                emailError = emailError,
+                                passwordError = passwordError
+                            )
+                        }
                     }
                     500, 502, 503 -> {
                         // Server errors - show as snackbar

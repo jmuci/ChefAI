@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
+import com.tenmilelabs.chefai.auth.data.network.AuthHttpException
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.domain.AccountSwitchHandler
 import com.tenmilelabs.chefai.auth.domain.SessionManager
@@ -274,6 +275,40 @@ class LoginViewModelTest {
             val event = awaitItem()
             assertThat(event).isInstanceOf(LoginUiEvent.ShowSnackbar::class.java)
         }
+    }
+
+    @Test
+    fun `a 400 that names no field still tells the user something`() = testScope.runTest {
+        // Given: the backend rejects the request with a message mentioning neither field
+        fakeAuthNetworkDataSource.shouldThrowError = true
+        fakeAuthNetworkDataSource.errorToThrow = AuthHttpException(message = "Bad Request", statusCode = 400)
+        viewModel.onEmailChange("test@example.com")
+        viewModel.onPasswordChange("password123")
+
+        viewModel.uiEvents.test {
+            viewModel.onLoginClick()
+            advanceUntilIdle()
+
+            // Then: a snackbar, rather than the spinner stopping with nothing shown anywhere
+            assertThat(awaitItem()).isEqualTo(LoginUiEvent.ShowSnackbar(R.string.error_login_failed))
+        }
+        assertThat(viewModel.uiState.value.emailError).isNull()
+        assertThat(viewModel.uiState.value.passwordError).isNull()
+        assertThat(viewModel.uiState.value.isLoading).isFalse()
+    }
+
+    @Test
+    fun `a 401 still lands on both credential fields`() = testScope.runTest {
+        fakeAuthNetworkDataSource.shouldThrowError = true
+        fakeAuthNetworkDataSource.errorToThrow = AuthHttpException(message = "Unauthorized", statusCode = 401)
+        viewModel.onEmailChange("test@example.com")
+        viewModel.onPasswordChange("password123")
+
+        viewModel.onLoginClick()
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.emailError).isNotNull()
+        assertThat(viewModel.uiState.value.passwordError).isNotNull()
     }
 
     @Test

@@ -223,25 +223,45 @@ class SecurePreferences @Inject constructor(
         }
     }
 
+    /**
+     * Stored in the clear, unlike every other value here, and deliberately so.
+     *
+     * This is not a credential: it is a random UUID naming the rows an anonymous session owns on
+     * this device. Encrypting it made it the one value whose loss is unrecoverable, because the
+     * Keystore key is device-bound while this DataStore file is not — `allowBackup` carries the
+     * file to a new device (and through device-to-device transfer) alongside the Room database,
+     * where every decrypt then fails, [com.tenmilelabs.chefai.auth.domain.SessionManager] mints a
+     * *new* localUserId, and the restored recipes sit in the database owned by an id nothing asks
+     * for again: an empty-looking app with all its data intact and unreachable. Tokens failing to
+     * decrypt across that boundary is correct — this failing is data loss.
+     */
     override suspend fun saveLocalUserId(uuid: UUID) {
         try {
             dataStore.edit { prefs ->
-                prefs[KEY_LOCAL_USER_ID] = encrypt(uuid.toString())
+                prefs[KEY_LOCAL_USER_ID] = uuid.toString()
             }
-            Timber.d("Local user ID saved securely")
+            Timber.d("Local user ID saved")
         } catch (e: Exception) {
             Timber.e(e, "Failed to save local user ID")
             throw e
         }
     }
 
+    /**
+     * Reads the plaintext id, falling back to decrypting one written by a build that encrypted it.
+     * Installs from before that change migrate the first time
+     * [com.tenmilelabs.chefai.auth.domain.SessionManager] restores an anonymous session, which
+     * re-saves whatever it reads.
+     */
     override fun getLocalUserId(): Flow<UUID?> = dataStore.data.map { prefs ->
-        prefs[KEY_LOCAL_USER_ID]?.let { encrypted ->
-            try {
-                UUID.fromString(decrypt(encrypted))
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to read local user ID from preferences")
-                null
+        prefs[KEY_LOCAL_USER_ID]?.let { stored ->
+            runCatching { UUID.fromString(stored) }.getOrElse {
+                try {
+                    UUID.fromString(decrypt(stored))
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to read local user ID from preferences")
+                    null
+                }
             }
         }
     }

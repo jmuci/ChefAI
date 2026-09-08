@@ -257,9 +257,10 @@ object RecipeEditorReducer {
         is EditorAction.DismissDeleteDialog -> state.copy(showDeleteConfirmation = false)
         is EditorAction.ClearError -> state.copy(saveError = null)
 
-        // Save, ConfirmDelete: handled by ViewModel, no state change here
+        // Save, ConfirmDelete, DiscardDraft: handled by ViewModel, no state change here
         is EditorAction.Save,
-        is EditorAction.ConfirmDelete -> state
+        is EditorAction.ConfirmDelete,
+        is EditorAction.DiscardDraft -> state
     }
 
     /**

@@ -149,7 +149,11 @@ class RecipeDetailsViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
-    val recipeUuid: UUID = UUID.fromString(savedStateHandle[AppDestinationArgs.RECIPE_ID_ARG]!!)
+    val recipeUuid: UUID = UUID.fromString(
+        requireNotNull(savedStateHandle[AppDestinationArgs.RECIPE_ID_ARG]) {
+            "${AppDestinationArgs.RECIPE_ID_ARG} is missing from the route arguments"
+        }
+    )
 
     /**
      * Present only when this screen was opened from a meal plan slot
@@ -341,6 +345,10 @@ class RecipeDetailsViewModel @Inject constructor(
                 _effects.send(RecipeDetailsEffect.RecipeDeleted)
             } catch (e: Exception) {
                 Timber.e(e, "Failed to delete recipe")
+                // Cleared along with the rest of the delete state: it was set optimistically to
+                // suppress the "recipe not found" flash while the row disappears, and left true it
+                // would keep a later, unrelated load error rendering as a spinner that never ends.
+                _isDeleted.value = false
                 _deleteUi.value = DeleteUiState(isDeleting = false)
                 _userMessage.value = R.string.delete_recipe_error
             }

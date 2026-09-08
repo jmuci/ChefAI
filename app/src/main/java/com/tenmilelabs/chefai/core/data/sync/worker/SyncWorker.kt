@@ -13,6 +13,7 @@ import com.tenmilelabs.chefai.core.data.sync.SyncStatusHolder
 import com.tenmilelabs.chefai.core.data.sync.network.SyncHttpException
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.CancellationException
 import timber.log.Timber
 
 @HiltWorker
@@ -62,12 +63,24 @@ class SyncWorker @AssistedInject constructor(
                         Timber.d("SyncWorker: Sync after refresh completed — $result")
                         syncStatusHolder.emitStatus(SyncStatus.Synced(System.currentTimeMillis()))
                         Result.success()
+                    } catch (retryException: CancellationException) {
+                        syncStatusHolder.emitStatus(SyncStatus.Idle)
+                        throw retryException
                     } catch (retryException: Exception) {
                         handleFailure(retryException)
                     }
                 }
             }
             handleFailure(e)
+        } catch (e: CancellationException) {
+            // Not a failure: WorkManager stopped this worker — most often because something
+            // enqueued replacement work under the same unique name (requestManualSync and
+            // requestBookmarkSync both use ExistingWorkPolicy.REPLACE, which cancels a *running*
+            // worker, not just a queued one). Reporting Error here put "Sync failed" in front of
+            // the user for a sync that was merely superseded, and swallowing the cancellation
+            // breaks structured concurrency besides.
+            syncStatusHolder.emitStatus(SyncStatus.Idle)
+            throw e
         } catch (e: Exception) {
             handleFailure(e)
         }
