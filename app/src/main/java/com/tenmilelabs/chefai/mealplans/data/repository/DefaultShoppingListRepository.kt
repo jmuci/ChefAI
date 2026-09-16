@@ -30,6 +30,10 @@ class DefaultShoppingListRepository @Inject constructor(
     override fun observeCheckedItems(mealPlanId: UUID): Flow<Set<String>> =
         shoppingListCheckDao.observeCheckedKeys(mealPlanId).map { it.toSet() }
 
+    override fun observeCheckedByUserIds(mealPlanId: UUID): Flow<Map<String, UUID>> =
+        shoppingListCheckDao.observeCheckedByUserIds(mealPlanId)
+            .map { rows -> rows.associate { it.itemKey to it.checkedBy } }
+
     /**
      * Always an upsert, never [ShoppingListCheckDao.delete] — an unchecked item is still on the
      * list (`checked = false`), not one that left it (`deletedAt`). See ADR-014 §5.2.
@@ -49,7 +53,10 @@ class DefaultShoppingListRepository @Inject constructor(
         syncScheduler.requestMutationSync()
     }
 
-    override suspend fun clearChecks(mealPlanId: UUID) = shoppingListCheckDao.clearForPlan(mealPlanId)
+    override suspend fun clearChecks(mealPlanId: UUID) {
+        shoppingListCheckDao.clearForPlan(mealPlanId, state = SyncState.PENDING, updatedAt = System.currentTimeMillis())
+        syncScheduler.requestMutationSync()
+    }
 }
 
 private fun PlanIngredientRow.toDomain() = PlannedIngredient(

@@ -305,6 +305,55 @@ class ShoppingListBuilderTest {
         assertThat(produce.items.filter { it.displayName != "banana" }.all { !it.isChecked }).isTrue()
     }
 
+    // --- checkedByName ---
+
+    @Test
+    fun `a ticked item resolves checkedByName from the checker map`() {
+        val recipe = UUID.randomUUID()
+        val ingredients = listOf(ingredient(recipe, 0, "onion", 1.0))
+
+        val list = ShoppingListBuilder.build(
+            ingredients = ingredients,
+            slotCountByRecipe = mapOf(recipe to 1),
+            plannedServings = 0,
+            checkedKeys = setOf("onion"),
+            checkedByNames = mapOf("onion" to "Alex"),
+        )
+
+        assertThat(list.allItems().single().checkedByName).isEqualTo("Alex")
+    }
+
+    @Test
+    fun `an unticked item never shows a checker even if the map has a stale entry for its key`() {
+        val recipe = UUID.randomUUID()
+        val ingredients = listOf(ingredient(recipe, 0, "onion", 1.0))
+
+        val list = ShoppingListBuilder.build(
+            ingredients = ingredients,
+            slotCountByRecipe = mapOf(recipe to 1),
+            plannedServings = 0,
+            checkedKeys = emptySet(),
+            checkedByNames = mapOf("onion" to "Alex"),
+        )
+
+        assertThat(list.allItems().single().checkedByName).isNull()
+    }
+
+    @Test
+    fun `a ticked item with no known checker has a null checkedByName`() {
+        val recipe = UUID.randomUUID()
+        val ingredients = listOf(ingredient(recipe, 0, "onion", 1.0))
+
+        val list = ShoppingListBuilder.build(
+            ingredients = ingredients,
+            slotCountByRecipe = mapOf(recipe to 1),
+            plannedServings = 0,
+            checkedKeys = setOf("onion"),
+        )
+
+        assertThat(list.allItems().single().checkedByName).isNull()
+    }
+
     // --- formatQuantity ---
 
     @Test

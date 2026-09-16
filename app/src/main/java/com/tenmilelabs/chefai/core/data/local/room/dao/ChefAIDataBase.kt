@@ -52,7 +52,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         TagEntity::class,
         UserEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = true
 )
 @TypeConverters(UuidConverters::class)
@@ -318,5 +318,18 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
             "CREATE INDEX IF NOT EXISTS `index_shopping_list_checks_syncState_updatedAt` " +
                 "ON `shopping_list_checks` (`syncState`, `updatedAt`)"
         )
+    }
+}
+
+/**
+ * Adds [com.tenmilelabs.chefai.core.data.local.room.ShoppingListCheckEntity.checkedBy] (ADR-014
+ * §"who checked this" follow-up) — the wire already carried `SyncGroceryListItem.checkedBy` since
+ * A8, but nothing persisted it locally, so the UI had nothing to resolve a display name from. No
+ * backfill needed: every pre-existing row predates this column, and `null` ("unknown checker") is
+ * the honest state for a tick made before this feature could record who made it.
+ */
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE shopping_list_checks ADD COLUMN checkedBy BLOB")
     }
 }

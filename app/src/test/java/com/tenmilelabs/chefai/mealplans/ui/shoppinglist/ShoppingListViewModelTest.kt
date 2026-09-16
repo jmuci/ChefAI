@@ -130,6 +130,42 @@ class ShoppingListViewModelTest {
     }
 
     @Test
+    fun `a checked item resolves the checker's display name from the household`() = runTest {
+        val checkerId = UUID.randomUUID()
+        val householdId = UUID.randomUUID()
+        mealPlanRepository.emitPlans(planWith(days = listOf(fullDay()), householdId = householdId))
+        shoppingListRepository.setIngredientsForRecipe(
+            recipeId,
+            listOf(PlannedIngredient(recipeId, 2, "Onion", 1.0, "cup")),
+        )
+        householdRepository.seedHousehold(
+            Household(
+                uuid = householdId,
+                name = "The Test Kitchen",
+                ownerId = checkerId,
+                members = listOf(HouseholdMember(checkerId, "Alex", "", HouseholdRole.OWNER)),
+            )
+        )
+
+        createViewModel().uiState.test {
+            val initial = awaitItem().let { if (it is ShoppingListUiState.Loading) awaitItem() else it }
+                as ShoppingListUiState.Success
+            assertThat(initial.list.sections.single().items.single().checkedByName).isNull()
+
+            shoppingListRepository.setChecked(planId, "onion", checked = true)
+            val checked = awaitItem() as ShoppingListUiState.Success
+            assertThat(checked.list.sections.single().items.single().checkedByName)
+                .isNull() // not yet round-tripped through a pull
+
+            shoppingListRepository.setCheckedBy(planId, "onion", checkerId)
+
+            val updated = awaitItem() as ShoppingListUiState.Success
+            assertThat(updated.list.sections.single().items.single().checkedByName).isEqualTo("Alex")
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun `onUncheckAll clears every tick`() = runTest {
         mealPlanRepository.emitPlans(planWith(days = listOf(fullDay())))
         shoppingListRepository.setIngredientsForRecipe(

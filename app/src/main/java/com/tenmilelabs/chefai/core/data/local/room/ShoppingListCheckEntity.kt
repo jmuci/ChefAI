@@ -19,11 +19,9 @@ import java.util.UUID
  * this row's identity is the composite key above, not a single `uuid`, which is exactly what
  * `SyncableEntity` requires and `SyncableCrossRef` does not.
  *
- * **Transitional note (ADR-014):** [checked] is the eventual source of truth once a shared plan's
- * list round-trips through sync, but until the sync wiring for it lands, unticking an item still
- * *deletes* the row — see [com.tenmilelabs.chefai.mealplans.data.repository
- * .DefaultShoppingListRepository.setChecked]. Every row that exists today therefore always has
- * `checked = true`; the column exists ahead of its consumer so the migration only has to run once.
+ * [checked] is the source of truth for a shared plan's list once it round-trips through sync —
+ * toggling, individually or via "uncheck all", is always an upsert to this row, never a delete; see
+ * [com.tenmilelabs.chefai.mealplans.data.repository.DefaultShoppingListRepository].
  */
 @Entity(
     tableName = "shopping_list_checks",
@@ -44,6 +42,13 @@ data class ShoppingListCheckEntity(
     /** Epoch millis the item was last ticked. Not shown anywhere yet; kept for a future "recently bought". */
     val checkedAt: Long,
     val checked: Boolean = true,
+    /**
+     * Whoever last checked this item — the userId of the pushing caller, server-derived, never
+     * meaningful for a pushed row (see `SyncGroceryListItem`'s doc). Null while unchecked, or while
+     * a local toggle hasn't yet round-tripped through a pull to confirm who the server credits it
+     * to.
+     */
+    val checkedBy: UUID? = null,
     override val updatedAt: Long = checkedAt,
     override val deletedAt: Long? = null,
     override val syncState: SyncState = SyncState.PENDING,

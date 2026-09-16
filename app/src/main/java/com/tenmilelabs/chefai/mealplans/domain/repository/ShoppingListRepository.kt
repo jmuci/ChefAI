@@ -12,6 +12,9 @@ interface ShoppingListRepository {
     /** Item keys ticked off on this plan. See `ShoppingListBuilder.nameKey`. */
     fun observeCheckedItems(mealPlanId: UUID): Flow<Set<String>>
 
+    /** Item key -> userId of whoever last checked it, for checked items with a known checker. */
+    fun observeCheckedByUserIds(mealPlanId: UUID): Flow<Map<String, UUID>>
+
     suspend fun setChecked(mealPlanId: UUID, itemKey: String, checked: Boolean)
 
     suspend fun clearChecks(mealPlanId: UUID)

@@ -11,17 +11,12 @@ import java.util.UUID
 /**
  * Data Access Object for the shopping_list_checks table.
  *
- * As of ADR-014's sync wiring, checking/unchecking an item is an ordinary upsert either way —
- * `DefaultShoppingListRepository.setChecked` never calls [delete] anymore, since an unchecked item
- * is still an item on the list (`checked = false`), not one that has left it. [delete]/
- * [clearForPlan] remain as plain hard-delete primitives (see their own tests) for a genuine
- * removal, which nothing in this codebase triggers yet — no "remove from list" UI exists, the list
- * is derived live from the plan's own ingredients (see `ShoppingListBuilder`).
- *
- * **Known gap**: [clearForPlan] (via `ShoppingListRepository.clearChecks`, the "uncheck all"
- * action) is still a hard delete, not an upsert-to-unchecked — so unlike a single [upsert]'d
- * uncheck, "uncheck all" does not yet produce PENDING rows for [getAllDirty] to push, and won't
- * sync to other household members. Follow-up, not fixed here.
+ * As of ADR-014's sync wiring, checking/unchecking an item — one at a time or all at once via
+ * [clearForPlan] — is an ordinary upsert-to-unchecked, never [delete]: an unchecked item is still
+ * an item on the list (`checked = false`), not one that has left it. [delete] remains as a plain
+ * hard-delete primitive (see its own test) for a genuine removal, which nothing in this codebase
+ * triggers yet — no "remove from list" UI exists, the list is derived live from the plan's own
+ * ingredients (see `ShoppingListBuilder`).
  */
 @Dao
 interface ShoppingListCheckDao {
@@ -41,8 +36,16 @@ interface ShoppingListCheckDao {
     @Query("DELETE FROM shopping_list_checks WHERE mealPlanId = :mealPlanId AND itemKey = :itemKey")
     suspend fun delete(mealPlanId: UUID, itemKey: String)
 
-    @Query("DELETE FROM shopping_list_checks WHERE mealPlanId = :mealPlanId")
-    suspend fun clearForPlan(mealPlanId: UUID)
+    /**
+     * Unchecks every currently-checked item on the plan — an upsert-to-unchecked on each row, same
+     * as a single [upsert]'d uncheck, so every affected row becomes `PENDING` and syncs to other
+     * household members exactly like an individual toggle would.
+     */
+    @Query(
+        "UPDATE shopping_list_checks SET checked = 0, checkedBy = NULL, syncState = :state, updatedAt = :updatedAt " +
+            "WHERE mealPlanId = :mealPlanId AND checked = 1"
+    )
+    suspend fun clearForPlan(mealPlanId: UUID, state: SyncState, updatedAt: Long)
 
     @Query("SELECT * FROM shopping_list_checks WHERE syncState IN ('PENDING', 'DELETED')")
     suspend fun getAllDirty(): List<ShoppingListCheckEntity>
@@ -52,4 +55,18 @@ interface ShoppingListCheckDao {
             "WHERE mealPlanId = :mealPlanId AND itemKey = :itemKey"
     )
     suspend fun updateSyncState(mealPlanId: UUID, itemKey: String, state: SyncState, updatedAt: Long)
+
+    /**
+     * `itemKey` → the userId of whoever last checked it, for every currently-checked item with a
+     * known checker (a local toggle that hasn't yet round-tripped through a pull has `checkedBy =
+     * null` and is excluded — see [ShoppingListCheckEntity.checkedBy]'s doc). Not `DISTINCT` on
+     * anything: `(mealPlanId, itemKey)` is this table's primary key, so one row per key already.
+     */
+    @Query(
+        "SELECT itemKey, checkedBy FROM shopping_list_checks " +
+            "WHERE mealPlanId = :mealPlanId AND checked = 1 AND deletedAt IS NULL AND checkedBy IS NOT NULL"
+    )
+    fun observeCheckedByUserIds(mealPlanId: UUID): Flow<List<CheckedByRow>>
 }
+
+data class CheckedByRow(val itemKey: String, val checkedBy: UUID)

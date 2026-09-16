@@ -12,9 +12,16 @@ class FakeShoppingListRepository : ShoppingListRepository {
     private val ingredientsByRecipe = mutableMapOf<UUID, List<PlannedIngredient>>()
     private val ingredientsTrigger = MutableStateFlow(0)
     private val checkedKeys = MutableStateFlow<Map<UUID, Set<String>>>(emptyMap())
+    private val checkedByUserIds = MutableStateFlow<Map<UUID, Map<String, UUID>>>(emptyMap())
 
     var shouldThrowOnObserveIngredients: Boolean = false
     var shouldThrowOnSetChecked: Boolean = false
+
+    /** Test seam: a real repository only learns this once a pull resolves who checked an item. */
+    fun setCheckedBy(mealPlanId: UUID, itemKey: String, userId: UUID) {
+        val current = checkedByUserIds.value[mealPlanId].orEmpty()
+        checkedByUserIds.value = checkedByUserIds.value + (mealPlanId to (current + (itemKey to userId)))
+    }
 
     fun setIngredientsForRecipe(recipeId: UUID, ingredients: List<PlannedIngredient>) {
         ingredientsByRecipe[recipeId] = ingredients
@@ -31,6 +38,9 @@ class FakeShoppingListRepository : ShoppingListRepository {
 
     override fun observeCheckedItems(mealPlanId: UUID): Flow<Set<String>> =
         checkedKeys.map { it[mealPlanId].orEmpty() }
+
+    override fun observeCheckedByUserIds(mealPlanId: UUID): Flow<Map<String, UUID>> =
+        checkedByUserIds.map { it[mealPlanId].orEmpty() }
 
     override suspend fun setChecked(mealPlanId: UUID, itemKey: String, checked: Boolean) {
         if (shouldThrowOnSetChecked) throw RuntimeException("Fake setChecked error")

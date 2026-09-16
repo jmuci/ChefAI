@@ -121,6 +121,7 @@ private fun ShoppingListContent(
                         quantityLabel = item.quantityLabel,
                         isApproximate = item.isApproximate,
                         isChecked = item.isChecked,
+                        checkedByName = item.checkedByName,
                         onToggle = { onToggleItem(item) },
                     )
                 }

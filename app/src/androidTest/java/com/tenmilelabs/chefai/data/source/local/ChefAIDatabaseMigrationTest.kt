@@ -12,6 +12,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_5_6
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_6_7
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_7_8
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_8_9
+import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_9_10
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -432,13 +433,37 @@ class ChefAIDatabaseMigrationTest {
     }
 
     @Test
-    fun migrateAll1To9_succeeds() {
+    fun migrate9To10_addsCheckedByColumnAndKeepsExistingChecks() {
+        val planId = UUID.randomUUID()
+
+        helper.createDatabase(TEST_DB, 9).use { db ->
+            db.execSQL(
+                "INSERT INTO shopping_list_checks (mealPlanId, itemKey, checkedAt, checked, updatedAt, syncState) " +
+                    "VALUES (?, 'onion', 4242, 1, 4242, 'SYNCED')",
+                arrayOf(planId.toBlob())
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 10, true, MIGRATION_9_10)
+
+        db.query(
+            "SELECT itemKey, checkedBy FROM shopping_list_checks WHERE mealPlanId = ?",
+            arrayOf(planId.toBlob())
+        ).use { cursor ->
+            assertTrue("the pre-existing check should survive the migration", cursor.moveToFirst())
+            assertEquals("onion", cursor.getString(0))
+            assertTrue("a tick made before this column existed has no known checker", cursor.isNull(1))
+        }
+    }
+
+    @Test
+    fun migrateAll1To10_succeeds() {
         helper.createDatabase(TEST_DB, 1).close()
 
         helper.runMigrationsAndValidate(
-            TEST_DB, 9, true,
+            TEST_DB, 10, true,
             MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-            MIGRATION_7_8, MIGRATION_8_9,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
         )
     }
 }
