@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 9,
-    "identityHash": "73dd464b2d244c9b3c537e994dae9fd6",
+    "identityHash": "ed8d1b3324ffc64e0b5178676d91bc5a",
     "entities": [
       {
         "tableName": "allergens",
@@ -236,13 +236,15 @@
         },
         "indices": [
           {
-            "name": "index_household_members_householdId",
+            "name": "index_household_members_householdId_role_displayName",
             "unique": false,
             "columnNames": [
-              "householdId"
+              "householdId",
+              "role",
+              "displayName"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_household_members_householdId` ON `${TABLE_NAME}` (`householdId`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_household_members_householdId_role_displayName` ON `${TABLE_NAME}` (`householdId`, `role`, `displayName`)"
           }
         ]
       },
@@ -534,6 +536,15 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_meal_plans_syncState_updatedAt` ON `${TABLE_NAME}` (`syncState`, `updatedAt`)"
+          },
+          {
+            "name": "index_meal_plans_householdId",
+            "unique": false,
+            "columnNames": [
+              "householdId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_meal_plans_householdId` ON `${TABLE_NAME}` (`householdId`)"
           }
         ],
         "foreignKeys": [
@@ -1623,7 +1634,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '73dd464b2d244c9b3c537e994dae9fd6')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'ed8d1b3324ffc64e0b5178676d91bc5a')"
     ]
   }
 }

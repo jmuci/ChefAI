@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.core.data.local.room.dao
 
 import androidx.room.Dao
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Upsert
 import com.tenmilelabs.chefai.core.data.local.room.HouseholdEntity
 import com.tenmilelabs.chefai.core.data.local.room.HouseholdInviteEntity
@@ -40,7 +41,23 @@ interface HouseholdDao {
     @Query("DELETE FROM household_invites WHERE inviteId = :inviteId")
     suspend fun removeInvite(inviteId: UUID)
 
-    /** Full local teardown on leave/removal — the household ceases to be this device's. */
+    @Query("DELETE FROM household_invites WHERE householdId = :id")
+    suspend fun clearInvitesForHousehold(id: UUID)
+
     @Query("DELETE FROM households WHERE uuid = :id")
-    suspend fun deleteHousehold(id: UUID)
+    suspend fun deleteHouseholdRow(id: UUID)
+
+    /**
+     * Full local teardown on leave/removal — the household ceases to be this device's, along with
+     * its cached members and any invites addressed under it. `@Transaction` composed from three
+     * plain deletes (same idiom as [com.tenmilelabs.chefai.core.data.local.room.dao
+     * .RecipeIngredientDao.upsertAllForRecipe]) rather than one, since there's no local FK to
+     * cascade this — see [HouseholdEntity]'s doc for why these tables can't be an FK target.
+     */
+    @Transaction
+    suspend fun deleteHousehold(id: UUID) {
+        deleteHouseholdRow(id)
+        clearMembers(id)
+        clearInvitesForHousehold(id)
+    }
 }

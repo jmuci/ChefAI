@@ -354,6 +354,29 @@ class ChefAIDatabaseMigrationTest {
         db.query("SELECT * FROM meal_plans LIMIT 0").use { cursor ->
             assertTrue("meal_plans should gain householdId", "householdId" in cursor.columnNames)
         }
+
+        // runMigrationsAndValidate(..., true, ...) above already fails the whole test if the real
+        // schema's indices disagree with MealPlanEntity/HouseholdMemberEntity's own
+        // @Entity(indices = ...) declarations — this is a targeted, more readable check of the
+        // same thing. A prior version of this migration created index_meal_plans_householdId in
+        // raw SQL without ever declaring it on MealPlanEntity, which the framework's own
+        // validation would have caught the first time this test actually ran.
+        assertTrue(
+            "meal_plans should have an index covering householdId",
+            db.query("PRAGMA index_list(`meal_plans`)").use { cursor ->
+                val nameCol = cursor.getColumnIndex("name")
+                generateSequence { if (cursor.moveToNext()) cursor.getString(nameCol) else null }
+                    .any { it == "index_meal_plans_householdId" }
+            }
+        )
+        assertTrue(
+            "household_members should have an index covering householdId",
+            db.query("PRAGMA index_list(`household_members`)").use { cursor ->
+                val nameCol = cursor.getColumnIndex("name")
+                generateSequence { if (cursor.moveToNext()) cursor.getString(nameCol) else null }
+                    .any { it.startsWith("index_household_members_householdId") }
+            }
+        )
     }
 
     @Test

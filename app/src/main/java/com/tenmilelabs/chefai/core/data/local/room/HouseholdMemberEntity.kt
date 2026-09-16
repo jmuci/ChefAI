@@ -16,7 +16,12 @@ import java.util.UUID
 @Entity(
     tableName = "household_members",
     primaryKeys = ["householdId", "userId"],
-    indices = [Index("householdId")],
+    // A plain Index("householdId") would be redundant with the composite primary key above —
+    // SQLite already backs (householdId, userId) with an implicit index usable for an
+    // equality lookup on the leftmost column alone. This composite index instead also covers
+    // HouseholdDao.observeMembers's `ORDER BY role, displayName`, so that query is a pure index
+    // scan rather than a filter-then-sort.
+    indices = [Index(value = ["householdId", "role", "displayName"])],
 )
 data class HouseholdMemberEntity(
     val householdId: UUID,

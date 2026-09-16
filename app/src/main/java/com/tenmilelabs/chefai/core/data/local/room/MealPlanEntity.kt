@@ -20,7 +20,8 @@ import java.util.UUID
     ],
     indices = [
         Index("userId"),
-        Index(value = ["syncState", "updatedAt"])
+        Index(value = ["syncState", "updatedAt"]),
+        Index("householdId")
     ]
 )
 data class MealPlanEntity(
