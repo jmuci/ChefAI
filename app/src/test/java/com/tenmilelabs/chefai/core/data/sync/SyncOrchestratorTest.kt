@@ -9,6 +9,7 @@ import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.RecipeStepEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
+import com.tenmilelabs.chefai.core.data.local.room.ShoppingListCheckEntity
 import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeAllergenDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeBookmarkedRecipeDao
@@ -21,6 +22,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeShoppingListCheckDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSourceClassificationDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSyncMetadataDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeTagDao
@@ -34,6 +36,7 @@ import com.tenmilelabs.chefai.core.data.sync.network.dto.ConflictEntityDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncErrorDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncBookmarkPullDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncCreatorDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncGroceryListItem
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDayDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncPullResponse
@@ -79,6 +82,7 @@ class SyncOrchestratorTest {
     private lateinit var recipeLabelCrossRefDao: FakeRecipeLabelCrossRefDao
     private lateinit var bookmarkedRecipeDao: FakeBookmarkedRecipeDao
     private lateinit var mealPlanDao: FakeMealPlanDao
+    private lateinit var shoppingListCheckDao: FakeShoppingListCheckDao
     private lateinit var sessionManager: SessionManager
     private lateinit var userDao: FakeUserDao
     private lateinit var syncMetadataDao: FakeSyncMetadataDao
@@ -114,6 +118,7 @@ class SyncOrchestratorTest {
         recipeLabelCrossRefDao = FakeRecipeLabelCrossRefDao()
         bookmarkedRecipeDao = FakeBookmarkedRecipeDao()
         mealPlanDao = FakeMealPlanDao()
+        shoppingListCheckDao = FakeShoppingListCheckDao()
         sessionManager = createTestSessionManager(CoroutineScope(testDispatcher))
         syncMetadataDao = FakeSyncMetadataDao()
         syncNetworkDataSource = FakeSyncNetworkDataSource()
@@ -136,6 +141,7 @@ class SyncOrchestratorTest {
             recipeLabelCrossRefDao = recipeLabelCrossRefDao,
             bookmarkedRecipeDao = bookmarkedRecipeDao,
             mealPlanDao = mealPlanDao,
+            shoppingListCheckDao = shoppingListCheckDao,
             sessionManager = sessionManager,
             syncMetadataDao = syncMetadataDao,
             transactionRunner = fakeTransactionRunner,
@@ -198,6 +204,11 @@ class SyncOrchestratorTest {
 
     private fun createSyncMealPlanDto(
         uuid: UUID = UuidV7Generator.newId(),
+        // Defaults to the current session's own id — i.e. "a plan I own" — since that's what
+        // every pre-households test here implicitly assumed. Override explicitly (e.g. to a
+        // different UUID) for a shared-plan/ownership-bug regression test.
+        ownerId: UUID = requireNotNull(sessionManager.getCurrentUserId()),
+        householdId: UUID? = null,
         name: String = "Server Plan",
         status: String = "READY",
         updatedAt: Long = 2000L,
@@ -205,6 +216,8 @@ class SyncOrchestratorTest {
         days: List<SyncMealPlanDayDto> = emptyList(),
     ): SyncMealPlanDto = SyncMealPlanDto(
         uuid = uuid.toString(),
+        ownerId = ownerId.toString(),
+        householdId = householdId?.toString(),
         name = name,
         status = status,
         preferencesJson = "{}",
@@ -212,6 +225,21 @@ class SyncOrchestratorTest {
         updatedAt = updatedAt,
         deletedAt = deletedAt,
         days = days,
+    )
+
+    private fun createSyncGroceryListItem(
+        mealPlanId: UUID,
+        itemKey: String = "onion",
+        checked: Boolean = true,
+        updatedAt: Long = 2000L,
+        deletedAt: Long? = null,
+    ): SyncGroceryListItem = SyncGroceryListItem(
+        mealPlanId = mealPlanId.toString(),
+        itemKey = itemKey,
+        checked = checked,
+        checkedBy = null,
+        updatedAt = updatedAt,
+        deletedAt = deletedAt,
     )
 
     private fun createSyncMealPlanDayDto(
@@ -810,6 +838,58 @@ class SyncOrchestratorTest {
     }
 
     @Test
+    fun `pull persists a shared plan under its real owner, not the pulling device's own user id — the ownership bug regression`() =
+        runTest(testDispatcher) {
+            val planId = UuidV7Generator.newId()
+            val realOwnerId = UuidV7Generator.newId()
+            val pullingUserId = requireNotNull(sessionManager.getCurrentUserId())
+            check(realOwnerId != pullingUserId) { "test is meaningless if these collide" }
+
+            val serverPlan = createSyncMealPlanDto(uuid = planId, ownerId = realOwnerId, name = "Shared Plan")
+            syncNetworkDataSource.pullResponses.addLast(
+                SyncPullResponse(
+                    recipes = emptyList(),
+                    serverTimestamp = 5000L,
+                    hasMore = false,
+                    mealPlans = listOf(serverPlan),
+                    creators = listOf(
+                        SyncCreatorDto(
+                            uuid = realOwnerId.toString(),
+                            displayName = "The Actual Owner",
+                            updatedAt = 5000L,
+                            deletedAt = null,
+                        )
+                    ),
+                )
+            )
+
+            syncOrchestrator.sync()
+
+            val savedPlan = requireNotNull(mealPlanDao.getMealPlanById(planId))
+            assertThat(savedPlan.userId).isEqualTo(realOwnerId)
+            assertThat(savedPlan.userId).isNotEqualTo(pullingUserId)
+        }
+
+    @Test
+    fun `pull persists a plan's householdId when the server marks it shared`() = runTest(testDispatcher) {
+        val planId = UuidV7Generator.newId()
+        val householdId = UuidV7Generator.newId()
+        val serverPlan = createSyncMealPlanDto(uuid = planId, householdId = householdId)
+        syncNetworkDataSource.pullResponses.addLast(
+            SyncPullResponse(
+                recipes = emptyList(),
+                serverTimestamp = 5000L,
+                hasMore = false,
+                mealPlans = listOf(serverPlan),
+            )
+        )
+
+        syncOrchestrator.sync()
+
+        assertThat(requireNotNull(mealPlanDao.getMealPlanById(planId)).householdId).isEqualTo(householdId)
+    }
+
+    @Test
     fun `pull drops a day's recipe reference when the recipe never arrives on this device`() =
         runTest(testDispatcher) {
             val planId = UuidV7Generator.newId()
@@ -985,7 +1065,7 @@ class SyncOrchestratorTest {
         val localDayId = UuidV7Generator.newId()
         recipeDao.upsertRecipe(createDirtyRecipe(uuid = dinnerRecipeId, syncState = SyncState.SYNCED))
         mealPlanDao.upsertMealPlan(
-            createSyncMealPlanDto(uuid = planId).toMealPlanEntity(sessionManager.getCurrentUserId()!!)
+            createSyncMealPlanDto(uuid = planId).toMealPlanEntity()
         )
         mealPlanDao.upsertDays(
             listOf(
@@ -1036,7 +1116,7 @@ class SyncOrchestratorTest {
         val newRecipeId = UuidV7Generator.newId()
         recipeDao.upsertRecipe(createDirtyRecipe(uuid = newRecipeId, syncState = SyncState.SYNCED))
         mealPlanDao.upsertMealPlan(
-            createSyncMealPlanDto(uuid = planId).toMealPlanEntity(sessionManager.getCurrentUserId()!!)
+            createSyncMealPlanDto(uuid = planId).toMealPlanEntity()
         )
         mealPlanDao.upsertDays(
             listOf(
@@ -1071,6 +1151,113 @@ class SyncOrchestratorTest {
         val savedDays = mealPlanDao.getDaysForMealPlan(planId)
         assertThat(savedDays.single().dinnerRecipeId).isEqualTo(newRecipeId)
         assertThat(savedDays.single().dinnerCookedAt).isNull()
+    }
+
+    // ==================== GROCERY LIST PULL TESTS ====================
+
+    @Test
+    fun `pull upserts a grocery item for a meal plan that already exists locally`() = runTest(testDispatcher) {
+        val planId = UuidV7Generator.newId()
+        mealPlanDao.upsertMealPlan(createSyncMealPlanDto(uuid = planId).toMealPlanEntity())
+        syncNetworkDataSource.pullResponses.addLast(
+            SyncPullResponse(
+                recipes = emptyList(),
+                serverTimestamp = 5000L,
+                hasMore = false,
+                groceryListItems = listOf(
+                    createSyncGroceryListItem(mealPlanId = planId, itemKey = "onion", checked = true)
+                ),
+            )
+        )
+
+        syncOrchestrator.sync()
+
+        assertThat(shoppingListCheckDao.getCheck(planId, "onion")?.checked).isTrue()
+    }
+
+    @Test
+    fun `pull skips a grocery item referencing a meal plan not known locally rather than failing the sync`() =
+        runTest(testDispatcher) {
+            val unknownPlanId = UuidV7Generator.newId()
+            syncNetworkDataSource.pullResponses.addLast(
+                SyncPullResponse(
+                    recipes = emptyList(),
+                    serverTimestamp = 5000L,
+                    hasMore = false,
+                    groceryListItems = listOf(createSyncGroceryListItem(mealPlanId = unknownPlanId)),
+                )
+            )
+
+            syncOrchestrator.sync()
+
+            assertThat(shoppingListCheckDao.getCheck(unknownPlanId, "onion")).isNull()
+        }
+
+    @Test
+    fun `pull resolves a grocery item conflict to the newer updatedAt regardless of arrival order`() =
+        runTest(testDispatcher) {
+            val planId = UuidV7Generator.newId()
+            mealPlanDao.upsertMealPlan(createSyncMealPlanDto(uuid = planId).toMealPlanEntity())
+            // A locally-pending, newer tick must survive a pull that only carries an older
+            // server-side value for the same item — same LWW shape as applyPulledRecipe.
+            shoppingListCheckDao.upsert(
+                ShoppingListCheckEntity(
+                    mealPlanId = planId,
+                    itemKey = "onion",
+                    checkedAt = 9000L,
+                    checked = false,
+                    updatedAt = 9000L,
+                    syncState = SyncState.PENDING,
+                )
+            )
+            syncNetworkDataSource.pullResponses.addLast(
+                SyncPullResponse(
+                    recipes = emptyList(),
+                    serverTimestamp = 5000L,
+                    hasMore = false,
+                    groceryListItems = listOf(
+                        createSyncGroceryListItem(mealPlanId = planId, itemKey = "onion", checked = true, updatedAt = 3000L)
+                    ),
+                )
+            )
+
+            syncOrchestrator.sync()
+
+            val local = shoppingListCheckDao.getCheck(planId, "onion")
+            assertThat(local?.checked).isFalse()
+            assertThat(local?.updatedAt).isEqualTo(9000L)
+        }
+
+    @Test
+    fun `pull overwrites a local grocery item when the server version is newer`() = runTest(testDispatcher) {
+        val planId = UuidV7Generator.newId()
+        mealPlanDao.upsertMealPlan(createSyncMealPlanDto(uuid = planId).toMealPlanEntity())
+        shoppingListCheckDao.upsert(
+            ShoppingListCheckEntity(
+                mealPlanId = planId,
+                itemKey = "onion",
+                checkedAt = 1000L,
+                checked = false,
+                updatedAt = 1000L,
+                syncState = SyncState.PENDING,
+            )
+        )
+        syncNetworkDataSource.pullResponses.addLast(
+            SyncPullResponse(
+                recipes = emptyList(),
+                serverTimestamp = 5000L,
+                hasMore = false,
+                groceryListItems = listOf(
+                    createSyncGroceryListItem(mealPlanId = planId, itemKey = "onion", checked = true, updatedAt = 9000L)
+                ),
+            )
+        )
+
+        syncOrchestrator.sync()
+
+        val local = shoppingListCheckDao.getCheck(planId, "onion")
+        assertThat(local?.checked).isTrue()
+        assertThat(local?.syncState).isEqualTo(SyncState.SYNCED)
     }
 
     // ==================== INTEGRATION TESTS ====================

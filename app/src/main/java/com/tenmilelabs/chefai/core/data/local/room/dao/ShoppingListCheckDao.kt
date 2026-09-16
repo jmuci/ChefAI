@@ -11,20 +11,25 @@ import java.util.UUID
 /**
  * Data Access Object for the shopping_list_checks table.
  *
- * [delete] is still the uncheck path today — see [ShoppingListCheckEntity]'s "Transitional note".
- * [getCheck]/[getAllDirty]/[updateSyncState] exist ahead of their consumer, added now so the ADR-014
- * migration only has to run once; they are unused until the sync wiring for a shared list lands.
+ * As of ADR-014's sync wiring, checking/unchecking an item is an ordinary upsert either way —
+ * `DefaultShoppingListRepository.setChecked` never calls [delete] anymore, since an unchecked item
+ * is still an item on the list (`checked = false`), not one that has left it. [delete]/
+ * [clearForPlan] remain as plain hard-delete primitives (see their own tests) for a genuine
+ * removal, which nothing in this codebase triggers yet — no "remove from list" UI exists, the list
+ * is derived live from the plan's own ingredients (see `ShoppingListBuilder`).
  *
- * **When that wiring lands**: [delete] must become a soft delete (`deletedAt`/`syncState =
- * 'DELETED'`), not stay a hard `DELETE` — [getAllDirty]'s `WHERE syncState IN ('PENDING',
- * 'DELETED')` can never observe a row that no longer exists, so an uncheck on one device would
- * silently never sync to other household members. [BookmarkedRecipeDao.softDelete] is the exact
- * template to copy for this table's own soft delete, once `delete()` is retired in favor of it.
+ * **Known gap**: [clearForPlan] (via `ShoppingListRepository.clearChecks`, the "uncheck all"
+ * action) is still a hard delete, not an upsert-to-unchecked — so unlike a single [upsert]'d
+ * uncheck, "uncheck all" does not yet produce PENDING rows for [getAllDirty] to push, and won't
+ * sync to other household members. Follow-up, not fixed here.
  */
 @Dao
 interface ShoppingListCheckDao {
 
-    @Query("SELECT itemKey FROM shopping_list_checks WHERE mealPlanId = :mealPlanId")
+    @Query(
+        "SELECT itemKey FROM shopping_list_checks " +
+            "WHERE mealPlanId = :mealPlanId AND checked = 1 AND deletedAt IS NULL"
+    )
     fun observeCheckedKeys(mealPlanId: UUID): Flow<List<String>>
 
     @Query("SELECT * FROM shopping_list_checks WHERE mealPlanId = :mealPlanId AND itemKey = :itemKey")

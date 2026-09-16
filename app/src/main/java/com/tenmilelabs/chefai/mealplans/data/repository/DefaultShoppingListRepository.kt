@@ -4,6 +4,8 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.ShoppingListCheckDao
 import com.tenmilelabs.chefai.core.data.local.room.ShoppingListCheckEntity
 import com.tenmilelabs.chefai.core.data.local.room.relations.PlanIngredientRow
+import com.tenmilelabs.chefai.core.data.local.util.SyncState
+import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import com.tenmilelabs.chefai.mealplans.domain.repository.ShoppingListRepository
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.PlannedIngredient
 import kotlinx.coroutines.flow.Flow
@@ -17,6 +19,7 @@ import javax.inject.Singleton
 class DefaultShoppingListRepository @Inject constructor(
     private val recipeDao: RecipeDao,
     private val shoppingListCheckDao: ShoppingListCheckDao,
+    private val syncScheduler: SyncScheduler,
 ) : ShoppingListRepository {
 
     override fun observeIngredientsForRecipes(recipeIds: List<UUID>): Flow<List<PlannedIngredient>> {
@@ -27,18 +30,23 @@ class DefaultShoppingListRepository @Inject constructor(
     override fun observeCheckedItems(mealPlanId: UUID): Flow<Set<String>> =
         shoppingListCheckDao.observeCheckedKeys(mealPlanId).map { it.toSet() }
 
+    /**
+     * Always an upsert, never [ShoppingListCheckDao.delete] — an unchecked item is still on the
+     * list (`checked = false`), not one that left it (`deletedAt`). See ADR-014 §5.2.
+     */
     override suspend fun setChecked(mealPlanId: UUID, itemKey: String, checked: Boolean) {
-        if (checked) {
-            shoppingListCheckDao.upsert(
-                ShoppingListCheckEntity(
-                    mealPlanId = mealPlanId,
-                    itemKey = itemKey,
-                    checkedAt = System.currentTimeMillis(),
-                )
+        val now = System.currentTimeMillis()
+        shoppingListCheckDao.upsert(
+            ShoppingListCheckEntity(
+                mealPlanId = mealPlanId,
+                itemKey = itemKey,
+                checkedAt = now,
+                checked = checked,
+                updatedAt = now,
+                syncState = SyncState.PENDING,
             )
-        } else {
-            shoppingListCheckDao.delete(mealPlanId, itemKey)
-        }
+        )
+        syncScheduler.requestMutationSync()
     }
 
     override suspend fun clearChecks(mealPlanId: UUID) = shoppingListCheckDao.clearForPlan(mealPlanId)

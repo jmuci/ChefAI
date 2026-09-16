@@ -113,6 +113,35 @@ class ShoppingListCheckDaoTest {
     }
 
     @Test
+    fun observeCheckedKeys_excludesAnUpsertedButUncheckedRow() = runTest {
+        // As of ADR-014's sync wiring, unchecking is an upsert with checked = false, not a
+        // delete — the row is still on the list, just not in the checked set observeCheckedKeys
+        // reports. See ShoppingListCheckDao's own KDoc.
+        val plan = mealPlan()
+        database.mealPlanDao().upsertMealPlan(plan)
+        database.shoppingListCheckDao().upsert(check(plan.uuid, "onion"))
+        database.shoppingListCheckDao().upsert(
+            check(plan.uuid, "onion").copy(checked = false)
+        )
+
+        assertTrue(database.shoppingListCheckDao().observeCheckedKeys(plan.uuid).first().isEmpty())
+        assertEquals(false, database.shoppingListCheckDao().getCheck(plan.uuid, "onion")?.checked)
+    }
+
+    @Test
+    fun observeCheckedKeys_excludesASoftDeletedRow() = runTest {
+        // A pulled item can arrive with deletedAt set (it left the list entirely — see
+        // SyncGroceryListItem's doc) without going through delete()/clearForPlan() at all.
+        val plan = mealPlan()
+        database.mealPlanDao().upsertMealPlan(plan)
+        database.shoppingListCheckDao().upsert(
+            check(plan.uuid, "onion").copy(deletedAt = 5_000L)
+        )
+
+        assertTrue(database.shoppingListCheckDao().observeCheckedKeys(plan.uuid).first().isEmpty())
+    }
+
+    @Test
     fun delete_removesOnlyThatItem() = runTest {
         val plan = mealPlan()
         database.mealPlanDao().upsertMealPlan(plan)
