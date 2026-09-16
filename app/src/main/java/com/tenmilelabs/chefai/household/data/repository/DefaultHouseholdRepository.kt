@@ -1,7 +1,9 @@
 package com.tenmilelabs.chefai.household.data.repository
 
+import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.HouseholdDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.MealPlanDao
 import com.tenmilelabs.chefai.household.data.mapper.toDomain
 import com.tenmilelabs.chefai.household.data.mapper.toEntity
 import com.tenmilelabs.chefai.household.data.mapper.toPendingInviteEntity
@@ -36,7 +38,9 @@ import javax.inject.Singleton
 class DefaultHouseholdRepository @Inject constructor(
     private val networkDataSource: HouseholdNetworkDataSource,
     private val householdDao: HouseholdDao,
+    private val mealPlanDao: MealPlanDao,
     private val transactionRunner: TransactionRunner,
+    private val sessionManager: SessionManager,
 ) : HouseholdRepository {
 
     override fun observeMyHousehold(): Flow<Household?> =
@@ -92,8 +96,16 @@ class DefaultHouseholdRepository @Inject constructor(
 
     override suspend fun leaveHousehold(): Result<Unit> = resultOf {
         val id = requireCachedHouseholdId()
+        val userId = requireCurrentUserId()
         networkDataSource.leaveHousehold(id)
-        householdDao.deleteHousehold(id)
+        // Do NOT reset the sync cursor here — the backend bumps server_updated_at on household
+        // rows at accept time and referenced recipes arrive via the gap clause, so a client-side
+        // reset would only force a needless full re-pull (ADR-014 §0.6).
+        transactionRunner {
+            mealPlanDao.deleteHouseholdPlansNotOwnedBy(id, keepOwnedBy = userId)
+            mealPlanDao.clearHouseholdLinkForOwnPlans(id, userId)
+            householdDao.deleteHousehold(id)
+        }
     }
 
     override suspend fun removeMember(userId: UUID): Result<Unit> = resultOf {
@@ -159,6 +171,9 @@ class DefaultHouseholdRepository @Inject constructor(
 
     private suspend fun requireCachedHouseholdId(): UUID =
         householdDao.getCachedHouseholdId() ?: throw IllegalStateException("No cached household")
+
+    private fun requireCurrentUserId(): UUID =
+        sessionManager.getCurrentUserId() ?: throw IllegalStateException("No authenticated user")
 
     private suspend fun cacheHousehold(response: HouseholdResponse) {
         val householdId = UUID.fromString(response.id)

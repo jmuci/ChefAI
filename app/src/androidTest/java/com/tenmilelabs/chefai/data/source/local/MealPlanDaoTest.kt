@@ -60,6 +60,7 @@ class MealPlanDaoTest {
         createdAt: Long = System.currentTimeMillis(),
         deletedAt: Long? = null,
         syncState: SyncState = SyncState.PENDING,
+        householdId: UUID? = null,
     ) = MealPlanEntity(
         uuid = uuid,
         userId = userId,
@@ -70,6 +71,7 @@ class MealPlanDaoTest {
         updatedAt = createdAt,
         deletedAt = deletedAt,
         syncState = syncState,
+        householdId = householdId,
     )
 
     private fun day(
@@ -234,5 +236,42 @@ class MealPlanDaoTest {
         database.mealPlanDao().upsertMealPlan(mealPlan(userId = userA.uuid, deletedAt = 1L))
 
         assertEquals(1, database.mealPlanDao().countMealPlansForUser(userA.uuid))
+    }
+
+    @Test
+    fun deleteHouseholdPlansNotOwnedBy_deletesOnlyTheRightRowsAndCascadesToDays() = runTest {
+        val householdId = UUID.randomUUID()
+        val otherHouseholdId = UUID.randomUUID()
+        val notOwned = mealPlan(userId = userB.uuid, householdId = householdId)
+        val owned = mealPlan(userId = userA.uuid, householdId = householdId)
+        val personal = mealPlan(userId = userA.uuid, householdId = null)
+        val differentHousehold = mealPlan(userId = userB.uuid, householdId = otherHouseholdId)
+        database.mealPlanDao().upsertMealPlan(notOwned)
+        database.mealPlanDao().upsertMealPlan(owned)
+        database.mealPlanDao().upsertMealPlan(personal)
+        database.mealPlanDao().upsertMealPlan(differentHousehold)
+        database.mealPlanDao().upsertDays(listOf(day(notOwned.uuid, dayIndex = 0)))
+
+        database.mealPlanDao().deleteHouseholdPlansNotOwnedBy(householdId, keepOwnedBy = userA.uuid)
+
+        assertNull(database.mealPlanDao().getMealPlanById(notOwned.uuid))
+        assertTrue(database.mealPlanDao().getDaysForMealPlan(notOwned.uuid).isEmpty())
+        assertEquals(owned, database.mealPlanDao().getMealPlanById(owned.uuid))
+        assertEquals(personal, database.mealPlanDao().getMealPlanById(personal.uuid))
+        assertEquals(differentHousehold, database.mealPlanDao().getMealPlanById(differentHousehold.uuid))
+    }
+
+    @Test
+    fun clearHouseholdLinkForOwnPlans_nullsHouseholdIdWithoutDeleting() = runTest {
+        val householdId = UUID.randomUUID()
+        val owned = mealPlan(userId = userA.uuid, householdId = householdId)
+        val someoneElses = mealPlan(userId = userB.uuid, householdId = householdId)
+        database.mealPlanDao().upsertMealPlan(owned)
+        database.mealPlanDao().upsertMealPlan(someoneElses)
+
+        database.mealPlanDao().clearHouseholdLinkForOwnPlans(householdId, userId = userA.uuid)
+
+        assertNull(database.mealPlanDao().getMealPlanById(owned.uuid)?.householdId)
+        assertEquals(householdId, database.mealPlanDao().getMealPlanById(someoneElses.uuid)?.householdId)
     }
 }

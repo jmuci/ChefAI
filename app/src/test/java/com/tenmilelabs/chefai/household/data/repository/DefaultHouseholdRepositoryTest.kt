@@ -2,10 +2,14 @@ package com.tenmilelabs.chefai.household.data.repository
 
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.HouseholdEntity
 import com.tenmilelabs.chefai.core.data.local.room.HouseholdInviteEntity
+import com.tenmilelabs.chefai.core.data.local.room.MealPlanEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeHouseholdDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeMealPlanDao
 import com.tenmilelabs.chefai.household.data.network.CreateInviteResult
 import com.tenmilelabs.chefai.household.data.network.FakeHouseholdNetworkDataSource
 import com.tenmilelabs.chefai.household.data.network.HouseholdJoinNetworkResult
@@ -13,6 +17,8 @@ import com.tenmilelabs.chefai.household.data.network.dto.HouseholdResponse
 import com.tenmilelabs.chefai.household.data.network.dto.InviteSummaryResponse
 import com.tenmilelabs.chefai.household.data.network.dto.MemberResponse
 import com.tenmilelabs.chefai.household.domain.model.HouseholdJoinOutcome
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
@@ -22,10 +28,13 @@ class DefaultHouseholdRepositoryTest {
 
     private val network = FakeHouseholdNetworkDataSource()
     private lateinit var dao: FakeHouseholdDao
+    private lateinit var mealPlanDao: FakeMealPlanDao
+    private lateinit var sessionManager: SessionManager
     private lateinit var repository: DefaultHouseholdRepository
 
     private val householdId = UUID.randomUUID()
     private val ownerId = UUID.randomUUID()
+    private val currentUserId = UUID.randomUUID()
 
     private fun householdResponse(members: List<MemberResponse> = emptyList()) = HouseholdResponse(
         id = householdId.toString(), name = "The Test Kitchen", ownerId = ownerId.toString(), members = members,
@@ -34,7 +43,12 @@ class DefaultHouseholdRepositoryTest {
     @Before
     fun setUp() {
         dao = FakeHouseholdDao()
-        repository = DefaultHouseholdRepository(network, dao, FakeTransactionRunner())
+        mealPlanDao = FakeMealPlanDao()
+        sessionManager = mockk<SessionManager>()
+        every { sessionManager.getCurrentUserId() } returns currentUserId
+        repository = DefaultHouseholdRepository(
+            network, dao, mealPlanDao, FakeTransactionRunner(), sessionManager,
+        )
     }
 
     @Test
@@ -122,6 +136,54 @@ class DefaultHouseholdRepositoryTest {
     }
 
     @Test
+    fun `leaveHousehold hard-deletes shared plans this device doesn't own`() = runTest {
+        dao.upsertHousehold(HouseholdEntity(householdId, "The Test Kitchen", ownerId, 0L, 0L))
+        val someoneElsesPlan = mealPlan(userId = ownerId, householdId = householdId)
+        mealPlanDao.upsertMealPlan(someoneElsesPlan)
+
+        repository.leaveHousehold()
+
+        assertThat(mealPlanDao.getMealPlanById(someoneElsesPlan.uuid)).isNull()
+    }
+
+    @Test
+    fun `leaveHousehold un-shares the leaving user's own plans without deleting them`() = runTest {
+        dao.upsertHousehold(HouseholdEntity(householdId, "The Test Kitchen", ownerId, 0L, 0L))
+        val ownPlan = mealPlan(userId = currentUserId, householdId = householdId)
+        mealPlanDao.upsertMealPlan(ownPlan)
+
+        repository.leaveHousehold()
+
+        val stored = mealPlanDao.getMealPlanById(ownPlan.uuid)
+        assertThat(stored).isNotNull()
+        assertThat(stored?.householdId).isNull()
+    }
+
+    @Test
+    fun `leaveHousehold doesn't touch a personal plan or another household's plan`() = runTest {
+        dao.upsertHousehold(HouseholdEntity(householdId, "The Test Kitchen", ownerId, 0L, 0L))
+        val personalPlan = mealPlan(userId = currentUserId, householdId = null)
+        val otherHouseholdPlan = mealPlan(userId = ownerId, householdId = UUID.randomUUID())
+        mealPlanDao.upsertMealPlan(personalPlan)
+        mealPlanDao.upsertMealPlan(otherHouseholdPlan)
+
+        repository.leaveHousehold()
+
+        assertThat(mealPlanDao.getMealPlanById(personalPlan.uuid)).isEqualTo(personalPlan)
+        assertThat(mealPlanDao.getMealPlanById(otherHouseholdPlan.uuid)).isEqualTo(otherHouseholdPlan)
+    }
+
+    @Test
+    fun `leaveHousehold fails cleanly with no authenticated user`() = runTest {
+        dao.upsertHousehold(HouseholdEntity(householdId, "The Test Kitchen", ownerId, 0L, 0L))
+        every { sessionManager.getCurrentUserId() } returns null
+
+        val result = repository.leaveHousehold()
+
+        assertThat(result.isFailure).isTrue()
+    }
+
+    @Test
     fun `inviteByEmail maps InviteeNotFound to a failure`() = runTest {
         dao.upsertHousehold(HouseholdEntity(householdId, "The Test Kitchen", ownerId, 0L, 0L))
         network.createInviteResult = CreateInviteResult.InviteeNotFound
@@ -193,4 +255,16 @@ class DefaultHouseholdRepositoryTest {
             // expected
         }
     }
+
+    private fun mealPlan(userId: UUID, householdId: UUID?) = MealPlanEntity(
+        uuid = UuidV7Generator.newId(),
+        userId = userId,
+        name = "This week",
+        status = "READY",
+        preferencesJson = "{}",
+        createdAt = 0L,
+        updatedAt = 0L,
+        deletedAt = null,
+        householdId = householdId,
+    )
 }
