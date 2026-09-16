@@ -109,13 +109,47 @@ next real toggle marks it `PENDING` again.
 
 ---
 
+## Decision 6: App Links host and token extraction
+
+Invite links use `https://chefai.app/invite?token=...` — matching the backend's default
+`household.inviteBaseUrl` (`ktor-chefai`'s `Application.kt`), not a placeholder chosen
+independently on the Android side.
+
+`InviteLinkParser.extractToken` (`core/util/`) takes a plain `String`, not `android.net.Uri`,
+parsed via `java.net.URI` — the same reason [`extractSharedRecipeUrl`] parses share-sheet text
+that way rather than with the Android type: it keeps the parser unit-testable on the plain JVM,
+with no Robolectric dependency. `MainActivity.consumeInviteIntent` converts `intent.data` to a
+`String` at the one call site that has to. Wrong scheme, wrong host, wrong path, or a missing/blank
+`token` query parameter all return `null` uniformly, mirroring `previewInvite`'s own "uniform 404"
+precedent from A3 — the caller only needs to know "was there an invite here," not why not.
+
+`MainActivity.consumeInviteIntent` mirrors the existing `consumeShareIntent` pattern exactly
+(capture into `mutableStateOf`, clear the intent's data as it's read, call from both `onCreate` and
+`onNewIntent`) rather than adopting Navigation-Compose's own deep-link machinery — one intent-entry
+pattern in this codebase, not two.
+
+**Manual verification** (matching `docs/sync-deep-dive.md`'s checklist style):
+
+```
+adb shell am start -W -a android.intent.action.VIEW -d "https://chefai.app/invite?token=abc" com.tenmilelabs.chefai
+```
+
+Verify: cold start (app not running), warm start (app backgrounded), and after `onNewIntent` while
+the app is already foregrounded on some other screen — all three should land on the accept-invite
+screen. Real device verification of the `https` App Link itself (not just the `am start` shortcut
+above, which bypasses domain verification) additionally requires `assetlinks.json` to be live at
+the real host — see the Consequences section below.
+
+---
+
 ## Status
 
 This ADR is written and the Room schema (this migration, v8→v9) lands in the same change. The
-household domain/network/UI layers, App Links, the anonymous→authenticated join flow, and the actual
-sync wiring for `meal_plans.householdId` and `shopping_list_checks` land in a sequence of further
-changes — see `docs/prompts/households-android-prompt.md` §9 for the full PR sequence and which
-backend endpoints each step depends on.
+household domain/network/UI layers and App Links (PRs A1–A7) have landed. The
+anonymous→authenticated join flow and the actual sync wiring for `meal_plans.householdId` and
+`shopping_list_checks` land in a sequence of further changes — see
+`docs/prompts/households-android-prompt.md` §9 for the full PR sequence and which backend endpoints
+each step depends on.
 
 ---
 
@@ -139,5 +173,7 @@ backend endpoints each step depends on.
 - **No "who checked this" attribution** in the UI, even though `checkedBy` exists on the wire —
   deferred as a follow-up once the base sync path is proven.
 - **`assetlinks.json` hosting is outside this repository.** App Links verification silently falls
-  back to a disambiguation dialog until it's served from the real host with this app's signing
-  cert fingerprint — a deploy-pipeline dependency, not something fixed by an app-side change.
+  back to a disambiguation dialog until `https://chefai.app/.well-known/assetlinks.json` is served
+  with this app's signing cert fingerprint — a deploy-pipeline dependency, not something fixed by
+  an app-side change. `android:autoVerify="true"` is already set on the intent filter; it has
+  nothing to verify against until that file exists.
