@@ -6,6 +6,8 @@ import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.core.domain.model.HouseholdRole
 import com.tenmilelabs.chefai.household.domain.model.Household
 import com.tenmilelabs.chefai.household.domain.model.HouseholdInviteLink
+import com.tenmilelabs.chefai.household.domain.model.HouseholdJoinOutcome
+import com.tenmilelabs.chefai.household.domain.model.PendingHouseholdInvite
 import com.tenmilelabs.chefai.household.domain.repository.HouseholdRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -39,6 +41,7 @@ sealed interface HouseholdEvent {
     data class ShareInviteLink(val link: HouseholdInviteLink) : HouseholdEvent
     data object InviteSent : HouseholdEvent
     data object LeftHousehold : HouseholdEvent
+    data object PendingInviteResolved : HouseholdEvent
 }
 
 @HiltViewModel
@@ -73,6 +76,21 @@ class HouseholdViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = HouseholdUiState.Loading,
     )
+
+    /**
+     * In-app invites addressed to this user — shown in [HouseholdUiState.NoHousehold]'s pending
+     * invite inbox. Kept separate from [uiState] rather than folded into [HouseholdUiState.NoHousehold]
+     * as a field, since a household member (a [HouseholdUiState.Success] session) can't have any —
+     * accepting one always means leaving whatever household they're currently in first, which this
+     * screen doesn't offer.
+     */
+    val pendingInvites: StateFlow<List<PendingHouseholdInvite>> = householdRepository
+        .observePendingInvites()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList(),
+        )
 
     init {
         refresh()
@@ -166,6 +184,32 @@ class HouseholdViewModel @Inject constructor(
                     if (it is CancellationException) throw it
                     Timber.e(it, "onLeaveHousehold: failed")
                     _events.emit(HouseholdEvent.ShowError("Couldn't leave the household"))
+                }
+        }
+    }
+
+    fun onAcceptPendingInvite(inviteId: UUID) {
+        viewModelScope.launch {
+            when (val outcome = householdRepository.acceptInvite(inviteId)) {
+                is HouseholdJoinOutcome.Joined -> _events.emit(HouseholdEvent.PendingInviteResolved)
+                HouseholdJoinOutcome.InvalidOrExpired ->
+                    _events.emit(HouseholdEvent.ShowError("That invite is no longer valid"))
+                HouseholdJoinOutcome.AlreadyInAHousehold ->
+                    _events.emit(HouseholdEvent.ShowError("You're already in a household"))
+                HouseholdJoinOutcome.NetworkError ->
+                    _events.emit(HouseholdEvent.ShowError("Couldn't accept that invite — check your connection"))
+            }
+        }
+    }
+
+    fun onDeclinePendingInvite(inviteId: UUID) {
+        viewModelScope.launch {
+            householdRepository.declineInvite(inviteId)
+                .onSuccess { _events.emit(HouseholdEvent.PendingInviteResolved) }
+                .onFailure {
+                    if (it is CancellationException) throw it
+                    Timber.e(it, "onDeclinePendingInvite: failed for $inviteId")
+                    _events.emit(HouseholdEvent.ShowError("Couldn't decline that invite"))
                 }
         }
     }

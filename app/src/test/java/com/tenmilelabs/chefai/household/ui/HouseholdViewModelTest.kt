@@ -10,7 +10,9 @@ import com.tenmilelabs.chefai.core.testutil.createTestSessionManagerWithAuthSour
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import com.tenmilelabs.chefai.household.domain.model.Household
 import com.tenmilelabs.chefai.household.domain.model.HouseholdInviteLink
+import com.tenmilelabs.chefai.household.domain.model.HouseholdJoinOutcome
 import com.tenmilelabs.chefai.household.domain.model.HouseholdMember
+import com.tenmilelabs.chefai.household.domain.model.PendingHouseholdInvite
 import com.tenmilelabs.chefai.household.domain.repository.FakeHouseholdRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -255,6 +257,75 @@ class HouseholdViewModelTest {
 
         viewModel.events.test {
             viewModel.onLeaveHousehold()
+            assertThat(awaitItem()).isInstanceOf(HouseholdEvent.ShowError::class.java)
+        }
+    }
+
+    // --- Pending invite inbox ---
+
+    private fun pendingInvite() = PendingHouseholdInvite(
+        inviteId = UuidV7Generator.newId(),
+        householdId = UuidV7Generator.newId(),
+        expiresAt = System.currentTimeMillis() + 999_999L,
+        createdAt = System.currentTimeMillis(),
+    )
+
+    @Test
+    fun `pendingInvites reflects the repository's list`() = runTest {
+        val invite = pendingInvite()
+        householdRepository.pendingInvites = listOf(invite)
+
+        createViewModel().pendingInvites.test {
+            assertThat(awaitItem()).containsExactly(invite)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onAcceptPendingInvite on success emits PendingInviteResolved`() = runTest {
+        householdRepository.acceptInviteResult =
+            HouseholdJoinOutcome.Joined(householdWithMe(HouseholdRole.MEMBER))
+        val invite = pendingInvite()
+        val viewModel = createViewModel()
+
+        viewModel.events.test {
+            viewModel.onAcceptPendingInvite(invite.inviteId)
+            assertThat(awaitItem()).isEqualTo(HouseholdEvent.PendingInviteResolved)
+        }
+        assertThat(householdRepository.lastAcceptedInviteId).isEqualTo(invite.inviteId)
+    }
+
+    @Test
+    fun `onAcceptPendingInvite maps InvalidOrExpired to ShowError`() = runTest {
+        householdRepository.acceptInviteResult = HouseholdJoinOutcome.InvalidOrExpired
+        val viewModel = createViewModel()
+
+        viewModel.events.test {
+            viewModel.onAcceptPendingInvite(UuidV7Generator.newId())
+            assertThat(awaitItem()).isInstanceOf(HouseholdEvent.ShowError::class.java)
+        }
+    }
+
+    @Test
+    fun `onDeclinePendingInvite on success emits PendingInviteResolved`() = runTest {
+        householdRepository.declineInviteResult = Result.success(Unit)
+        val invite = pendingInvite()
+        val viewModel = createViewModel()
+
+        viewModel.events.test {
+            viewModel.onDeclinePendingInvite(invite.inviteId)
+            assertThat(awaitItem()).isEqualTo(HouseholdEvent.PendingInviteResolved)
+        }
+        assertThat(householdRepository.lastDeclinedInviteId).isEqualTo(invite.inviteId)
+    }
+
+    @Test
+    fun `onDeclinePendingInvite failure emits ShowError`() = runTest {
+        householdRepository.declineInviteResult = Result.failure(RuntimeException("boom"))
+        val viewModel = createViewModel()
+
+        viewModel.events.test {
+            viewModel.onDeclinePendingInvite(UuidV7Generator.newId())
             assertThat(awaitItem()).isInstanceOf(HouseholdEvent.ShowError::class.java)
         }
     }
