@@ -5,6 +5,7 @@ import androidx.navigation.NavHostController
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.DRAFT_ID_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.IMPORT_URL_ARG
+import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.INVITE_TOKEN_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.MEAL_PLAN_DAY_ID_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.MEAL_PLAN_ID_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.MEAL_PLAN_SLOT_ARG
@@ -30,6 +31,7 @@ internal object ScreenBaseRoutes {
     const val IMPORT_RECIPE_BROWSER = "import_recipe_browser_screen"
     const val SETTINGS = "settings_screen"
     const val HOUSEHOLD = "household_screen"
+    const val ACCEPT_INVITE = "accept_invite_screen"
     const val LOGIN = "login_screen"
     const val REGISTER = "register_screen"
     const val MEAL_PLAN_DETAIL = "meal_plan_detail"
@@ -80,6 +82,14 @@ object AppDestinationArgs {
      * URL-encoded in the route for the same reason as [PREFILL_URL_ARG].
      */
     const val IMPORT_URL_ARG = "importUrl"
+
+    /**
+     * A household invite token, optional on [ScreenBaseRoutes.ACCEPT_INVITE] — present when
+     * arriving via a share-sheet link (or, from A7, an App Link) with the token already known;
+     * absent when the user opens the screen via [ScreenBaseRoutes.HOUSEHOLD]'s "enter a code" CTA
+     * and types it in by hand. URL-encoded in the route for the same reason as [PREFILL_URL_ARG].
+     */
+    const val INVITE_TOKEN_ARG = "inviteToken"
 }
 
 /**
@@ -136,6 +146,10 @@ enum class AppDestinations(
     MEAL_PLAN_WIZARD(R.string.app_dest_title_meal_plan_wizard, ScreenBaseRoutes.MEAL_PLAN_WIZARD),
     SETTINGS(R.string.app_dest_title_settings, ScreenBaseRoutes.SETTINGS),
     HOUSEHOLD(R.string.app_dest_title_household, ScreenBaseRoutes.HOUSEHOLD),
+    ACCEPT_INVITE(
+        R.string.app_dest_title_accept_invite,
+        "${ScreenBaseRoutes.ACCEPT_INVITE}?${INVITE_TOKEN_ARG}={${INVITE_TOKEN_ARG}}"
+    ),
     LOGIN(R.string.app_dest_title_login, ScreenBaseRoutes.LOGIN),
     REGISTER(R.string.app_dest_title_register, ScreenBaseRoutes.REGISTER),
 }
@@ -211,6 +225,16 @@ class NavigationActions(private val navController: NavHostController) {
     fun navigateToHousehold() {
         navController.navigate(ScreenBaseRoutes.HOUSEHOLD) {
             launchSingleTop = true
+        }
+    }
+
+    /** @param token pre-known (e.g. a share-sheet link); `null` for manual code entry. */
+    fun navigateToAcceptInvite(token: String? = null) {
+        if (token == null) {
+            navController.navigate(ScreenBaseRoutes.ACCEPT_INVITE)
+        } else {
+            val encoded = URLEncoder.encode(token, "UTF-8")
+            navController.navigate("${ScreenBaseRoutes.ACCEPT_INVITE}?${INVITE_TOKEN_ARG}=$encoded")
         }
     }
 

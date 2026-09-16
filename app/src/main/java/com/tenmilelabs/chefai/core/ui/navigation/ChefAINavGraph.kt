@@ -46,6 +46,7 @@ import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.ui.LoginScreen
 import com.tenmilelabs.chefai.auth.ui.RegisterScreen
 import com.tenmilelabs.chefai.home.ui.HomeScreen
+import com.tenmilelabs.chefai.household.ui.AcceptInviteScreen
 import com.tenmilelabs.chefai.household.ui.HouseholdScreen
 import com.tenmilelabs.chefai.mealplans.ui.MealPlansScreen
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailScreen
@@ -284,6 +285,28 @@ fun ChefAINavGraph(
             HouseholdScreen(
                 snackbarHostState = snackbarHostState,
                 onNavigateBack = { navController.popBackStack() },
+                onEnterInviteCode = { navActions.navigateToAcceptInvite() },
+            )
+        }
+        composable(
+            route = AppDestinations.ACCEPT_INVITE.route,
+            arguments = listOf(
+                navArgument(AppDestinationArgs.INVITE_TOKEN_ARG) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            ),
+        ) {
+            AcceptInviteScreen(
+                // The only entry point into this screen today is HouseholdScreen's own "enter a
+                // code" CTA, so Household is always already the destination underneath this one —
+                // popping back to it (rather than pushing a fresh instance) lets its existing,
+                // still-live ViewModel pick up the newly joined household from the same Room cache
+                // it's already observing, no extra fetch needed.
+                onNavigateToHousehold = { navController.popBackStack() },
+                onNavigateToLogin = { navActions.navigateToLogin() },
+                onNavigateToRegister = { navActions.navigateToRegister() },
             )
         }
         composable(route = AppDestinations.LOGIN.route) {

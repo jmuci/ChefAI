@@ -46,6 +46,8 @@ class FakeHouseholdRepository : HouseholdRepository {
     var inviteByEmailResult: Result<Unit> = Result.failure(UnsupportedOperationException())
     var acceptInviteResult: HouseholdJoinOutcome = HouseholdJoinOutcome.NetworkError
     var declineInviteResult: Result<Unit> = Result.success(Unit)
+    var previewInviteResult: Result<HouseholdInvitePreview> = Result.failure(UnsupportedOperationException())
+    var joinWithTokenResult: HouseholdJoinOutcome = HouseholdJoinOutcome.NetworkError
 
     var refreshCount = 0
         private set
@@ -58,6 +60,10 @@ class FakeHouseholdRepository : HouseholdRepository {
     var lastAcceptedInviteId: UUID? = null
         private set
     var lastDeclinedInviteId: UUID? = null
+        private set
+    var lastPreviewedToken: String? = null
+        private set
+    var lastJoinedToken: String? = null
         private set
 
     override fun observeMyHousehold(): Flow<Household?> = householdFlow
@@ -99,11 +105,15 @@ class FakeHouseholdRepository : HouseholdRepository {
         return inviteByEmailResult
     }
 
-    override suspend fun previewInvite(token: String): Result<HouseholdInvitePreview> =
-        Result.failure(UnsupportedOperationException())
+    override suspend fun previewInvite(token: String): Result<HouseholdInvitePreview> {
+        lastPreviewedToken = token
+        return previewInviteResult
+    }
 
-    override suspend fun joinWithToken(token: String): HouseholdJoinOutcome =
-        HouseholdJoinOutcome.NetworkError
+    override suspend fun joinWithToken(token: String): HouseholdJoinOutcome {
+        lastJoinedToken = token
+        return joinWithTokenResult
+    }
 
     override suspend fun acceptInvite(inviteId: UUID): HouseholdJoinOutcome {
         lastAcceptedInviteId = inviteId
