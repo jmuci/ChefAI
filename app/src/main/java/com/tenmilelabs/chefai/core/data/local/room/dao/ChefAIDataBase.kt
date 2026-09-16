@@ -7,6 +7,9 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.tenmilelabs.chefai.core.data.local.room.AllergenEntity
 import com.tenmilelabs.chefai.core.data.local.room.BookmarkedRecipeEntity
+import com.tenmilelabs.chefai.core.data.local.room.HouseholdEntity
+import com.tenmilelabs.chefai.core.data.local.room.HouseholdInviteEntity
+import com.tenmilelabs.chefai.core.data.local.room.HouseholdMemberEntity
 import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.LabelEntity
 import com.tenmilelabs.chefai.core.data.local.room.MealPlanDayEntity
@@ -29,6 +32,9 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
     entities = [
         AllergenEntity::class,
         BookmarkedRecipeEntity::class,
+        HouseholdEntity::class,
+        HouseholdMemberEntity::class,
+        HouseholdInviteEntity::class,
         IngredientEntity::class,
         LabelEntity::class,
         MealPlanEntity::class,
@@ -46,7 +52,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         TagEntity::class,
         UserEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 @TypeConverters(UuidConverters::class)
@@ -68,6 +74,7 @@ abstract class ChefAIDataBase : RoomDatabase() {
     abstract fun recipeDraftDao(): RecipeDraftDao
     abstract fun mealPlanDao(): MealPlanDao
     abstract fun shoppingListCheckDao(): ShoppingListCheckDao
+    abstract fun householdDao(): HouseholdDao
 }
 
 /**
@@ -231,5 +238,71 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
         db.execSQL("ALTER TABLE recipes ADD COLUMN proteinGramsPerServing INTEGER")
         db.execSQL("ALTER TABLE recipe_drafts ADD COLUMN caloriesPerServing TEXT NOT NULL DEFAULT ''")
         db.execSQL("ALTER TABLE recipe_drafts ADD COLUMN proteinGramsPerServing TEXT NOT NULL DEFAULT ''")
+    }
+}
+
+/**
+ * Households (ADR-014): adds the three read-through cache tables
+ * ([com.tenmilelabs.chefai.core.data.local.room.HouseholdEntity],
+ * [com.tenmilelabs.chefai.core.data.local.room.HouseholdMemberEntity],
+ * [com.tenmilelabs.chefai.core.data.local.room.HouseholdInviteEntity]), a nullable
+ * `meal_plans.householdId` (null for every existing plan — all personal), and makes
+ * `shopping_list_checks` a [com.tenmilelabs.chefai.core.data.local.util.SyncableCrossRef].
+ *
+ * `shopping_list_checks` existing rows backfill `checked = 1` and `syncState = 'SYNCED'`, not
+ * `'PENDING'`: every row that already exists is a tick a real device made before this feature
+ * shipped, and pushing it as a brand-new edit the moment sync wiring lands would misrepresent it
+ * as something the user just did. `updatedAt` backfills from `checkedAt`, the closest fact the row
+ * already carries about "when". See [ShoppingListCheckEntity]'s "Transitional note" doc for why
+ * `checked` has no live consumer yet.
+ */
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `households` (
+                `uuid` BLOB NOT NULL, `name` TEXT NOT NULL, `ownerId` BLOB NOT NULL,
+                `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL,
+                PRIMARY KEY(`uuid`)
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `household_members` (
+                `householdId` BLOB NOT NULL, `userId` BLOB NOT NULL, `displayName` TEXT NOT NULL,
+                `avatarUrl` TEXT NOT NULL, `role` TEXT NOT NULL, `joinedAt` INTEGER NOT NULL,
+                PRIMARY KEY(`householdId`, `userId`)
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_household_members_householdId` " +
+                "ON `household_members` (`householdId`)"
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `household_invites` (
+                `inviteId` BLOB NOT NULL, `householdId` BLOB NOT NULL, `householdName` TEXT NOT NULL,
+                `inviterDisplayName` TEXT NOT NULL, `createdAt` INTEGER NOT NULL,
+                PRIMARY KEY(`inviteId`)
+            )
+            """.trimIndent()
+        )
+
+        db.execSQL("ALTER TABLE meal_plans ADD COLUMN householdId BLOB")
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_meal_plans_householdId` ON `meal_plans` (`householdId`)"
+        )
+
+        db.execSQL("ALTER TABLE shopping_list_checks ADD COLUMN checked INTEGER NOT NULL DEFAULT 1")
+        db.execSQL("ALTER TABLE shopping_list_checks ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE shopping_list_checks ADD COLUMN deletedAt INTEGER")
+        db.execSQL("ALTER TABLE shopping_list_checks ADD COLUMN syncState TEXT NOT NULL DEFAULT 'SYNCED'")
+        db.execSQL("UPDATE shopping_list_checks SET updatedAt = checkedAt")
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_shopping_list_checks_syncState_updatedAt` " +
+                "ON `shopping_list_checks` (`syncState`, `updatedAt`)"
+        )
     }
 }
