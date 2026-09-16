@@ -450,11 +450,12 @@ class SessionManager @Inject constructor(
                 refreshToken = newAuthToken.refreshToken
             )
 
-            // Update session state
-            _userSession.value = UserSession.Authenticated(
-                user = currentSession.user,
-                authToken = newAuthToken
-            )
+            // Update session state. `.copy()`, not a fresh Authenticated(...) — this is a mutation
+            // of the existing session (only the token changed), not a new sign-in, so `household`
+            // must carry forward. Reconstructing from parts here would silently drop it back to
+            // null on every token refresh, which fires on its own timer independent of any
+            // household state change.
+            _userSession.value = currentSession.copy(authToken = newAuthToken)
 
             Timber.d("Token refreshed successfully")
             Result.success(Unit)

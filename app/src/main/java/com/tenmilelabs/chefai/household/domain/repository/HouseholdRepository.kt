@@ -43,12 +43,18 @@ interface HouseholdRepository {
     /** Unauthenticated-safe preview of a link's invite, shown before forcing sign-in. */
     suspend fun previewInvite(token: String): Result<PendingHouseholdInvite>
 
-    /** The link path: accept by raw token. */
-    suspend fun joinWithToken(token: String): Result<HouseholdJoinOutcome>
+    /**
+     * The link path: accept by raw token. Returns [HouseholdJoinOutcome] directly, not wrapped in
+     * [Result] — a transient failure is [HouseholdJoinOutcome.NetworkError], not `Result.failure`,
+     * so a caller writes one exhaustive `when` instead of unwrapping a `Result` around a sealed
+     * type. See [HouseholdJoinOutcome]'s doc for the precedent this follows.
+     */
+    suspend fun joinWithToken(token: String): HouseholdJoinOutcome
 
     /** The in-app path: accept a pending invite already visible via [observePendingInvites], by id
-     *  — no token involved, since the pending-invite listing never carries one. */
-    suspend fun acceptInvite(inviteId: UUID): Result<HouseholdJoinOutcome>
+     *  — no token involved, since the pending-invite listing never carries one. Same unwrapped
+     *  [HouseholdJoinOutcome] contract as [joinWithToken]. */
+    suspend fun acceptInvite(inviteId: UUID): HouseholdJoinOutcome
 
     suspend fun declineInvite(inviteId: UUID): Result<Unit>
 }

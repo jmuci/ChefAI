@@ -1,7 +1,7 @@
 package com.tenmilelabs.chefai.auth.domain.model
 
+import com.tenmilelabs.chefai.core.domain.model.HouseholdRole
 import com.tenmilelabs.chefai.core.domain.model.User
-import com.tenmilelabs.chefai.household.domain.model.HouseholdRole
 import java.util.UUID
 
 /**
