@@ -1,7 +1,8 @@
 # Sync Deep Dive: Step-by-Step Flow, Scenarios & Manual Testing
 
-**Last updated:** 2026-03-08
-**Related:** [ADR-006](adrs/adr-006-sync-protocol.md), [RFC-001](rfcs/rfc-001-offline-first-sync.md)
+**Last updated:** 2026-09-16
+**Related:** [ADR-006](adrs/adr-006-sync-protocol.md), [RFC-001](rfcs/rfc-001-offline-first-sync.md),
+[ADR-014](adrs/adr-014-households.md)
 
 ---
 
@@ -294,6 +295,79 @@ The loop repeats if `hasMore = true`.
 
 ---
 
+### Scenario F — Household grocery list: two members tick the same item offline
+
+**Setup:** A household's grocery list item ("onion") is `checked=false`, `SYNCED`, `updatedAt=10` on
+both members' devices to start. Device A, offline, ticks it `checked=true` at `updatedAt=50`. Device
+B, separately offline and unaware of A's edit, re-ticks it back to `checked=false` at
+`updatedAt=150` — a genuinely more recent edit. Device B regains connectivity first; Device A stays
+offline longer and reconnects after.
+
+```
+[Device B]                            [Server]
+  |                                      |
+  | onion: checked=false, PENDING,       |
+  |   updatedAt=150                      |
+  |                                      |
+  | -- POST /sync/push ----------------> |
+  |                    accepted=[onion]  |
+  | <-- 200 ----------------------------- |
+  |                                      |
+  | onion syncState=SYNCED               |
+  |  (server now stores updatedAt=150)   |
+  ✓ Device B's edit is now the server's truth
+```
+
+```
+[Device A]                            [Server]
+  |                                      |
+  | onion: checked=true, PENDING,        |
+  |   updatedAt=50 (made before B's      |
+  |   edit, pushed after — A was         |
+  |   offline longer)                    |
+  |                                      |
+  | -- POST /sync/push ----------------> |
+  |   conflicts=[{mealPlanId, "onion"}]  |
+  | <-- 200 ----------------------------- |
+  |                                      |
+  | onion stays PENDING, still shows     |
+  |   checked=true locally — the         |
+  |   conflicts bucket carries only the  |
+  |   item's identifier, no server       |
+  |   version comes back on this push    |
+  |                                      |
+  | -- GET /sync/pull ------------------> |
+  |   groceryListItems=[{onion,          |
+  |     checked=false, updatedAt=150}]   |
+  | <-- 200 ----------------------------- |
+  |                                      |
+  | applyPulledGroceryListItem:          |
+  |   local.syncState == PENDING         |
+  |   local.updatedAt (50) >             |
+  |     server.updatedAt (150)? → no     |
+  |   → upsert server version            |
+  |                                      |
+  | onion: checked=false, SYNCED         |
+  ✓ Device A's tick is silently undone —
+    resolved on the next pull, not on
+    the push that was rejected
+```
+
+**Expected result:** Both devices converge on `checked=false` — Device B's edit, the objectively
+more recent one — but only after Device A's *next pull*, not the moment its push was rejected.
+Device A's user sees their own tick silently revert with no in-app explanation. The winner is
+decided by `updatedAt` alone, regardless of which device's push happened to reach the server first
+(see `SyncOrchestratorTest`'s "pull resolves a grocery item conflict to the newer updatedAt
+regardless of arrival order"). This is accepted, documented behaviour — see ADR-014 Decision 7 —
+not a bug: no merge UI exists, and `SyncState.CONFLICT` stays unused, same as everywhere else in
+this codebase.
+
+Two members editing the *same day's recipe assignment* in a shared plan resolves through the
+identical mechanism — `MealPlanEntity.updatedAt` last-writer-wins — already exercised end-to-end in
+Scenario B above. Sharing only changes who can trigger it, never the resolution rule.
+
+---
+
 ## 5. Manual Testing Checklist
 
 ### Prerequisites
@@ -416,6 +490,19 @@ The loop repeats if `hasMore = true`.
 - [ ] **Mutation trigger**: Edit a recipe → sync fires within 5s (debounce)
 - [ ] **Periodic trigger**: Leave app running for 15+ minutes → sync fires automatically
 - [ ] **Login trigger**: Logout and re-login → immediate sync fires
+
+### 5.7 Household Grocery List (Scenario F)
+
+- [ ] **Two members ticking the same item offline converges via pull, not push**
+  1. Two accounts in one household, both viewing the same shared plan's shopping list
+  2. Both go offline (Airplane Mode); each ticks/unticks the same item differently
+  3. Bring Device B online first, wait for its push to complete — verify logcat `Push: completed —
+     accepted=1`
+  4. Bring Device A online — verify logcat shows that item in the push response's `conflicts`
+     bucket, and the item's `syncState` stays `PENDING` in Room immediately after
+  5. Trigger a pull on Device A (foreground the app, or wait for periodic sync) — verify the item
+     flips to Device B's value and `syncState = SYNCED`
+  6. Confirm no crash and no error toast — this is expected, silent LWW, not a failure
 
 ---
 
