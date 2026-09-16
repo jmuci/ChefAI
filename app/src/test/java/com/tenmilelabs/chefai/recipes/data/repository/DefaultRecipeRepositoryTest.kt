@@ -28,6 +28,7 @@ import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import com.tenmilelabs.chefai.core.data.sync.RecipeFetchOutcome
 import com.tenmilelabs.chefai.core.data.sync.SyncOrchestrator
 import com.tenmilelabs.chefai.core.domain.model.Label
+import com.tenmilelabs.chefai.household.domain.repository.FakeHouseholdRepository
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
 import com.tenmilelabs.chefai.core.testutil.recipe1
@@ -127,6 +128,7 @@ class DefaultRecipeRepositoryTest {
                 )
             },
             syncSchedulerProvider = { FakeSyncManager() },
+            householdRepositoryProvider = { FakeHouseholdRepository() },
             applicationScope = testScope
         ).apply {
             uuidGenerator = { UuidV7Generator.newId() }

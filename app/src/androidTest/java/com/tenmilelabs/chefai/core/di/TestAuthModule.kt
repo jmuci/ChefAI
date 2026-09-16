@@ -12,6 +12,10 @@ import com.tenmilelabs.chefai.core.data.repository.DataStoreUserPreferencesRepos
 import com.tenmilelabs.chefai.core.data.repository.DefaultMetadataRepository
 import com.tenmilelabs.chefai.core.domain.repository.MetadataRepository
 import com.tenmilelabs.chefai.core.domain.repository.UserPreferencesRepository
+import com.tenmilelabs.chefai.household.data.network.HouseholdApiService
+import com.tenmilelabs.chefai.household.data.network.HouseholdNetworkDataSource
+import com.tenmilelabs.chefai.household.data.repository.DefaultHouseholdRepository
+import com.tenmilelabs.chefai.household.domain.repository.HouseholdRepository
 import com.tenmilelabs.chefai.mealplans.data.network.MealPlanApiService
 import com.tenmilelabs.chefai.mealplans.data.network.MealPlanNetworkDataSource
 import com.tenmilelabs.chefai.mealplans.data.repository.DefaultMealPlanRepository
@@ -197,4 +201,21 @@ abstract class TestRepositoryModule {
     @Binds
     @Singleton
     abstract fun bindHostResolver(resolver: SystemHostResolver): HostResolver
+
+    /**
+     * Binds the household repository (same as production) — required because [SessionManager]
+     * now takes a `Provider<HouseholdRepository>` (see ADR-014), and this module replaces
+     * [RepositoryModule] wholesale. See docs/claude/gotchas.md #21.
+     */
+    @Binds
+    @Singleton
+    abstract fun bindHouseholdRepository(repository: DefaultHouseholdRepository): HouseholdRepository
+
+    /**
+     * Binds the household network data source (same as production) — required for the same
+     * reason as [bindHouseholdRepository].
+     */
+    @Binds
+    @Singleton
+    abstract fun bindHouseholdNetworkDataSource(service: HouseholdApiService): HouseholdNetworkDataSource
 }

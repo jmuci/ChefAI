@@ -21,6 +21,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
+import com.tenmilelabs.chefai.household.domain.repository.FakeHouseholdRepository
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -76,6 +77,7 @@ class RegisterViewModelTest {
                 )
             },
             syncSchedulerProvider = { FakeSyncManager() },
+            householdRepositoryProvider = { FakeHouseholdRepository() },
             applicationScope = testScope
         ).apply {
             uuidGenerator = { UuidV7Generator.newId() }

@@ -18,6 +18,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
+import com.tenmilelabs.chefai.household.domain.repository.FakeHouseholdRepository
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
@@ -78,6 +79,7 @@ fun createTestSessionManager(
             )
         },
         syncSchedulerProvider = { FakeSyncScheduler() },
+        householdRepositoryProvider = { FakeHouseholdRepository() },
         applicationScope = testScope
     ).apply {
         uuidGenerator = { UuidV7Generator.newId() }
@@ -132,6 +134,7 @@ fun createTestSessionManagerWithAuthSource(
             )
         },
         syncSchedulerProvider = { FakeSyncScheduler() },
+        householdRepositoryProvider = { FakeHouseholdRepository() },
         applicationScope = testScope
     ).apply {
         uuidGenerator = { UuidV7Generator.newId() }
@@ -169,6 +172,7 @@ fun createRealSessionManagerWithFakes(
             )
         },
         syncSchedulerProvider = { FakeSyncManager() },
+        householdRepositoryProvider = { FakeHouseholdRepository() },
         applicationScope = testScope
     ).apply {
         uuidGenerator = { UuidV7Generator.newId() }

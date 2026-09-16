@@ -8,6 +8,7 @@ import com.tenmilelabs.chefai.auth.data.network.dto.LoginRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RefreshTokenRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RegisterRequest
 import com.tenmilelabs.chefai.auth.domain.model.AuthToken
+import com.tenmilelabs.chefai.auth.domain.model.AuthenticatedHousehold
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.auth.domain.usecase.AccountUpgradeUseCase
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
@@ -17,6 +18,8 @@ import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import com.tenmilelabs.chefai.core.di.ApplicationScope
 import com.tenmilelabs.chefai.core.domain.model.User
+import com.tenmilelabs.chefai.household.domain.model.Household
+import com.tenmilelabs.chefai.household.domain.repository.HouseholdRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,6 +47,7 @@ class SessionManager @Inject constructor(
     private val accountSwitchHandler: AccountSwitchHandler,
     private val accountUpgradeUseCaseProvider: Provider<AccountUpgradeUseCase>,
     private val syncSchedulerProvider: Provider<SyncScheduler>,
+    private val householdRepositoryProvider: Provider<HouseholdRepository>,
     @param:ApplicationScope private val applicationScope: CoroutineScope
 ) : TokenProvider {
 
@@ -110,6 +114,7 @@ class SessionManager @Inject constructor(
                 // Ensure the user row exists in Room before sync fires so that
                 // pulled recipes (which reference this creatorId) satisfy the FK constraint.
                 persistAuthenticatedUser(user)
+                attachHouseholdState(user)
 
                 // Check if token is expired
                 val currentTime = System.currentTimeMillis()
@@ -188,6 +193,38 @@ class SessionManager @Inject constructor(
             )
         )
         Timber.d("Persisted authenticated user to Room: ${user.uuid}")
+    }
+
+    /**
+     * Populates [UserSession.Authenticated.household] from the local household cache only — never
+     * a network call on this hot session-restore/login path, per that field's own doc. Then kicks
+     * off a background refresh, the same fire-and-forget shape [requestImmediateSync] already is,
+     * and re-emits once it lands so a stale/missing cache entry (e.g. first login on a new device)
+     * catches up shortly after.
+     */
+    private suspend fun attachHouseholdState(user: User) {
+        val cached = householdRepositoryProvider.get().observeMyHousehold().first()
+        applyHouseholdState(user.uuid, cached)
+
+        applicationScope.launch {
+            householdRepositoryProvider.get().refresh()
+            val refreshed = householdRepositoryProvider.get().observeMyHousehold().first()
+            applyHouseholdState(user.uuid, refreshed)
+        }
+    }
+
+    /** No-ops if the session has since moved on to a different user (logout, account switch). */
+    private fun applyHouseholdState(userId: UUID, household: Household?) {
+        val current = _userSession.value
+        if (current !is UserSession.Authenticated || current.user.uuid != userId) return
+
+        val role = household?.members?.firstOrNull { it.userId == userId }?.role
+        val authenticatedHousehold = if (household != null && role != null) {
+            AuthenticatedHousehold(householdId = household.uuid, role = role)
+        } else {
+            null
+        }
+        _userSession.value = current.copy(household = authenticatedHousehold)
     }
 
     /**
@@ -274,6 +311,7 @@ class SessionManager @Inject constructor(
             // Persist the authenticated user to Room before sync fires so that pulled
             // recipes (which reference this creatorId) satisfy the FK constraint.
             persistAuthenticatedUser(user)
+            attachHouseholdState(user)
 
             // Trigger sync: push any local recipes and start periodic sync
             syncSchedulerProvider.get().requestImmediateSync()
@@ -354,6 +392,7 @@ class SessionManager @Inject constructor(
             // Persist the authenticated user to Room before sync fires so that pulled
             // recipes (which reference this creatorId) satisfy the FK constraint.
             persistAuthenticatedUser(user)
+            attachHouseholdState(user)
 
             // Trigger sync: push any local recipes and start periodic sync
             syncSchedulerProvider.get().requestImmediateSync()

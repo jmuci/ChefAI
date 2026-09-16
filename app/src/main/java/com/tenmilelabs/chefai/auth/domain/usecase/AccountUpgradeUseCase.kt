@@ -26,6 +26,10 @@ import javax.inject.Singleton
  *
  * The entire operation runs in a single Room transaction for atomicity.
  *
+ * Deliberately does not touch household tables (see ADR-014): an anonymous session can never own
+ * a household or invite row — those only ever get created server-side for an authenticated user —
+ * so there is nothing to reassign here. Not a gap to fill in later.
+ *
  * @see <a href="docs/rfcs/rfc-001-offline-first-sync.md">RFC-001 Section 7</a>
  */
 @Singleton
