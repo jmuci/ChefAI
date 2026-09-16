@@ -46,6 +46,7 @@ import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.ui.LoginScreen
 import com.tenmilelabs.chefai.auth.ui.RegisterScreen
 import com.tenmilelabs.chefai.home.ui.HomeScreen
+import com.tenmilelabs.chefai.household.ui.HouseholdScreen
 import com.tenmilelabs.chefai.mealplans.ui.MealPlansScreen
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailScreen
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailUiState
@@ -279,6 +280,12 @@ fun ChefAINavGraph(
         composable(route = AppDestinations.SETTINGS.route) {
             SettingsScreen()
         }
+        composable(route = AppDestinations.HOUSEHOLD.route) {
+            HouseholdScreen(
+                snackbarHostState = snackbarHostState,
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
         composable(route = AppDestinations.LOGIN.route) {
             LoginScreen(
                 snackbarHostState = snackbarHostState,
@@ -382,6 +389,9 @@ fun ChefAINavGraph(
                     },
                     onSettings = {
                         navActions.navigateToSettings()
+                    },
+                    onHousehold = {
+                        navActions.navigateToHousehold()
                     },
                     extraActions = {
                         if (currentRoute == AppDestinations.MEAL_PLAN_DETAIL.route) {
