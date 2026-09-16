@@ -330,14 +330,16 @@ fun ChefAINavGraph(
             LoginScreen(
                 snackbarHostState = snackbarHostState,
                 onNavigateToHome = { navActions.navigateToHome() },
-                onNavigateToRegister = { navActions.navigateToRegister() }
+                onNavigateToRegister = { navActions.navigateToRegister() },
+                onNavigateToAcceptInvite = { token -> navActions.navigateToAcceptInvite(token) },
             )
         }
         composable(route = AppDestinations.REGISTER.route) {
             RegisterScreen(
                 snackbarHostState = snackbarHostState,
                 onNavigateToHome = { navActions.navigateToHome() },
-                onNavigateToLogin = { navActions.navigateToLogin() }
+                onNavigateToLogin = { navActions.navigateToLogin() },
+                onNavigateToAcceptInvite = { token -> navActions.navigateToAcceptInvite(token) },
             )
         }
     }

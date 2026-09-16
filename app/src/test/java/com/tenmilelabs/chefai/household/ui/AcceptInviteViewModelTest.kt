@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.household.ui
 
 import androidx.lifecycle.SavedStateHandle
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
 import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
@@ -16,6 +17,7 @@ import com.tenmilelabs.chefai.household.domain.model.HouseholdJoinOutcome
 import com.tenmilelabs.chefai.household.domain.repository.FakeHouseholdRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
@@ -29,6 +31,7 @@ class AcceptInviteViewModelTest {
     val mainCoroutineRule = MainCoroutineRule()
 
     private val householdRepository = FakeHouseholdRepository()
+    private val securePreferences = FakeSecurePreferences()
 
     private val preview = HouseholdInvitePreview(
         householdName = "The Test Kitchen",
@@ -62,6 +65,7 @@ class AcceptInviteViewModelTest {
         ),
         householdRepository = householdRepository,
         sessionManager = sessionManager,
+        securePreferences = securePreferences,
     )
 
     @Test
@@ -139,6 +143,15 @@ class AcceptInviteViewModelTest {
     }
 
     @Test
+    fun `resolving to RequiresSignIn persists the token so sign-up can resume the join`() = runTest {
+        householdRepository.previewInviteResult = Result.success(preview)
+
+        createViewModel(token = "abc", sessionManager = anonymousSessionManager())
+
+        assertThat(securePreferences.getPendingInviteToken().first()).isEqualTo("abc")
+    }
+
+    @Test
     fun `already being in a household resolves to AlreadyInAHousehold without calling join`() = runTest {
         householdRepository.previewInviteResult = Result.success(preview)
         householdRepository.household = Household(
@@ -171,6 +184,36 @@ class AcceptInviteViewModelTest {
 
         assertThat(viewModel.uiState.value).isEqualTo(AcceptInviteUiState.Joined)
         assertThat(householdRepository.lastJoinedToken).isEqualTo("abc")
+    }
+
+    @Test
+    fun `onAccept clears the pending invite token once the join succeeds`() = runTest {
+        householdRepository.previewInviteResult = Result.success(preview)
+        val joinedHousehold = Household(
+            uuid = UuidV7Generator.newId(),
+            name = "The Test Kitchen",
+            ownerId = UuidV7Generator.newId(),
+            members = emptyList(),
+        )
+        householdRepository.joinWithTokenResult = HouseholdJoinOutcome.Joined(joinedHousehold)
+        securePreferences.savePendingInviteToken("abc")
+        val viewModel = createViewModel(token = "abc")
+
+        viewModel.onAccept()
+
+        assertThat(securePreferences.getPendingInviteToken().first()).isNull()
+    }
+
+    @Test
+    fun `onAccept leaves the pending invite token stored when the join fails`() = runTest {
+        householdRepository.previewInviteResult = Result.success(preview)
+        householdRepository.joinWithTokenResult = HouseholdJoinOutcome.NetworkError
+        securePreferences.savePendingInviteToken("abc")
+        val viewModel = createViewModel(token = "abc")
+
+        viewModel.onAccept()
+
+        assertThat(securePreferences.getPendingInviteToken().first()).isEqualTo("abc")
     }
 
     @Test

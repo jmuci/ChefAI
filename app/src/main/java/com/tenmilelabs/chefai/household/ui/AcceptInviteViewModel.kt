@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.household.ui
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tenmilelabs.chefai.auth.data.local.SecurePreferencesInterface
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
@@ -35,9 +36,10 @@ sealed interface AcceptInviteUiState {
      * redirect — the user's anonymous recipes are real data and deserve a beat of visibility
      * before anything happens to them (see ADR-014 §7).
      *
-     * Signing in from here does **not** yet auto-resume this join — that requires persisting the
-     * pending token across the sign-up round trip (ADR-014 §7, PR A9). For now the user re-enters
-     * the code after signing in via [HouseholdUiState.NoHousehold]'s own entry point.
+     * The token is persisted via [SecurePreferencesInterface.savePendingInviteToken] just before
+     * this state is reached, so Login/Register can resume the join once sign-in completes — see
+     * [LoginViewModel][com.tenmilelabs.chefai.auth.ui.LoginViewModel] and
+     * [RegisterViewModel][com.tenmilelabs.chefai.auth.ui.RegisterViewModel].
      */
     data object RequiresSignIn : AcceptInviteUiState
 
@@ -50,6 +52,7 @@ class AcceptInviteViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val householdRepository: HouseholdRepository,
     private val sessionManager: SessionManager,
+    private val securePreferences: SecurePreferencesInterface,
 ) : ViewModel() {
 
     private val initialToken: String? = savedStateHandle[AppDestinationArgs.INVITE_TOKEN_ARG]
@@ -84,7 +87,12 @@ class AcceptInviteViewModel @Inject constructor(
         if (current !is AcceptInviteUiState.Preview) return
         viewModelScope.launch {
             _uiState.value = AcceptInviteUiState.Loading
-            _uiState.value = when (householdRepository.joinWithToken(current.token)) {
+            val outcome = householdRepository.joinWithToken(current.token)
+            if (outcome is HouseholdJoinOutcome.Joined) {
+                // Only once the join itself succeeds — a crash mid-join resumes on next launch.
+                securePreferences.clearPendingInviteToken()
+            }
+            _uiState.value = when (outcome) {
                 is HouseholdJoinOutcome.Joined -> AcceptInviteUiState.Joined
                 HouseholdJoinOutcome.InvalidOrExpired -> AcceptInviteUiState.InvalidOrExpired
                 HouseholdJoinOutcome.AlreadyInAHousehold -> AcceptInviteUiState.AlreadyInAHousehold
@@ -112,7 +120,12 @@ class AcceptInviteViewModel @Inject constructor(
         token: String,
         preview: HouseholdInvitePreview,
     ): AcceptInviteUiState = when {
-        sessionManager.userSession.value !is UserSession.Authenticated -> AcceptInviteUiState.RequiresSignIn
+        sessionManager.userSession.value !is UserSession.Authenticated -> {
+            // Persisted so the sign-up round trip (which may kill the process) can resume the
+            // join afterward — see AcceptInviteUiState.RequiresSignIn's doc and ADR-014 §7.
+            securePreferences.savePendingInviteToken(token)
+            AcceptInviteUiState.RequiresSignIn
+        }
         householdRepository.observeMyHousehold().first() != null -> AcceptInviteUiState.AlreadyInAHousehold
         else -> AcceptInviteUiState.Preview(preview, token)
     }

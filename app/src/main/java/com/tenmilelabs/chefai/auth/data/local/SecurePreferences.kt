@@ -53,6 +53,7 @@ class SecurePreferences @Inject constructor(
         private val KEY_LOCAL_USER_ID = stringPreferencesKey("local_user_id")
         private val KEY_CURRENT_USER_ID = stringPreferencesKey("current_user_id")
         private val KEY_LAST_LOGIN_EMAIL = stringPreferencesKey("last_login_email")
+        private val KEY_PENDING_INVITE_TOKEN = stringPreferencesKey("pending_invite_token")
     }
 
     private val dataStore: DataStore<Preferences> = context.dataStore
@@ -313,5 +314,31 @@ class SecurePreferences @Inject constructor(
 
     override fun getLastLoginEmail(): Flow<String?> = dataStore.data.map { prefs ->
         prefs[KEY_LAST_LOGIN_EMAIL]?.let { runCatching { decrypt(it) }.getOrNull() }
+    }
+
+    override suspend fun savePendingInviteToken(token: String) {
+        try {
+            dataStore.edit { prefs ->
+                prefs[KEY_PENDING_INVITE_TOKEN] = encrypt(token)
+            }
+            Timber.d("Pending invite token saved")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to save pending invite token")
+        }
+    }
+
+    override fun getPendingInviteToken(): Flow<String?> = dataStore.data.map { prefs ->
+        prefs[KEY_PENDING_INVITE_TOKEN]?.let { runCatching { decrypt(it) }.getOrNull() }
+    }
+
+    override suspend fun clearPendingInviteToken() {
+        try {
+            dataStore.edit { prefs ->
+                prefs.remove(KEY_PENDING_INVITE_TOKEN)
+            }
+            Timber.d("Pending invite token cleared")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to clear pending invite token")
+        }
     }
 }

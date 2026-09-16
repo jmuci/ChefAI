@@ -50,6 +50,9 @@ sealed interface LoginUiEvent {
     data class ShowSnackbar(val message: Int) : LoginUiEvent
     data object NavigateToHome : LoginUiEvent
     data object NavigateToRegister : LoginUiEvent
+
+    /** A household invite was pending sign-in (ADR-014 §7) — resume the join instead of Home. */
+    data class NavigateToAcceptInvite(val token: String) : LoginUiEvent
 }
 
 /**
@@ -156,7 +159,15 @@ class LoginViewModel @Inject constructor(
             result.fold(
                 onSuccess = { _ ->
                     securePreferences.saveLastLoginEmail(email)
-                    _uiEvent.emit(LoginUiEvent.NavigateToHome)
+                    // AccountUpgradeUseCase has already completed inside SessionManager.login()
+                    // (awaited, not fire-and-forget) by the time this runs, so getCurrentUserId()
+                    // is stable — see SessionManager.login()'s doc and ADR-014 §7.
+                    val pendingInviteToken = securePreferences.getPendingInviteToken().first()
+                    if (pendingInviteToken != null) {
+                        _uiEvent.emit(LoginUiEvent.NavigateToAcceptInvite(pendingInviteToken))
+                    } else {
+                        _uiEvent.emit(LoginUiEvent.NavigateToHome)
+                    }
                 },
                 onFailure = { exception ->
                     Timber.e(exception, "Login failed")

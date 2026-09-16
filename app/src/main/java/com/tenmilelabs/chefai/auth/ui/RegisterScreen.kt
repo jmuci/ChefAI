@@ -62,7 +62,8 @@ fun RegisterScreen(
     viewModel: RegisterViewModel = hiltViewModel(),
     snackbarHostState: SnackbarHostState? = null,
     onNavigateToHome: () -> Unit = {},
-    onNavigateToLogin: () -> Unit = {}
+    onNavigateToLogin: () -> Unit = {},
+    onNavigateToAcceptInvite: (String) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
@@ -91,6 +92,9 @@ fun RegisterScreen(
                 }
                 RegisterUiEvent.NavigateToLogin -> {
                     onNavigateToLogin()
+                }
+                is RegisterUiEvent.NavigateToAcceptInvite -> {
+                    onNavigateToAcceptInvite(event.token)
                 }
             }
         }
