@@ -142,14 +142,48 @@ the real host — see the Consequences section below.
 
 ---
 
+## Decision 7: Offline behaviour is last-writer-wins, not merged — sharing only changes who can trigger it
+
+Nothing about offline handling is new for this feature; sharing only widens who can produce the
+conflicts that were already possible for one user across two devices.
+
+**Always available offline**, unaffected by household membership: viewing the shared plan and list
+(Room is SSOT regardless of who else can see the same row), toggling grocery items (writes
+`PENDING`, syncs on reconnect via the existing debounced mutation trigger), marking a meal cooked
+(local-only, no sync field at all — see the "Meal Plans — Android UI" row in `CLAUDE.md`'s gap
+table), and assigning a recipe to a day (already local-write + `requestMutationSync()`).
+
+**Two members tick the same grocery item offline, then both reconnect:** ordinary last-writer-wins
+on `SyncGroceryListItem.updatedAt`, identical to every other synced field in this codebase.
+Whoever's push reaches the server second is rejected into that push's `conflicts` bucket — which,
+unlike the recipe sync path, carries only the item's identifier (`mealPlanId`, `itemKey`), not the
+winning value — so the loser's row stays `PENDING` and visually unchanged locally until its *next
+pull* delivers the winning version and `applyPulledGroceryListItem`'s LWW check overwrites it. This
+is a real, user-visible "my tick got undone" moment with no in-app explanation. It is documented
+here plainly rather than designing a merge UI that doesn't exist — `SyncState.CONFLICT` remains
+defined and unused, same as everywhere else.
+
+**Two members edit the same day's recipe assignment:** identical mechanism, via
+`MealPlanEntity.updatedAt` — already the behaviour for one user editing the same plan from two
+devices (see `docs/sync-deep-dive.md` Scenario B). Sharing changes *who* can trigger it, never the
+resolution rule.
+
+**Deliberately not built:** presence indicators, edit locking, or any signal that another member is
+looking at the same plan right now. The grocery list and meal plan behave, offline and under
+conflict, exactly as a single user's own multi-device sync already did before this feature existed.
+
+See `docs/sync-deep-dive.md` for the full push/pull step-by-step and a household-specific
+sequence-diagram scenario (grocery-item LWW), added alongside the existing recipe-sync scenarios.
+
+---
+
 ## Status
 
 This ADR is written and the Room schema (this migration, v8→v9) lands in the same change. The
-household domain/network/UI layers and App Links (PRs A1–A7) have landed. The
-anonymous→authenticated join flow and the actual sync wiring for `meal_plans.householdId` and
-`shopping_list_checks` land in a sequence of further changes — see
-`docs/prompts/households-android-prompt.md` §9 for the full PR sequence and which backend endpoints
-each step depends on.
+household domain/network/UI layers, App Links, the sync wiring for `meal_plans.householdId` and
+`shopping_list_checks`, the anonymous→authenticated join flow, leave/removal local cleanup, and the
+shared-plan UI badges (PRs A1–A11) have landed. Only offline/conflict documentation (this PR, A12)
+remains — see `docs/prompts/households-android-prompt.md` §9 for the full PR sequence.
 
 ---
 
@@ -167,7 +201,7 @@ each step depends on.
 
 - **No deferred deep linking.** An invite link opened when the app isn't installed has no Play
   Store hand-off yet; the manual invite-code entry screen is the acknowledged v1 fallback.
-- **Silent last-writer-wins on the grocery list**, once it's wired up: two people ticking the same
+- **Silent last-writer-wins on the grocery list** (see Decision 7): two people ticking the same
   item in the same aisle will occasionally see a tick disappear with no explanation. `SyncState
   .CONFLICT` exists in the enum but is unused here, same as everywhere else in this codebase.
 - **No "who checked this" attribution** in the UI, even though `checkedBy` exists on the wire —
