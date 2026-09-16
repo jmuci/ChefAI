@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.core.domain.repository.UserPreferencesRepository
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
+import com.tenmilelabs.chefai.household.domain.repository.HouseholdRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.repository.ShoppingListRepository
@@ -34,6 +35,8 @@ sealed interface ShoppingListUiState {
     data class Success(
         val planName: String,
         val list: ShoppingList,
+        /** Null unless the plan is shared and its owner was found in the cached household. */
+        val ownerDisplayName: String? = null,
     ) : ShoppingListUiState
 }
 
@@ -48,6 +51,7 @@ class ShoppingListViewModel @Inject constructor(
     private val mealPlanRepository: MealPlanRepository,
     private val shoppingListRepository: ShoppingListRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
+    private val householdRepository: HouseholdRepository,
 ) : ViewModel() {
 
     private val mealPlanId: UUID = UUID.fromString(
@@ -74,7 +78,8 @@ class ShoppingListViewModel @Inject constructor(
                     shoppingListRepository.observeIngredientsForRecipes(slotCounts.keys.toList()),
                     shoppingListRepository.observeCheckedItems(mealPlanId),
                     userPreferencesRepository.measurementSystem,
-                ) { ingredients, checked, measurementSystem ->
+                    householdRepository.observeMyHousehold(),
+                ) { ingredients, checked, measurementSystem, household ->
                     ShoppingListUiState.Success(
                         planName = plan.name,
                         list = ShoppingListBuilder.build(
@@ -84,6 +89,11 @@ class ShoppingListViewModel @Inject constructor(
                             checkedKeys = checked,
                             measurementSystem = measurementSystem,
                         ),
+                        ownerDisplayName = if (plan.householdId != null) {
+                            household?.members?.firstOrNull { it.userId == plan.userId }?.displayName
+                        } else {
+                            null
+                        },
                     )
                 }
             }

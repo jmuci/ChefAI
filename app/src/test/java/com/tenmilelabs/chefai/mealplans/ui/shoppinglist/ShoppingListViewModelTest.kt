@@ -4,8 +4,12 @@ import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.core.data.repository.FakeUserPreferencesRepository
+import com.tenmilelabs.chefai.core.domain.model.HouseholdRole
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
+import com.tenmilelabs.chefai.household.domain.model.Household
+import com.tenmilelabs.chefai.household.domain.model.HouseholdMember
+import com.tenmilelabs.chefai.household.domain.repository.FakeHouseholdRepository
 import com.tenmilelabs.chefai.mealplans.data.repository.FakeMealPlanRepository
 import com.tenmilelabs.chefai.mealplans.data.repository.FakeShoppingListRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.DietaryRestriction
@@ -33,6 +37,7 @@ class ShoppingListViewModelTest {
     private lateinit var mealPlanRepository: FakeMealPlanRepository
     private lateinit var shoppingListRepository: FakeShoppingListRepository
     private lateinit var userPreferencesRepository: FakeUserPreferencesRepository
+    private lateinit var householdRepository: FakeHouseholdRepository
 
     private val planId = UUID.randomUUID()
     private val recipeId = UUID.randomUUID()
@@ -42,6 +47,7 @@ class ShoppingListViewModelTest {
         mealPlanRepository = FakeMealPlanRepository()
         shoppingListRepository = FakeShoppingListRepository()
         userPreferencesRepository = FakeUserPreferencesRepository()
+        householdRepository = FakeHouseholdRepository()
     }
 
     @Test
@@ -63,6 +69,38 @@ class ShoppingListViewModelTest {
             val state = awaitItem().let { if (it is ShoppingListUiState.Loading) awaitItem() else it }
             val success = state as ShoppingListUiState.Success
             assertThat(success.list.isEmpty).isTrue()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `uiState resolves the owner's display name for a shared plan`() = runTest {
+        val ownerId = UUID.randomUUID()
+        val householdId = UUID.randomUUID()
+        mealPlanRepository.emitPlans(planWith(days = emptyList(), userId = ownerId, householdId = householdId))
+        householdRepository.seedHousehold(
+            Household(
+                uuid = householdId,
+                name = "The Test Kitchen",
+                ownerId = ownerId,
+                members = listOf(HouseholdMember(ownerId, "Chef Owner", "", HouseholdRole.OWNER)),
+            )
+        )
+
+        createViewModel().uiState.test {
+            val state = awaitItem().let { if (it is ShoppingListUiState.Loading) awaitItem() else it }
+            assertThat((state as ShoppingListUiState.Success).ownerDisplayName).isEqualTo("Chef Owner")
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `uiState ownerDisplayName is null for a personal plan`() = runTest {
+        mealPlanRepository.emitPlans(planWith(days = emptyList(), householdId = null))
+
+        createViewModel().uiState.test {
+            val state = awaitItem().let { if (it is ShoppingListUiState.Loading) awaitItem() else it }
+            assertThat((state as ShoppingListUiState.Success).ownerDisplayName).isNull()
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -149,6 +187,7 @@ class ShoppingListViewModelTest {
         mealPlanRepository = mealPlanRepository,
         shoppingListRepository = shoppingListRepository,
         userPreferencesRepository = userPreferencesRepository,
+        householdRepository = householdRepository,
     )
 
     private fun fullDay() = MealPlanDay(
@@ -158,9 +197,13 @@ class ShoppingListViewModelTest {
         lunchRecipeId = null,
     )
 
-    private fun planWith(days: List<MealPlanDay>) = MealPlan(
+    private fun planWith(
+        days: List<MealPlanDay>,
+        userId: UUID = UUID.randomUUID(),
+        householdId: UUID? = null,
+    ) = MealPlan(
         uuid = planId,
-        userId = UUID.randomUUID(),
+        userId = userId,
         name = "3-day meal plan",
         preferences = MealPlanPreferences(
             planLengthDays = 3,
@@ -177,5 +220,6 @@ class ShoppingListViewModelTest {
         createdAt = 0L,
         updatedAt = 0L,
         days = days,
+        householdId = householdId,
     )
 }

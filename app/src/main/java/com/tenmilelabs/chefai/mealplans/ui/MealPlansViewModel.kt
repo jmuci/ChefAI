@@ -6,6 +6,8 @@ import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.core.util.WhileUiSubscribed
+import com.tenmilelabs.chefai.household.domain.model.Household
+import com.tenmilelabs.chefai.household.domain.repository.HouseholdRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
@@ -26,7 +29,7 @@ import javax.inject.Inject
 
 sealed interface MealPlansUiState {
     data object Loading : MealPlansUiState
-    data class Success(val mealPlans: List<MealPlan>) : MealPlansUiState
+    data class Success(val mealPlans: List<MealPlan>, val household: Household?) : MealPlansUiState
     data object Error : MealPlansUiState
 }
 
@@ -38,6 +41,7 @@ sealed interface MealPlansEvent {
 @HiltViewModel
 class MealPlansViewModel @Inject constructor(
     private val mealPlanRepository: MealPlanRepository,
+    private val householdRepository: HouseholdRepository,
     sessionManager: SessionManager,
 ) : ViewModel() {
 
@@ -52,8 +56,9 @@ class MealPlansViewModel @Inject constructor(
                 is UserSession.Authenticated -> mealPlanRepository.observeMealPlansForUser(session.user.uuid)
             }
         }
-        .map<List<MealPlan>, MealPlansUiState> { plans ->
-            MealPlansUiState.Success(plans)
+        .combine(householdRepository.observeMyHousehold()) { plans, household -> plans to household }
+        .map<Pair<List<MealPlan>, Household?>, MealPlansUiState> { (plans, household) ->
+            MealPlansUiState.Success(plans, household)
         }
         .catch { e ->
             if (e is CancellationException) throw e

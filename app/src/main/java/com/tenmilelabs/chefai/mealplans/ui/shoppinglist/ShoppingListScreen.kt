@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.core.ui.components.SharedByBadge
 import com.tenmilelabs.chefai.core.util.EmptyContent
 import com.tenmilelabs.chefai.core.util.LoadingContent
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
@@ -76,6 +77,7 @@ fun ShoppingListScreen(
         } else {
             ShoppingListContent(
                 planName = state.planName,
+                ownerDisplayName = state.ownerDisplayName,
                 list = state.list,
                 onToggleItem = viewModel::onToggleItem,
                 onUncheckAll = viewModel::onUncheckAll,
@@ -90,12 +92,18 @@ fun ShoppingListScreen(
 private fun ShoppingListContent(
     planName: String,
     list: ShoppingList,
+    ownerDisplayName: String? = null,
     onToggleItem: (ShoppingListItem) -> Unit,
     onUncheckAll: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        ShoppingListHeader(planName = planName, list = list, onUncheckAll = onUncheckAll)
+        ShoppingListHeader(
+            planName = planName,
+            ownerDisplayName = ownerDisplayName,
+            list = list,
+            onUncheckAll = onUncheckAll,
+        )
 
         LazyColumn(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
@@ -124,6 +132,7 @@ private fun ShoppingListContent(
 @Composable
 private fun ShoppingListHeader(
     planName: String,
+    ownerDisplayName: String?,
     list: ShoppingList,
     onUncheckAll: () -> Unit,
     modifier: Modifier = Modifier,
@@ -152,6 +161,7 @@ private fun ShoppingListHeader(
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.weight(1f),
                 )
+                SharedByBadge(ownerDisplayName = ownerDisplayName)
                 if (list.checkedCount > 0) {
                     TextButton(onClick = onUncheckAll) {
                         Text(stringResource(R.string.shopping_list_uncheck_all))
@@ -254,6 +264,7 @@ private fun ShoppingListContentDarkPreview() {
     ChefAITheme(darkTheme = true) {
         ShoppingListContent(
             planName = "3-day meal plan",
+            ownerDisplayName = "Chef Owner",
             list = previewList(),
             onToggleItem = {},
             onUncheckAll = {},

@@ -90,6 +90,11 @@ private fun MealPlansContent(
                     ) { mealPlan ->
                         MealPlanCard(
                             mealPlan = mealPlan,
+                            ownerDisplayName = if (mealPlan.householdId != null) {
+                                uiState.household?.members
+                                    ?.firstOrNull { it.userId == mealPlan.userId }
+                                    ?.displayName
+                            } else null,
                             onClick = { onMealPlanClick(mealPlan.uuid) },
                             onDelete = { onDeleteMealPlan(mealPlan.uuid) },
                         )

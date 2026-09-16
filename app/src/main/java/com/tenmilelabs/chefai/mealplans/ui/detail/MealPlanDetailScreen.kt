@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.core.ui.components.SharedByBadge
 import com.tenmilelabs.chefai.core.util.EmptyContent
 import com.tenmilelabs.chefai.core.util.LoadingContent
 import com.tenmilelabs.chefai.mealplans.domain.model.DietaryRestriction
@@ -204,6 +205,7 @@ private fun ProgressHeader(
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.weight(1f),
                 )
+                SharedByBadge(ownerDisplayName = state.ownerDisplayName)
                 StatusText(status = state.mealPlan.status)
             }
 

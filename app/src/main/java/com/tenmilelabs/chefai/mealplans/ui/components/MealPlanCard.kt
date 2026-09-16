@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.tenmilelabs.chefai.core.ui.components.SharedByBadge
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.mealplans.domain.model.DietaryRestriction
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
@@ -39,6 +40,7 @@ fun MealPlanCard(
     onClick: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
+    ownerDisplayName: String? = null,
 ) {
     Card(
         onClick = onClick,
@@ -62,6 +64,7 @@ fun MealPlanCard(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                 )
+                SharedByBadge(ownerDisplayName = ownerDisplayName)
                 StatusBadge(status = mealPlan.status)
                 IconButton(onClick = onDelete) {
                     Icon(
@@ -227,6 +230,52 @@ private fun MealPlanCardGeneratingLightPreview() {
                 updatedAt = System.currentTimeMillis(),
                 days = emptyList(),
             ),
+            onClick = {},
+            onDelete = {},
+        )
+    }
+}
+
+@Preview(name = "Shared — Light", showBackground = true)
+@Composable
+private fun MealPlanCardSharedLightPreview() {
+    ChefAITheme(darkTheme = false) {
+        MealPlanCard(
+            mealPlan = MealPlan(
+                uuid = UUID.randomUUID(),
+                userId = UUID.randomUUID(),
+                name = "Family dinners",
+                status = MealPlanStatus.READY,
+                preferences = previewPreferences,
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis(),
+                days = emptyList(),
+                householdId = UUID.randomUUID(),
+            ),
+            ownerDisplayName = "Chef Owner",
+            onClick = {},
+            onDelete = {},
+        )
+    }
+}
+
+@Preview(name = "Shared — Dark", showBackground = true)
+@Composable
+private fun MealPlanCardSharedDarkPreview() {
+    ChefAITheme(darkTheme = true) {
+        MealPlanCard(
+            mealPlan = MealPlan(
+                uuid = UUID.randomUUID(),
+                userId = UUID.randomUUID(),
+                name = "Family dinners",
+                status = MealPlanStatus.READY,
+                preferences = previewPreferences,
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis(),
+                days = emptyList(),
+                householdId = UUID.randomUUID(),
+            ),
+            ownerDisplayName = "Chef Owner",
             onClick = {},
             onDelete = {},
         )
