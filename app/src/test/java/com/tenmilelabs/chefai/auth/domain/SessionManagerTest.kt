@@ -20,6 +20,10 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
+import com.tenmilelabs.chefai.core.domain.model.HouseholdRole
+import com.tenmilelabs.chefai.household.domain.model.Household
+import com.tenmilelabs.chefai.household.domain.model.HouseholdMember
+import com.tenmilelabs.chefai.household.domain.repository.FakeHouseholdRepository
 import io.mockk.coVerify
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import io.mockk.mockk
@@ -51,6 +55,7 @@ class SessionManagerTest {
     private lateinit var fakeRecipeTagCrossRefDao: FakeRecipeTagCrossRefDao
     private lateinit var fakeRecipeLabelCrossRefDao: FakeRecipeLabelCrossRefDao
     private lateinit var accountUpgradeUseCaseProvider: Provider<AccountUpgradeUseCase>
+    private lateinit var fakeHouseholdRepository: FakeHouseholdRepository
     private lateinit var fakeSyncManager: FakeSyncManager
     private lateinit var mockDatabase: ChefAIDataBase
     private lateinit var accountSwitchHandler: AccountSwitchHandler
@@ -83,6 +88,7 @@ class SessionManagerTest {
             )
         }
 
+        fakeHouseholdRepository = FakeHouseholdRepository()
         fakeSyncManager = FakeSyncManager()
         mockDatabase = mockk(relaxed = true)
         accountSwitchHandler = AccountSwitchHandler(
@@ -101,6 +107,7 @@ class SessionManagerTest {
             accountSwitchHandler = accountSwitchHandler,
             accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
             syncSchedulerProvider = { fakeSyncManager },
+            householdRepositoryProvider = { fakeHouseholdRepository },
             applicationScope = testScope
         ).apply {
             uuidGenerator = { UuidV7Generator.newId() }
@@ -368,6 +375,7 @@ class SessionManagerTest {
             accountSwitchHandler = accountSwitchHandler,
             accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
             syncSchedulerProvider = { FakeSyncManager() },
+            householdRepositoryProvider = { fakeHouseholdRepository },
             applicationScope = testScope
         ).apply { uuidGenerator = { UuidV7Generator.newId() } }
         advanceUntilIdle()
@@ -395,6 +403,7 @@ class SessionManagerTest {
             accountSwitchHandler = accountSwitchHandler,
             accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
             syncSchedulerProvider = { FakeSyncManager() },
+            householdRepositoryProvider = { fakeHouseholdRepository },
             applicationScope = testScope
         ).apply { uuidGenerator = { UuidV7Generator.newId() } }
         advanceUntilIdle()
@@ -428,6 +437,7 @@ class SessionManagerTest {
             accountSwitchHandler = accountSwitchHandler,
             accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
             syncSchedulerProvider = { FakeSyncManager() },
+            householdRepositoryProvider = { fakeHouseholdRepository },
             applicationScope = testScope
         ).apply { uuidGenerator = { UuidV7Generator.newId() } }
         advanceUntilIdle()
@@ -735,6 +745,7 @@ class SessionManagerTest {
             accountSwitchHandler = accountSwitchHandler,
             accountUpgradeUseCaseProvider = Provider { throw RuntimeException("Upgrade failed") },
             syncSchedulerProvider = { FakeSyncManager() },
+            householdRepositoryProvider = { fakeHouseholdRepository },
             applicationScope = testScope
         ).apply { uuidGenerator = { UuidV7Generator.newId() } }
         advanceUntilIdle()
@@ -876,6 +887,7 @@ class SessionManagerTest {
             accountSwitchHandler = accountSwitchHandler,
             accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
             syncSchedulerProvider = { FakeSyncManager() },
+            householdRepositoryProvider = { fakeHouseholdRepository },
             applicationScope = testScope
         ).apply { uuidGenerator = { UuidV7Generator.newId() } }
         advanceUntilIdle()
@@ -885,5 +897,103 @@ class SessionManagerTest {
         val userEntity = fakeUserDao.getUserById(restoredSession.user.uuid)
         assertThat(userEntity).isNotNull()
         assertThat(userEntity!!.syncState).isEqualTo(SyncState.SYNCED)
+    }
+
+    // --- Household State Tests ---
+
+    private fun householdOf(userId: UUID, role: HouseholdRole) = Household(
+        uuid = UuidV7Generator.newId(),
+        name = "The Test Kitchen",
+        ownerId = if (role == HouseholdRole.OWNER) userId else UuidV7Generator.newId(),
+        members = listOf(
+            HouseholdMember(userId = userId, displayName = "Chef", avatarUrl = "", role = role)
+        ),
+    )
+
+    @Test
+    fun `login attaches household state from the local cache`() = testScope.runTest {
+        val userId = UuidV7Generator.newId()
+        fakeAuthNetworkDataSource.authResponse = AuthResponse(
+            token = "fake_token",
+            refreshToken = "fake_refresh",
+            userId = userId.toString(),
+            username = "chef",
+            email = "chef@example.com",
+            expiresIn = 3600
+        )
+        fakeHouseholdRepository.household = householdOf(userId, HouseholdRole.OWNER)
+
+        val result = sessionManager.login("chef@example.com", "password123")
+
+        assertThat(result.isSuccess).isTrue()
+        val session = sessionManager.userSession.value as UserSession.Authenticated
+        assertThat(session.household?.role).isEqualTo(HouseholdRole.OWNER)
+        assertThat(session.household?.householdId).isEqualTo(fakeHouseholdRepository.household?.uuid)
+    }
+
+    @Test
+    fun `login leaves household null when the cache holds none`() = testScope.runTest {
+        val result = sessionManager.login("solo@example.com", "password123")
+
+        assertThat(result.isSuccess).isTrue()
+        val session = sessionManager.userSession.value as UserSession.Authenticated
+        assertThat(session.household).isNull()
+    }
+
+    @Test
+    fun `attaching household state defers the network refresh to a background coroutine`() = testScope.runTest {
+        sessionManager.login("chef@example.com", "password123")
+
+        // The cache-only attach step (observeMyHousehold) must not itself trigger a refresh —
+        // only the deferred background launch does, once the scheduler runs it.
+        assertThat(fakeHouseholdRepository.refreshCount).isEqualTo(0)
+
+        advanceUntilIdle()
+
+        assertThat(fakeHouseholdRepository.refreshCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `household state catches up once the background refresh lands`() = testScope.runTest {
+        val userId = UuidV7Generator.newId()
+        fakeAuthNetworkDataSource.authResponse = AuthResponse(
+            token = "fake_token",
+            refreshToken = "fake_refresh",
+            userId = userId.toString(),
+            username = "chef",
+            email = "chef@example.com",
+            expiresIn = 3600
+        )
+        // Nothing cached yet locally, but the server will report a household on refresh.
+        fakeHouseholdRepository.householdAfterRefresh = householdOf(userId, HouseholdRole.MEMBER)
+
+        sessionManager.login("chef@example.com", "password123")
+        val beforeRefresh = sessionManager.userSession.value as UserSession.Authenticated
+        assertThat(beforeRefresh.household).isNull()
+
+        advanceUntilIdle()
+
+        val afterRefresh = sessionManager.userSession.value as UserSession.Authenticated
+        assertThat(afterRefresh.household?.role).isEqualTo(HouseholdRole.MEMBER)
+    }
+
+    @Test
+    fun `a background household refresh does not resurrect a session the user already left`() = testScope.runTest {
+        val userId = UuidV7Generator.newId()
+        fakeAuthNetworkDataSource.authResponse = AuthResponse(
+            token = "fake_token",
+            refreshToken = "fake_refresh",
+            userId = userId.toString(),
+            username = "chef",
+            email = "chef@example.com",
+            expiresIn = 3600
+        )
+        fakeHouseholdRepository.householdAfterRefresh = householdOf(userId, HouseholdRole.OWNER)
+
+        sessionManager.login("chef@example.com", "password123")
+        sessionManager.logout()
+        advanceUntilIdle()
+
+        assertThat(sessionManager.userSession.value).isInstanceOf(UserSession.Anonymous::class.java)
     }
 }
