@@ -1,7 +1,9 @@
 package com.tenmilelabs.chefai.household.domain.repository
 
 import com.tenmilelabs.chefai.household.domain.model.Household
+import com.tenmilelabs.chefai.household.domain.model.HouseholdInvite
 import com.tenmilelabs.chefai.household.domain.model.HouseholdInviteLink
+import com.tenmilelabs.chefai.household.domain.model.HouseholdInvitePreview
 import com.tenmilelabs.chefai.household.domain.model.HouseholdJoinOutcome
 import com.tenmilelabs.chefai.household.domain.model.PendingHouseholdInvite
 import kotlinx.coroutines.flow.Flow
@@ -17,8 +19,9 @@ import java.util.UUID
  */
 interface HouseholdRepository {
 
-    /** Cache-first: emits the local cache immediately, refreshed by [refresh]. Null = no household. */
-    fun observeMyHousehold(userId: UUID): Flow<Household?>
+    /** Cache-first: emits the local cache immediately, refreshed by [refresh]. Null = no household.
+     *  No user id parameter — the cache holds at most one household, always the caller's own. */
+    fun observeMyHousehold(): Flow<Household?>
 
     fun observePendingInvites(): Flow<List<PendingHouseholdInvite>>
 
@@ -26,6 +29,13 @@ interface HouseholdRepository {
     suspend fun refresh(): Result<Unit>
 
     suspend fun createHousehold(name: String): Result<Household>
+
+    /** Owner-only. */
+    suspend fun renameHousehold(name: String): Result<Household>
+
+    /** Owner-only explicit dissolution — distinct from [leaveHousehold]: every member loses the
+     *  household, not just the caller. */
+    suspend fun deleteHousehold(): Result<Unit>
 
     /** Self-service leave, available to a member of any role — including the owner. */
     suspend fun leaveHousehold(): Result<Unit>
@@ -40,8 +50,9 @@ interface HouseholdRepository {
      *  [observePendingInvites] on their own device. */
     suspend fun inviteByEmail(email: String): Result<Unit>
 
-    /** Unauthenticated-safe preview of a link's invite, shown before forcing sign-in. */
-    suspend fun previewInvite(token: String): Result<PendingHouseholdInvite>
+    /** Unauthenticated-safe preview of a link's invite, shown before forcing sign-in. No invite
+     *  id — the link path accepts by [joinWithToken], not [acceptInvite]. */
+    suspend fun previewInvite(token: String): Result<HouseholdInvitePreview>
 
     /**
      * The link path: accept by raw token. Returns [HouseholdJoinOutcome] directly, not wrapped in
@@ -57,4 +68,11 @@ interface HouseholdRepository {
     suspend fun acceptInvite(inviteId: UUID): HouseholdJoinOutcome
 
     suspend fun declineInvite(inviteId: UUID): Result<Unit>
+
+    /** Owner-only. This household's own outstanding invites (management view) — distinct from
+     *  [observePendingInvites], which lists invites addressed *to* this caller. Not cached. */
+    suspend fun listOutstandingInvites(): Result<List<HouseholdInvite>>
+
+    /** Owner-only. */
+    suspend fun revokeInvite(inviteId: UUID): Result<Unit>
 }

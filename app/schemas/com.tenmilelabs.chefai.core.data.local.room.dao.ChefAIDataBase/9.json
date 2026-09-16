@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 9,
-    "identityHash": "ed8d1b3324ffc64e0b5178676d91bc5a",
+    "identityHash": "0f62c3ba7c4c0e6bb0a1590acfafb07c",
     "entities": [
       {
         "tableName": "allergens",
@@ -250,7 +250,7 @@
       },
       {
         "tableName": "household_invites",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`inviteId` BLOB NOT NULL, `householdId` BLOB NOT NULL, `householdName` TEXT NOT NULL, `inviterDisplayName` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`inviteId`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`inviteId` BLOB NOT NULL, `householdId` BLOB NOT NULL, `expiresAt` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`inviteId`))",
         "fields": [
           {
             "fieldPath": "inviteId",
@@ -265,15 +265,9 @@
             "notNull": true
           },
           {
-            "fieldPath": "householdName",
-            "columnName": "householdName",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "inviterDisplayName",
-            "columnName": "inviterDisplayName",
-            "affinity": "TEXT",
+            "fieldPath": "expiresAt",
+            "columnName": "expiresAt",
+            "affinity": "INTEGER",
             "notNull": true
           },
           {
@@ -1634,7 +1628,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'ed8d1b3324ffc64e0b5178676d91bc5a')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '0f62c3ba7c4c0e6bb0a1590acfafb07c')"
     ]
   }
 }

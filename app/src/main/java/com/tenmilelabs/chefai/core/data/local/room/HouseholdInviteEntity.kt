@@ -11,14 +11,20 @@ import java.util.UUID
  * hands the listing endpoint this cache is built from a raw token to accept with (see
  * `households-backend-prompt.md` §0.4).
  *
- * Denormalized (`householdName`, `inviterDisplayName`) so the accept screen needs no extra fetch,
- * and wholesale-replaced on refresh, same as [HouseholdEntity]/[HouseholdMemberEntity].
+ * No `householdName`/`inviterDisplayName`, despite this doc originally assuming denormalized
+ * names: the backend's `GET /households/invites/pending` (what populates this table) returns
+ * `InviteSummaryResponse`, which carries neither field — only the link-preview endpoint
+ * (`GET /households/invites/preview?token=`, keyed by a token a pending invite never has) returns
+ * names, into a separate, unpersisted domain type
+ * ([com.tenmilelabs.chefai.household.domain.model.HouseholdInvitePreview]). So an in-app pending
+ * invite is always nameless; a UI falls back to something generic ("You've been invited to a
+ * household") plus [expiresAt]. Wholesale-replaced on refresh, same as [HouseholdEntity]/
+ * [HouseholdMemberEntity].
  */
 @Entity(tableName = "household_invites")
 data class HouseholdInviteEntity(
     @PrimaryKey val inviteId: UUID,
     val householdId: UUID,
-    val householdName: String,
-    val inviterDisplayName: String,
+    val expiresAt: Long,
     val createdAt: Long,
 )

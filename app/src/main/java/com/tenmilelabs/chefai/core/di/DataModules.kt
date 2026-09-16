@@ -6,6 +6,10 @@ import com.tenmilelabs.chefai.auth.data.local.SecurePreferences
 import com.tenmilelabs.chefai.auth.data.local.SecurePreferencesInterface
 import com.tenmilelabs.chefai.collections.data.repository.DefaultCollectionsRepository
 import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
+import com.tenmilelabs.chefai.household.data.network.HouseholdApiService
+import com.tenmilelabs.chefai.household.data.network.HouseholdNetworkDataSource
+import com.tenmilelabs.chefai.household.data.repository.DefaultHouseholdRepository
+import com.tenmilelabs.chefai.household.domain.repository.HouseholdRepository
 import com.tenmilelabs.chefai.mealplans.data.network.MealPlanApiService
 import com.tenmilelabs.chefai.mealplans.data.network.MealPlanNetworkDataSource
 import com.tenmilelabs.chefai.mealplans.data.repository.DefaultMealPlanRepository
@@ -103,6 +107,14 @@ abstract class RepositoryModule {
     @Singleton
     @Binds
     abstract fun bindHostResolver(resolver: SystemHostResolver): HostResolver
+
+    @Singleton
+    @Binds
+    abstract fun bindHouseholdRepository(repository: DefaultHouseholdRepository): HouseholdRepository
+
+    @Singleton
+    @Binds
+    abstract fun bindHouseholdNetworkDataSource(service: HouseholdApiService): HouseholdNetworkDataSource
 }
 
 

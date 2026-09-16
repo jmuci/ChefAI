@@ -50,8 +50,7 @@ class HouseholdDaoTest {
     private fun invite(householdId: UUID, inviteId: UUID = UuidV7Generator.newId()) = HouseholdInviteEntity(
         inviteId = inviteId,
         householdId = householdId,
-        householdName = "The Test Kitchen",
-        inviterDisplayName = "Chef Owner",
+        expiresAt = 999_999L,
         createdAt = 1_000L,
     )
 
