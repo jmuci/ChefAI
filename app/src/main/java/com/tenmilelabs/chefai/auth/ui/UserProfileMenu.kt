@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -61,6 +62,8 @@ class UserProfileViewModel @Inject constructor(
  * @param onLogout Callback invoked after successful logout
  * @param onSettings Callback invoked to open the settings screen. Offered to signed-in and guest
  *   sessions alike — the settings behind it are device preferences, not account properties.
+ * @param onHousehold Callback invoked to open the household screen. Authenticated only — an
+ *   anonymous session has no account to share a household with.
  * @param modifier Modifier for styling
  * @param viewModel ViewModel for handling logout logic
  */
@@ -70,6 +73,7 @@ fun UserProfileMenu(
     onLogin: () -> Unit = {},
     onLogout: () -> Unit = {},
     onSettings: () -> Unit = {},
+    onHousehold: () -> Unit = {},
     viewModel: UserProfileViewModel = hiltViewModel()
 ) {
     val userSession by rememberUserSession()
@@ -125,6 +129,21 @@ fun UserProfileMenu(
                         text = { Text(text = user.displayName) },
                         onClick = { },
                         enabled = false
+                    )
+
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.household_menu_item)) },
+                        onClick = {
+                            expanded = false
+                            onHousehold()
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Group,
+                                contentDescription = null
+                            )
+                        },
+                        modifier = Modifier.testTag("HouseholdMenuItem")
                     )
 
                     DropdownMenuItem(

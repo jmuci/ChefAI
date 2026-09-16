@@ -31,6 +31,7 @@ fun ChefAITopAppBar(
     onLogin: () -> Unit = {},
     onLogout: () -> Unit = {},
     onSettings: () -> Unit = {},
+    onHousehold: () -> Unit = {},
     extraActions: @Composable RowScope.() -> Unit = {},
 ) {
 
@@ -70,6 +71,7 @@ fun ChefAITopAppBar(
                 onLogin = onLogin,
                 onLogout = onLogout,
                 onSettings = onSettings,
+                onHousehold = onHousehold,
             )
         },
         scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())

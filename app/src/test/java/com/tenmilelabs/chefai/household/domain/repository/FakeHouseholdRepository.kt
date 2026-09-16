@@ -18,25 +18,63 @@ class FakeHouseholdRepository : HouseholdRepository {
         get() = householdFlow.value
         set(value) { householdFlow.value = value }
 
+    private val pendingInvitesFlow = MutableStateFlow<List<PendingHouseholdInvite>>(emptyList())
+    var pendingInvites: List<PendingHouseholdInvite>
+        get() = pendingInvitesFlow.value
+        set(value) { pendingInvitesFlow.value = value }
+
     /** What [household] becomes once [refresh] runs — lets a test simulate the cache catching up. */
     var householdAfterRefresh: Household? = null
+    var refreshResult: Result<Unit> = Result.success(Unit)
+
+    /**
+     * Sets [household] AND [householdAfterRefresh] together. Most callers under test (e.g.
+     * `HouseholdViewModel.init`) trigger a [refresh] as soon as they're created, and a successful
+     * [refresh] always replaces [household] with [householdAfterRefresh] — so seeding only
+     * [household] gets silently wiped back to `null` the moment that refresh runs. Use this instead
+     * of the [household] setter directly whenever the seeded value should still be there after that.
+     */
+    fun seedHousehold(value: Household?) {
+        household = value
+        householdAfterRefresh = value
+    }
+
+    var createHouseholdResult: Result<Household> = Result.failure(UnsupportedOperationException())
+    var leaveHouseholdResult: Result<Unit> = Result.failure(UnsupportedOperationException())
+    var removeMemberResult: Result<Unit> = Result.failure(UnsupportedOperationException())
+    var createInviteLinkResult: Result<HouseholdInviteLink> = Result.failure(UnsupportedOperationException())
+    var inviteByEmailResult: Result<Unit> = Result.failure(UnsupportedOperationException())
+    var acceptInviteResult: HouseholdJoinOutcome = HouseholdJoinOutcome.NetworkError
+    var declineInviteResult: Result<Unit> = Result.success(Unit)
 
     var refreshCount = 0
+        private set
+    var lastCreatedHouseholdName: String? = null
+        private set
+    var lastRemovedMemberId: UUID? = null
+        private set
+    var lastInvitedEmail: String? = null
+        private set
+    var lastAcceptedInviteId: UUID? = null
+        private set
+    var lastDeclinedInviteId: UUID? = null
         private set
 
     override fun observeMyHousehold(): Flow<Household?> = householdFlow
 
-    override fun observePendingInvites(): Flow<List<PendingHouseholdInvite>> =
-        MutableStateFlow(emptyList())
+    override fun observePendingInvites(): Flow<List<PendingHouseholdInvite>> = pendingInvitesFlow
 
     override suspend fun refresh(): Result<Unit> {
         refreshCount++
-        household = householdAfterRefresh
-        return Result.success(Unit)
+        if (refreshResult.isSuccess) household = householdAfterRefresh
+        return refreshResult
     }
 
-    override suspend fun createHousehold(name: String): Result<Household> =
-        Result.failure(UnsupportedOperationException())
+    override suspend fun createHousehold(name: String): Result<Household> {
+        lastCreatedHouseholdName = name
+        createHouseholdResult.onSuccess { household = it }
+        return createHouseholdResult
+    }
 
     override suspend fun renameHousehold(name: String): Result<Household> =
         Result.failure(UnsupportedOperationException())
@@ -44,17 +82,22 @@ class FakeHouseholdRepository : HouseholdRepository {
     override suspend fun deleteHousehold(): Result<Unit> =
         Result.failure(UnsupportedOperationException())
 
-    override suspend fun leaveHousehold(): Result<Unit> =
-        Result.failure(UnsupportedOperationException())
+    override suspend fun leaveHousehold(): Result<Unit> {
+        leaveHouseholdResult.onSuccess { household = null }
+        return leaveHouseholdResult
+    }
 
-    override suspend fun removeMember(userId: UUID): Result<Unit> =
-        Result.failure(UnsupportedOperationException())
+    override suspend fun removeMember(userId: UUID): Result<Unit> {
+        lastRemovedMemberId = userId
+        return removeMemberResult
+    }
 
-    override suspend fun createInviteLink(): Result<HouseholdInviteLink> =
-        Result.failure(UnsupportedOperationException())
+    override suspend fun createInviteLink(): Result<HouseholdInviteLink> = createInviteLinkResult
 
-    override suspend fun inviteByEmail(email: String): Result<Unit> =
-        Result.failure(UnsupportedOperationException())
+    override suspend fun inviteByEmail(email: String): Result<Unit> {
+        lastInvitedEmail = email
+        return inviteByEmailResult
+    }
 
     override suspend fun previewInvite(token: String): Result<HouseholdInvitePreview> =
         Result.failure(UnsupportedOperationException())
@@ -62,11 +105,15 @@ class FakeHouseholdRepository : HouseholdRepository {
     override suspend fun joinWithToken(token: String): HouseholdJoinOutcome =
         HouseholdJoinOutcome.NetworkError
 
-    override suspend fun acceptInvite(inviteId: UUID): HouseholdJoinOutcome =
-        HouseholdJoinOutcome.NetworkError
+    override suspend fun acceptInvite(inviteId: UUID): HouseholdJoinOutcome {
+        lastAcceptedInviteId = inviteId
+        return acceptInviteResult
+    }
 
-    override suspend fun declineInvite(inviteId: UUID): Result<Unit> =
-        Result.failure(UnsupportedOperationException())
+    override suspend fun declineInvite(inviteId: UUID): Result<Unit> {
+        lastDeclinedInviteId = inviteId
+        return declineInviteResult
+    }
 
     override suspend fun listOutstandingInvites(): Result<List<HouseholdInvite>> =
         Result.failure(UnsupportedOperationException())
