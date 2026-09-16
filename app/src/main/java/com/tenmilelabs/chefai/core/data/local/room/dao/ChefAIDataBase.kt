@@ -263,6 +263,12 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
  * plain `Index("householdId")` to a composite covering [HouseholdDao.observeMembers]'s
  * `ORDER BY role, displayName`, since a plain single-column index there was redundant with the
  * table's own composite primary key.
+ *
+ * Amended again while building A3 against the real (now-shipped) backend contract:
+ * `household_invites` drops `householdName`/`inviterDisplayName` (added `expiresAt` instead) — the
+ * backend's `GET /households/invites/pending` (what populates this table) never returns names,
+ * only `GET /households/invites/preview?token=` does, and a pending invite has no token to preview
+ * with. See [com.tenmilelabs.chefai.core.data.local.room.HouseholdInviteEntity]'s doc.
  */
 val MIGRATION_8_9 = object : Migration(8, 9) {
     override fun migrate(db: SupportSQLiteDatabase) {
@@ -291,8 +297,8 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
         db.execSQL(
             """
             CREATE TABLE IF NOT EXISTS `household_invites` (
-                `inviteId` BLOB NOT NULL, `householdId` BLOB NOT NULL, `householdName` TEXT NOT NULL,
-                `inviterDisplayName` TEXT NOT NULL, `createdAt` INTEGER NOT NULL,
+                `inviteId` BLOB NOT NULL, `householdId` BLOB NOT NULL, `expiresAt` INTEGER NOT NULL,
+                `createdAt` INTEGER NOT NULL,
                 PRIMARY KEY(`inviteId`)
             )
             """.trimIndent()

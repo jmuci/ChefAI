@@ -20,11 +20,26 @@ interface HouseholdDao {
     @Query("SELECT * FROM households WHERE uuid = :id")
     fun observeHousehold(id: UUID): Flow<HouseholdEntity?>
 
+    /** At most one row ever exists (see [HouseholdEntity]'s doc) — the reactive counterpart of
+     *  [getCachedHouseholdId], needing no id to observe "whichever household is cached". */
+    @Query("SELECT * FROM households LIMIT 1")
+    fun observeCachedHousehold(): Flow<HouseholdEntity?>
+
+    /** Resolves "my household id" for callers that need it before they can query the id-scoped
+     *  methods above. */
+    @Query("SELECT uuid FROM households LIMIT 1")
+    suspend fun getCachedHouseholdId(): UUID?
+
     @Query("SELECT * FROM household_members WHERE householdId = :id ORDER BY role ASC, displayName ASC")
     fun observeMembers(id: UUID): Flow<List<HouseholdMemberEntity>>
 
     @Query("SELECT * FROM household_invites ORDER BY createdAt DESC")
     fun observePendingInvites(): Flow<List<HouseholdInviteEntity>>
+
+    /** One-shot read for [com.tenmilelabs.chefai.household.data.repository
+     *  .DefaultHouseholdRepository.refresh] to diff the fresh server listing against. */
+    @Query("SELECT inviteId FROM household_invites")
+    suspend fun getCachedInviteIds(): List<UUID>
 
     @Upsert
     suspend fun upsertHousehold(household: HouseholdEntity)

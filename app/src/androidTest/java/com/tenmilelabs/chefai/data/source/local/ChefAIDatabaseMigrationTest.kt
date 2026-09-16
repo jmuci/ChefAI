@@ -347,8 +347,7 @@ class ChefAIDatabaseMigrationTest {
         db.query("SELECT * FROM household_invites LIMIT 0").use { cursor ->
             assertTrue(
                 "household_invites should have the expected columns",
-                listOf("inviteId", "householdId", "householdName", "inviterDisplayName", "createdAt")
-                    .all { it in cursor.columnNames }
+                listOf("inviteId", "householdId", "expiresAt", "createdAt").all { it in cursor.columnNames }
             )
         }
         db.query("SELECT * FROM meal_plans LIMIT 0").use { cursor ->
