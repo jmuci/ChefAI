@@ -9,6 +9,7 @@ import com.tenmilelabs.chefai.core.data.local.room.MealPlanEntity
 import com.tenmilelabs.chefai.core.data.local.room.ShoppingListCheckEntity
 import com.tenmilelabs.chefai.core.data.local.room.UserEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
+import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import junit.framework.TestCase.assertEquals
 import junit.framework.TestCase.assertTrue
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -52,8 +53,17 @@ class ShoppingListCheckDaoTest {
         deletedAt = null,
     )
 
-    private fun check(mealPlanId: UUID, itemKey: String, checkedAt: Long = 1_000L) =
-        ShoppingListCheckEntity(mealPlanId = mealPlanId, itemKey = itemKey, checkedAt = checkedAt)
+    private fun check(
+        mealPlanId: UUID,
+        itemKey: String,
+        checkedAt: Long = 1_000L,
+        syncState: SyncState = SyncState.PENDING,
+    ) = ShoppingListCheckEntity(
+        mealPlanId = mealPlanId,
+        itemKey = itemKey,
+        checkedAt = checkedAt,
+        syncState = syncState,
+    )
 
     @Before
     fun createDb() = runTest {
@@ -143,6 +153,55 @@ class ShoppingListCheckDaoTest {
         )
 
         assertTrue(database.shoppingListCheckDao().observeCheckedKeys(plan.uuid).first().isEmpty())
+    }
+
+    @Test
+    fun getCheck_returnsTheStoredRow() = runTest {
+        val plan = mealPlan()
+        database.mealPlanDao().upsertMealPlan(plan)
+        database.shoppingListCheckDao().upsert(check(plan.uuid, "onion"))
+
+        val stored = database.shoppingListCheckDao().getCheck(plan.uuid, "onion")
+
+        assertEquals("onion", stored?.itemKey)
+        assertTrue("a freshly-upserted row defaults to checked", stored?.checked == true)
+    }
+
+    @Test
+    fun getCheck_returnsNullForAnUnknownItem() = runTest {
+        val plan = mealPlan()
+        database.mealPlanDao().upsertMealPlan(plan)
+
+        assertEquals(null, database.shoppingListCheckDao().getCheck(plan.uuid, "onion"))
+    }
+
+    @Test
+    fun getAllDirty_returnsOnlyPendingAndDeletedRows() = runTest {
+        val plan = mealPlan()
+        database.mealPlanDao().upsertMealPlan(plan)
+        database.shoppingListCheckDao().upsert(check(plan.uuid, "onion", syncState = SyncState.PENDING))
+        database.shoppingListCheckDao().upsert(check(plan.uuid, "garlic", syncState = SyncState.SYNCED))
+        database.shoppingListCheckDao().upsert(check(plan.uuid, "milk", syncState = SyncState.DELETED))
+
+        val dirtyKeys = database.shoppingListCheckDao().getAllDirty().map { it.itemKey }.toSet()
+
+        assertEquals(setOf("onion", "milk"), dirtyKeys)
+    }
+
+    @Test
+    fun updateSyncState_updatesOnlyTheTargetedRow() = runTest {
+        val plan = mealPlan()
+        database.mealPlanDao().upsertMealPlan(plan)
+        database.shoppingListCheckDao().upsert(check(plan.uuid, "onion", syncState = SyncState.PENDING))
+        database.shoppingListCheckDao().upsert(check(plan.uuid, "garlic", syncState = SyncState.PENDING))
+
+        database.shoppingListCheckDao().updateSyncState(plan.uuid, "onion", SyncState.SYNCED, updatedAt = 5_000L)
+
+        val onion = database.shoppingListCheckDao().getCheck(plan.uuid, "onion")
+        val garlic = database.shoppingListCheckDao().getCheck(plan.uuid, "garlic")
+        assertEquals(SyncState.SYNCED, onion?.syncState)
+        assertEquals(5_000L, onion?.updatedAt)
+        assertEquals("an untouched sibling row keeps its own state", SyncState.PENDING, garlic?.syncState)
     }
 
     /** Matches `UuidConverters`' big-endian most-significant/least-significant blob layout. */

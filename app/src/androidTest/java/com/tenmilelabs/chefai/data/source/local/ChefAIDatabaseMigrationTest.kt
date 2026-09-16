@@ -11,6 +11,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_4_5
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_5_6
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_6_7
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_7_8
+import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_8_9
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -325,13 +326,97 @@ class ChefAIDatabaseMigrationTest {
     }
 
     @Test
-    fun migrateAll1To8_succeeds() {
+    fun migrate8To9_addsHouseholdTablesAndMealPlanHouseholdIdColumn() {
+        helper.createDatabase(TEST_DB, 8).close()
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 9, true, MIGRATION_8_9)
+
+        db.query("SELECT * FROM households LIMIT 0").use { cursor ->
+            assertTrue(
+                "households should have the expected columns",
+                listOf("uuid", "name", "ownerId", "createdAt", "updatedAt").all { it in cursor.columnNames }
+            )
+        }
+        db.query("SELECT * FROM household_members LIMIT 0").use { cursor ->
+            assertTrue(
+                "household_members should have the expected columns",
+                listOf("householdId", "userId", "displayName", "avatarUrl", "role", "joinedAt")
+                    .all { it in cursor.columnNames }
+            )
+        }
+        db.query("SELECT * FROM household_invites LIMIT 0").use { cursor ->
+            assertTrue(
+                "household_invites should have the expected columns",
+                listOf("inviteId", "householdId", "householdName", "inviterDisplayName", "createdAt")
+                    .all { it in cursor.columnNames }
+            )
+        }
+        db.query("SELECT * FROM meal_plans LIMIT 0").use { cursor ->
+            assertTrue("meal_plans should gain householdId", "householdId" in cursor.columnNames)
+        }
+    }
+
+    @Test
+    fun migrate8To9_existingMealPlanGetsNullHouseholdId() {
+        val planId = UUID.randomUUID()
+        val userId = UUID.randomUUID()
+
+        helper.createDatabase(TEST_DB, 8).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO meal_plans (
+                    uuid, userId, name, status, preferencesJson, createdAt, updatedAt, deletedAt, syncState
+                ) VALUES (?, ?, 'This week', 'READY', '{}', 100, 100, NULL, 'SYNCED')
+                """.trimIndent(),
+                arrayOf(planId.toBlob(), userId.toBlob())
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 9, true, MIGRATION_8_9)
+
+        db.query("SELECT householdId FROM meal_plans WHERE uuid = ?", arrayOf(planId.toBlob())).use { cursor ->
+            assertTrue("the pre-existing plan should survive the migration", cursor.moveToFirst())
+            assertTrue("an existing plan is personal until explicitly shared", cursor.isNull(0))
+        }
+    }
+
+    @Test
+    fun migrate8To9_shoppingListCheckBackfillsCheckedAndSyncedFromCheckedAt() {
+        val planId = UUID.randomUUID()
+
+        helper.createDatabase(TEST_DB, 8).use { db ->
+            db.execSQL(
+                "INSERT INTO shopping_list_checks (mealPlanId, itemKey, checkedAt) VALUES (?, 'onion', 4242)",
+                arrayOf(planId.toBlob())
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 9, true, MIGRATION_8_9)
+
+        db.query(
+            "SELECT checked, updatedAt, deletedAt, syncState FROM shopping_list_checks WHERE mealPlanId = ?",
+            arrayOf(planId.toBlob())
+        ).use { cursor ->
+            assertTrue("the pre-existing tick should survive the migration", cursor.moveToFirst())
+            assertEquals("a pre-existing row was a real tick", 1, cursor.getInt(0))
+            assertEquals("updatedAt backfills from checkedAt", 4242L, cursor.getLong(1))
+            assertTrue("no item has been removed from the list", cursor.isNull(2))
+            assertEquals(
+                "a pre-existing tick is a historical fact, not a pending edit to push",
+                "SYNCED",
+                cursor.getString(3)
+            )
+        }
+    }
+
+    @Test
+    fun migrateAll1To9_succeeds() {
         helper.createDatabase(TEST_DB, 1).close()
 
         helper.runMigrationsAndValidate(
-            TEST_DB, 8, true,
+            TEST_DB, 9, true,
             MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-            MIGRATION_7_8,
+            MIGRATION_7_8, MIGRATION_8_9,
         )
     }
 }

@@ -33,4 +33,13 @@ data class MealPlanEntity(
     override val updatedAt: Long,
     override val deletedAt: Long?,
     override val syncState: SyncState = SyncState.PENDING,
+    /**
+     * Null for a personal plan (unchanged behaviour). Non-null means the plan is shared with a
+     * household — see ADR-014. [userId] still names the plan's actual owner in both cases; a
+     * shared plan is not re-owned by the household, only made visible/editable to its members.
+     *
+     * Deliberately no local foreign key to `households.uuid` — see [HouseholdEntity]'s doc for
+     * why the household cache tables can't be an FK target here.
+     */
+    val householdId: UUID? = null,
 ) : SyncableEntity
