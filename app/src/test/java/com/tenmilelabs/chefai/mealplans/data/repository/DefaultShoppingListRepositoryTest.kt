@@ -9,6 +9,8 @@ import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.UserEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeShoppingListCheckDao
+import com.tenmilelabs.chefai.core.data.local.util.SyncState
+import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -21,6 +23,7 @@ class DefaultShoppingListRepositoryTest {
 
     private lateinit var recipeDao: FakeRecipeDao
     private lateinit var checkDao: FakeShoppingListCheckDao
+    private lateinit var syncScheduler: FakeSyncManager
     private lateinit var repository: DefaultShoppingListRepository
 
     private val user = UserEntity(
@@ -36,7 +39,8 @@ class DefaultShoppingListRepositoryTest {
     fun setup() {
         recipeDao = FakeRecipeDao()
         checkDao = FakeShoppingListCheckDao()
-        repository = DefaultShoppingListRepository(recipeDao, checkDao)
+        syncScheduler = FakeSyncManager()
+        repository = DefaultShoppingListRepository(recipeDao, checkDao, syncScheduler)
     }
 
     // --- observeIngredientsForRecipes ---
@@ -80,13 +84,35 @@ class DefaultShoppingListRepositoryTest {
     }
 
     @Test
-    fun `setChecked(false) removes a previously ticked item`() = runTest {
+    fun `setChecked(false) removes a previously ticked item from the checked set`() = runTest {
         val planId = UUID.randomUUID()
         repository.setChecked(planId, "onion", checked = true)
 
         repository.setChecked(planId, "onion", checked = false)
 
         assertThat(repository.observeCheckedItems(planId).first()).isEmpty()
+    }
+
+    @Test
+    fun `setChecked(false) upserts the row rather than deleting it — an unchecked item is still on the list`() = runTest {
+        val planId = UUID.randomUUID()
+        repository.setChecked(planId, "onion", checked = true)
+
+        repository.setChecked(planId, "onion", checked = false)
+
+        val stored = checkDao.getCheck(planId, "onion")
+        assertThat(stored).isNotNull()
+        assertThat(stored?.checked).isFalse()
+    }
+
+    @Test
+    fun `setChecked stamps the row PENDING and requests a mutation sync`() = runTest {
+        val planId = UUID.randomUUID()
+
+        repository.setChecked(planId, "onion", checked = true)
+
+        assertThat(checkDao.getCheck(planId, "onion")?.syncState).isEqualTo(SyncState.PENDING)
+        assertThat(syncScheduler.mutationSyncCount).isEqualTo(1)
     }
 
     @Test

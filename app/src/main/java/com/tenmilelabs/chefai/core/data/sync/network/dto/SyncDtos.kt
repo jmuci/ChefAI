@@ -6,7 +6,8 @@ import kotlinx.serialization.Serializable
 data class SyncPushRequest(
     val recipes: List<SyncRecipeDto>,
     val bookmarkedRecipes: List<SyncBookmarkPushDto> = emptyList(),
-    val mealPlans: List<SyncMealPlanDto> = emptyList()
+    val mealPlans: List<SyncMealPlanDto> = emptyList(),
+    val groceryListItems: List<SyncGroceryListItem> = emptyList()
 )
 
 @Serializable
@@ -69,7 +70,8 @@ data class SyncPushResponse(
     val serverTimestamp: Long,
     val bookmarkedRecipes: List<BookmarkAcceptedDto> = emptyList(),
     val bookmarkErrors: List<BookmarkErrorDto> = emptyList(),
-    val mealPlans: MealPlanPushResults = MealPlanPushResults()
+    val mealPlans: MealPlanPushResults = MealPlanPushResults(),
+    val groceryListItems: GroceryItemPushResults = GroceryItemPushResults()
 )
 
 @Serializable
@@ -194,7 +196,8 @@ data class SyncPullResponse(
     val tags: List<SyncTagDto> = emptyList(),
     val labels: List<SyncLabelDto> = emptyList(),
     val bookmarkedRecipes: List<SyncBookmarkPullDto> = emptyList(),
-    val mealPlans: List<SyncMealPlanDto> = emptyList()
+    val mealPlans: List<SyncMealPlanDto> = emptyList(),
+    val groceryListItems: List<SyncGroceryListItem> = emptyList()
 )
 
 @Serializable
@@ -210,6 +213,16 @@ data class SyncBookmarkPullDto(
 @Serializable
 data class SyncMealPlanDto(
     val uuid: String,
+    /**
+     * The plan's real owner — never inferred from the caller. A household member who can edit a
+     * shared plan is frequently not its owner; the client must not stamp `ownerId = <whoever
+     * pulled it>`, or the first shared plan a member pulls silently reassigns ownership on their
+     * device. See [com.tenmilelabs.chefai.core.data.sync.mapper.toMealPlanEntity] and ADR-014.
+     */
+    val ownerId: String,
+    /** Null = personal, unchanged pre-households behavior. Non-null = visible to every active
+     *  member of that household, not just [ownerId]. */
+    val householdId: String? = null,
     val name: String,
     val status: String,
     val preferencesJson: String,
@@ -258,4 +271,52 @@ data class GenerateMealPlanStatelessResponseDto(
     val recipes: List<SyncRecipeDto>,
     val referenceData: SyncReferenceDataDto,
     val creators: List<SyncCreatorDto>
+)
+
+// --- Grocery List Sync DTOs ---
+
+/**
+ * An explicit `checked: Boolean`, not a tombstone-on-uncheck: unchecking an item is an ordinary
+ * LWW update, not a delete-then-recreate, so a toggle/untoggle cycle never accumulates tombstone
+ * rows. [deletedAt] means only "this item left the list entirely" (e.g. removed from the plan) —
+ * see ADR-014 §0.3.
+ */
+@Serializable
+data class SyncGroceryListItem(
+    val mealPlanId: String,
+    val itemKey: String,
+    val checked: Boolean,
+    /** Whoever last checked/unchecked this item — server-derived on push, never trusted from a
+     *  pushed payload; only meaningful on a pulled item. */
+    val checkedBy: String? = null,
+    val updatedAt: Long,
+    val deletedAt: Long?
+)
+
+@Serializable
+data class GroceryItemAcceptedDto(
+    val mealPlanId: String,
+    val itemKey: String,
+    val serverUpdatedAt: Long
+)
+
+@Serializable
+data class GroceryItemIdentifierDto(
+    val mealPlanId: String,
+    val itemKey: String
+)
+
+@Serializable
+data class GroceryItemErrorDto(
+    val mealPlanId: String,
+    val itemKey: String,
+    val reason: String,
+    val message: String
+)
+
+@Serializable
+data class GroceryItemPushResults(
+    val accepted: List<GroceryItemAcceptedDto> = emptyList(),
+    val conflicts: List<GroceryItemIdentifierDto> = emptyList(),
+    val errors: List<GroceryItemErrorDto> = emptyList()
 )

@@ -17,7 +17,11 @@ class FakeShoppingListCheckDao : ShoppingListCheckDao {
     }
 
     override fun observeCheckedKeys(mealPlanId: UUID): Flow<List<String>> =
-        trigger.map { checks.keys.filter { it.first == mealPlanId }.map { it.second } }
+        trigger.map {
+            checks.values
+                .filter { it.mealPlanId == mealPlanId && it.checked && it.deletedAt == null }
+                .map { it.itemKey }
+        }
 
     override suspend fun upsert(check: ShoppingListCheckEntity) {
         checks[check.mealPlanId to check.itemKey] = check

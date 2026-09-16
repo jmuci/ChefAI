@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.core.data.sync.mapper
 
 import com.tenmilelabs.chefai.core.data.local.room.MealPlanDayEntity
 import com.tenmilelabs.chefai.core.data.local.room.MealPlanEntity
+import com.tenmilelabs.chefai.core.data.local.room.ShoppingListCheckEntity
 import com.tenmilelabs.chefai.core.data.local.room.AllergenEntity
 import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.LabelEntity
@@ -26,6 +27,7 @@ import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncTagDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncCreatorDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDayDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncGroceryListItem
 import java.util.UUID
 
 // --- Push direction: Room entities → DTO ---
@@ -216,6 +218,8 @@ fun SyncCreatorDto.toUserEntity(): UserEntity = UserEntity(
 
 fun MealPlanEntity.toSyncDto(days: List<MealPlanDayEntity>): SyncMealPlanDto = SyncMealPlanDto(
     uuid = uuid.toString(),
+    ownerId = userId.toString(),
+    householdId = householdId?.toString(),
     name = name,
     status = status,
     preferencesJson = preferencesJson,
@@ -234,9 +238,13 @@ fun MealPlanDayEntity.toSyncDto(): SyncMealPlanDayDto = SyncMealPlanDayDto(
 
 // --- Meal Plan: Pull direction (DTO → Entity) ---
 
-fun SyncMealPlanDto.toMealPlanEntity(userId: UUID): MealPlanEntity = MealPlanEntity(
+/** The DTO is self-describing (see [SyncMealPlanDto.ownerId]/[SyncMealPlanDto.householdId]) — no
+ *  caller-supplied `userId` here, or a shared plan pulled by a non-owning member would silently
+ *  reassign ownership to whoever pulled it. See ADR-014. */
+fun SyncMealPlanDto.toMealPlanEntity(): MealPlanEntity = MealPlanEntity(
     uuid = UUID.fromString(uuid),
-    userId = userId,
+    userId = UUID.fromString(ownerId),
+    householdId = householdId?.let { UUID.fromString(it) },
     name = name,
     status = status,
     preferencesJson = preferencesJson,
@@ -252,4 +260,29 @@ fun SyncMealPlanDayDto.toMealPlanDayEntity(mealPlanId: UUID): MealPlanDayEntity 
     dayIndex = dayIndex,
     dinnerRecipeId = dinnerRecipeId?.let { UUID.fromString(it) },
     lunchRecipeId = lunchRecipeId?.let { UUID.fromString(it) }
+)
+
+// --- Grocery List: Push direction (Entity → DTO) ---
+
+fun ShoppingListCheckEntity.toSyncDto(): SyncGroceryListItem = SyncGroceryListItem(
+    mealPlanId = mealPlanId.toString(),
+    itemKey = itemKey,
+    checked = checked,
+    // Server-derived from the pushing caller (see SyncGroceryListItem's doc) — this device
+    // doesn't know who it is, so there's nothing honest to send.
+    checkedBy = null,
+    updatedAt = updatedAt,
+    deletedAt = deletedAt,
+)
+
+// --- Grocery List: Pull direction (DTO → Entity) ---
+
+fun SyncGroceryListItem.toEntity(): ShoppingListCheckEntity = ShoppingListCheckEntity(
+    mealPlanId = UUID.fromString(mealPlanId),
+    itemKey = itemKey,
+    checkedAt = updatedAt,
+    checked = checked,
+    updatedAt = updatedAt,
+    deletedAt = deletedAt,
+    syncState = SyncState.SYNCED,
 )
