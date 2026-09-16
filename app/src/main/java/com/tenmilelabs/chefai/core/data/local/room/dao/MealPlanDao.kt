@@ -39,6 +39,21 @@ interface MealPlanDao {
     @Query("SELECT COUNT(*) FROM meal_plans WHERE userId = :userId AND deletedAt IS NULL")
     suspend fun countMealPlansForUser(userId: UUID): Int
 
+    // Household cleanup
+
+    /**
+     * Drops shared plans this device no longer has any claim to. A plan the leaving user owns is
+     * kept, with its household link cleared — the server does the same, so the two agree. A hard
+     * delete, not a soft one: pushing a `DELETED` state for a plan owned by somebody else is not a
+     * request this client is authorized to make.
+     */
+    @Query("DELETE FROM meal_plans WHERE householdId = :householdId AND userId != :keepOwnedBy")
+    suspend fun deleteHouseholdPlansNotOwnedBy(householdId: UUID, keepOwnedBy: UUID)
+
+    /** Un-shares the leaving user's own plans without deleting them. */
+    @Query("UPDATE meal_plans SET householdId = NULL WHERE householdId = :householdId AND userId = :userId")
+    suspend fun clearHouseholdLinkForOwnPlans(householdId: UUID, userId: UUID)
+
     // Days
 
     @Query("SELECT * FROM meal_plan_days WHERE mealPlanId = :mealPlanId ORDER BY dayIndex ASC")

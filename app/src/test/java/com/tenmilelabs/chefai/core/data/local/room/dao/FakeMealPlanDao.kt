@@ -72,6 +72,19 @@ class FakeMealPlanDao : MealPlanDao {
     override suspend fun countMealPlansForUser(userId: UUID): Int =
         plans.values.count { it.userId == userId && it.deletedAt == null }
 
+    override suspend fun deleteHouseholdPlansNotOwnedBy(householdId: UUID, keepOwnedBy: UUID) {
+        plans.values.filter { it.householdId == householdId && it.userId != keepOwnedBy }
+            .map { it.uuid }
+            .forEach { plans.remove(it) }
+        notifyChange()
+    }
+
+    override suspend fun clearHouseholdLinkForOwnPlans(householdId: UUID, userId: UUID) {
+        plans.values.filter { it.householdId == householdId && it.userId == userId }
+            .forEach { plans[it.uuid] = it.copy(householdId = null) }
+        notifyChange()
+    }
+
     override fun observeDaysForMealPlan(mealPlanId: UUID): Flow<List<MealPlanDayEntity>> =
         daysFlow.map { it.values.filter { day -> day.mealPlanId == mealPlanId }.sortedBy { day -> day.dayIndex } }
 
