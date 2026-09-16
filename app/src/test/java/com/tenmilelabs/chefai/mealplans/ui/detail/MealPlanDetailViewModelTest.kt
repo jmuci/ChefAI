@@ -7,11 +7,15 @@ import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.AuthToken
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncExecutor
+import com.tenmilelabs.chefai.core.domain.model.HouseholdRole
 import com.tenmilelabs.chefai.core.domain.model.User
 import com.tenmilelabs.chefai.core.testutil.recipePreview1
 import com.tenmilelabs.chefai.core.testutil.recipePreview2
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
+import com.tenmilelabs.chefai.household.domain.model.Household
+import com.tenmilelabs.chefai.household.domain.model.HouseholdMember
+import com.tenmilelabs.chefai.household.domain.repository.FakeHouseholdRepository
 import com.tenmilelabs.chefai.mealplans.data.repository.FakeMealPlanRepository
 import com.tenmilelabs.chefai.mealplans.data.repository.FakeShoppingListRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.DietaryRestriction
@@ -49,6 +53,7 @@ class MealPlanDetailViewModelTest {
     private lateinit var recipesRepository: FakeRecipesRepository
     private lateinit var syncExecutor: FakeSyncExecutor
     private lateinit var shoppingListRepository: FakeShoppingListRepository
+    private lateinit var householdRepository: FakeHouseholdRepository
     private lateinit var sessionManager: SessionManager
 
     private val planId = UUID.randomUUID()
@@ -62,6 +67,7 @@ class MealPlanDetailViewModelTest {
         recipesRepository.setRecipePreviewsToEmit(listOf(recipePreview1, recipePreview2))
         syncExecutor = FakeSyncExecutor()
         shoppingListRepository = FakeShoppingListRepository()
+        householdRepository = FakeHouseholdRepository()
         sessionManager = mockk()
         // Default to authenticated: the existing generation tests below exercise the server round
         // trip (requestGeneration/daysFromServer), which only an authenticated session takes — see
@@ -131,6 +137,40 @@ class MealPlanDetailViewModelTest {
         createViewModel().uiState.test {
             val state = awaitItem().let { if (it is MealPlanDetailUiState.Loading) awaitItem() else it }
             assertThat((state as MealPlanDetailUiState.Success).showsSlotLabels).isFalse()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // --- Shared badge ---
+
+    @Test
+    fun `uiState resolves the owner's display name for a shared plan`() = runTest {
+        val ownerId = UUID.randomUUID()
+        val householdId = UUID.randomUUID()
+        mealPlanRepository.emitPlans(planWith(fullDay(), userId = ownerId, householdId = householdId))
+        householdRepository.seedHousehold(
+            Household(
+                uuid = householdId,
+                name = "The Test Kitchen",
+                ownerId = ownerId,
+                members = listOf(HouseholdMember(ownerId, "Chef Owner", "", HouseholdRole.OWNER)),
+            )
+        )
+
+        createViewModel().uiState.test {
+            val state = awaitItem().let { if (it is MealPlanDetailUiState.Loading) awaitItem() else it }
+            assertThat((state as MealPlanDetailUiState.Success).ownerDisplayName).isEqualTo("Chef Owner")
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `uiState ownerDisplayName is null for a personal plan`() = runTest {
+        mealPlanRepository.emitPlans(planWith(fullDay(), householdId = null))
+
+        createViewModel().uiState.test {
+            val state = awaitItem().let { if (it is MealPlanDetailUiState.Loading) awaitItem() else it }
+            assertThat((state as MealPlanDetailUiState.Success).ownerDisplayName).isNull()
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -384,6 +424,7 @@ class MealPlanDetailViewModelTest {
             recipesRepository = recipesRepository,
             generateMealPlanUseCase = generateMealPlanUseCase,
             shoppingListRepository = shoppingListRepository,
+            householdRepository = householdRepository,
         )
     }
 
@@ -402,15 +443,19 @@ class MealPlanDetailViewModelTest {
     private fun planWith(
         day: MealPlanDay,
         mealType: MealType = MealType.DINNER_AND_LUNCH,
-    ) = planWith(listOf(day), mealType)
+        userId: UUID = UUID.randomUUID(),
+        householdId: UUID? = null,
+    ) = planWith(listOf(day), mealType, userId = userId, householdId = householdId)
 
     private fun planWith(
         days: List<MealPlanDay>,
         mealType: MealType = MealType.DINNER_AND_LUNCH,
         recipeSource: RecipeSource = RecipeSource.INCLUDE_PUBLIC,
+        userId: UUID = UUID.randomUUID(),
+        householdId: UUID? = null,
     ) = MealPlan(
         uuid = planId,
-        userId = UUID.randomUUID(),
+        userId = userId,
         name = "3-day meal plan",
         preferences = MealPlanPreferences(
             planLengthDays = 3,
@@ -427,5 +472,6 @@ class MealPlanDetailViewModelTest {
         createdAt = 0L,
         updatedAt = 0L,
         days = days,
+        householdId = householdId,
     )
 }

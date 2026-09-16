@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
+import com.tenmilelabs.chefai.household.domain.model.Household
+import com.tenmilelabs.chefai.household.domain.repository.HouseholdRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.print.MealPlanPrintDocument
@@ -42,6 +44,8 @@ sealed interface MealPlanDetailUiState {
         val board: MealPlanBoard,
         /** True while a generation attempt (remote or local) is in flight. */
         val isGenerating: Boolean = false,
+        /** Null unless [mealPlan] is shared and its owner was found in the cached household. */
+        val ownerDisplayName: String? = null,
     ) : MealPlanDetailUiState {
         val upcoming: List<DaySection> get() = board.upcoming
         val cooked: List<PlannedMeal> get() = board.cooked
@@ -68,6 +72,7 @@ class MealPlanDetailViewModel @Inject constructor(
     private val recipesRepository: RecipesRepository,
     private val generateMealPlanUseCase: GenerateMealPlanUseCase,
     private val shoppingListRepository: ShoppingListRepository,
+    private val householdRepository: HouseholdRepository,
 ) : ViewModel() {
 
     private val mealPlanId: UUID = UUID.fromString(
@@ -95,7 +100,9 @@ class MealPlanDetailViewModel @Inject constructor(
                     recipesRepository.getRecipePreviewsByIds(recipeIds)
                 }
 
-                previews.map { list -> buildState(mealPlan, list.associateBy { it.uuid }) }
+                previews.combine(householdRepository.observeMyHousehold()) { list, household ->
+                    buildState(mealPlan, list.associateBy { it.uuid }, household)
+                }
             }
         }
         .combine(isGenerating) { state, generating ->
@@ -193,9 +200,15 @@ class MealPlanDetailViewModel @Inject constructor(
         internal fun buildState(
             mealPlan: MealPlan,
             recipeMap: Map<UUID, RecipePreview>,
+            household: Household? = null,
         ): MealPlanDetailUiState.Success = MealPlanDetailUiState.Success(
             mealPlan = mealPlan,
             board = MealPlanBoard.from(mealPlan, recipeMap),
+            ownerDisplayName = if (mealPlan.householdId != null) {
+                household?.members?.firstOrNull { it.userId == mealPlan.userId }?.displayName
+            } else {
+                null
+            },
         )
     }
 }

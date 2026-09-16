@@ -21,6 +21,7 @@ fun MealPlanEntity.toDomain(days: List<MealPlanDayEntity>): MealPlan = MealPlan(
     createdAt = createdAt,
     updatedAt = updatedAt,
     days = days.map { it.toDomain() },
+    householdId = householdId,
 )
 
 fun MealPlanDayEntity.toDomain(): MealPlanDay = MealPlanDay(
@@ -41,6 +42,7 @@ fun MealPlan.toEntity(): MealPlanEntity = MealPlanEntity(
     createdAt = createdAt,
     updatedAt = updatedAt,
     deletedAt = null,
+    householdId = householdId,
 )
 
 /**

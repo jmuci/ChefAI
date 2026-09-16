@@ -6,6 +6,10 @@ import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
+import com.tenmilelabs.chefai.household.domain.model.Household
+import com.tenmilelabs.chefai.household.domain.model.HouseholdMember
+import com.tenmilelabs.chefai.household.domain.repository.FakeHouseholdRepository
+import com.tenmilelabs.chefai.core.domain.model.HouseholdRole
 import com.tenmilelabs.chefai.mealplans.data.repository.FakeMealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.DietaryRestriction
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
@@ -29,15 +33,18 @@ class MealPlansViewModelTest {
     val mainCoroutineRule = MainCoroutineRule()
 
     private lateinit var repository: FakeMealPlanRepository
+    private lateinit var householdRepository: FakeHouseholdRepository
     private lateinit var sessionManager: SessionManager
     private lateinit var viewModel: MealPlansViewModel
 
     @Before
     fun setup() {
         repository = FakeMealPlanRepository()
+        householdRepository = FakeHouseholdRepository()
         sessionManager = createTestSessionManager(CoroutineScope(mainCoroutineRule.testDispatcher))
         viewModel = MealPlansViewModel(
             mealPlanRepository = repository,
+            householdRepository = householdRepository,
             sessionManager = sessionManager,
         )
     }
@@ -46,6 +53,7 @@ class MealPlansViewModelTest {
         userId: UUID,
         name: String = "Test Plan",
         status: MealPlanStatus = MealPlanStatus.DRAFT,
+        householdId: UUID? = null,
     ) = MealPlan(
         uuid = UUID.randomUUID(),
         userId = userId,
@@ -65,6 +73,7 @@ class MealPlansViewModelTest {
         createdAt = System.currentTimeMillis(),
         updatedAt = System.currentTimeMillis(),
         days = emptyList(),
+        householdId = householdId,
     )
 
     // --- Initial state ---
@@ -151,6 +160,41 @@ class MealPlansViewModelTest {
         }
     }
 
+    // --- Household ---
+
+    @Test
+    fun `uiState carries the cached household alongside the plans`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        val household = Household(
+            uuid = UUID.randomUUID(),
+            name = "The Test Kitchen",
+            ownerId = userId,
+            members = listOf(
+                HouseholdMember(userId, "Chef Owner", "", HouseholdRole.OWNER),
+            ),
+        )
+        householdRepository.seedHousehold(household)
+        repository.emitPlans(makePlan(userId, householdId = household.uuid))
+
+        viewModel.uiState.test {
+            val state = awaitItem().let { if (it is MealPlansUiState.Loading) awaitItem() else it }
+            assertThat((state as MealPlansUiState.Success).household).isEqualTo(household)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `uiState household is null when nothing is cached`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        repository.emitPlans(makePlan(userId))
+
+        viewModel.uiState.test {
+            val state = awaitItem().let { if (it is MealPlansUiState.Loading) awaitItem() else it }
+            assertThat((state as MealPlansUiState.Success).household).isNull()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     // --- Error state ---
 
     @Test
@@ -158,6 +202,7 @@ class MealPlansViewModelTest {
         val errorRepository = FakeMealPlanRepository().also { it.shouldThrowOnObserve = true }
         val errorViewModel = MealPlansViewModel(
             mealPlanRepository = errorRepository,
+            householdRepository = householdRepository,
             sessionManager = sessionManager,
         )
 
