@@ -255,6 +255,14 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
  * as something the user just did. `updatedAt` backfills from `checkedAt`, the closest fact the row
  * already carries about "when". See [ShoppingListCheckEntity]'s "Transitional note" doc for why
  * `checked` has no live consumer yet.
+ *
+ * Amended post-review (still pre-release, no installed base to preserve — see fix commit): the
+ * `meal_plans.householdId` index this migration creates was missing from [MealPlanEntity]'s own
+ * `@Entity(indices = ...)`, so Room's compiled schema disagreed with what this SQL actually
+ * created — [MealPlanEntity] now declares it. The `household_members` index was widened from a
+ * plain `Index("householdId")` to a composite covering [HouseholdDao.observeMembers]'s
+ * `ORDER BY role, displayName`, since a plain single-column index there was redundant with the
+ * table's own composite primary key.
  */
 val MIGRATION_8_9 = object : Migration(8, 9) {
     override fun migrate(db: SupportSQLiteDatabase) {
@@ -277,8 +285,8 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
             """.trimIndent()
         )
         db.execSQL(
-            "CREATE INDEX IF NOT EXISTS `index_household_members_householdId` " +
-                "ON `household_members` (`householdId`)"
+            "CREATE INDEX IF NOT EXISTS `index_household_members_householdId_role_displayName` " +
+                "ON `household_members` (`householdId`, `role`, `displayName`)"
         )
         db.execSQL(
             """

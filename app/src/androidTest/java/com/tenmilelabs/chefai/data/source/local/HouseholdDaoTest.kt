@@ -146,11 +146,25 @@ class HouseholdDaoTest {
     }
 
     @Test
+    fun deleteHousehold_isAFullLocalTeardownOfItsOwnMembersAndInvites() = runTest {
+        // No FK from household_members/household_invites to households (see HouseholdEntity's
+        // doc), so deleteHousehold composes three plain deletes under @Transaction itself rather
+        // than relying on a cascade — this pins that composition down.
+        val entity = household()
+        database.householdDao().upsertHousehold(entity)
+        database.householdDao().upsertMembers(listOf(member(entity.uuid)))
+        database.householdDao().upsertInvites(listOf(invite(entity.uuid)))
+
+        database.householdDao().deleteHousehold(entity.uuid)
+
+        assertTrue(database.householdDao().observeMembers(entity.uuid).first().isEmpty())
+        assertTrue(database.householdDao().observePendingInvites().first().isEmpty())
+    }
+
+    @Test
     fun deleteHousehold_leavesMembersOfOtherHouseholdsUntouched() = runTest {
-        // No FK from household_members to households (see HouseholdEntity's doc), so this is a
-        // real behaviour to pin down, not a given: deleting one household's row must not cascade
-        // anywhere, and the caller (leave/removal flow) is responsible for clearing that
-        // household's own members separately.
+        // deleteHousehold only ever composes deletes scoped to its own [id] — this pins that
+        // scoping down so a future edit to the @Transaction body can't widen it by accident.
         val entity = household()
         val other = household()
         database.householdDao().upsertHousehold(entity)

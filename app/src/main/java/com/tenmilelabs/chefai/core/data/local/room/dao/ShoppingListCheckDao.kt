@@ -14,6 +14,12 @@ import java.util.UUID
  * [delete] is still the uncheck path today — see [ShoppingListCheckEntity]'s "Transitional note".
  * [getCheck]/[getAllDirty]/[updateSyncState] exist ahead of their consumer, added now so the ADR-014
  * migration only has to run once; they are unused until the sync wiring for a shared list lands.
+ *
+ * **When that wiring lands**: [delete] must become a soft delete (`deletedAt`/`syncState =
+ * 'DELETED'`), not stay a hard `DELETE` — [getAllDirty]'s `WHERE syncState IN ('PENDING',
+ * 'DELETED')` can never observe a row that no longer exists, so an uncheck on one device would
+ * silently never sync to other household members. [BookmarkedRecipeDao.softDelete] is the exact
+ * template to copy for this table's own soft delete, once `delete()` is retired in favor of it.
  */
 @Dao
 interface ShoppingListCheckDao {
