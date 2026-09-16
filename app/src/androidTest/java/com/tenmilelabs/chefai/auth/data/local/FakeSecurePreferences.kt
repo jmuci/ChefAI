@@ -24,6 +24,7 @@ class FakeSecurePreferences : SecurePreferencesInterface {
         private const val KEY_LOCAL_USER_ID = "local_user_id"
         private const val KEY_CURRENT_USER_ID = "current_user_id"
         private const val KEY_LAST_LOGIN_EMAIL = "last_login_email"
+        private const val KEY_PENDING_INVITE_TOKEN = "pending_invite_token"
     }
 
     override suspend fun saveAuthData(
@@ -153,5 +154,21 @@ class FakeSecurePreferences : SecurePreferencesInterface {
 
     override fun getLastLoginEmail(): Flow<String?> = storage.map { prefs ->
         prefs[KEY_LAST_LOGIN_EMAIL] as? String
+    }
+
+    override suspend fun savePendingInviteToken(token: String) {
+        storage.value = storage.value.toMutableMap().apply {
+            put(KEY_PENDING_INVITE_TOKEN, token)
+        }
+    }
+
+    override fun getPendingInviteToken(): Flow<String?> = storage.map { prefs ->
+        prefs[KEY_PENDING_INVITE_TOKEN] as? String
+    }
+
+    override suspend fun clearPendingInviteToken() {
+        storage.value = storage.value.toMutableMap().apply {
+            remove(KEY_PENDING_INVITE_TOKEN)
+        }
     }
 }

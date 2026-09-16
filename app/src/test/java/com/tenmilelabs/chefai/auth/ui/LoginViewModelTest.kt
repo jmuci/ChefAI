@@ -393,6 +393,24 @@ class LoginViewModelTest {
     }
 
     @Test
+    fun `login with a pending invite token resumes the join instead of home`() = testScope.runTest {
+        // Given: an anonymous session previewed an invite and stored the token before signing in
+        fakeSecurePreferences.savePendingInviteToken("invite-token-abc")
+        viewModel.onEmailChange("test@example.com")
+        viewModel.onPasswordChange("password123")
+
+        // When: Login succeeds
+        viewModel.uiEvents.test {
+            viewModel.onLoginClick()
+            advanceUntilIdle()
+
+            // Then: Navigates to resume the invite join, not home
+            val event = awaitItem()
+            assertThat(event).isEqualTo(LoginUiEvent.NavigateToAcceptInvite("invite-token-abc"))
+        }
+    }
+
+    @Test
     fun `on email change shows matching suggestions`() = testScope.runTest {
         // Given: A saved login email stored in preferences
         fakeSecurePreferences.saveLastLoginEmail("user@example.com")

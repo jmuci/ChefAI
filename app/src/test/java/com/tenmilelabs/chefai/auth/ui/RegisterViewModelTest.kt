@@ -83,7 +83,7 @@ class RegisterViewModelTest {
             uuidGenerator = { UuidV7Generator.newId() }
         }
 
-        viewModel = RegisterViewModel(sessionManager)
+        viewModel = RegisterViewModel(sessionManager, fakeSecurePreferences)
     }
 
     @Test
@@ -538,6 +538,26 @@ class RegisterViewModelTest {
             assertThat(event).isInstanceOf(RegisterUiEvent.ShowSnackbarText::class.java)
             assertThat((event as RegisterUiEvent.ShowSnackbarText).message)
                 .isEqualTo("Invalid input data")
+        }
+    }
+
+    @Test
+    fun `on register click with a pending invite token resumes the join instead of home`() = testScope.runTest {
+        // Given: an anonymous session previewed an invite and stored the token before signing up
+        fakeSecurePreferences.savePendingInviteToken("invite-token-abc")
+        viewModel.onUsernameChange("testuser")
+        viewModel.onEmailChange("test@example.com")
+        viewModel.onPasswordChange("password123")
+        viewModel.onConfirmPasswordChange("password123")
+
+        // When: Registration succeeds
+        viewModel.uiEvents.test {
+            viewModel.onRegisterClick()
+            advanceUntilIdle()
+
+            // Then: Navigates to resume the invite join, not home
+            val event = awaitItem()
+            assertThat(event).isEqualTo(RegisterUiEvent.NavigateToAcceptInvite("invite-token-abc"))
         }
     }
 

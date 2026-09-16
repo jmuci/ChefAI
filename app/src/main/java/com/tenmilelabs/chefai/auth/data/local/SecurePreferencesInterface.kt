@@ -49,4 +49,16 @@ interface SecurePreferencesInterface {
 
     /** Reads the last successfully used login email, or null if none has been stored. */
     fun getLastLoginEmail(): Flow<String?>
+
+    /**
+     * Persists a household invite token an anonymous session previewed but can't act on, so the
+     * sign-up round trip (which may kill the process) can resume the join afterward (ADR-014 §7).
+     */
+    suspend fun savePendingInviteToken(token: String)
+
+    /** Reads the pending invite token, or null if none has been stored. */
+    fun getPendingInviteToken(): Flow<String?>
+
+    /** Clears the pending invite token once its join succeeds or is explicitly declined. */
+    suspend fun clearPendingInviteToken()
 }

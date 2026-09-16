@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.auth.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.auth.data.local.SecurePreferencesInterface
 import com.tenmilelabs.chefai.auth.data.network.AuthHttpException
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -11,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.io.IOException
@@ -44,6 +46,9 @@ sealed interface RegisterUiEvent {
     data class ShowSnackbarText(val message: String) : RegisterUiEvent
     data object NavigateToHome : RegisterUiEvent
     data object NavigateToLogin : RegisterUiEvent
+
+    /** A household invite was pending sign-up (ADR-014 §7) — resume the join instead of Home. */
+    data class NavigateToAcceptInvite(val token: String) : RegisterUiEvent
 }
 
 /**
@@ -51,7 +56,8 @@ sealed interface RegisterUiEvent {
  */
 @HiltViewModel
 class RegisterViewModel @Inject constructor(
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val securePreferences: SecurePreferencesInterface,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RegisterUiState())
@@ -120,8 +126,16 @@ class RegisterViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = false)
 
             result.fold(
-                onSuccess = { user ->
-                    _uiEvent.emit(RegisterUiEvent.NavigateToHome)
+                onSuccess = { _ ->
+                    // AccountUpgradeUseCase has already completed inside SessionManager.register()
+                    // (awaited, not fire-and-forget) by the time this runs, so getCurrentUserId()
+                    // is stable — see SessionManager.register()'s doc and ADR-014 §7.
+                    val pendingInviteToken = securePreferences.getPendingInviteToken().first()
+                    if (pendingInviteToken != null) {
+                        _uiEvent.emit(RegisterUiEvent.NavigateToAcceptInvite(pendingInviteToken))
+                    } else {
+                        _uiEvent.emit(RegisterUiEvent.NavigateToHome)
+                    }
                 },
                 onFailure = { exception ->
                     Timber.e(exception, "Registration failed")
