@@ -77,6 +77,8 @@ fun ChefAINavGraph(
     },
     pendingSharedUrl: String? = null,
     onPendingSharedUrlConsumed: () -> Unit = {},
+    pendingInviteToken: String? = null,
+    onPendingInviteTokenConsumed: () -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val backPressedDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
@@ -87,6 +89,16 @@ fun ChefAINavGraph(
         if (pendingSharedUrl != null) {
             navActions.navigateToImportRecipe(prefillUrl = pendingSharedUrl)
             onPendingSharedUrlConsumed()
+        }
+    }
+
+    // A household invite App Link jumps straight to the accept screen, token already in hand —
+    // regardless of which screen is currently on top. Session state (anonymous vs. authenticated,
+    // already-in-a-household) is resolved by AcceptInviteViewModel itself once it loads, not here.
+    LaunchedEffect(pendingInviteToken) {
+        if (pendingInviteToken != null) {
+            navActions.navigateToAcceptInvite(pendingInviteToken)
+            onPendingInviteTokenConsumed()
         }
     }
 
@@ -299,12 +311,17 @@ fun ChefAINavGraph(
             ),
         ) {
             AcceptInviteScreen(
-                // The only entry point into this screen today is HouseholdScreen's own "enter a
-                // code" CTA, so Household is always already the destination underneath this one —
-                // popping back to it (rather than pushing a fresh instance) lets its existing,
-                // still-live ViewModel pick up the newly joined household from the same Room cache
-                // it's already observing, no extra fetch needed.
-                onNavigateToHousehold = { navController.popBackStack() },
+                // Entry point varies — HouseholdScreen's own "enter a code" CTA (Household already
+                // on the stack underneath) or an App Link, which can land here from anywhere,
+                // including a cold start with nothing but Home beneath it. popUpTo(HOME) collapses
+                // either case to a clean Home -> Household stack rather than accumulating a
+                // duplicate Household entry when one was already there.
+                onNavigateToHousehold = {
+                    navController.navigate(ScreenBaseRoutes.HOUSEHOLD) {
+                        popUpTo(AppDestinations.HOME.route)
+                        launchSingleTop = true
+                    }
+                },
                 onNavigateToLogin = { navActions.navigateToLogin() },
                 onNavigateToRegister = { navActions.navigateToRegister() },
             )

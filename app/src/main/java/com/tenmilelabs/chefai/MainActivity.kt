@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import com.tenmilelabs.chefai.core.ui.navigation.ChefAINavGraph
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.core.ui.timer.FloatingRecipeTimerWidget
+import com.tenmilelabs.chefai.core.util.InviteLinkParser
 import com.tenmilelabs.chefai.core.util.extractSharedRecipeUrl
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -23,11 +24,13 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private var pendingSharedUrl by mutableStateOf<String?>(null)
+    private var pendingInviteToken by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         consumeShareIntent(intent)
+        consumeInviteIntent(intent)
         setContent {
             ChefAITheme {
                 Surface(tonalElevation = 5.dp) {
@@ -36,6 +39,8 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.fillMaxSize(),
                             pendingSharedUrl = pendingSharedUrl,
                             onPendingSharedUrlConsumed = { pendingSharedUrl = null },
+                            pendingInviteToken = pendingInviteToken,
+                            onPendingInviteTokenConsumed = { pendingInviteToken = null },
                         )
                         // Lives above the nav graph, not inside it, so a timer survives
                         // navigating between screens instead of being torn down with the route.
@@ -50,6 +55,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         consumeShareIntent(intent)
+        consumeInviteIntent(intent)
     }
 
     /**
@@ -65,5 +71,20 @@ class MainActivity : ComponentActivity() {
         if (intent.action != Intent.ACTION_SEND || intent.type != "text/plain") return
         pendingSharedUrl = extractSharedRecipeUrl(intent.getStringExtra(Intent.EXTRA_TEXT))
         intent.removeExtra(Intent.EXTRA_TEXT)
+    }
+
+    /**
+     * Handles an App Link (`https://chefai.app/invite?token=...`) landing on this activity.
+     *
+     * Mirrors [consumeShareIntent]: the token is read once and the data URI is cleared from the
+     * intent as it's read, for the same reason — `getIntent()` keeps returning this same launching
+     * intent for the life of the task, so every recreation (rotation, theme change, process death)
+     * re-runs [onCreate] against it; without clearing it, a link the user already resolved (joined,
+     * declined, or dismissed) would re-open the accept screen underneath them every time.
+     */
+    private fun consumeInviteIntent(intent: Intent) {
+        if (intent.action != Intent.ACTION_VIEW) return
+        pendingInviteToken = InviteLinkParser.extractToken(intent.data?.toString())
+        intent.data = null
     }
 }
