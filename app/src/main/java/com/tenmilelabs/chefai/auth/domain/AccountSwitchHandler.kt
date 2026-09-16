@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.auth.domain
 
 import com.tenmilelabs.chefai.auth.data.local.SecurePreferencesInterface
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
+import com.tenmilelabs.chefai.core.data.local.room.dao.HouseholdDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.UserDao
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
@@ -26,6 +27,7 @@ class AccountSwitchHandler @Inject constructor(
     private val database: ChefAIDataBase,
     private val recipeDao: RecipeDao,
     private val userDao: UserDao,
+    private val householdDao: HouseholdDao,
     private val recipeImageStore: RecipeImageStore,
 ) {
 
@@ -57,6 +59,16 @@ class AccountSwitchHandler @Inject constructor(
                 val departingRecipeIds = recipeDao.getRecipeIdsForUser(previousUserId)
                 recipeDao.deleteRecipesForUser(previousUserId)
                 departingRecipeIds.forEach { recipeImageStore.delete(it) }
+                // Unlike recipes/meal plans, the household cache has no userId column to filter
+                // by (see HouseholdEntity's doc) — it's a single global "my household" mirror, so
+                // leaving it in place would hand the incoming account the departing one's
+                // membership until the next refresh happens to complete. That refresh runs
+                // asynchronously off the new session (SessionManager.attachHouseholdState), so a
+                // caller reading the cache in the window before it lands — e.g.
+                // AcceptInviteViewModel's own-household check right after this same sign-up —
+                // would see the departing account's household and misreport the new one as already
+                // a member of it.
+                householdDao.clearCache()
                 AccountSwitchOutcome.PRESERVED_ANONYMOUS_DATA
             }
             else -> {
