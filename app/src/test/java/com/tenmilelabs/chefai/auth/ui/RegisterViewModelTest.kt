@@ -11,6 +11,7 @@ import com.tenmilelabs.chefai.auth.domain.usecase.AccountUpgradeUseCase
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeHouseholdDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDao
@@ -66,6 +67,7 @@ class RegisterViewModelTest {
                 database = mockk<ChefAIDataBase>(relaxed = true),
                 recipeDao = fakeRecipeDao,
                 userDao = fakeUserDao,
+                householdDao = FakeHouseholdDao(),
                 recipeImageStore = mockk<RecipeImageStore>(relaxed = true),
             ),
             accountUpgradeUseCaseProvider = {

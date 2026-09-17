@@ -75,4 +75,25 @@ interface HouseholdDao {
         clearMembers(id)
         clearInvitesForHousehold(id)
     }
+
+    @Query("DELETE FROM households")
+    suspend fun deleteAllHouseholds()
+
+    @Query("DELETE FROM household_members")
+    suspend fun clearAllMembers()
+
+    @Query("DELETE FROM household_invites")
+    suspend fun clearAllInvites()
+
+    /**
+     * Full teardown regardless of which household is cached — unlike [deleteHousehold], this needs
+     * no id, since the caller (an account switch) has no reliable way to know which household the
+     * *previous* account had cached. See [com.tenmilelabs.chefai.auth.domain.AccountSwitchHandler].
+     */
+    @Transaction
+    suspend fun clearCache() {
+        deleteAllHouseholds()
+        clearAllMembers()
+        clearAllInvites()
+    }
 }

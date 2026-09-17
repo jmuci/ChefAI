@@ -13,6 +13,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UserEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeLabelDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeHouseholdDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDao
@@ -117,6 +118,7 @@ class DefaultRecipeRepositoryTest {
                 database = mockk<ChefAIDataBase>(relaxed = true),
                 recipeDao = accountSwitchRecipeDao,
                 userDao = fakeUserDao,
+                householdDao = FakeHouseholdDao(),
                 recipeImageStore = mockk<RecipeImageStore>(relaxed = true),
             ),
             accountUpgradeUseCaseProvider = {

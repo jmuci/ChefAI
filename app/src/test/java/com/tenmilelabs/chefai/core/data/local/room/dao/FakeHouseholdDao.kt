@@ -80,4 +80,25 @@ class FakeHouseholdDao : HouseholdDao {
         clearMembers(id)
         clearInvitesForHousehold(id)
     }
+
+    override suspend fun deleteAllHouseholds() {
+        households.clear()
+        notifyHouseholds()
+    }
+
+    override suspend fun clearAllMembers() {
+        members.clear()
+        notifyMembers()
+    }
+
+    override suspend fun clearAllInvites() {
+        invites.clear()
+        notifyInvites()
+    }
+
+    override suspend fun clearCache() {
+        deleteAllHouseholds()
+        clearAllMembers()
+        clearAllInvites()
+    }
 }

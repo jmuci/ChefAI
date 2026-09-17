@@ -3,8 +3,10 @@ package com.tenmilelabs.chefai.auth.domain
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
+import com.tenmilelabs.chefai.core.data.local.room.HouseholdEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeHouseholdDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
@@ -24,6 +26,7 @@ class AccountSwitchHandlerTest {
     private lateinit var database: ChefAIDataBase
     private lateinit var recipeDao: FakeRecipeDao
     private lateinit var userDao: FakeUserDao
+    private lateinit var householdDao: FakeHouseholdDao
     private lateinit var recipeImageStore: RecipeImageStore
     private lateinit var handler: AccountSwitchHandler
 
@@ -33,12 +36,14 @@ class AccountSwitchHandlerTest {
         database = mockk(relaxed = true)
         recipeDao = FakeRecipeDao()
         userDao = FakeUserDao()
+        householdDao = FakeHouseholdDao()
         recipeImageStore = mockk(relaxed = true)
         handler = AccountSwitchHandler(
             securePreferences = securePreferences,
             database = database,
             recipeDao = recipeDao,
             userDao = userDao,
+            householdDao = householdDao,
             recipeImageStore = recipeImageStore,
         )
     }
@@ -114,6 +119,32 @@ class AccountSwitchHandlerTest {
         coVerify(exactly = 1) { recipeImageStore.delete(departingRecipe.uuid) }
         coVerify(exactly = 0) { recipeImageStore.delete(anonymousRecipe.uuid) }
         coVerify(exactly = 0) { recipeImageStore.deleteAll() }
+    }
+
+    @Test
+    fun `switching away clears the household cache so the incoming account can't inherit it`() = runTest {
+        // Reproduces a real bug: the household tables have no userId column (a single "my
+        // household" mirror, see HouseholdEntity's doc), so without this clear, a brand-new
+        // account signing up on the same device — e.g. accepting an invite right after the
+        // previous account logged out — would see the departing account's household as its own
+        // until the next refresh happened to complete.
+        val previousUserId = UuidV7Generator.newId()
+        val anonymousUserId = UuidV7Generator.newId()
+        val newUserId = UuidV7Generator.newId()
+        securePreferences.setCurrentUserId(previousUserId)
+        householdDao.upsertHousehold(
+            HouseholdEntity(
+                uuid = UuidV7Generator.newId(),
+                name = "The Test Kitchen",
+                ownerId = previousUserId,
+                createdAt = 0L,
+                updatedAt = 0L,
+            )
+        )
+
+        handler.handleLogin(newUserId = newUserId, anonymousUserId = anonymousUserId)
+
+        assertThat(householdDao.getCachedHouseholdId()).isNull()
     }
 
     private fun recipeFor(creatorId: UUID) = RecipeEntity(
