@@ -77,9 +77,11 @@ class ShoppingListViewModel @Inject constructor(
                 combine(
                     shoppingListRepository.observeIngredientsForRecipes(slotCounts.keys.toList()),
                     shoppingListRepository.observeCheckedItems(mealPlanId),
+                    shoppingListRepository.observeCheckedByUserIds(mealPlanId),
                     userPreferencesRepository.measurementSystem,
                     householdRepository.observeMyHousehold(),
-                ) { ingredients, checked, measurementSystem, household ->
+                ) { ingredients, checked, checkedByUserIds, measurementSystem, household ->
+                    val members = household?.members.orEmpty()
                     ShoppingListUiState.Success(
                         planName = plan.name,
                         list = ShoppingListBuilder.build(
@@ -88,9 +90,12 @@ class ShoppingListViewModel @Inject constructor(
                             plannedServings = plan.preferences.servingsPerMeal,
                             checkedKeys = checked,
                             measurementSystem = measurementSystem,
+                            checkedByNames = checkedByUserIds.mapNotNull { (itemKey, userId) ->
+                                members.firstOrNull { it.userId == userId }?.displayName?.let { itemKey to it }
+                            }.toMap(),
                         ),
                         ownerDisplayName = if (plan.householdId != null) {
-                            household?.members?.firstOrNull { it.userId == plan.userId }?.displayName
+                            members.firstOrNull { it.userId == plan.userId }?.displayName
                         } else {
                             null
                         },

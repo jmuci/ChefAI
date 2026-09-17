@@ -154,19 +154,89 @@ class ShoppingListCheckDaoTest {
     }
 
     @Test
-    fun clearForPlan_removesEveryCheckForThatPlanOnly() = runTest {
+    fun clearForPlan_unchecksEveryItemForThatPlanOnly() = runTest {
         val planA = mealPlan()
         val planB = mealPlan()
         database.mealPlanDao().upsertMealPlan(planA)
         database.mealPlanDao().upsertMealPlan(planB)
-        database.shoppingListCheckDao().upsert(check(planA.uuid, "onion"))
-        database.shoppingListCheckDao().upsert(check(planA.uuid, "garlic"))
+        database.shoppingListCheckDao().upsert(check(planA.uuid, "onion", syncState = SyncState.SYNCED))
+        database.shoppingListCheckDao().upsert(check(planA.uuid, "garlic", syncState = SyncState.SYNCED))
         database.shoppingListCheckDao().upsert(check(planB.uuid, "milk"))
 
-        database.shoppingListCheckDao().clearForPlan(planA.uuid)
+        database.shoppingListCheckDao().clearForPlan(planA.uuid, state = SyncState.PENDING, updatedAt = 9_999L)
 
         assertTrue(database.shoppingListCheckDao().observeCheckedKeys(planA.uuid).first().isEmpty())
         assertEquals(listOf("milk"), database.shoppingListCheckDao().observeCheckedKeys(planB.uuid).first())
+    }
+
+    @Test
+    fun clearForPlan_stampsUnchecheckedRowsPendingSoTheyPushLikeAnIndividualUncheckWould() = runTest {
+        val plan = mealPlan()
+        database.mealPlanDao().upsertMealPlan(plan)
+        database.shoppingListCheckDao().upsert(check(plan.uuid, "onion", syncState = SyncState.SYNCED))
+
+        database.shoppingListCheckDao().clearForPlan(plan.uuid, state = SyncState.PENDING, updatedAt = 9_999L)
+
+        val onion = database.shoppingListCheckDao().getCheck(plan.uuid, "onion")
+        assertEquals(false, onion?.checked)
+        assertEquals(SyncState.PENDING, onion?.syncState)
+        assertEquals(9_999L, onion?.updatedAt)
+        assertEquals(
+            "uncheck-all rows must show up in the push queue like any other dirty row",
+            listOf("onion"),
+            database.shoppingListCheckDao().getAllDirty().map { it.itemKey },
+        )
+    }
+
+    @Test
+    fun observeCheckedByUserIds_returnsOnlyCheckedItemsWithAKnownChecker() = runTest {
+        val plan = mealPlan()
+        val checkerId = UuidV7Generator.newId()
+        database.mealPlanDao().upsertMealPlan(plan)
+        database.shoppingListCheckDao().upsert(check(plan.uuid, "onion").copy(checkedBy = checkerId))
+        database.shoppingListCheckDao().upsert(check(plan.uuid, "garlic")) // checked, no known checker
+        database.shoppingListCheckDao().upsert(
+            check(plan.uuid, "milk").copy(checked = false, checkedBy = checkerId) // unchecked
+        )
+
+        val rows = database.shoppingListCheckDao().observeCheckedByUserIds(plan.uuid).first()
+
+        assertEquals(listOf("onion"), rows.map { it.itemKey })
+        assertEquals(checkerId, rows.single().checkedBy)
+    }
+
+    @Test
+    fun clearForPlan_clearsCheckedByAlongWithChecked() = runTest {
+        val plan = mealPlan()
+        val checkerId = UuidV7Generator.newId()
+        database.mealPlanDao().upsertMealPlan(plan)
+        database.shoppingListCheckDao().upsert(
+            check(plan.uuid, "onion", syncState = SyncState.SYNCED).copy(checkedBy = checkerId)
+        )
+
+        database.shoppingListCheckDao().clearForPlan(plan.uuid, state = SyncState.PENDING, updatedAt = 9_999L)
+
+        assertTrue(database.shoppingListCheckDao().observeCheckedByUserIds(plan.uuid).first().isEmpty())
+        assertEquals(null, database.shoppingListCheckDao().getCheck(plan.uuid, "onion")?.checkedBy)
+    }
+
+    @Test
+    fun clearForPlan_doesNotTouchAnAlreadyUncheckedRow() = runTest {
+        val plan = mealPlan()
+        database.mealPlanDao().upsertMealPlan(plan)
+        database.shoppingListCheckDao().upsert(
+            check(plan.uuid, "onion", syncState = SyncState.SYNCED).copy(checked = false, updatedAt = 111L)
+        )
+
+        database.shoppingListCheckDao().clearForPlan(plan.uuid, state = SyncState.PENDING, updatedAt = 9_999L)
+
+        val onion = database.shoppingListCheckDao().getCheck(plan.uuid, "onion")
+        assertEquals(
+            "a row that was never ticked has nothing to push just because uncheck-all ran",
+            SyncState.SYNCED,
+            onion?.syncState,
+        )
+        assertEquals(111L, onion?.updatedAt)
     }
 
     @Test

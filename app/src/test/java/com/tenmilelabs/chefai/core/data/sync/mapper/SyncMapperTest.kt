@@ -7,8 +7,10 @@ import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.RecipeStepEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
+import com.tenmilelabs.chefai.core.data.local.room.ShoppingListCheckEntity
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncGroceryListItem
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeIngredientDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeStepDto
@@ -416,5 +418,55 @@ class SyncMapperTest {
             assertThat(dto.privacy).isEqualTo(privacy.name)
             assertThat(roundTripped.privacy).isEqualTo(privacy)
         }
+    }
+
+    // --- Grocery list item ---
+
+    @Test
+    fun `toSyncDto never sends checkedBy — the server derives it from the pushing caller`() {
+        val entity = ShoppingListCheckEntity(
+            mealPlanId = UUID.randomUUID(),
+            itemKey = "onion",
+            checkedAt = 1_000L,
+            checked = true,
+            checkedBy = UUID.randomUUID(),
+        )
+
+        val dto = entity.toSyncDto()
+
+        assertThat(dto.checkedBy).isNull()
+    }
+
+    @Test
+    fun `toEntity carries a pulled item's checkedBy through as a UUID`() {
+        val checkerId = UUID.randomUUID()
+        val dto = SyncGroceryListItem(
+            mealPlanId = UUID.randomUUID().toString(),
+            itemKey = "onion",
+            checked = true,
+            checkedBy = checkerId.toString(),
+            updatedAt = 5_000L,
+            deletedAt = null,
+        )
+
+        val entity = dto.toEntity()
+
+        assertThat(entity.checkedBy).isEqualTo(checkerId)
+    }
+
+    @Test
+    fun `toEntity leaves checkedBy null for an unchecked pulled item`() {
+        val dto = SyncGroceryListItem(
+            mealPlanId = UUID.randomUUID().toString(),
+            itemKey = "onion",
+            checked = false,
+            checkedBy = null,
+            updatedAt = 5_000L,
+            deletedAt = null,
+        )
+
+        val entity = dto.toEntity()
+
+        assertThat(entity.checkedBy).isNull()
     }
 }

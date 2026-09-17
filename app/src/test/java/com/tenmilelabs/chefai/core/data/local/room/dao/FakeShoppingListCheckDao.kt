@@ -23,6 +23,13 @@ class FakeShoppingListCheckDao : ShoppingListCheckDao {
                 .map { it.itemKey }
         }
 
+    override fun observeCheckedByUserIds(mealPlanId: UUID): Flow<List<CheckedByRow>> =
+        trigger.map {
+            checks.values
+                .filter { it.mealPlanId == mealPlanId && it.checked && it.deletedAt == null && it.checkedBy != null }
+                .map { CheckedByRow(it.itemKey, requireNotNull(it.checkedBy)) }
+        }
+
     override suspend fun upsert(check: ShoppingListCheckEntity) {
         checks[check.mealPlanId to check.itemKey] = check
         notifyChange()
@@ -33,8 +40,11 @@ class FakeShoppingListCheckDao : ShoppingListCheckDao {
         notifyChange()
     }
 
-    override suspend fun clearForPlan(mealPlanId: UUID) {
-        checks.keys.filter { it.first == mealPlanId }.forEach { checks.remove(it) }
+    override suspend fun clearForPlan(mealPlanId: UUID, state: SyncState, updatedAt: Long) {
+        checks.keys.filter { it.first == mealPlanId }
+            .mapNotNull { checks[it] }
+            .filter { it.checked }
+            .forEach { checks[it.mealPlanId to it.itemKey] = it.copy(checked = false, checkedBy = null, syncState = state, updatedAt = updatedAt) }
         notifyChange()
     }
 

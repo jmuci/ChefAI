@@ -54,6 +54,7 @@ fun ShoppingListRow(
     isChecked: Boolean,
     onToggle: () -> Unit,
     isApproximate: Boolean = false,
+    checkedByName: String? = null,
     modifier: Modifier = Modifier,
 ) {
     // Held as State, not unwrapped with `by`: nothing else in the composition reads .value, so
@@ -124,6 +125,13 @@ fun ShoppingListRow(
                     } else {
                         Modifier
                     },
+                )
+            }
+            if (checkedByName != null) {
+                Text(
+                    text = stringResource(R.string.shopping_list_checked_by, checkedByName),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -199,6 +207,21 @@ private fun ShoppingListRowCheckedDarkPreview() {
             name = "Greek yogurt",
             quantityLabel = "500 g",
             isChecked = true,
+            onToggle = {},
+            modifier = Modifier.padding(16.dp),
+        )
+    }
+}
+
+@Preview(name = "Picked up, checked by — Light", showBackground = true)
+@Composable
+private fun ShoppingListRowCheckedByPreview() {
+    ChefAITheme(darkTheme = false) {
+        ShoppingListRow(
+            name = "Chicken breast",
+            quantityLabel = "500 g",
+            isChecked = true,
+            checkedByName = "Alex",
             onToggle = {},
             modifier = Modifier.padding(16.dp),
         )

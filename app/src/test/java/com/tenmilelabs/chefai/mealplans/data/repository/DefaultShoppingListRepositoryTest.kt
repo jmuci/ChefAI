@@ -6,6 +6,7 @@ import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
+import com.tenmilelabs.chefai.core.data.local.room.ShoppingListCheckEntity
 import com.tenmilelabs.chefai.core.data.local.room.UserEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeShoppingListCheckDao
@@ -126,6 +127,68 @@ class DefaultShoppingListRepositoryTest {
 
         assertThat(repository.observeCheckedItems(planA).first()).isEmpty()
         assertThat(repository.observeCheckedItems(planB).first()).containsExactly("milk")
+    }
+
+    @Test
+    fun `clearChecks upserts rows to unchecked-PENDING and requests a sync, rather than deleting them`() = runTest {
+        val planId = UUID.randomUUID()
+        repository.setChecked(planId, "onion", checked = true)
+
+        repository.clearChecks(planId)
+
+        val stored = checkDao.getCheck(planId, "onion")
+        assertThat(stored).isNotNull()
+        assertThat(stored?.checked).isFalse()
+        assertThat(stored?.syncState).isEqualTo(SyncState.PENDING)
+        assertThat(syncScheduler.mutationSyncCount).isEqualTo(2)
+    }
+
+    // --- observeCheckedByUserIds ---
+
+    @Test
+    fun `observeCheckedByUserIds is empty until a pull resolves who checked an item`() = runTest {
+        val planId = UUID.randomUUID()
+        repository.setChecked(planId, "onion", checked = true)
+
+        assertThat(repository.observeCheckedByUserIds(planId).first()).isEmpty()
+    }
+
+    @Test
+    fun `observeCheckedByUserIds reflects a pulled item's checkedBy`() = runTest {
+        val planId = UUID.randomUUID()
+        val checkerId = UUID.randomUUID()
+        checkDao.upsert(
+            ShoppingListCheckEntity(
+                mealPlanId = planId,
+                itemKey = "onion",
+                checkedAt = 1_000L,
+                checked = true,
+                checkedBy = checkerId,
+                syncState = SyncState.SYNCED,
+            )
+        )
+
+        assertThat(repository.observeCheckedByUserIds(planId).first()).containsExactly("onion", checkerId)
+    }
+
+    @Test
+    fun `clearChecks removes the plan's checkers along with its ticks`() = runTest {
+        val planId = UUID.randomUUID()
+        val checkerId = UUID.randomUUID()
+        checkDao.upsert(
+            ShoppingListCheckEntity(
+                mealPlanId = planId,
+                itemKey = "onion",
+                checkedAt = 1_000L,
+                checked = true,
+                checkedBy = checkerId,
+                syncState = SyncState.SYNCED,
+            )
+        )
+
+        repository.clearChecks(planId)
+
+        assertThat(repository.observeCheckedByUserIds(planId).first()).isEmpty()
     }
 
     // --- Helpers ---

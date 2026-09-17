@@ -22,6 +22,8 @@ data class ShoppingListItem(
      * announce itself here at least as loudly as it does on the recipe screen.
      */
     val isApproximate: Boolean = false,
+    /** Display name of whoever checked this off, when [isChecked] and the checker is known. */
+    val checkedByName: String? = null,
 )
 
 /** One aisle's worth of items, alphabetical. */
@@ -62,6 +64,10 @@ object ShoppingListBuilder {
      * @param measurementSystem the units to shop in. Converting before the amounts are grouped is
      *   what lets a cup of flour from one recipe and 125 g of it from another add up to one line
      *   instead of two joined by "+".
+     * @param checkedByNames item key -> display name of whoever checked it, already resolved by
+     *   the caller against the cached household's members — this pure builder has no household
+     *   concept of its own, mirroring how `ownerDisplayName` is resolved outside `ShoppingListBuilder`
+     *   for shared-plan badges elsewhere.
      */
     fun build(
         ingredients: List<PlannedIngredient>,
@@ -69,6 +75,7 @@ object ShoppingListBuilder {
         plannedServings: Int,
         checkedKeys: Set<String>,
         measurementSystem: MeasurementSystem = MeasurementSystem.DEFAULT,
+        checkedByNames: Map<String, String> = emptyMap(),
     ): ShoppingList {
         data class ScaledRow(
             val displayName: String,
@@ -133,6 +140,7 @@ object ShoppingListBuilder {
                     .joinToString(" + ")
                     .ifEmpty { null }
 
+                val isChecked = key in checkedKeys
                 ShoppingListItem(
                     key = key,
                     displayName = displayName,
@@ -140,7 +148,8 @@ object ShoppingListBuilder {
                     // One estimated contributor makes the whole total an estimate.
                     isApproximate = rows.any { it.isApproximate },
                     section = GrocerySectionClassifier.classify(displayName),
-                    isChecked = key in checkedKeys,
+                    isChecked = isChecked,
+                    checkedByName = if (isChecked) checkedByNames[key] else null,
                 )
             }
 

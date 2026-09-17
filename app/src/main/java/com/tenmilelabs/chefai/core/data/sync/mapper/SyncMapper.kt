@@ -282,6 +282,7 @@ fun SyncGroceryListItem.toEntity(): ShoppingListCheckEntity = ShoppingListCheckE
     itemKey = itemKey,
     checkedAt = updatedAt,
     checked = checked,
+    checkedBy = checkedBy?.let { UUID.fromString(it) },
     updatedAt = updatedAt,
     deletedAt = deletedAt,
     syncState = SyncState.SYNCED,
