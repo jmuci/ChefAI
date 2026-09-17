@@ -6,6 +6,7 @@ import com.tenmilelabs.chefai.household.domain.model.HouseholdInviteLink
 import com.tenmilelabs.chefai.household.domain.model.HouseholdInvitePreview
 import com.tenmilelabs.chefai.household.domain.model.HouseholdJoinOutcome
 import com.tenmilelabs.chefai.household.domain.model.PendingHouseholdInvite
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.util.UUID
@@ -51,6 +52,17 @@ class FakeHouseholdRepository : HouseholdRepository {
 
     var refreshCount = 0
         private set
+
+    /**
+     * One gate per [refresh] call, consumed in call order — lets a test hold a call suspended
+     * (simulating an in-flight network request) while later calls run and complete around it, to
+     * reproduce a stale response landing after a newer one already has. A call made with no queued
+     * gate proceeds immediately, so most tests can ignore this entirely.
+     */
+    private val refreshGates = ArrayDeque<CompletableDeferred<Unit>>()
+
+    fun enqueueRefreshGate(): CompletableDeferred<Unit> =
+        CompletableDeferred<Unit>().also { refreshGates.addLast(it) }
     var lastCreatedHouseholdName: String? = null
         private set
     var lastRemovedMemberId: UUID? = null
@@ -72,8 +84,17 @@ class FakeHouseholdRepository : HouseholdRepository {
 
     override suspend fun refresh(): Result<Unit> {
         refreshCount++
-        if (refreshResult.isSuccess) household = householdAfterRefresh
+        // Captured now, before any gate suspends us — mirrors a real response carrying whatever
+        // data the server had when the REQUEST was made, not whenever this call happens to finish.
+        val resultToApply = householdAfterRefresh
+        if (refreshGates.isNotEmpty()) refreshGates.removeFirst().await()
+        if (refreshResult.isSuccess) household = resultToApply
         return refreshResult
+    }
+
+    override suspend fun clearLocalCache() {
+        household = null
+        pendingInvites = emptyList()
     }
 
     override suspend fun createHousehold(name: String): Result<Household> {
