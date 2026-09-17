@@ -21,6 +21,7 @@ import com.tenmilelabs.chefai.core.domain.model.User
 import com.tenmilelabs.chefai.household.domain.model.Household
 import com.tenmilelabs.chefai.household.domain.repository.HouseholdRepository
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -59,6 +60,15 @@ class SessionManager @Inject constructor(
 
     /** Serializes [refreshToken] so concurrent 401s spend the refresh token once, not twice. */
     private val refreshMutex = Mutex()
+
+    /**
+     * The background job started by the most recent [attachHouseholdState] call. Tracked so a new
+     * call — or [logout] — can cancel a previous one still in flight: without this, a slow response
+     * for an account that has since logged out or switched away can land after the household cache
+     * has already been cleared/re-populated for whoever is active now, re-leaking the departed
+     * account's household (the same defect class this field's callers exist to prevent).
+     */
+    private var householdRefreshJob: Job? = null
 
     init {
         // Load session on initialization
@@ -110,6 +120,15 @@ class SessionManager @Inject constructor(
                     user = user,
                     authToken = authToken
                 )
+
+                // login()/register() persist auth data before accountSwitchHandler.handleLogin
+                // completes, so a process death in that window leaves valid credentials for the new
+                // account in storage but the switch cleanup (household cache, previous-account
+                // recipes) never run — and nothing else would ever re-detect it on a later cold
+                // start. handleLogin is a no-op (NO_CHANGE) when the stored "current user" already
+                // matches, so running it unconditionally here is safe on the normal restore path and
+                // only does real work when recovering from that interrupted switch.
+                accountSwitchHandler.handleLogin(newUserId = user.uuid, anonymousUserId = null)
 
                 // Ensure the user row exists in Room before sync fires so that
                 // pulled recipes (which reference this creatorId) satisfy the FK constraint.
@@ -206,7 +225,10 @@ class SessionManager @Inject constructor(
         val cached = householdRepositoryProvider.get().observeMyHousehold().first()
         applyHouseholdState(user.uuid, cached)
 
-        applicationScope.launch {
+        // Cancel any refresh still in flight for whoever this call is superseding — see
+        // householdRefreshJob's doc.
+        householdRefreshJob?.cancel()
+        householdRefreshJob = applicationScope.launch {
             householdRepositoryProvider.get().refresh()
             val refreshed = householdRepositoryProvider.get().observeMyHousehold().first()
             applyHouseholdState(user.uuid, refreshed)
@@ -417,11 +439,21 @@ class SessionManager @Inject constructor(
             val currentUser = getCurrentUser()
             Timber.d("Logging out user: ${currentUser?.uuid}")
 
+            // Cancel any household refresh still in flight so a stale response for the departing
+            // account can't land after we've moved on — see householdRefreshJob's doc.
+            householdRefreshJob?.cancel()
+
             // Cancel all sync work before clearing auth data
             syncSchedulerProvider.get().cancelAllSync()
 
             // Clear auth data (preserves localUserId)
             securePreferences.clearAuthData()
+
+            // The household cache has no per-user scoping (ADR-014) — clear it here too, not only
+            // on the next login's account-switch cleanup, so nothing that reads it directly during
+            // the anonymous window between logout and the next sign-in sees the departing account's
+            // household.
+            householdRepositoryProvider.get().clearLocalCache()
 
             // Return to anonymous state, reusing existing localUserId
             enterAnonymousSession()

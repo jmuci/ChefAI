@@ -49,6 +49,7 @@ class AccountSwitchHandlerDatabaseTest {
             database = database,
             recipeDao = database.recipeDao(),
             userDao = database.userDao(),
+            householdDao = database.householdDao(),
             recipeImageStore = RecipeImageStore(getApplicationContext(), Dispatchers.IO),
         )
     }

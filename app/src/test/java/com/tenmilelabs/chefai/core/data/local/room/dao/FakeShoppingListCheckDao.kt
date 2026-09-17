@@ -16,18 +16,11 @@ class FakeShoppingListCheckDao : ShoppingListCheckDao {
         trigger.value++
     }
 
-    override fun observeCheckedKeys(mealPlanId: UUID): Flow<List<String>> =
+    override fun observeCheckedRows(mealPlanId: UUID): Flow<List<CheckedItemRow>> =
         trigger.map {
             checks.values
                 .filter { it.mealPlanId == mealPlanId && it.checked && it.deletedAt == null }
-                .map { it.itemKey }
-        }
-
-    override fun observeCheckedByUserIds(mealPlanId: UUID): Flow<List<CheckedByRow>> =
-        trigger.map {
-            checks.values
-                .filter { it.mealPlanId == mealPlanId && it.checked && it.deletedAt == null && it.checkedBy != null }
-                .map { CheckedByRow(it.itemKey, requireNotNull(it.checkedBy)) }
+                .map { CheckedItemRow(it.itemKey, it.checkedBy) }
         }
 
     override suspend fun upsert(check: ShoppingListCheckEntity) {
@@ -43,8 +36,16 @@ class FakeShoppingListCheckDao : ShoppingListCheckDao {
     override suspend fun clearForPlan(mealPlanId: UUID, state: SyncState, updatedAt: Long) {
         checks.keys.filter { it.first == mealPlanId }
             .mapNotNull { checks[it] }
-            .filter { it.checked }
-            .forEach { checks[it.mealPlanId to it.itemKey] = it.copy(checked = false, checkedBy = null, syncState = state, updatedAt = updatedAt) }
+            .filter { it.checked && it.deletedAt == null }
+            .forEach {
+                checks[it.mealPlanId to it.itemKey] = it.copy(
+                    checked = false,
+                    checkedBy = null,
+                    checkedAt = updatedAt,
+                    syncState = state,
+                    updatedAt = updatedAt,
+                )
+            }
         notifyChange()
     }
 

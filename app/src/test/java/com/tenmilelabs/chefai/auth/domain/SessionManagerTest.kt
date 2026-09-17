@@ -998,4 +998,100 @@ class SessionManagerTest {
 
         assertThat(sessionManager.userSession.value).isInstanceOf(UserSession.Anonymous::class.java)
     }
+
+    @Test
+    fun `a stale in-flight household refresh from a previous account cannot land after a switch`() = testScope.runTest {
+        // Chef A logs in; their household refresh starts but stays "in flight" (network still
+        // pending) until this test lets it through via gateA.
+        val chefAId = UuidV7Generator.newId()
+        fakeAuthNetworkDataSource.authResponse = AuthResponse(
+            token = "token_a", refreshToken = "refresh_a", userId = chefAId.toString(),
+            username = "chefA", email = "chefa@example.com", expiresIn = 3600
+        )
+        val gateA = fakeHouseholdRepository.enqueueRefreshGate()
+        fakeHouseholdRepository.householdAfterRefresh = householdOf(chefAId, HouseholdRole.OWNER)
+        sessionManager.login("chefa@example.com", "password123")
+        advanceUntilIdle() // Chef A's refresh call starts and blocks on gateA.
+
+        // Chef A logs out and Chef B registers on the same device before A's refresh resolves.
+        sessionManager.logout()
+        val chefBId = UuidV7Generator.newId()
+        fakeAuthNetworkDataSource.authResponse = AuthResponse(
+            token = "token_b", refreshToken = "refresh_b", userId = chefBId.toString(),
+            username = "chefB", email = "chefb@example.com", expiresIn = 3600
+        )
+        fakeHouseholdRepository.householdAfterRefresh = null // Chef B has no household of their own.
+        val gateB = fakeHouseholdRepository.enqueueRefreshGate()
+        sessionManager.login("chefb@example.com", "password123")
+        advanceUntilIdle() // Chef B's own refresh call starts and blocks on gateB.
+
+        // Chef B's own (fast) refresh lands first, correctly finding no household.
+        gateB.complete(Unit)
+        advanceUntilIdle()
+        assertThat(fakeHouseholdRepository.household).isNull()
+
+        // Chef A's slow, stale refresh finally "arrives" — it must not be able to overwrite
+        // Chef B's already-correct state with Chef A's household.
+        gateA.complete(Unit)
+        advanceUntilIdle()
+
+        assertThat(fakeHouseholdRepository.household).isNull()
+        val session = sessionManager.userSession.value as UserSession.Authenticated
+        assertThat(session.user.uuid).isEqualTo(chefBId)
+        assertThat(session.household).isNull()
+    }
+
+    @Test
+    fun `logout clears the household cache so it can't leak into the next anonymous or authenticated session`() =
+        testScope.runTest {
+            fakeHouseholdRepository.seedHousehold(householdOf(UuidV7Generator.newId(), HouseholdRole.OWNER))
+            sessionManager.login("test@example.com", "password123")
+            advanceUntilIdle()
+            assertThat(fakeHouseholdRepository.household).isNotNull()
+
+            sessionManager.logout()
+
+            assertThat(fakeHouseholdRepository.household).isNull()
+        }
+
+    @Test
+    fun `cold start detects an interrupted account switch and completes the cleanup`() = testScope.runTest {
+        // Simulates a process death between login()'s saveAuthData() and handleLogin() completing:
+        // valid credentials for a new account are already in storage, but KEY_CURRENT_USER_ID still
+        // points at the previous one, because only handleLogin ever writes it.
+        val oldUserId = UuidV7Generator.newId()
+        val newUserId = UuidV7Generator.newId()
+        fakeSecurePreferences.setCurrentUserId(oldUserId)
+        fakeSecurePreferences.saveAuthData(
+            userUuid = newUserId,
+            displayName = "New User",
+            email = "new@example.com",
+            avatarUrl = "",
+            accessToken = "token",
+            refreshToken = "refresh",
+            tokenExpiry = System.currentTimeMillis() + 3_600_000
+        )
+
+        // When: a fresh SessionManager loads this stored session on cold start.
+        val newSessionManager = SessionManager(
+            securePreferences = fakeSecurePreferences,
+            authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
+            userDao = fakeUserDao,
+            accountSwitchHandler = accountSwitchHandler,
+            accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
+            syncSchedulerProvider = { FakeSyncManager() },
+            householdRepositoryProvider = { fakeHouseholdRepository },
+            applicationScope = testScope
+        ).apply { uuidGenerator = { UuidV7Generator.newId() } }
+        advanceUntilIdle()
+
+        // Then: the interrupted switch is completed now, via the same conservative "clear the
+        // local database" recovery an interactive switch with no anonymous data to preserve uses,
+        // and KEY_CURRENT_USER_ID is brought in line with the now-restored session.
+        coVerify(exactly = 1) { mockDatabase.clearAllTables() }
+        assertThat(newSessionManager.getStoredCurrentUserId()).isEqualTo(newUserId)
+        val session = newSessionManager.userSession.value
+        assertThat(session).isInstanceOf(UserSession.Authenticated::class.java)
+        assertThat((session as UserSession.Authenticated).user.uuid).isEqualTo(newUserId)
+    }
 }

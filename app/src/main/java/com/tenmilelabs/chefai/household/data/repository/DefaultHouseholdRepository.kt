@@ -75,6 +75,8 @@ class DefaultHouseholdRepository @Inject constructor(
         }
     }
 
+    override suspend fun clearLocalCache() = householdDao.clearCache()
+
     override suspend fun createHousehold(name: String): Result<Household> = resultOf {
         val response = networkDataSource.createHousehold(name)
         cacheHousehold(response)

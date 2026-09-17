@@ -28,6 +28,14 @@ interface HouseholdRepository {
     /** Re-fetches the caller's household and pending invites and replaces the local cache wholesale. */
     suspend fun refresh(): Result<Unit>
 
+    /**
+     * Wipes the local household/members/invites cache with no network call — the cache has no
+     * per-user scoping (see this interface's own doc), so anything that ends a session (logout,
+     * an account switch) must clear it explicitly rather than leaving the departing account's data
+     * behind for whoever reads the cache next.
+     */
+    suspend fun clearLocalCache()
+
     suspend fun createHousehold(name: String): Result<Household>
 
     /** Owner-only. */

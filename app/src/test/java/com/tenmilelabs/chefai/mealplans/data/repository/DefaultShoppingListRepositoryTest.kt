@@ -68,18 +68,18 @@ class DefaultShoppingListRepositoryTest {
         assertThat(row.unit).isEqualTo("tbsp")
     }
 
-    // --- observeCheckedItems / setChecked / clearChecks ---
+    // --- observeCheckedState / setChecked / clearChecks ---
 
     @Test
-    fun `observeCheckedItems reflects a setChecked(true) call`() = runTest {
+    fun `observeCheckedState reflects a setChecked(true) call`() = runTest {
         val planId = UUID.randomUUID()
 
-        repository.observeCheckedItems(planId).test {
-            assertThat(awaitItem()).isEmpty()
+        repository.observeCheckedState(planId).test {
+            assertThat(awaitItem().checkedKeys).isEmpty()
 
             repository.setChecked(planId, "onion", checked = true)
 
-            assertThat(awaitItem()).containsExactly("onion")
+            assertThat(awaitItem().checkedKeys).containsExactly("onion")
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -91,7 +91,31 @@ class DefaultShoppingListRepositoryTest {
 
         repository.setChecked(planId, "onion", checked = false)
 
-        assertThat(repository.observeCheckedItems(planId).first()).isEmpty()
+        assertThat(repository.observeCheckedState(planId).first().checkedKeys).isEmpty()
+    }
+
+    @Test
+    fun `setChecked preserves an existing row's deletedAt instead of resurrecting it`() = runTest {
+        // A pulled deletion can leave deletedAt set on a row whose itemKey is still shown by
+        // ShoppingListBuilder (it derives the visible list from the plan's live ingredients,
+        // independently of this row) — tapping that checkbox must not silently undo the deletion.
+        val planId = UUID.randomUUID()
+        checkDao.upsert(
+            ShoppingListCheckEntity(
+                mealPlanId = planId,
+                itemKey = "onion",
+                checkedAt = 1_000L,
+                checked = true,
+                deletedAt = 5_000L,
+                syncState = SyncState.SYNCED,
+            )
+        )
+
+        repository.setChecked(planId, "onion", checked = false)
+
+        val stored = checkDao.getCheck(planId, "onion")
+        assertThat(stored?.checked).isFalse()
+        assertThat(stored?.deletedAt).isEqualTo(5_000L)
     }
 
     @Test
@@ -125,8 +149,29 @@ class DefaultShoppingListRepositoryTest {
 
         repository.clearChecks(planA)
 
-        assertThat(repository.observeCheckedItems(planA).first()).isEmpty()
-        assertThat(repository.observeCheckedItems(planB).first()).containsExactly("milk")
+        assertThat(repository.observeCheckedState(planA).first().checkedKeys).isEmpty()
+        assertThat(repository.observeCheckedState(planB).first().checkedKeys).containsExactly("milk")
+    }
+
+    @Test
+    fun `clearChecks does not resurrect a soft-deleted row`() = runTest {
+        val planId = UUID.randomUUID()
+        checkDao.upsert(
+            ShoppingListCheckEntity(
+                mealPlanId = planId,
+                itemKey = "onion",
+                checkedAt = 1_000L,
+                checked = true,
+                deletedAt = 5_000L,
+                syncState = SyncState.SYNCED,
+            )
+        )
+
+        repository.clearChecks(planId)
+
+        val stored = checkDao.getCheck(planId, "onion")
+        assertThat(stored?.syncState).isEqualTo(SyncState.SYNCED)
+        assertThat(stored?.deletedAt).isEqualTo(5_000L)
     }
 
     @Test
@@ -143,18 +188,18 @@ class DefaultShoppingListRepositoryTest {
         assertThat(syncScheduler.mutationSyncCount).isEqualTo(2)
     }
 
-    // --- observeCheckedByUserIds ---
+    // --- observeCheckedState: checkedByUserIds ---
 
     @Test
-    fun `observeCheckedByUserIds is empty until a pull resolves who checked an item`() = runTest {
+    fun `observeCheckedState's checkedByUserIds is empty until a pull resolves who checked an item`() = runTest {
         val planId = UUID.randomUUID()
         repository.setChecked(planId, "onion", checked = true)
 
-        assertThat(repository.observeCheckedByUserIds(planId).first()).isEmpty()
+        assertThat(repository.observeCheckedState(planId).first().checkedByUserIds).isEmpty()
     }
 
     @Test
-    fun `observeCheckedByUserIds reflects a pulled item's checkedBy`() = runTest {
+    fun `observeCheckedState's checkedByUserIds reflects a pulled item's checkedBy`() = runTest {
         val planId = UUID.randomUUID()
         val checkerId = UUID.randomUUID()
         checkDao.upsert(
@@ -168,7 +213,8 @@ class DefaultShoppingListRepositoryTest {
             )
         )
 
-        assertThat(repository.observeCheckedByUserIds(planId).first()).containsExactly("onion", checkerId)
+        assertThat(repository.observeCheckedState(planId).first().checkedByUserIds)
+            .containsExactly("onion", checkerId)
     }
 
     @Test
@@ -188,7 +234,7 @@ class DefaultShoppingListRepositoryTest {
 
         repository.clearChecks(planId)
 
-        assertThat(repository.observeCheckedByUserIds(planId).first()).isEmpty()
+        assertThat(repository.observeCheckedState(planId).first().checkedByUserIds).isEmpty()
     }
 
     // --- Helpers ---

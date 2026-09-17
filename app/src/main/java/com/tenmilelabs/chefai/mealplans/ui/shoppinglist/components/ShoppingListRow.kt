@@ -227,3 +227,18 @@ private fun ShoppingListRowCheckedByPreview() {
         )
     }
 }
+
+@Preview(name = "Picked up, checked by — Dark", showBackground = true)
+@Composable
+private fun ShoppingListRowCheckedByDarkPreview() {
+    ChefAITheme(darkTheme = true) {
+        ShoppingListRow(
+            name = "Chicken breast",
+            quantityLabel = "500 g",
+            isChecked = true,
+            checkedByName = "Alex",
+            onToggle = {},
+            modifier = Modifier.padding(16.dp),
+        )
+    }
+}

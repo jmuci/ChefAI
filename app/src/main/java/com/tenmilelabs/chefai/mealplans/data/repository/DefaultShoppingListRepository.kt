@@ -6,6 +6,7 @@ import com.tenmilelabs.chefai.core.data.local.room.ShoppingListCheckEntity
 import com.tenmilelabs.chefai.core.data.local.room.relations.PlanIngredientRow
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
+import com.tenmilelabs.chefai.mealplans.domain.repository.CheckedItemsState
 import com.tenmilelabs.chefai.mealplans.domain.repository.ShoppingListRepository
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.PlannedIngredient
 import kotlinx.coroutines.flow.Flow
@@ -27,19 +28,29 @@ class DefaultShoppingListRepository @Inject constructor(
         return recipeDao.observeIngredientsForRecipes(recipeIds).map { rows -> rows.map { it.toDomain() } }
     }
 
-    override fun observeCheckedItems(mealPlanId: UUID): Flow<Set<String>> =
-        shoppingListCheckDao.observeCheckedKeys(mealPlanId).map { it.toSet() }
-
-    override fun observeCheckedByUserIds(mealPlanId: UUID): Flow<Map<String, UUID>> =
-        shoppingListCheckDao.observeCheckedByUserIds(mealPlanId)
-            .map { rows -> rows.associate { it.itemKey to it.checkedBy } }
+    override fun observeCheckedState(mealPlanId: UUID): Flow<CheckedItemsState> =
+        shoppingListCheckDao.observeCheckedRows(mealPlanId).map { rows ->
+            CheckedItemsState(
+                checkedKeys = rows.map { it.itemKey }.toSet(),
+                checkedByUserIds = rows.mapNotNull { row ->
+                    row.checkedBy?.let { row.itemKey to it }
+                }.toMap(),
+            )
+        }
 
     /**
      * Always an upsert, never [ShoppingListCheckDao.delete] — an unchecked item is still on the
      * list (`checked = false`), not one that left it (`deletedAt`). See ADR-014 §5.2.
+     *
+     * Carries forward any existing row's `deletedAt` rather than defaulting it to null: a plain
+     * checked/unchecked toggle must never resurrect an item a sync pull already marked as removed
+     * from the plan server-side, even though [com.tenmilelabs.chefai.mealplans.domain.shoppinglist
+     * .ShoppingListBuilder] can still be showing it (it derives the visible list from the plan's
+     * current ingredients, independently of this row's `deletedAt`).
      */
     override suspend fun setChecked(mealPlanId: UUID, itemKey: String, checked: Boolean) {
         val now = System.currentTimeMillis()
+        val existingDeletedAt = shoppingListCheckDao.getCheck(mealPlanId, itemKey)?.deletedAt
         shoppingListCheckDao.upsert(
             ShoppingListCheckEntity(
                 mealPlanId = mealPlanId,
@@ -47,6 +58,7 @@ class DefaultShoppingListRepository @Inject constructor(
                 checkedAt = now,
                 checked = checked,
                 updatedAt = now,
+                deletedAt = existingDeletedAt,
                 syncState = SyncState.PENDING,
             )
         )
