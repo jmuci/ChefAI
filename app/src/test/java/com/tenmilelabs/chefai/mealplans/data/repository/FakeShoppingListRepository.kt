@@ -1,9 +1,11 @@
 package com.tenmilelabs.chefai.mealplans.data.repository
 
+import com.tenmilelabs.chefai.mealplans.domain.repository.CheckedItemsState
 import com.tenmilelabs.chefai.mealplans.domain.repository.ShoppingListRepository
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.PlannedIngredient
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import java.util.UUID
 
@@ -36,11 +38,13 @@ class FakeShoppingListRepository : ShoppingListRepository {
         }
     }
 
-    override fun observeCheckedItems(mealPlanId: UUID): Flow<Set<String>> =
-        checkedKeys.map { it[mealPlanId].orEmpty() }
-
-    override fun observeCheckedByUserIds(mealPlanId: UUID): Flow<Map<String, UUID>> =
-        checkedByUserIds.map { it[mealPlanId].orEmpty() }
+    override fun observeCheckedState(mealPlanId: UUID): Flow<CheckedItemsState> =
+        combine(checkedKeys, checkedByUserIds) { keys, byUser ->
+            CheckedItemsState(
+                checkedKeys = keys[mealPlanId].orEmpty(),
+                checkedByUserIds = byUser[mealPlanId].orEmpty(),
+            )
+        }
 
     override suspend fun setChecked(mealPlanId: UUID, itemKey: String, checked: Boolean) {
         if (shouldThrowOnSetChecked) throw RuntimeException("Fake setChecked error")

@@ -78,18 +78,21 @@ class ShoppingListCheckDaoTest {
         database.close()
     }
 
+    private suspend fun checkedKeys(planId: UUID) =
+        database.shoppingListCheckDao().observeCheckedRows(planId).first().map { it.itemKey }
+
     @Test
-    fun upsert_thenObserveCheckedKeys_returnsTheTickedItem() = runTest {
+    fun upsert_thenObserveCheckedRows_returnsTheTickedItem() = runTest {
         val plan = mealPlan()
         database.mealPlanDao().upsertMealPlan(plan)
 
         database.shoppingListCheckDao().upsert(check(plan.uuid, "onion"))
 
-        assertEquals(listOf("onion"), database.shoppingListCheckDao().observeCheckedKeys(plan.uuid).first())
+        assertEquals(listOf("onion"), checkedKeys(plan.uuid))
     }
 
     @Test
-    fun observeCheckedKeys_scopesToItsOwnMealPlan() = runTest {
+    fun observeCheckedRows_scopesToItsOwnMealPlan() = runTest {
         val planA = mealPlan()
         val planB = mealPlan()
         database.mealPlanDao().upsertMealPlan(planA)
@@ -97,8 +100,8 @@ class ShoppingListCheckDaoTest {
         database.shoppingListCheckDao().upsert(check(planA.uuid, "onion"))
         database.shoppingListCheckDao().upsert(check(planB.uuid, "garlic"))
 
-        assertEquals(listOf("onion"), database.shoppingListCheckDao().observeCheckedKeys(planA.uuid).first())
-        assertEquals(listOf("garlic"), database.shoppingListCheckDao().observeCheckedKeys(planB.uuid).first())
+        assertEquals(listOf("onion"), checkedKeys(planA.uuid))
+        assertEquals(listOf("garlic"), checkedKeys(planB.uuid))
     }
 
     @Test
@@ -109,13 +112,13 @@ class ShoppingListCheckDaoTest {
         database.shoppingListCheckDao().upsert(check(plan.uuid, "onion", checkedAt = 1L))
         database.shoppingListCheckDao().upsert(check(plan.uuid, "onion", checkedAt = 2L))
 
-        assertEquals(listOf("onion"), database.shoppingListCheckDao().observeCheckedKeys(plan.uuid).first())
+        assertEquals(listOf("onion"), checkedKeys(plan.uuid))
     }
 
     @Test
-    fun observeCheckedKeys_excludesAnUpsertedButUncheckedRow() = runTest {
+    fun observeCheckedRows_excludesAnUpsertedButUncheckedRow() = runTest {
         // As of ADR-014's sync wiring, unchecking is an upsert with checked = false, not a
-        // delete — the row is still on the list, just not in the checked set observeCheckedKeys
+        // delete — the row is still on the list, just not in the checked set observeCheckedRows
         // reports. See ShoppingListCheckDao's own KDoc.
         val plan = mealPlan()
         database.mealPlanDao().upsertMealPlan(plan)
@@ -124,12 +127,12 @@ class ShoppingListCheckDaoTest {
             check(plan.uuid, "onion").copy(checked = false)
         )
 
-        assertTrue(database.shoppingListCheckDao().observeCheckedKeys(plan.uuid).first().isEmpty())
+        assertTrue(checkedKeys(plan.uuid).isEmpty())
         assertEquals(false, database.shoppingListCheckDao().getCheck(plan.uuid, "onion")?.checked)
     }
 
     @Test
-    fun observeCheckedKeys_excludesASoftDeletedRow() = runTest {
+    fun observeCheckedRows_excludesASoftDeletedRow() = runTest {
         // A pulled item can arrive with deletedAt set (it left the list entirely — see
         // SyncGroceryListItem's doc) without going through delete()/clearForPlan() at all.
         val plan = mealPlan()
@@ -138,7 +141,7 @@ class ShoppingListCheckDaoTest {
             check(plan.uuid, "onion").copy(deletedAt = 5_000L)
         )
 
-        assertTrue(database.shoppingListCheckDao().observeCheckedKeys(plan.uuid).first().isEmpty())
+        assertTrue(checkedKeys(plan.uuid).isEmpty())
     }
 
     @Test
@@ -150,7 +153,7 @@ class ShoppingListCheckDaoTest {
 
         database.shoppingListCheckDao().delete(plan.uuid, "onion")
 
-        assertEquals(listOf("garlic"), database.shoppingListCheckDao().observeCheckedKeys(plan.uuid).first())
+        assertEquals(listOf("garlic"), checkedKeys(plan.uuid))
     }
 
     @Test
@@ -165,8 +168,8 @@ class ShoppingListCheckDaoTest {
 
         database.shoppingListCheckDao().clearForPlan(planA.uuid, state = SyncState.PENDING, updatedAt = 9_999L)
 
-        assertTrue(database.shoppingListCheckDao().observeCheckedKeys(planA.uuid).first().isEmpty())
-        assertEquals(listOf("milk"), database.shoppingListCheckDao().observeCheckedKeys(planB.uuid).first())
+        assertTrue(checkedKeys(planA.uuid).isEmpty())
+        assertEquals(listOf("milk"), checkedKeys(planB.uuid))
     }
 
     @Test
@@ -182,6 +185,11 @@ class ShoppingListCheckDaoTest {
         assertEquals(SyncState.PENDING, onion?.syncState)
         assertEquals(9_999L, onion?.updatedAt)
         assertEquals(
+            "checkedAt is bumped too, matching what a single-item uncheck already does",
+            9_999L,
+            onion?.checkedAt,
+        )
+        assertEquals(
             "uncheck-all rows must show up in the push queue like any other dirty row",
             listOf("onion"),
             database.shoppingListCheckDao().getAllDirty().map { it.itemKey },
@@ -189,7 +197,26 @@ class ShoppingListCheckDaoTest {
     }
 
     @Test
-    fun observeCheckedByUserIds_returnsOnlyCheckedItemsWithAKnownChecker() = runTest {
+    fun clearForPlan_doesNotResurrectASoftDeletedRow() = runTest {
+        // A pulled deletion (item left the plan entirely — see SyncGroceryListItem's doc) can
+        // leave deletedAt set on a row that's still checked = true from before the deletion.
+        // "Uncheck all" must not flip it back to PENDING and push it as a live update.
+        val plan = mealPlan()
+        database.mealPlanDao().upsertMealPlan(plan)
+        database.shoppingListCheckDao().upsert(
+            check(plan.uuid, "onion", syncState = SyncState.SYNCED).copy(deletedAt = 5_000L)
+        )
+
+        database.shoppingListCheckDao().clearForPlan(plan.uuid, state = SyncState.PENDING, updatedAt = 9_999L)
+
+        val onion = database.shoppingListCheckDao().getCheck(plan.uuid, "onion")
+        assertEquals(true, onion?.checked)
+        assertEquals(SyncState.SYNCED, onion?.syncState)
+        assertEquals(5_000L, onion?.deletedAt)
+    }
+
+    @Test
+    fun observeCheckedRows_reportsCheckedByOnlyForItemsWithAKnownChecker() = runTest {
         val plan = mealPlan()
         val checkerId = UuidV7Generator.newId()
         database.mealPlanDao().upsertMealPlan(plan)
@@ -199,10 +226,11 @@ class ShoppingListCheckDaoTest {
             check(plan.uuid, "milk").copy(checked = false, checkedBy = checkerId) // unchecked
         )
 
-        val rows = database.shoppingListCheckDao().observeCheckedByUserIds(plan.uuid).first()
+        val rows = database.shoppingListCheckDao().observeCheckedRows(plan.uuid).first()
 
-        assertEquals(listOf("onion"), rows.map { it.itemKey })
-        assertEquals(checkerId, rows.single().checkedBy)
+        assertEquals(setOf("onion", "garlic"), rows.map { it.itemKey }.toSet())
+        assertEquals(checkerId, rows.single { it.itemKey == "onion" }.checkedBy)
+        assertEquals(null, rows.single { it.itemKey == "garlic" }.checkedBy)
     }
 
     @Test
@@ -216,7 +244,7 @@ class ShoppingListCheckDaoTest {
 
         database.shoppingListCheckDao().clearForPlan(plan.uuid, state = SyncState.PENDING, updatedAt = 9_999L)
 
-        assertTrue(database.shoppingListCheckDao().observeCheckedByUserIds(plan.uuid).first().isEmpty())
+        assertTrue(database.shoppingListCheckDao().observeCheckedRows(plan.uuid).first().isEmpty())
         assertEquals(null, database.shoppingListCheckDao().getCheck(plan.uuid, "onion")?.checkedBy)
     }
 
@@ -251,7 +279,7 @@ class ShoppingListCheckDaoTest {
             "DELETE FROM meal_plans WHERE uuid = x'${plan.uuid.toHex()}'"
         )
 
-        assertTrue(database.shoppingListCheckDao().observeCheckedKeys(plan.uuid).first().isEmpty())
+        assertTrue(checkedKeys(plan.uuid).isEmpty())
     }
 
     @Test

@@ -21,11 +21,18 @@ import java.util.UUID
 @Dao
 interface ShoppingListCheckDao {
 
+    /**
+     * Every currently-checked, non-deleted item on the plan, with whoever last checked it if known
+     * (`checkedBy` is null for a local toggle that hasn't yet round-tripped through a pull — see
+     * [ShoppingListCheckEntity.checkedBy]'s doc). One query backing both the checked-set and the
+     * "who checked this" attribution, so a single write to this table triggers one Room
+     * invalidation for callers that need both, not two independently-recomputing ones.
+     */
     @Query(
-        "SELECT itemKey FROM shopping_list_checks " +
+        "SELECT itemKey, checkedBy FROM shopping_list_checks " +
             "WHERE mealPlanId = :mealPlanId AND checked = 1 AND deletedAt IS NULL"
     )
-    fun observeCheckedKeys(mealPlanId: UUID): Flow<List<String>>
+    fun observeCheckedRows(mealPlanId: UUID): Flow<List<CheckedItemRow>>
 
     @Query("SELECT * FROM shopping_list_checks WHERE mealPlanId = :mealPlanId AND itemKey = :itemKey")
     suspend fun getCheck(mealPlanId: UUID, itemKey: String): ShoppingListCheckEntity?
@@ -39,11 +46,16 @@ interface ShoppingListCheckDao {
     /**
      * Unchecks every currently-checked item on the plan — an upsert-to-unchecked on each row, same
      * as a single [upsert]'d uncheck, so every affected row becomes `PENDING` and syncs to other
-     * household members exactly like an individual toggle would.
+     * household members exactly like an individual toggle would. Excludes a soft-deleted row
+     * (`deletedAt` set): that item already left the list server-side, and unchecking it here would
+     * push a `checked = false` update that resurrects it. `checkedAt` is bumped to [updatedAt] too,
+     * matching [ShoppingListCheckEntity.checkedAt]'s "last ticked" contract the way a single-item
+     * uncheck (see the repository's `setChecked`) already does.
      */
     @Query(
-        "UPDATE shopping_list_checks SET checked = 0, checkedBy = NULL, syncState = :state, updatedAt = :updatedAt " +
-            "WHERE mealPlanId = :mealPlanId AND checked = 1"
+        "UPDATE shopping_list_checks SET checked = 0, checkedBy = NULL, checkedAt = :updatedAt, " +
+            "syncState = :state, updatedAt = :updatedAt " +
+            "WHERE mealPlanId = :mealPlanId AND checked = 1 AND deletedAt IS NULL"
     )
     suspend fun clearForPlan(mealPlanId: UUID, state: SyncState, updatedAt: Long)
 
@@ -55,18 +67,6 @@ interface ShoppingListCheckDao {
             "WHERE mealPlanId = :mealPlanId AND itemKey = :itemKey"
     )
     suspend fun updateSyncState(mealPlanId: UUID, itemKey: String, state: SyncState, updatedAt: Long)
-
-    /**
-     * `itemKey` → the userId of whoever last checked it, for every currently-checked item with a
-     * known checker (a local toggle that hasn't yet round-tripped through a pull has `checkedBy =
-     * null` and is excluded — see [ShoppingListCheckEntity.checkedBy]'s doc). Not `DISTINCT` on
-     * anything: `(mealPlanId, itemKey)` is this table's primary key, so one row per key already.
-     */
-    @Query(
-        "SELECT itemKey, checkedBy FROM shopping_list_checks " +
-            "WHERE mealPlanId = :mealPlanId AND checked = 1 AND deletedAt IS NULL AND checkedBy IS NOT NULL"
-    )
-    fun observeCheckedByUserIds(mealPlanId: UUID): Flow<List<CheckedByRow>>
 }
 
-data class CheckedByRow(val itemKey: String, val checkedBy: UUID)
+data class CheckedItemRow(val itemKey: String, val checkedBy: UUID?)
