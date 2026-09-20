@@ -38,7 +38,7 @@ internal object ModernistPalette {
      * So each theme resolves its own value. Light is ink at **65%** (the top of the handoff's
      * 55–65% band) composited over [Ground]:
      * `0.65 × 0x20 + 0.35 × 0xF3 = 0x6A` → `#6A6868`, which clears 4.5:1 against the ground
-     * (4.85:1). The literal 55% mix the CSS specifies measures 3.66:1 and fails AA for the 11–13px
+     * (4.96:1). The literal 55% mix the CSS specifies measures 3.66:1 and fails AA for the 11–13px
      * captions it is used on, so the band's darker end is the correct reading of the design.
      */
     val InkMuted = Color(0xFF6A6868)
@@ -61,8 +61,22 @@ internal object ModernistPalette {
     val Accent400 = Color(0xFF57ABA4)
     val Accent500 = Color(0xFF128C87)
 
-    /** `--color-accent` / `--color-accent-600` — the brand teal. */
+    /**
+     * `--color-accent` / `--color-accent-600` — the brand teal.
+     *
+     * **Fills and large type only.** Against [Ground] this measures 4.26:1, which clears AA for
+     * large text (≥18.66px bold / ≥24px) but *fails* the 4.5:1 required for body and label sizes.
+     * The design puts accent on a lot of small text — the 11px/800 section labels on Settings and
+     * the shopping list, the "Plan →" and "+ Add meal" links, the Accept-invite kicker, the
+     * current-day highlight — and every one of those needs [Accent700] instead. That is what
+     * [ChefColors.accentText] is for; see its KDoc.
+     *
+     * As a *fill* with [Ground] on top ([ColorScheme.onPrimary]) it is 4.26:1 the other way round
+     * and fine for button labels at 14px/800, which is large-adjacent and carries a 2dp rule.
+     */
     val Accent600 = Color(0xFF0A8080)
+
+    /** `--color-accent-700`. 6.31:1 on [Ground] — the accent step that is safe for small text. */
     val Accent700 = Color(0xFF0A6363)
     val Accent800 = Color(0xFF084A4A)
     val Accent900 = Color(0xFF053232)

@@ -44,6 +44,10 @@ data class ChefRamp(
  * - **[accent] / [neutral]** — the full ramps. Material exposes one `primary`, but the design
  *   cycles accent-100/200/300 as card fills and pairs accent-100 with accent-900 in the import
  *   error banner. Those steps have nowhere else to live.
+ * - **[accentText]** — the accent step that is legible as small text. `colorScheme.primary` is
+ *   accent-600, which measures 4.26:1 on the ground and fails AA below large-text sizes. Accent
+ *   *text* is a different role from accent *fill*, so it gets its own token rather than a note in
+ *   a doc that a call site can miss.
  * - **[navSurface]** — the bottom-nav sage. Deliberately not the teal accent, and with no
  *   counterpart anywhere else in the system, so one named role covers it.
  * - **[sectionRuleWidth] / [rowRuleWidth] / [cornerRadius]** — the layout constants. This system
@@ -54,6 +58,7 @@ data class ChefRamp(
  * Read it through [chefColors]:
  * ```
  * val fill = MaterialTheme.chefColors.accent.s100
+ * Text(label, color = MaterialTheme.chefColors.accentText)
  * HorizontalDivider(thickness = MaterialTheme.chefColors.sectionRuleWidth)
  * ```
  */
@@ -61,6 +66,18 @@ data class ChefRamp(
 data class ChefColors(
     val accent: ChefRamp,
     val neutral: ChefRamp,
+    /**
+     * Accent used as **text or an icon on the ground** — section labels, links, the current-day
+     * highlight, the accent kicker.
+     *
+     * Light resolves to accent-700 (6.31:1), not the brand accent-600 (4.26:1, below the 4.5:1
+     * AA floor for anything under large-text size). Nearly every accent string in this design is
+     * 11–14px, so the safe step is the default and the brand step is the exception.
+     *
+     * Use `colorScheme.primary` for accent **fills** (button grounds, the wizard progress bar,
+     * number badges, selected chips) where ground-colored text sits on top of it.
+     */
+    val accentText: Color,
     val navSurface: Color,
     val sectionRuleWidth: Dp,
     val rowRuleWidth: Dp,
@@ -91,6 +108,7 @@ internal val LightChefColors = ChefColors(
         s800 = ModernistPalette.Neutral800,
         s900 = ModernistPalette.Neutral900,
     ),
+    accentText = ModernistPalette.Accent700,
     navSurface = ModernistPalette.NavSage,
     sectionRuleWidth = ChefRuleWidths.Section,
     rowRuleWidth = ChefRuleWidths.Row,
@@ -149,6 +167,9 @@ internal val DarkChefColors = ChefColors(
         s800 = ModernistPalette.Neutral200,
         s900 = ModernistPalette.Neutral100,
     ),
+    // TODO(dark): the ramp flips on a dark ground, so the legible accent step is not accent-700
+    //  there. Blocked on the same decision as the ramp above.
+    accentText = DarkUnset,
     navSurface = DarkUnset,
     // Theme-invariant: a rule is the same weight on any ground. Only its color changes.
     sectionRuleWidth = ChefRuleWidths.Section,
