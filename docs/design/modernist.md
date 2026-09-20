@@ -562,7 +562,7 @@ the component is wrong.
 
 | Composable | Replaces | Notes |
 | --- | --- | --- |
-| `RuledGroup` / `SectionRule` / `RowRule` | hand-written dividers | § 3's rhythm in one call. Two forms: `RuledGroup(items) { item -> … }` and a `RuledGroup { row { } }` scope for heterogeneous rows. |
+| `RuledGroup` / `SectionRule` / `RowRule` | hand-written dividers | § 3's rhythm in one call. Two forms: `RuledGroup(items) { item -> … }` and a `RuledGroup { row { } }` scope for heterogeneous rows. Pass `key = { it.id }` for a list whose items can change. |
 | `FlatBlockButton` / `FlatButton` | `Button` / `OutlinedButton` / `TextButton` | `Primary` / `Secondary` / `Ghost` / `Destructive`. Block form is 52dp, full width, **label flush left**; inline wraps and centers. `loading = true` swaps the label for a spinner. |
 | `FlatChip` | `FilterChip` | Selected = accent fill + ExtraBold ground label; unselected = 2dp rule. 44dp, 14dp padding. |
 | `FlatSwitch` | `Switch` | 48×28 visual in a 44dp hit target. |
@@ -571,7 +571,8 @@ the component is wrong.
 | `FlatTag` | `AssistChip`, `Badge` | Non-interactive by construction — a tappable tag is a `FlatChip`. |
 | `SquareAvatar` / `CircleAvatar` | — | 36dp square initials tile; the 40dp circle is the one exception to zero radius. `avatarInitials(name)` derives the letters. |
 | `WizardProgressBar` | the old `LinearProgressIndicator` one | One segment per step, `currentStepIndex` is **zero-based**. |
-| `Modifier.flatClickable` / `Modifier.modernistFocusRing` | `clickable` + ripple | § 4. The row primitive: no ripple, flat pressed tint, focus ring. |
+| `Modifier.flatClickable` / `flatToggleable` / `flatSelectable` | `clickable` / `toggleable` / `selectable` + ripple | § 4. The row primitives: no ripple, flat pressed tint, focus ring. Use the toggle/select ones whenever the row *has* a state — selection here is carried by fill and weight, so a screen reader gets nothing unless the state is in the semantics. **Apply any `border` after them**, or the pressed tint paints over it. |
+| `Modifier.modernistFocusRing` | — | § 4.2. 2dp accent, 2dp outside the bounds. Already applied by the three above. |
 
 Every one of them carries light **and** dark previews of every state. Dark is still un-designed;
 the dark previews exist to prove the components render and to keep the un-designed tokens visible.

@@ -153,13 +153,16 @@ private fun FlatButtonBody(
     Row(
         modifier = modifier
             .alpha(if (enabled) 1f else DISABLED_ALPHA)
-            .then(variant.containerModifier())
+            // Fill *before* the click modifier so the pressed tint replaces it; border *after* it
+            // so the tint does not paint over the 2dp rule that defines the button.
+            .then(variant.fillModifier())
             .flatClickable(
                 onClick = onClick,
                 enabled = clickable,
                 role = Role.Button,
                 pressedTint = variant.pressedTint(),
             )
+            .then(variant.borderModifier())
             .semantics { if (loading) contentDescription = text }
             .padding(horizontal = horizontalPadding),
         horizontalArrangement = horizontalArrangement,
@@ -202,18 +205,31 @@ private fun FlatButtonVariant.contentColor(): Color = when (this) {
     FlatButtonVariant.Destructive -> MaterialTheme.colorScheme.error
 }
 
+/** The resting fill. Goes *before* the click modifier: the pressed tint is meant to replace it. */
 @Composable
-private fun FlatButtonVariant.containerModifier(): Modifier = when (this) {
+private fun FlatButtonVariant.fillModifier(): Modifier = when (this) {
     FlatButtonVariant.Primary -> Modifier.background(MaterialTheme.colorScheme.primary)
+    FlatButtonVariant.Secondary,
+    FlatButtonVariant.Ghost,
+    FlatButtonVariant.Destructive,
+    -> Modifier
+}
+
+/**
+ * The 2dp rule. Goes *after* the click modifier, because the pressed tint fills the whole bounds
+ * and would otherwise paint straight over it — the button would lose its outline mid-press.
+ */
+@Composable
+private fun FlatButtonVariant.borderModifier(): Modifier = when (this) {
     FlatButtonVariant.Secondary -> Modifier.border(
         width = MaterialTheme.chefColors.sectionRuleWidth,
         color = MaterialTheme.colorScheme.outline,
     )
-    FlatButtonVariant.Ghost -> Modifier
     FlatButtonVariant.Destructive -> Modifier.border(
         width = MaterialTheme.chefColors.sectionRuleWidth,
         color = MaterialTheme.colorScheme.error,
     )
+    FlatButtonVariant.Primary, FlatButtonVariant.Ghost -> Modifier
 }
 
 /**

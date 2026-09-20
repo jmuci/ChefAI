@@ -9,6 +9,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -70,6 +71,10 @@ fun RowRule(modifier: Modifier = Modifier) {
  * A list group with the rule rhythm applied: 2dp, rows separated by 1dp, 2dp.
  *
  * @param items one row per element, in order. Empty renders nothing.
+ * @param key what identifies a row across recompositions. The default — the item itself — is right
+ *   for enums, strings and value objects. **Pass a stable id (`key = { it.id }`) for anything
+ *   whose contents can change**, otherwise editing an item looks like replacing it and the row
+ *   loses whatever it remembered.
  * @param row the row body. It supplies its own padding and its own `heightIn(min = 44.dp)`; see
  *   [flatClickable] for the tappable-row recipe.
  */
@@ -77,14 +82,22 @@ fun RowRule(modifier: Modifier = Modifier) {
 fun <T> RuledGroup(
     items: List<T>,
     modifier: Modifier = Modifier,
+    key: (T) -> Any? = { item -> item },
     row: @Composable (T) -> Unit,
 ) {
     if (items.isEmpty()) return
     Column(modifier) {
         SectionRule()
         items.forEachIndexed { index, item ->
-            if (index > 0) RowRule()
-            row(item)
+            // Every iteration invokes the same lambda, so without an explicit key Compose matches
+            // rows positionally: deleting the second of four items composes the third into the
+            // second's slot, and it inherits whatever that slot remembered — a stuck pressed tint
+            // from `flatClickable`'s interaction source, a half-finished `animateDpAsState`, any
+            // `remember` the screen put in its own row.
+            key(key(item)) {
+                if (index > 0) RowRule()
+                row(item)
+            }
         }
         SectionRule()
     }
