@@ -284,6 +284,7 @@
     <string name="wizard_minutes_format">%1$d min</string>
 
     <string name="import_recipe_title">Import Recipe</string>
+    <string name="import_recipe_lede">Paste a link and ChefAI reads the ingredients and steps off the page.</string>
     <string name="import_recipe_url_label">Recipe URL</string>
     <string name="import_recipe_url_placeholder">Paste a recipe link…</string>
     <string name="import_recipe_button">Import</string>

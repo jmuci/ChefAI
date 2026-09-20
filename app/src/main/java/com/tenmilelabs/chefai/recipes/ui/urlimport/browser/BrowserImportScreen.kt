@@ -1,8 +1,10 @@
 package com.tenmilelabs.chefai.recipes.ui.urlimport.browser
 
+import android.content.res.Configuration.UI_MODE_NIGHT_YES
 import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.WebView
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,11 +13,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -25,7 +27,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.dimensionResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -33,14 +35,19 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatButton
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatButtonVariant
+import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
+import com.tenmilelabs.chefai.core.ui.navigation.ChefAINavigation
+import com.tenmilelabs.chefai.core.ui.navigation.ChefAITopAppBar
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.recipes.data.network.ScraperWebViewClient
 import com.tenmilelabs.chefai.recipes.data.network.applyScraperHardening
 import com.tenmilelabs.chefai.recipes.data.network.readRenderedHtml
-import kotlinx.coroutines.delay
 import java.util.UUID
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.delay
 
 /** Matches the off-screen fetcher's cadence — cheap, and fast enough to feel instant. */
 private val SNAPSHOT_INTERVAL = 500.milliseconds
@@ -70,7 +77,7 @@ fun BrowserImportRoute(
         }
     }
 
-    BrowserImportScreen(state = state, onAction = viewModel::dispatch)
+    BrowserImportScreen(state = state, onAction = viewModel::dispatch, onNavigateBack = onNavigateBack)
 }
 
 /**
@@ -79,14 +86,28 @@ fun BrowserImportRoute(
  * Nothing here tries to defeat the bot check — the user clears it themselves, exactly as they would
  * in Chrome. The rendered DOM is polled throughout, so the moment the real page appears the recipe
  * is picked up and the screen gets out of the way.
+ *
+ * Not one of the 19 designed screens; the handoff's instruction for it is to reuse screen 18's
+ * header and error-banner treatment, which is what [ChefAITopAppBar] plus the accent-tinted banner
+ * below give it.
  */
 @Composable
 fun BrowserImportScreen(
     state: BrowserImportState,
     onAction: (BrowserImportAction) -> Unit,
     modifier: Modifier = Modifier,
+    onNavigateBack: () -> Unit = {},
 ) {
-    Column(modifier = modifier.testTag("BrowserImportScreen").fillMaxSize()) {
+    Column(
+        modifier = modifier
+            .testTag("BrowserImportScreen")
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+    ) {
+        ChefAITopAppBar(
+            title = stringResource(R.string.import_recipe_title),
+            navigation = ChefAINavigation.Close(onClick = { onAction(BrowserImportAction.Cancel) }),
+        )
         BrowserImportBanner(state = state, onAction = onAction)
 
         if (state.errorRes == null) {
@@ -105,43 +126,61 @@ private fun BrowserImportBanner(
     state: BrowserImportState,
     onAction: (BrowserImportAction) -> Unit,
 ) {
-    Surface(tonalElevation = 3.dp) {
-        Column(modifier = Modifier.fillMaxWidth().padding(dimensionResource(R.dimen.padding_medium))) {
-            // Deliberately not keyed on state.isExtracting: a parse attempt on a snapshot with no
-            // recipe on it (the common case, every 500ms while the check sits unsolved) resolves
-            // in milliseconds, and briefly swapping the hint text in and out reflows this banner
-            // between one and two lines several times a second — the "page keeps reloading" look.
-            // A real recipe extraction is only ever visible for that same instant before the whole
-            // screen navigates away, so there is nothing worth surfacing here either way.
-            val hintRes = when {
-                state.errorRes != null -> state.errorRes
-                state.phase == BrowserImportState.Phase.AWAITING_USER -> R.string.import_recipe_browser_hint
-                else -> R.string.import_recipe_browser_loading
+    // See ImportRecipeScreen's ImportErrorBanner — same reasoning, same DARK MODE FLAG.
+    val hintRes = when {
+        state.errorRes != null -> state.errorRes
+        state.phase == BrowserImportState.Phase.AWAITING_USER -> R.string.import_recipe_browser_hint
+        else -> R.string.import_recipe_browser_loading
+    }
+
+    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        if (state.errorRes != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    painter = painterResource(ChefAIIcons.CircleAlert),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(
+                    text = stringResource(hintRes),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
             }
+        } else {
             Text(
                 text = stringResource(hintRes),
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (state.errorRes != null) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Spacer(Modifier.height(8.dp))
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            )
+        }
 
-            if (state.errorRes == null) {
-                Spacer(Modifier.height(dimensionResource(R.dimen.padding_small)))
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.padding_small))) {
-                TextButton(onClick = { onAction(BrowserImportAction.Cancel) }) {
-                    Text(stringResource(R.string.import_recipe_browser_cancel))
-                }
-                if (state.errorRes != null) {
-                    TextButton(onClick = { onAction(BrowserImportAction.EnterManually) }) {
-                        Text(stringResource(R.string.import_recipe_enter_manually))
-                    }
-                }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlatButton(
+                text = stringResource(R.string.import_recipe_browser_cancel),
+                onClick = { onAction(BrowserImportAction.Cancel) },
+                variant = FlatButtonVariant.Ghost,
+            )
+            if (state.errorRes != null) {
+                FlatButton(
+                    text = stringResource(R.string.import_recipe_enter_manually),
+                    onClick = { onAction(BrowserImportAction.EnterManually) },
+                    variant = FlatButtonVariant.Ghost,
+                )
             }
         }
     }
@@ -221,7 +260,7 @@ private fun BrowserImportLoadingLightPreview() {
     }
 }
 
-@Preview(name = "Awaiting user — Dark", showBackground = true)
+@Preview(name = "Awaiting user — Dark", showBackground = true, uiMode = UI_MODE_NIGHT_YES)
 @Composable
 private fun BrowserImportAwaitingUserDarkPreview() {
     ChefAITheme(darkTheme = true) {
