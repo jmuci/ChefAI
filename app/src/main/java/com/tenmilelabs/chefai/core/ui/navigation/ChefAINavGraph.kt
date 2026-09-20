@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.core.ui.navigation
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Row
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -17,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.tenmilelabs.chefai.auth.ui.UserProfileMenu
 import com.tenmilelabs.chefai.core.ui.sync.SyncStatusIndicator
@@ -26,8 +28,6 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Print
-import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,6 +47,10 @@ import androidx.navigation.navArgument
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.ui.LoginScreen
 import com.tenmilelabs.chefai.auth.ui.RegisterScreen
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatButton
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatButtonVariant
+import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
+import com.tenmilelabs.chefai.core.ui.navigation.ChefAITopAppBarWithSubtitle
 import com.tenmilelabs.chefai.home.ui.HomeScreen
 import com.tenmilelabs.chefai.household.ui.AcceptInviteScreen
 import com.tenmilelabs.chefai.household.ui.HouseholdScreen
@@ -54,12 +58,15 @@ import com.tenmilelabs.chefai.mealplans.ui.MealPlansScreen
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailScreen
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailUiState
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailViewModel
+import com.tenmilelabs.chefai.mealplans.ui.detail.mealPlanDetailSubtitle
 import com.tenmilelabs.chefai.mealplans.ui.create.CreateMealPlanEvent
 import com.tenmilelabs.chefai.mealplans.ui.create.CreateMealPlanViewModel
 import com.tenmilelabs.chefai.mealplans.ui.create.WizardAdvancedScreen
 import com.tenmilelabs.chefai.mealplans.ui.create.WizardBasicsScreen
 import com.tenmilelabs.chefai.mealplans.ui.create.WizardPreferencesScreen
 import com.tenmilelabs.chefai.mealplans.ui.shoppinglist.ShoppingListScreen
+import com.tenmilelabs.chefai.mealplans.ui.shoppinglist.ShoppingListUiState
+import com.tenmilelabs.chefai.mealplans.ui.shoppinglist.ShoppingListViewModel
 import com.tenmilelabs.chefai.recipes.ui.RecipesScreen
 import com.tenmilelabs.chefai.recipes.ui.details.RecipeDetailsScreen
 import com.tenmilelabs.chefai.recipes.ui.editor.RecipeEditorScreen
@@ -155,10 +162,14 @@ fun ChefAINavGraph(
                 snackbarHostState = snackbarHostState,
             )
         }
-        composable(route = AppDestinations.MEAL_PLAN_DETAIL.route) {
+        composable(route = AppDestinations.MEAL_PLAN_DETAIL.route) { backStackEntry ->
+            val planIdArg = backStackEntry.arguments?.getString(AppDestinationArgs.MEAL_PLAN_ID_ARG)
             MealPlanDetailScreen(
                 onMealClick = { meal ->
                     navActions.navigateToMealPlanRecipeDetail(meal.recipeId, meal.dayId, meal.slot)
+                },
+                onShoppingListClick = {
+                    planIdArg?.let { navActions.navigateToMealPlanShoppingList(UUID.fromString(it)) }
                 },
                 snackbarHostState = snackbarHostState,
             )
@@ -364,11 +375,6 @@ fun ChefAINavGraph(
         )
     }
 
-    // Captured off the meal-plan-detail destination's own arguments so the shared FAB knows which
-    // plan's shopping list to open — the Scaffold only otherwise tracks the route pattern, not its
-    // filled-in path arguments.
-    var currentMealPlanId by rememberSaveable { mutableStateOf<String?>(null) }
-
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     var isFabMenuExpanded by rememberSaveable { mutableStateOf(false) }
 
@@ -380,12 +386,8 @@ fun ChefAINavGraph(
     // Add destination listener only once and properly dispose of it
     DisposableEffect(navController) {
         val listener =
-            NavController.OnDestinationChangedListener { _: NavController, destination: NavDestination, arguments ->
+            NavController.OnDestinationChangedListener { _: NavController, destination: NavDestination, _ ->
                 val newRoute = destination.route ?: AppDestinations.HOME.route
-
-                if (destination.route == AppDestinations.MEAL_PLAN_DETAIL.route) {
-                    currentMealPlanId = arguments?.getString(AppDestinationArgs.MEAL_PLAN_ID_ARG)
-                }
 
                 titleRes = if (destination.route in wizardRoutes) {
                     R.string.app_dest_title_meal_plan_wizard
@@ -422,49 +424,88 @@ fun ChefAINavGraph(
                 currentRoute != AppDestinations.REGISTER.route &&
                 currentRoute !in wizardRoutes
             ) {
-                ChefAITopAppBar(
-                    title = stringResource(titleRes),
-                    navigation = if (!isTopLevelDestination) {
-                        ChefAINavigation.Back {
-                            // Route through the system back dispatcher rather than
-                            // popping directly, so screens with their own BackHandler
-                            // (e.g. RecipeEditorScreen's unsaved-changes check) get a
-                            // chance to intercept before the back stack is popped.
-                            backPressedDispatcher?.onBackPressed()
-                                ?: navController.popBackStack()
+                val navigation = if (!isTopLevelDestination) {
+                    ChefAINavigation.Back {
+                        // Route through the system back dispatcher rather than
+                        // popping directly, so screens with their own BackHandler
+                        // (e.g. RecipeEditorScreen's unsaved-changes check) get a
+                        // chance to intercept before the back stack is popped.
+                        backPressedDispatcher?.onBackPressed()
+                            ?: navController.popBackStack()
+                    }
+                } else {
+                    ChefAINavigation.None
+                }
+                val trailingActions: @Composable RowScope.() -> Unit = {
+                    // Sync status indicator (hidden when idle)
+                    SyncStatusIndicator()
+                    // User profile menu on the right side
+                    UserProfileMenu(
+                        onLogout = {},
+                        onLogin = { navActions.navigateToLogin() },
+                        onSettings = { navActions.navigateToSettings() },
+                        onHousehold = { navActions.navigateToHousehold() },
+                    )
+                }
+
+                when (currentRoute) {
+                    AppDestinations.MEAL_PLAN_DETAIL.route -> {
+                        // The plan's name/date-range/sharing subtitle (16) needs the same state the
+                        // print action already reads here, so both come from one hoisted view model.
+                        navController.currentBackStackEntry?.let { entry ->
+                            val detailViewModel: MealPlanDetailViewModel = hiltViewModel(entry)
+                            val detailState by detailViewModel.uiState.collectAsStateWithLifecycle()
+                            val success = detailState as? MealPlanDetailUiState.Success
+                            ChefAITopAppBarWithSubtitle(
+                                title = success?.mealPlan?.name ?: stringResource(titleRes),
+                                subtitle = success?.let {
+                                    mealPlanDetailSubtitle(it.mealPlan, it.ownerDisplayName)
+                                }.orEmpty(),
+                                navigation = navigation,
+                                actions = {
+                                    if ((success?.totalCount ?: 0) > 0) {
+                                        IconButton(onClick = { detailViewModel.onPrintClick() }) {
+                                            Icon(
+                                                painter = painterResource(ChefAIIcons.Printer),
+                                                contentDescription = stringResource(R.string.meal_plan_print),
+                                            )
+                                        }
+                                    }
+                                    trailingActions()
+                                },
+                            )
                         }
-                    } else {
-                        ChefAINavigation.None
-                    },
-                    actions = {
-                        // Screen-specific actions (e.g. print), closest to the title.
-                        if (currentRoute == AppDestinations.MEAL_PLAN_DETAIL.route) {
-                            navController.currentBackStackEntry?.let { entry ->
-                                val printViewModel: MealPlanDetailViewModel = hiltViewModel(entry)
-                                val printState by printViewModel.uiState.collectAsStateWithLifecycle()
-                                val canPrint = (printState as? MealPlanDetailUiState.Success)
-                                    ?.totalCount?.let { it > 0 } == true
-                                if (canPrint) {
-                                    IconButton(onClick = { printViewModel.onPrintClick() }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Print,
-                                            contentDescription = stringResource(R.string.meal_plan_print),
+                    }
+                    AppDestinations.MEAL_PLAN_SHOPPING_LIST.route -> {
+                        navController.currentBackStackEntry?.let { entry ->
+                            val listViewModel: ShoppingListViewModel = hiltViewModel(entry)
+                            val listState by listViewModel.uiState.collectAsStateWithLifecycle()
+                            val checkedCount = (listState as? ShoppingListUiState.Success)
+                                ?.list?.checkedCount ?: 0
+                            ChefAITopAppBar(
+                                title = stringResource(titleRes),
+                                navigation = navigation,
+                                actions = {
+                                    if (checkedCount > 0) {
+                                        FlatButton(
+                                            text = stringResource(R.string.shopping_list_uncheck_all),
+                                            onClick = { listViewModel.onUncheckAll() },
+                                            variant = FlatButtonVariant.Ghost,
                                         )
                                     }
-                                }
-                            }
+                                    trailingActions()
+                                },
+                            )
                         }
-                        // Sync status indicator (hidden when idle)
-                        SyncStatusIndicator()
-                        // User profile menu on the right side
-                        UserProfileMenu(
-                            onLogout = {},
-                            onLogin = { navActions.navigateToLogin() },
-                            onSettings = { navActions.navigateToSettings() },
-                            onHousehold = { navActions.navigateToHousehold() },
+                    }
+                    else -> {
+                        ChefAITopAppBar(
+                            title = stringResource(titleRes),
+                            navigation = navigation,
+                            actions = trailingActions,
                         )
-                    },
-                )
+                    }
+                }
             }
         },
         bottomBar = {
@@ -505,29 +546,9 @@ fun ChefAINavGraph(
                         )
                     }
                 }
-                AppDestinations.MEAL_PLAN_DETAIL.route -> {
-                    currentMealPlanId?.let { planId ->
-                        FloatingActionButton(
-                            onClick = {
-                                navActions.navigateToMealPlanShoppingList(UUID.fromString(planId))
-                            },
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ShoppingCart,
-                                contentDescription = stringResource(R.string.shopping_list_open),
-                            )
-                        }
-                    }
-                }
             }
         }
     ) { innerPadding ->
-        val wizardRoutes = setOf(
-            ScreenBaseRoutes.MEAL_PLAN_WIZARD_BASICS,
-            ScreenBaseRoutes.MEAL_PLAN_WIZARD_PREFERENCES,
-            ScreenBaseRoutes.MEAL_PLAN_WIZARD_ADVANCED,
-        )
         val hideNav = currentRoute == AppDestinations.LOGIN.route ||
             currentRoute == AppDestinations.REGISTER.route ||
             currentRoute == AppDestinations.IMPORT_RECIPE.route ||

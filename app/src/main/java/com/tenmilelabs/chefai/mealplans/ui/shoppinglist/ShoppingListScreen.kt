@@ -1,42 +1,37 @@
 package com.tenmilelabs.chefai.mealplans.ui.shoppinglist
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
-import com.tenmilelabs.chefai.core.ui.components.SharedByBadge
+import com.tenmilelabs.chefai.core.ui.components.flat.RowRule
+import com.tenmilelabs.chefai.core.ui.components.flat.SectionRule
+import com.tenmilelabs.chefai.core.ui.navigation.ChefAITopAppBarSurface
+import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
+import com.tenmilelabs.chefai.core.ui.theme.chefColors
 import com.tenmilelabs.chefai.core.util.EmptyContent
 import com.tenmilelabs.chefai.core.util.LoadingContent
-import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.GrocerySection
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.ShoppingList
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.ShoppingListItem
@@ -76,46 +71,43 @@ fun ShoppingListScreen(
             )
         } else {
             ShoppingListContent(
-                planName = state.planName,
-                ownerDisplayName = state.ownerDisplayName,
                 list = state.list,
                 onToggleItem = viewModel::onToggleItem,
-                onUncheckAll = viewModel::onUncheckAll,
                 modifier = modifier,
             )
         }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+/**
+ * The picked-up summary and its progress bar. Built on [ChefAITopAppBarSurface] as a bare slot,
+ * the way the wizard's step bar stacks under its own title row — the screen's own back, title and
+ * ghost "Uncheck all" button live in the app shell's header, above this.
+ */
 @Composable
 private fun ShoppingListContent(
-    planName: String,
     list: ShoppingList,
-    ownerDisplayName: String? = null,
     onToggleItem: (ShoppingListItem) -> Unit,
-    onUncheckAll: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        ShoppingListHeader(
-            planName = planName,
-            ownerDisplayName = ownerDisplayName,
-            list = list,
-            onUncheckAll = onUncheckAll,
-        )
+        ShoppingListProgressHeader(list = list)
 
         LazyColumn(
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(bottom = 16.dp),
         ) {
-            list.sections.forEach { section ->
-                stickyHeader(key = "header-${section.section.name}") {
+            list.sections.forEachIndexed { sectionIndex, section ->
+                item(key = "header-${section.section.name}") {
+                    if (sectionIndex > 0) Spacer(Modifier.height(16.dp))
                     SectionHeader(section = section)
                 }
-                items(
+                item(key = "rule-top-${section.section.name}") { SectionRule() }
+                itemsIndexed(
                     items = section.items,
-                    key = { "item-${it.key}" },
-                ) { item ->
+                    key = { _, item -> "item-${item.key}" },
+                ) { index, item ->
+                    if (index > 0) RowRule()
                     ShoppingListRow(
                         name = item.displayName,
                         quantityLabel = item.quantityLabel,
@@ -125,70 +117,37 @@ private fun ShoppingListContent(
                         onToggle = { onToggleItem(item) },
                     )
                 }
+                item(key = "rule-bottom-${section.section.name}") { SectionRule() }
             }
         }
     }
 }
 
 @Composable
-private fun ShoppingListHeader(
-    planName: String,
-    ownerDisplayName: String?,
+private fun ShoppingListProgressHeader(
     list: ShoppingList,
-    onUncheckAll: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val progress by animateFloatAsState(targetValue = list.progress, label = "shoppingProgress")
 
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = planName,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.weight(1f),
-                )
-                SharedByBadge(ownerDisplayName = ownerDisplayName)
-                if (list.checkedCount > 0) {
-                    TextButton(onClick = onUncheckAll) {
-                        Text(stringResource(R.string.shopping_list_uncheck_all))
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            LinearProgressIndicator(
-                progress = { progress },
+    ChefAITopAppBarSurface(modifier = modifier) {
+        Text(
+            text = stringResource(R.string.shopping_list_progress, list.checkedCount, list.totalCount),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .background(MaterialTheme.chefColors.neutral.s200),
+        ) {
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f),
-                gapSize = 0.dp,
-                drawStopIndicator = {},
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = stringResource(R.string.shopping_list_progress, list.checkedCount, list.totalCount),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    .fillMaxWidth(progress)
+                    .height(6.dp)
+                    .background(MaterialTheme.colorScheme.primary),
             )
         }
     }
@@ -199,31 +158,12 @@ private fun SectionHeader(
     section: ShoppingListSection,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "${section.section.emoji}  ${section.section.label}",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = "${section.checkedCount}/${section.items.size}",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
+    Text(
+        text = section.section.label.uppercase(),
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.chefColors.accentText,
+        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+    )
 }
 
 // region Previews
@@ -233,14 +173,23 @@ private fun previewList(): ShoppingList = ShoppingList(
         ShoppingListSection(
             section = GrocerySection.PRODUCE,
             items = listOf(
-                ShoppingListItem("banana", "Banana", "3", GrocerySection.PRODUCE, isChecked = false),
-                ShoppingListItem("onion", "Onion", "2", GrocerySection.PRODUCE, isChecked = true),
+                ShoppingListItem("broccoli", "Broccoli", "2 heads", GrocerySection.PRODUCE, isChecked = true, checkedByName = "Ana"),
+                ShoppingListItem("garlic", "Garlic", "1 bulb", GrocerySection.PRODUCE, isChecked = false),
+                ShoppingListItem("dill", "Fresh dill", "1 bunch", GrocerySection.PRODUCE, isChecked = false),
+            ),
+        ),
+        ShoppingListSection(
+            section = GrocerySection.MEAT_AND_SEAFOOD,
+            items = listOf(
+                ShoppingListItem("salmon", "Salmon fillets", "6 pcs", GrocerySection.MEAT_AND_SEAFOOD, isChecked = true),
+                ShoppingListItem("beef", "Beef mince", "900 g", GrocerySection.MEAT_AND_SEAFOOD, isChecked = false, isApproximate = true),
             ),
         ),
         ShoppingListSection(
             section = GrocerySection.DAIRY_AND_EGGS,
             items = listOf(
-                ShoppingListItem("milk", "Milk", "1 l", GrocerySection.DAIRY_AND_EGGS, isChecked = false),
+                ShoppingListItem("pecorino", "Pecorino romano", "150 g", GrocerySection.DAIRY_AND_EGGS, isChecked = false),
+                ShoppingListItem("eggs", "Eggs", "6", GrocerySection.DAIRY_AND_EGGS, isChecked = false),
             ),
         ),
     ),
@@ -251,10 +200,8 @@ private fun previewList(): ShoppingList = ShoppingList(
 private fun ShoppingListContentLightPreview() {
     ChefAITheme(darkTheme = false) {
         ShoppingListContent(
-            planName = "3-day meal plan",
             list = previewList(),
             onToggleItem = {},
-            onUncheckAll = {},
         )
     }
 }
@@ -264,11 +211,8 @@ private fun ShoppingListContentLightPreview() {
 private fun ShoppingListContentDarkPreview() {
     ChefAITheme(darkTheme = true) {
         ShoppingListContent(
-            planName = "3-day meal plan",
-            ownerDisplayName = "Chef Owner",
             list = previewList(),
             onToggleItem = {},
-            onUncheckAll = {},
         )
     }
 }

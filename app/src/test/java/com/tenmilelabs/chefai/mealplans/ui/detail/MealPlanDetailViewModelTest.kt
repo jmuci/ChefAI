@@ -93,16 +93,15 @@ class MealPlanDetailViewModelTest {
     // --- State ---
 
     @Test
-    fun `resolves a plan's meals into day sections`() = runTest {
+    fun `resolves a plan's meals in day order`() = runTest {
         mealPlanRepository.emitPlans(planWith(fullDay()))
 
         createViewModel().uiState.test {
             val state = awaitItem().let { if (it is MealPlanDetailUiState.Loading) awaitItem() else it }
             assertThat(state).isInstanceOf(MealPlanDetailUiState.Success::class.java)
             val success = state as MealPlanDetailUiState.Success
-            assertThat(success.upcoming).hasSize(1)
-            assertThat(success.upcoming.single().meals).hasSize(2)
-            assertThat(success.cooked).isEmpty()
+            assertThat(success.meals).hasSize(2)
+            assertThat(success.meals.none { it.isCooked }).isTrue()
             assertThat(success.totalCount).isEqualTo(2)
             cancelAndIgnoreRemainingEvents()
         }
@@ -137,6 +136,38 @@ class MealPlanDetailViewModelTest {
         createViewModel().uiState.test {
             val state = awaitItem().let { if (it is MealPlanDetailUiState.Loading) awaitItem() else it }
             assertThat((state as MealPlanDetailUiState.Success).showsSlotLabels).isFalse()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // --- Shopping list footer count ---
+
+    @Test
+    fun `uiState resolves the shopping list's total item count`() = runTest {
+        mealPlanRepository.emitPlans(planWith(fullDay()))
+        shoppingListRepository.setIngredientsForRecipe(
+            recipePreview1.uuid,
+            listOf(PlannedIngredient(recipePreview1.uuid, recipeServings = 2, displayName = "Egg", quantity = 2.0, unit = "")),
+        )
+        shoppingListRepository.setIngredientsForRecipe(
+            recipePreview2.uuid,
+            listOf(PlannedIngredient(recipePreview2.uuid, recipeServings = 2, displayName = "Flour", quantity = 200.0, unit = "g")),
+        )
+
+        createViewModel().uiState.test {
+            val state = awaitItem().let { if (it is MealPlanDetailUiState.Loading) awaitItem() else it }
+            assertThat((state as MealPlanDetailUiState.Success).shoppingListItemCount).isEqualTo(2)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `uiState reports zero shopping list items for an empty plan`() = runTest {
+        mealPlanRepository.emitPlans(emptyPlan())
+
+        createViewModel().uiState.test {
+            val state = awaitItem().let { if (it is MealPlanDetailUiState.Loading) awaitItem() else it }
+            assertThat((state as MealPlanDetailUiState.Success).shoppingListItemCount).isEqualTo(0)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -178,7 +209,7 @@ class MealPlanDetailViewModelTest {
     // --- Marking cooked ---
 
     @Test
-    fun `toggling a meal cooked moves it to the cooked list`() = runTest {
+    fun `toggling a meal cooked marks it in place`() = runTest {
         mealPlanRepository.emitPlans(planWith(fullDay()))
         val viewModel = createViewModel()
 
@@ -186,21 +217,20 @@ class MealPlanDetailViewModelTest {
             val initial = awaitItem()
                 .let { if (it is MealPlanDetailUiState.Loading) awaitItem() else it }
                 as MealPlanDetailUiState.Success
-            val meal = initial.upcoming.single().meals.first { it.slot == MealSlot.LUNCH }
+            val meal = initial.meals.first { it.slot == MealSlot.LUNCH }
 
             viewModel.onToggleCooked(meal)
 
             val updated = awaitItem() as MealPlanDetailUiState.Success
-            assertThat(updated.cooked.map { it.slot }).containsExactly(MealSlot.LUNCH)
-            assertThat(updated.upcoming.single().meals.map { it.slot })
-                .containsExactly(MealSlot.DINNER)
+            assertThat(updated.meals.first { it.slot == MealSlot.LUNCH }.isCooked).isTrue()
+            assertThat(updated.meals.first { it.slot == MealSlot.DINNER }.isCooked).isFalse()
             assertThat(updated.cookedCount).isEqualTo(1)
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun `toggling a cooked meal again returns it to upcoming`() = runTest {
+    fun `toggling a cooked meal again marks it outstanding`() = runTest {
         mealPlanRepository.emitPlans(planWith(fullDay(lunchCookedAt = 50L)))
         val viewModel = createViewModel()
 
@@ -209,11 +239,11 @@ class MealPlanDetailViewModelTest {
                 .let { if (it is MealPlanDetailUiState.Loading) awaitItem() else it }
                 as MealPlanDetailUiState.Success
 
-            viewModel.onToggleCooked(initial.cooked.single())
+            viewModel.onToggleCooked(initial.meals.first { it.isCooked })
 
             val updated = awaitItem() as MealPlanDetailUiState.Success
-            assertThat(updated.cooked).isEmpty()
-            assertThat(updated.upcoming.single().meals).hasSize(2)
+            assertThat(updated.meals.none { it.isCooked }).isTrue()
+            assertThat(updated.meals).hasSize(2)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -227,7 +257,7 @@ class MealPlanDetailViewModelTest {
                 .let { if (it is MealPlanDetailUiState.Loading) awaitItem() else it }
                 as MealPlanDetailUiState.Success
             assertThat(state.progress).isEqualTo(1f)
-            assertThat(state.upcoming).isEmpty()
+            assertThat(state.meals.all { it.isCooked }).isTrue()
             cancelAndIgnoreRemainingEvents()
         }
     }

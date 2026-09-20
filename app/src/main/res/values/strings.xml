@@ -239,9 +239,10 @@
     <string name="meal_plan_generating">Building your meal plan…</string>
     <string name="meal_plan_print">Print meal plan</string>
     <string name="meal_plan_shared_by">Shared by %1$s</string>
+    <string name="meal_plan_shopping_list_button">Shopping list · %1$d items</string>
 
     <!-- Shopping List -->
-    <string name="app_dest_title_shopping_list">Shopping List</string>
+    <string name="app_dest_title_shopping_list">Shopping list</string>
     <string name="shopping_list_open">Shopping list</string>
     <string name="shopping_list_progress">%1$d of %2$d picked up</string>
     <string name="shopping_list_uncheck_all">Uncheck all</string>

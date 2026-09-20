@@ -8,11 +8,13 @@ import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.household.domain.model.Household
 import com.tenmilelabs.chefai.household.domain.repository.HouseholdRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
+import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.print.MealPlanPrintDocument
 import com.tenmilelabs.chefai.mealplans.domain.print.MealPlanPrintDocumentBuilder
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.repository.ShoppingListRepository
+import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.ShoppingListBuilder
 import com.tenmilelabs.chefai.mealplans.domain.usecase.GenerateMealPlanUseCase
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,6 +25,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -46,9 +49,10 @@ sealed interface MealPlanDetailUiState {
         val isGenerating: Boolean = false,
         /** Null unless [mealPlan] is shared and its owner was found in the cached household. */
         val ownerDisplayName: String? = null,
+        /** Total shopping-list line count for the footer button — 0 before it has resolved. */
+        val shoppingListItemCount: Int = 0,
     ) : MealPlanDetailUiState {
-        val upcoming: List<DaySection> get() = board.upcoming
-        val cooked: List<PlannedMeal> get() = board.cooked
+        val meals: List<PlannedMeal> get() = board.meals
         val cookedCount: Int get() = board.cookedCount
         val totalCount: Int get() = board.totalCount
         val progress: Float get() = board.progress
@@ -100,8 +104,34 @@ class MealPlanDetailViewModel @Inject constructor(
                     recipesRepository.getRecipePreviewsByIds(recipeIds)
                 }
 
-                previews.combine(householdRepository.observeMyHousehold()) { list, household ->
-                    buildState(mealPlan, list.associateBy { it.uuid }, household)
+                // A recipe filling two slots needs two shops' worth, matching the shopping-list
+                // screen's own count — see ShoppingListViewModel.
+                val slotCounts: Map<UUID, Int> = mealPlan.days
+                    .flatMap { day -> MealSlot.entries.mapNotNull { day.recipeIdFor(it) } }
+                    .groupingBy { it }
+                    .eachCount()
+
+                // The footer button's item count is a nice-to-have, not the reason this screen
+                // exists — a shopping-list repository hiccup (thrown eagerly or mid-flow) should
+                // leave the count at 0 rather than take the whole detail screen down with it.
+                val itemCount = if (recipeIds.isEmpty()) {
+                    flowOf(0)
+                } else {
+                    runCatching { shoppingListRepository.observeIngredientsForRecipes(recipeIds) }
+                        .getOrElse { flowOf(emptyList()) }
+                        .map { ingredients ->
+                            ShoppingListBuilder.build(
+                                ingredients = ingredients,
+                                slotCountByRecipe = slotCounts,
+                                plannedServings = mealPlan.preferences.servingsPerMeal,
+                                checkedKeys = emptySet(),
+                            ).totalCount
+                        }
+                        .catch { emit(0) }
+                }
+
+                combine(previews, householdRepository.observeMyHousehold(), itemCount) { list, household, count ->
+                    buildState(mealPlan, list.associateBy { it.uuid }, household, count)
                 }
             }
         }
@@ -201,6 +231,7 @@ class MealPlanDetailViewModel @Inject constructor(
             mealPlan: MealPlan,
             recipeMap: Map<UUID, RecipePreview>,
             household: Household? = null,
+            shoppingListItemCount: Int = 0,
         ): MealPlanDetailUiState.Success = MealPlanDetailUiState.Success(
             mealPlan = mealPlan,
             board = MealPlanBoard.from(mealPlan, recipeMap),
@@ -209,6 +240,7 @@ class MealPlanDetailViewModel @Inject constructor(
             } else {
                 null
             },
+            shoppingListItemCount = shoppingListItemCount,
         )
     }
 }
