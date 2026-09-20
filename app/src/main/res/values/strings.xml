@@ -173,6 +173,9 @@
     <string name="label_password">Password</string>
     <string name="label_confirm_password">Confirm Password</string>
     <string name="label_username">Username</string>
+    <string name="placeholder_email">alice@example.com</string>
+    <string name="content_description_show_password">Show password</string>
+    <string name="content_description_hide_password">Hide password</string>
     <string name="remember_me">Remember me</string>
     <string name="create_account_subtitle">Join ChefAI and start your culinary journey</string>
     <string name="register_button">Create Account</string>

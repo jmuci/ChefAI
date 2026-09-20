@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.core.ui.components.ChefAIWordmark
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatTag
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatTagTone
 import com.tenmilelabs.chefai.core.ui.components.flat.SectionRule
@@ -92,6 +93,7 @@ private object HeaderMetrics {
  * | [ChefAITopAppBar] | title, optional trailing actions | Recipes (04) |
  * | [ChefAITopAppBarWithSubtitle] | title over a muted second line | Home (01), Meal plan detail (16) |
  * | [ChefAITopAppBarWithTag] | title with a trailing status tag | Recipe editor (19) |
+ * | [ChefAITopAppBarWithWordmark] | back arrow, accent wordmark instead of a title | Create account (08) |
  * | [ChefAITopAppBarSurface] | the bare ground + padding + rule, as a slot | wizard (13–15), shopping list (17) |
  *
  * [ChefAINavigation] is orthogonal to all of them — any shape can carry a back arrow, an X, or
@@ -174,6 +176,24 @@ fun ChefAITopAppBarWithTag(
             },
         ) {
             HeaderTitle(title)
+        }
+    }
+}
+
+/**
+ * The back-arrow header that carries the accent wordmark instead of a screen title — Create
+ * account (08). [ChefAIWordmark] replaces [HeaderTitle] because the screen's identity is the
+ * point here, not a title naming what the screen does; Log in (07) shows the same wordmark inline,
+ * with no header at all.
+ */
+@Composable
+fun ChefAITopAppBarWithWordmark(
+    modifier: Modifier = Modifier,
+    navigation: ChefAINavigation = ChefAINavigation.None,
+) {
+    ChefAITopAppBarSurface(modifier = modifier) {
+        HeaderRow(navigation = navigation) {
+            ChefAIWordmark()
         }
     }
 }
@@ -325,6 +345,15 @@ private fun ChefAITopAppBarWithSubtitlePreview() {
                 )
             },
         )
+    }
+}
+
+@Preview(name = "Header — back + wordmark", showBackground = true)
+@Preview(name = "Header — back + wordmark, dark", showBackground = true, uiMode = UI_MODE_NIGHT_YES)
+@Composable
+private fun ChefAITopAppBarWithWordmarkPreview() {
+    ChefAITheme {
+        ChefAITopAppBarWithWordmark(navigation = ChefAINavigation.Back(onClick = {}))
     }
 }
 
