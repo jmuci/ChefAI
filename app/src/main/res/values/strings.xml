@@ -98,6 +98,7 @@
     <string name="recipe_timer_widget_content_description">Recipe step timer</string>
     <string name="view_more">View more</string>
     <string name="view_less">View less</string>
+    <string name="view_recipe_button">View Recipe</string>
     <string name="save_to_collection_content_description">Save to collection</string>
     <string name="remove_from_collection_content_description">Remove from collection</string>
     <string name="recipe_not_found_error_subtitle">Oops! This was not supposed to happen. Please navigate back and try again later.</string>
@@ -145,6 +146,7 @@
     <string name="section_recipe_photo">Recipe Photo</string>
     <string name="section_tags">Tags</string>
     <string name="servings_format">%1$d servings</string>
+    <string name="recipe_servings_format">Serves %1$d</string>
     <string name="snackbar_save_error">Failed to save recipe.</string>
     <string name="start_step_timer_content_description">Start timer for this step</string>
     <string name="step_number_format">%1$d.</string>
