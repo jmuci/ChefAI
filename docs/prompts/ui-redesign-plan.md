@@ -68,22 +68,45 @@ new dependency for what is ultimately static XML, unverified maintenance.
 Foundation is Opus because it sets conventions every later session copies.
 Screen sessions are Sonnet 5 because by then the pattern is fixed.
 
-| # | PR | Scope | Model |
-|---|----|-------|-------|
-| **1** | `redesign/theme` | Zero-radius `Shapes`. Semantic roles in `ColorSchemes.kt` (bg/ink/muted/divider/surfaceVariant). `LocalChefColors` CompositionLocal for what M3 has no slot for: the accent ramp 100–900, neutral ramp, nav sage `#e7f0e0`, divider widths (2dp/1dp), 0dp radius constant — light + dark instances, dark filled with TODOs. Archivo via the existing `GoogleFont` provider, replacing Roboto. **`docs/design/modernist.md`**: token table, type scale, rule rhythm, dark-mode discipline, and a "how to build a screen in this system" recipe. **A unit test that greps `ui/` for `Color(0x`/`.copy(alpha=` on ink and fails** — the guardrail that keeps Sonnet sessions honest. | **Opus 5** |
-| **2** | `redesign/icons` | D4 above. Mechanical once the list is fixed; can run parallel with 1. | Sonnet 5 |
-| **3** | `redesign/components` | `core/ui/components/flat/`: `FlatChip`, `FlatSwitch`, `FlatField`, `WizardProgressBar`, `SectionRule`, plus `FlatButton` (primary/secondary/ghost, 52dp block, flush-left label), `FlatCheckbox`, `FlatRadio`, `FlatTag`, `SquareAvatar`. Focus ring (2dp accent, 2dp offset), pressed tint one ramp step — no rounded ripples. Light+dark previews each. | **Opus 5** |
-| **4** | `redesign/shell` | Bottom nav (sage bar, 10px/800 labels, accent active), `ChefAITopAppBar` → flat header, `UserProfileMenu` panel (2px ink border + `--shadow-lg`; in dark the border carries it, per the handoff) — screen **09**, all three `UserSession` states. | **Opus 5** |
-| **4b** | `redesign/shared-cards` | Restyle everything in `core/ui/components/`: `RecipeListCard`, `LargeCard`, `InfoChip`, `CookedToggleButton`, `SharedByBadge`, `RecipePrivacyBadge`, `SectionHeaderWithSubtitle`. **This PR exists so the screen wave never touches `core/ui/components/`** — those seven files have consumers in four different screen PRs. Read handoff sections 1, 3, 4, 5 for their specs. | Sonnet 5 |
-| **5** | `redesign/settings-auth` | **10** Settings, **07** Log in, **08** Create account. Exercises `FlatField`, `FlatRadio`, rule rhythm, flush-left buttons, accent-700 field errors. | Sonnet 5 |
-| **6** | `redesign/wizard` | **13/14/15** wizard steps. `WizardProgressBar`, `FlatChip`, `FlatSwitch`, servings stepper band, disabled `collectionTooSmall` state, `isSaving`. | Sonnet 5 |
-| **7** | `redesign/plan-detail-shopping` | **16** Meal plan detail (per-meal segment bar), **17** Shopping list (aisle order, `≈` weights, "Checked by"). Empty/ungenerated states included. | Sonnet 5 |
-| **8** | `redesign/household` | **11** Household (has + empty), **12** Accept invite (all `HouseholdJoinOutcome` states). Square initials tiles, overlapping stack, invite-code box. | Sonnet 5 |
-| **9** | `redesign/recipe-editor-import` | **19** Recipe editor (ingredient/step rule rhythm, drag grips, tags), **18** Import (error banner — flag it as a ramp-flip case for dark). Drop "Recently imported". Split 9a/9b if the diff sprawls. | Sonnet 5 |
-| **10** | `redesign/search-recipes` | **02** Search browse (flat accent-ramp card tones replacing the gradient — ramp-flip case for dark), **03** results, **04** Recipes grid + filter chips per D5 (+ file the issue), **05** Recipe detail. | Sonnet 5 |
-| **11** | `redesign/home-sdui` | **01** Home — restyle `ComponentRenderer` / `SduiCarousel` / `LargeCard` / `InfoChip` to Modernist. No backend change. | Sonnet 5 |
-| **12** | `redesign/meal-plans-week` | **06** Meal Plans week view: VM + data work to go from plan-card list to a Mon–Sun day grid with "+ Add meal" empty days, week navigator, household segmented control, grocery summary. Write an ADR. | **Opus 5** |
-| **13** | `redesign/cleanup` | Sweep: rounded `Surface`/`Card`, rounded-bound ripples, missing focus rings, emoji still in strings/enum labels, any literal color the test missed, dark `TODO(dark)` inventory listed in one place. | Sonnet 5 |
+Status as of 2026-09-20: **waves A–C are merged.** Next up is PR 5, the wave-D0 canary.
+
+| # | PR | Scope | Model | Status |
+|---|----|-------|-------|--------|
+| **1** | `redesign/theme` | Zero-radius `Shapes`. Semantic roles in `ColorSchemes.kt` (bg/ink/muted/divider/surfaceVariant). `LocalChefColors` CompositionLocal for what M3 has no slot for: the accent ramp 100–900, neutral ramp, nav sage `#e7f0e0`, divider widths (2dp/1dp), 0dp radius constant — light + dark instances, dark filled with TODOs. Archivo via the existing `GoogleFont` provider, replacing Roboto. **`docs/design/modernist.md`**: token table, type scale, rule rhythm, dark-mode discipline, and a "how to build a screen in this system" recipe. **A unit test that greps `ui/` for `Color(0x`/`.copy(alpha=` on ink and fails** — the guardrail that keeps Sonnet sessions honest. | **Opus 5** | ✅ [#229](https://github.com/jmuci/ChefAI/pull/229) + [#231](https://github.com/jmuci/ChefAI/pull/231) |
+| **2** | `redesign/icons` | D4 above. Mechanical once the list is fixed; can run parallel with 1. | Sonnet 5 | ✅ [#234](https://github.com/jmuci/ChefAI/pull/234) |
+| **3** | `redesign/components` | `core/ui/components/flat/`: `FlatChip`, `FlatSwitch`, `FlatField`, `WizardProgressBar`, `SectionRule`, plus `FlatButton` (primary/secondary/ghost, 52dp block, flush-left label), `FlatCheckbox`, `FlatRadio`, `FlatTag`, `SquareAvatar`. Focus ring (2dp accent, 2dp offset), pressed tint one ramp step — no rounded ripples. Light+dark previews each. | **Opus 5** | ✅ [#230](https://github.com/jmuci/ChefAI/pull/230) + [#232](https://github.com/jmuci/ChefAI/pull/232) |
+| **4** | `redesign/shell` | Bottom nav (sage bar, 10px/800 labels, accent active), `ChefAITopAppBar` → flat header, `UserProfileMenu` panel (2px ink border + `--shadow-lg`; in dark the border carries it, per the handoff) — screen **09**, all three `UserSession` states. | **Opus 5** | ✅ [#235](https://github.com/jmuci/ChefAI/pull/235) |
+| **4b** | `redesign/shared-cards` | Restyle everything in `core/ui/components/`: `RecipeListCard`, `LargeCard`, `InfoChip`, `CookedToggleButton`, `SharedByBadge`, `RecipePrivacyBadge`, `SectionHeaderWithSubtitle`. **This PR exists so the screen wave never touches `core/ui/components/`** — those seven files have consumers in four different screen PRs. Read handoff sections 1, 3, 4, 5 for their specs. | Sonnet 5 | ✅ [#233](https://github.com/jmuci/ChefAI/pull/233) + [#236](https://github.com/jmuci/ChefAI/pull/236) |
+| **5** | `redesign/settings-auth` | **10** Settings, **07** Log in, **08** Create account. Exercises `FlatField`, `FlatRadio`, rule rhythm, flush-left buttons, accent-700 field errors. | Sonnet 5 | ⏭ **next (canary)** |
+| **6** | `redesign/wizard` | **13/14/15** wizard steps. `WizardProgressBar`, `FlatChip`, `FlatSwitch`, servings stepper band, disabled `collectionTooSmall` state, `isSaving`. | Sonnet 5 |  |
+| **7** | `redesign/plan-detail-shopping` | **16** Meal plan detail (per-meal segment bar), **17** Shopping list (aisle order, `≈` weights, "Checked by"). Empty/ungenerated states included. | Sonnet 5 |  |
+| **8** | `redesign/household` | **11** Household (has + empty), **12** Accept invite (all `HouseholdJoinOutcome` states). Square initials tiles, overlapping stack, invite-code box. | Sonnet 5 |  |
+| **9** | `redesign/recipe-editor-import` | **19** Recipe editor (ingredient/step rule rhythm, drag grips, tags), **18** Import (error banner — flag it as a ramp-flip case for dark). Drop "Recently imported". Split 9a/9b if the diff sprawls. | Sonnet 5 |  |
+| **10** | `redesign/search-recipes` | **02** Search browse (flat accent-ramp card tones replacing the gradient — ramp-flip case for dark), **03** results, **04** Recipes grid + filter chips per D5 (+ file the issue), **05** Recipe detail. | Sonnet 5 |  |
+| **11** | `redesign/home-sdui` | **01** Home — restyle `ComponentRenderer` / `SduiCarousel` / `LargeCard` / `InfoChip` to Modernist. No backend change. | Sonnet 5 |  |
+| **12** | `redesign/meal-plans-week` | **06** Meal Plans week view: VM + data work to go from plan-card list to a Mon–Sun day grid with "+ Add meal" empty days, week navigator, household segmented control, grocery summary. Write an ADR. | **Opus 5** |  |
+| **13** | `redesign/cleanup` | Sweep: rounded `Surface`/`Card`, rounded-bound ripples, missing focus rings, emoji still in strings/enum labels, any literal color the test missed, dark `TODO(dark)` inventory listed in one place. | Sonnet 5 |  |
+
+### Follow-up PRs not in the original plan
+
+Both came out of reviewing merged work, and both were done *before* the parallel wave on the same
+reasoning: a convention that nine sessions will copy is cheap to fix now and expensive later.
+
+- **[#231](https://github.com/jmuci/ChefAI/pull/231) — theme follow-ups.** `primary` (accent-600)
+  measures 4.26:1 on the ground and fails AA below large-text size, and the design puts accent on
+  a lot of 11–14px text. Added `chefColors.accentText` (accent-700, 6.31:1) for accent as *text*;
+  `colorScheme.primary` stays the *fill*. Also replaced an `inversePrimary` alias for accent-300
+  with the named ramp step, and widened the guardrail to catch the float and named-argument
+  `Color(…)` constructors plus `Color.White`/`Black`/`Transparent`.
+- **[#236](https://github.com/jmuci/ChefAI/pull/236) — Lucide in the components.** #234 merged
+  *after* #230 and #233, so the component library and shared cards were written before
+  `ChefAIIcons` existed and used Material icons. `FlatField.leadingIcon` and
+  `FlatButton.leadingIcon` change from `ImageVector?` to `@DrawableRes Int?` — done before the
+  fan-out rather than under seven live branches.
+
+**Ordering lesson for the rest of the plan:** wave A's two PRs were meant to be parallel but #234
+landed fourth, and anything built in between missed it. If a later wave has a PR whose output
+everything else consumes, merge it first rather than merely starting it first.
 
 ## Sequencing & parallelization
 
