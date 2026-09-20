@@ -49,6 +49,8 @@ class FakeHouseholdRepository : HouseholdRepository {
     var declineInviteResult: Result<Unit> = Result.success(Unit)
     var previewInviteResult: Result<HouseholdInvitePreview> = Result.failure(UnsupportedOperationException())
     var joinWithTokenResult: HouseholdJoinOutcome = HouseholdJoinOutcome.NetworkError
+    var listOutstandingInvitesResult: Result<List<HouseholdInvite>> = Result.success(emptyList())
+    var revokeInviteResult: Result<Unit> = Result.failure(UnsupportedOperationException())
 
     var refreshCount = 0
         private set
@@ -76,6 +78,8 @@ class FakeHouseholdRepository : HouseholdRepository {
     var lastPreviewedToken: String? = null
         private set
     var lastJoinedToken: String? = null
+        private set
+    var lastRevokedInviteId: UUID? = null
         private set
 
     override fun observeMyHousehold(): Flow<Household?> = householdFlow
@@ -147,8 +151,10 @@ class FakeHouseholdRepository : HouseholdRepository {
     }
 
     override suspend fun listOutstandingInvites(): Result<List<HouseholdInvite>> =
-        Result.failure(UnsupportedOperationException())
+        listOutstandingInvitesResult
 
-    override suspend fun revokeInvite(inviteId: UUID): Result<Unit> =
-        Result.failure(UnsupportedOperationException())
+    override suspend fun revokeInvite(inviteId: UUID): Result<Unit> {
+        lastRevokedInviteId = inviteId
+        return revokeInviteResult
+    }
 }

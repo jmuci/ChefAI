@@ -337,6 +337,9 @@ fun ChefAINavGraph(
                 },
                 onNavigateToLogin = { navActions.navigateToLogin() },
                 onNavigateToRegister = { navActions.navigateToRegister() },
+                onClose = {
+                    backPressedDispatcher?.onBackPressed() ?: navController.popBackStack()
+                },
             )
         }
         composable(route = AppDestinations.LOGIN.route) {
@@ -419,9 +422,12 @@ fun ChefAINavGraph(
         modifier,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            // Don't show top bar on login, register, or the wizard's own-header screens
+            // Don't show the generic Back bar on login, register, the wizard's own-header
+            // screens, or accept-invite — the last draws its own close (X) header, screen 12's
+            // "you came *to* this screen and will leave without a trail" shape rather than Back.
             if (currentRoute != AppDestinations.LOGIN.route &&
                 currentRoute != AppDestinations.REGISTER.route &&
+                currentRoute != AppDestinations.ACCEPT_INVITE.route &&
                 currentRoute !in wizardRoutes
             ) {
                 val navigation = if (!isTopLevelDestination) {
@@ -512,6 +518,7 @@ fun ChefAINavGraph(
             val hideNav = currentRoute == AppDestinations.LOGIN.route ||
                 currentRoute == AppDestinations.REGISTER.route ||
                 currentRoute == AppDestinations.IMPORT_RECIPE.route ||
+                currentRoute == AppDestinations.ACCEPT_INVITE.route ||
                 currentRoute in wizardRoutes
             if (!hideNav && !isExpanded) {
                 BottomNavigationBar(navController)
@@ -552,6 +559,7 @@ fun ChefAINavGraph(
         val hideNav = currentRoute == AppDestinations.LOGIN.route ||
             currentRoute == AppDestinations.REGISTER.route ||
             currentRoute == AppDestinations.IMPORT_RECIPE.route ||
+            currentRoute == AppDestinations.ACCEPT_INVITE.route ||
             currentRoute in wizardRoutes
 
         Row(modifier = Modifier.padding(innerPadding)) {

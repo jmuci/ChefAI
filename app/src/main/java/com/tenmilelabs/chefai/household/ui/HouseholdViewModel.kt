@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.core.domain.model.HouseholdRole
 import com.tenmilelabs.chefai.household.domain.model.Household
+import com.tenmilelabs.chefai.household.domain.model.HouseholdInvite
 import com.tenmilelabs.chefai.household.domain.model.HouseholdInviteLink
 import com.tenmilelabs.chefai.household.domain.model.HouseholdJoinOutcome
 import com.tenmilelabs.chefai.household.domain.model.PendingHouseholdInvite
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
@@ -31,6 +33,7 @@ sealed interface HouseholdUiState {
     data class Success(
         val household: Household,
         val myRole: HouseholdRole,
+        val currentUserId: UUID?,
         val isRefreshing: Boolean,
     ) : HouseholdUiState
     data class Error(val message: String) : HouseholdUiState
@@ -64,7 +67,12 @@ class HouseholdViewModel @Inject constructor(
         _lastRefreshError,
     ) { household, isRefreshing, lastRefreshError ->
         when {
-            household != null -> HouseholdUiState.Success(household, myRoleIn(household), isRefreshing)
+            household != null -> HouseholdUiState.Success(
+                household = household,
+                myRole = myRoleIn(household),
+                currentUserId = sessionManager.getCurrentUserId(),
+                isRefreshing = isRefreshing,
+            )
             // Only surfaced while there's nothing cached to fall back on — once a household is
             // cached, a background refresh failure leaves it visible (possibly stale) rather than
             // replacing it with an error screen.
@@ -76,6 +84,15 @@ class HouseholdViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = HouseholdUiState.Loading,
     )
+
+    /**
+     * The signed-in owner's own outstanding invites — screen 11's "Pending invites" group
+     * (email + expiry + Revoke). Distinct from [pendingInvites], which is the invitee's-eye view
+     * of invites addressed *to* this caller. Not cached server-side, so this is a plain
+     * one-shot-per-refresh list rather than a cold [Flow] like [uiState].
+     */
+    private val _outstandingInvites = MutableStateFlow<List<HouseholdInvite>>(emptyList())
+    val outstandingInvites: StateFlow<List<HouseholdInvite>> = _outstandingInvites.asStateFlow()
 
     /**
      * In-app invites addressed to this user — shown in [HouseholdUiState.NoHousehold]'s pending
@@ -121,7 +138,28 @@ class HouseholdViewModel @Inject constructor(
                     _lastRefreshError.value = "Couldn't load your household"
                 }
             _isRefreshing.value = false
+            refreshOutstandingInvites()
         }
+    }
+
+    /**
+     * Owner-only outstanding invites (screen 11's "Pending invites" group) — reloaded after every
+     * [refresh] and after any action that changes the set: sending an invite or revoking one.
+     * Silently cleared for a member or once there's no household at all, rather than surfaced as
+     * an error, since it is supplementary to the household itself.
+     */
+    private suspend fun refreshOutstandingInvites() {
+        val household = householdRepository.observeMyHousehold().first()
+        if (household == null || myRoleIn(household) != HouseholdRole.OWNER) {
+            _outstandingInvites.value = emptyList()
+            return
+        }
+        householdRepository.listOutstandingInvites()
+            .onSuccess { _outstandingInvites.value = it }
+            .onFailure {
+                if (it is CancellationException) throw it
+                Timber.e(it, "refreshOutstandingInvites: failed")
+            }
     }
 
     fun onCreateHousehold(name: String) {
@@ -139,7 +177,10 @@ class HouseholdViewModel @Inject constructor(
     fun onInviteByLink() {
         viewModelScope.launch {
             householdRepository.createInviteLink()
-                .onSuccess { _events.emit(HouseholdEvent.ShareInviteLink(it)) }
+                .onSuccess {
+                    _events.emit(HouseholdEvent.ShareInviteLink(it))
+                    refreshOutstandingInvites()
+                }
                 .onFailure {
                     if (it is CancellationException) throw it
                     Timber.e(it, "onInviteByLink: failed")
@@ -151,11 +192,26 @@ class HouseholdViewModel @Inject constructor(
     fun onInviteByEmail(email: String) {
         viewModelScope.launch {
             householdRepository.inviteByEmail(email)
-                .onSuccess { _events.emit(HouseholdEvent.InviteSent) }
+                .onSuccess {
+                    _events.emit(HouseholdEvent.InviteSent)
+                    refreshOutstandingInvites()
+                }
                 .onFailure {
                     if (it is CancellationException) throw it
                     Timber.e(it, "onInviteByEmail: failed")
                     _events.emit(HouseholdEvent.ShowError("Couldn't send that invite"))
+                }
+        }
+    }
+
+    fun onRevokeInvite(inviteId: UUID) {
+        viewModelScope.launch {
+            householdRepository.revokeInvite(inviteId)
+                .onSuccess { refreshOutstandingInvites() }
+                .onFailure {
+                    if (it is CancellationException) throw it
+                    Timber.e(it, "onRevokeInvite: failed for $inviteId")
+                    _events.emit(HouseholdEvent.ShowError("Couldn't revoke that invite"))
                 }
         }
     }

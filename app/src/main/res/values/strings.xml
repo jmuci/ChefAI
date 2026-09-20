@@ -332,8 +332,13 @@
     <string name="household_retry_button">Retry</string>
     <string name="household_owner_label">Owner</string>
     <string name="household_member_label">Member</string>
+    <string name="household_you_label">you</string>
+    <plurals name="household_members_count">
+        <item quantity="one">%1$d member · sharing one plan</item>
+        <item quantity="other">%1$d members · sharing one plan</item>
+    </plurals>
     <string name="household_invite_link_button">Invite via link</string>
-    <string name="household_invite_email_button">Invite by email</string>
+    <string name="household_invite_email_button">By email</string>
     <string name="household_invite_email_dialog_title">Invite by email</string>
     <string name="household_invite_email_dialog_label">Email address</string>
     <string name="household_invite_email_dialog_confirm">Send invite</string>
@@ -347,15 +352,19 @@
     <string name="household_share_chooser_title">Invite to household</string>
     <string name="household_pending_invites_title">Pending invites</string>
     <string name="household_pending_invite_expires">Expires %1$s</string>
+    <string name="household_revoke_invite_button">Revoke</string>
+    <string name="household_pending_invite_link_label">Shareable link</string>
     <string name="household_accept_button">Accept</string>
     <string name="household_decline_button">Decline</string>
     <string name="household_enter_code_button">Enter invite code</string>
 
     <!-- Accept invite -->
+    <string name="accept_invite_header_title">Invite</string>
     <string name="accept_invite_code_title">Enter invite code</string>
     <string name="accept_invite_code_label">Invite code</string>
     <string name="accept_invite_code_button">Continue</string>
     <string name="accept_invite_invited_by">Invited by %1$s</string>
+    <string name="accept_invite_description">Join to see and edit the shared meal plan and grocery list. Your existing recipes stay yours.</string>
     <string name="accept_invite_accept_button">Join household</string>
     <string name="accept_invite_invalid_title">This invite isn\'t valid</string>
     <string name="accept_invite_invalid_subtitle">It may have expired, been revoked, or already been used.</string>
