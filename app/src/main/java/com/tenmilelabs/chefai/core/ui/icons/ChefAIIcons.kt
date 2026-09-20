@@ -30,6 +30,7 @@ object ChefAIIcons {
     @DrawableRes val Eye: Int = R.drawable.ic_lucide_eye
     @DrawableRes val EyeOff: Int = R.drawable.ic_lucide_eye_off
     @DrawableRes val Globe: Int = R.drawable.ic_lucide_globe
+    @DrawableRes val GripVertical: Int = R.drawable.ic_lucide_grip_vertical
     @DrawableRes val House: Int = R.drawable.ic_lucide_house
     @DrawableRes val Image: Int = R.drawable.ic_lucide_image
     @DrawableRes val ImageOff: Int = R.drawable.ic_lucide_image_off

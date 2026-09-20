@@ -1,23 +1,22 @@
 package com.tenmilelabs.chefai.recipes.ui.editor.components
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.MenuAnchorType
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.dp
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatField
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatSuggestionsPanel
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * A [FlatField] with a suggestions list beneath it — "+ Add Tags" / "+ Add Labels" on the recipe
+ * editor (screen 19). See [FlatSuggestionsPanel] for why the list is inline rather than a floating
+ * dropdown.
+ */
 @Composable
 public fun AutocompleteInput(
     value: String,
@@ -26,51 +25,22 @@ public fun AutocompleteInput(
     onSuggestionClick: (String) -> Unit = {},
     onEnterPressed: () -> Unit = {},
     label: String,
-    placeholder: String
+    placeholder: String,
+    modifier: Modifier = Modifier,
 ) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-
-    ExposedDropdownMenuBox(
-        expanded = expanded && suggestions.isNotEmpty(),
-        onExpandedChange = { expanded = it }
-    ) {
-        OutlinedTextField(
+    Column(modifier.fillMaxWidth()) {
+        FlatField(
             value = value,
-            onValueChange = {
-                onValueChange(it)
-                expanded = true
-            },
-            label = { Text(label) },
-            placeholder = { Text(placeholder) },
-            modifier = Modifier
-                .menuAnchor(
-                    type = MenuAnchorType.PrimaryNotEditable,
-                    enabled = true
-                )
-                .fillMaxWidth(),
-            keyboardActions = KeyboardActions(
-                onDone = {
-                    onEnterPressed()
-                    expanded = false
-                }
-            ),
+            onValueChange = onValueChange,
+            label = label,
+            placeholder = placeholder,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            singleLine = true
+            keyboardActions = KeyboardActions(onDone = { onEnterPressed() }),
         )
-
-        ExposedDropdownMenu(
-            expanded = expanded && suggestions.isNotEmpty(),
-            onDismissRequest = { expanded = false }
-        ) {
-            suggestions.forEach { suggestion ->
-                DropdownMenuItem(
-                    text = { Text(suggestion) },
-                    onClick = {
-                        onSuggestionClick(suggestion)
-                        expanded = false
-                    }
-                )
-            }
-        }
+        FlatSuggestionsPanel(
+            suggestions = suggestions,
+            onSuggestionClick = onSuggestionClick,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
 }

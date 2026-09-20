@@ -37,6 +37,8 @@ sealed interface EditorAction {
     data class IngredientUnitChanged(val unit: String) : EditorAction
     data class IngredientSelected(val name: String, val ingredientId: UUID) : EditorAction
     data class RemoveIngredient(val ingredient: RecipeIngredient) : EditorAction
+    data class MoveIngredientUp(val ingredient: RecipeIngredient) : EditorAction
+    data class MoveIngredientDown(val ingredient: RecipeIngredient) : EditorAction
 
     // Steps
     data class StepInputChanged(val input: String) : EditorAction
