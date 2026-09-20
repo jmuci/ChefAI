@@ -32,7 +32,8 @@ role — they are what the theme resolves to, never what you type.
 | Background (ground) | `#F3F2F2` | `background`, `surface` | One ground for the whole app. There are no cards. |
 | Ink | `#201E1D` | `onBackground`, `onSurface` | Full-strength text. |
 | Muted ink | `#6A6868` | `onSurfaceVariant` | Captions, meta lines, subtitles, field labels. |
-| Accent | `#0A8080` | `primary` | `onPrimary` is the ground, not white. |
+| Accent (fills) | `#0A8080` | `primary` | `onPrimary` is the ground, not white. **Fills and large type only** — see below. |
+| Accent (text) | `#0A6363` | `chefColors.accentText` | Accent on small text: section labels, links, the day highlight. |
 | Accent tinted fill | `#E3F0EF` / `#053232` | `primaryContainer` / `onPrimaryContainer` | accent-100 fill, accent-900 text. |
 | Divider / rule | `#9F9D9D` | `outline` | The 2dp section rule. |
 | Hairline | `#C9C8C8` | `outlineVariant` | The 1dp row rule. |
@@ -53,6 +54,15 @@ Two deliberate choices in that table:
 - **`secondary` and `tertiary` are accent steps** (accent-700 and accent-800), not new hues. The
   system is mono. If a screen needs a second color, it needs a different *step*, not a different
   *hue*.
+- **Accent as text is a different role from accent as fill.** The brand accent-600 measures
+  4.26:1 on the ground: fine for a fill with ground-colored text on top, fine for large type, but
+  under the 4.5:1 AA floor for anything smaller. Nearly every accent *string* in this design is
+  11–14px — the Settings and shopping-list section labels, "Plan →", "+ Add meal", the
+  Accept-invite kicker, the current-day highlight — so those take `chefColors.accentText`
+  (accent-700, 6.31:1). `colorScheme.primary` stays the fill.
+
+  Measured against `#F3F2F2`: ink 14.86:1 · muted ink 4.96:1 · accent-700 6.31:1 · accent-600
+  4.26:1 · the rejected 55% muted ink 3.66:1.
 
 ### 1.2 Roles that Material 3 has no slot for
 
@@ -62,6 +72,7 @@ Read these from `MaterialTheme.chefColors` (`core/ui/theme/ChefColors.kt`).
 | --- | --- | --- |
 | `chefColors.accent.s100 … .s900` | `#E3F0EF` → `#053232` | Tinted fills, deep-accent text, the search cards' `index % 3` cycle. |
 | `chefColors.neutral.s100 … .s900` | `#F8F4F4` → `#2D2B2B` | Neutral tiles, member initials, disabled segments, thumbnails. |
+| `chefColors.accentText` | `#0A6363` | Accent as text or an icon on the ground. Accent-700, not the brand accent-600. |
 | `chefColors.navSurface` | `#E7F0E0` | The bottom-nav bar. A light sage, deliberately *not* the teal. |
 | `chefColors.sectionRuleWidth` | `2.dp` | The heavy rule. |
 | `chefColors.rowRuleWidth` | `1.dp` | The hairline between rows. |
@@ -293,6 +304,7 @@ So, three rules:
 | `chefColors.accent.*` (dark) | **magenta** | Light tinted fills come from the *shallow* end (accent-100/200/300) with accent-900 text. On a dark ground the fill must come from the *deep* end with light text. The ramp direction **flips**; it does not just darken. Darkening each step one-for-one gives fills that vanish into the ground and text that fails contrast. Affects the Search category cards and the Import error banner. |
 | `chefColors.navSurface` (dark) | **magenta** | The sage has no dark counterpart at all. It is a lighter treatment chosen to set the nav bar apart from the ground; what plays that role on a dark ground is open — possibly not a tint at all, possibly a rule. |
 | `colorScheme.outline` (dark) | provisional `#716F6F` | The 2dp rules carry the entire layout. In dark they must read *as assertive as they do in light*, which is not the same relative contrast. Tune this by eye; do not derive it. |
+| `chefColors.accentText` (dark) | **magenta** | Same blocker as the ramp: the legible accent step on a dark ground is not accent-700, and which step it *is* depends on where the ramp lands. |
 | `chefColors.neutral.*` (dark) | provisional, inverted 100↔900 | A mono ramp does invert cleanly, so this one is filled in — but it has not been contrast-checked at the steps that carry text. |
 | `colorScheme.primary` (dark) | provisional accent-400 | The full-strength accent is too dark to sit on a dark ground, so dark uses accent-400 and flips `onPrimary` from light to dark. That inverts the accent/ink relationship, which is a design call. |
 | Shadows | — | `--shadow-sm/md/lg` are tuned to the light ground and read as noise on a dark one. The profile-menu panel uses a shadow *plus* a 2dp border; in dark, the border should do the work alone. |
@@ -322,10 +334,16 @@ not an allowlist entry.
 
 You will occasionally need a color the theme does not have. In order of preference:
 
-1. **An existing M3 slot.** Re-read § 1.1 — `surfaceVariant`, `outlineVariant`, `inversePrimary`
-   and `surfaceContainer` cover more than people expect.
-2. **An existing ramp step.** `chefColors.accent.s700`, `chefColors.neutral.s300`. Most
-   "new" colors in this design are a step on a ramp that already exists.
+1. **An existing ramp step.** `chefColors.accent.s700`, `chefColors.neutral.s300`. Most
+   "new" colors in this design are a step on a ramp that already exists, and the ramp says what
+   the color *is*.
+2. **An M3 slot that genuinely means what you need.** `surfaceVariant`, `outlineVariant` and
+   `surfaceContainer` cover more than people expect.
+
+   Do **not** borrow a slot because its light value happens to match. `inversePrimary` is
+   "primary on an inverted surface" — it is accent-300 in light and accent-600 in dark, so code
+   that means "accent-300" and writes `inversePrimary` silently changes color between themes and
+   breaks the day someone styles a Snackbar. If you mean a ramp step, name the ramp step.
 3. **A new field on `ChefColors`.** Add it to the data class, give it a real value in
    `LightChefColors`, and give it `DarkUnset` + a `TODO(dark)` in `DarkChefColors` explaining what
    decision is missing. Update the table in § 1.2.
@@ -334,9 +352,18 @@ What you do not do is allowlist a call site.
 
 ### Known gaps in the guardrail
 
-`Color.White` and `Color.Black` are not flagged today, because the legacy photo scrims in
-`LargeCard` / `RecipeListCard` still use them for gradient overlays on grayscale imagery. Those
-call sites go away when those cards are restyled; tighten the rule then. **Do not add new ones.**
+Named constants (`Color.White`, `Color.Black`, `Color.Transparent`) **are** flagged, but three
+files are grandfathered: the pre-redesign photo scrims in `LargeCard` and `RecipeListCard`, and
+`CategoryCard`'s gradient. White text over a black scrim on grayscale imagery is genuinely
+theme-invariant; it was simply never expressed as a role.
+
+That list is an exact set, not a prefix allowlist. Adding a named color anywhere else fails, and
+clearing the last one out of a listed file *also* fails, with a message telling you to delete the
+entry — so it can only shrink. `LargeCard`/`RecipeListCard` come off it in the shared-cards PR,
+`CategoryCard` in the search PR when its gradient becomes a flat ramp fill.
+
+Still not caught: a color assembled at runtime (`lerp`, `compositeOver`, `Color(someInt)`). If you
+are computing a color on a screen, you are building a token — put it in `ChefColors`.
 
 ---
 
@@ -365,12 +392,12 @@ dropped in this design (Modernist does not use emoji) — keep the string, strip
 | Design says | You write |
 | --- | --- |
 | "Settings" 20px/800 | `typography.headlineLarge` |
-| section label, accent, 11px/800 uppercase | `typography.labelMedium`, `colorScheme.primary`, `.uppercase()` |
+| section label, accent, 11px/800 uppercase | `typography.labelMedium`, `chefColors.accentText`, `.uppercase()` |
 | 13px muted subtitle | `typography.bodyMedium`, `colorScheme.onSurfaceVariant` |
 | row label | `typography.bodyLarge`, `colorScheme.onBackground` |
 | selected row label goes 800 | same style, `fontWeight = FontWeight.ExtraBold` |
 | 12px muted example line | `typography.bodySmall`, `colorScheme.onSurfaceVariant` |
-| accent radio dot | `colorScheme.primary`, ring inset in `colorScheme.background` |
+| accent radio dot | `colorScheme.primary`, ring inset in `colorScheme.background` — a *fill*, so the brand step is right |
 | 2px above / 1px between / 2px below | `chefColors.sectionRuleWidth` + `outline`, `rowRuleWidth` + `outlineVariant` |
 | no corner radius anywhere | nothing — the theme already did it |
 
@@ -393,7 +420,8 @@ fun SettingsContent(
         Text(
             text = stringResource(R.string.settings_measurement_units_title).uppercase(),
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
+            // accentText, not primary: this is 11px, below the size where accent-600 clears AA.
+            color = MaterialTheme.chefColors.accentText,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
         Text(

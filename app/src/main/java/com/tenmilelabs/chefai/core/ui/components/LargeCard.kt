@@ -47,6 +47,7 @@ import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.ui.preview.PreviewData
 import com.tenmilelabs.chefai.core.ui.recipeImageModel
+import com.tenmilelabs.chefai.core.ui.theme.chefColors
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import java.util.UUID
 
@@ -130,9 +131,11 @@ fun LargeCard(
                     Icon(
                         imageVector = if (isInCollection) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
                         contentDescription = stringResource(R.string.save_to_collection_content_description),
-                        // Accent-300 rather than the accent itself: this icon sits on a dark scrim over a photo,
-                        // where the full-strength teal does not separate. See docs/design/modernist.md.
-                        tint = if (isInCollection) MaterialTheme.colorScheme.inversePrimary else Color.White
+                        // Accent-300 rather than the accent itself: this icon sits on a dark scrim over a
+                        // photo, where the full-strength teal does not separate. Named as a ramp step, not
+                        // borrowed from `inversePrimary` — that slot means "primary on an inverted surface"
+                        // and only coincides with accent-300 in light.
+                        tint = if (isInCollection) MaterialTheme.chefColors.accent.s300 else Color.White
                     )
                 }
             }

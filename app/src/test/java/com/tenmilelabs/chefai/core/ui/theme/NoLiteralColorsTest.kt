@@ -87,6 +87,43 @@ class NoLiteralColorsTest {
     }
 
     @Test
+    fun `named color literals stay confined to the legacy photo scrims`() {
+        val offendingFiles = scanUiSources { line -> NAMED_COLOR.containsMatchIn(line) }
+            .map { it.substringBefore(".kt:") + ".kt" }
+            .toSet()
+
+        val added = offendingFiles - NAMED_COLOR_LEGACY
+        assertWithMessage(
+            """
+            |Named color literals (Color.White, Color.Black, …) outside the legacy photo scrims:
+            |
+            |${added.joinToString("\n") { "  $it" }}
+            |
+            |A named constant is as unreachable by the dark theme as a hex literal is. Use the role:
+            |
+            |  text/icon on a photo scrim -> the scrim is theme-invariant, but say so with a role
+            |  accent as small text       -> MaterialTheme.chefColors.accentText
+            |  accent as a fill           -> MaterialTheme.colorScheme.primary
+            |  no fill at all             -> Color.Unspecified (not flagged — it is not a color)
+            |
+            |See docs/design/modernist.md § Known gaps in the guardrail.
+            """.trimMargin(),
+        ).that(added).isEmpty()
+
+        val cleaned = NAMED_COLOR_LEGACY - offendingFiles
+        assertWithMessage(
+            """
+            |These files no longer hold named color literals:
+            |
+            |${cleaned.joinToString("\n") { "  $it" }}
+            |
+            |Remove them from NAMED_COLOR_LEGACY. The list is allowed to shrink and nothing else —
+            |leaving a clean file in it lets a future literal back in silently.
+            """.trimMargin(),
+        ).that(cleaned).isEmpty()
+    }
+
+    @Test
     fun `the scan covers the ui source tree and the allowlisted theme package still exists`() {
         // Both halves of this test are load-bearing. If the source layout moves and the walk finds
         // nothing, the two tests above pass vacuously and the guardrail is silently off. If
@@ -129,7 +166,41 @@ class NoLiteralColorsTest {
         /** Package path, relative to the source root, that is allowed to name colors. */
         const val THEME_PACKAGE = "com/tenmilelabs/chefai/core/ui/theme"
 
-        val COLOR_LITERAL = Regex("""Color\(\s*0x[0-9a-fA-F]+""")
+        /**
+         * `Color(0x…)`, `Color(1f, 0f, 0f)` and `Color(red = 32, …)` — every way to construct one
+         * by value. The hex form is the common one; the other two are what someone reaches for
+         * once the hex form starts failing.
+         */
+        val COLOR_LITERAL = Regex(
+            """Color\(\s*(0x[0-9a-fA-F]+|red\s*=|\d+\s*(f|\.\d)|\d+\s*,)""",
+        )
+
+        /**
+         * The named constants. Not constructed, so [COLOR_LITERAL] never sees them, but just as
+         * unreachable by the dark theme — `Color.White` is a value, not a role.
+         *
+         * `Color.Unspecified` is deliberately absent: it is the *absence* of a color, which is the
+         * right way to say "no fill" and has nothing for a theme to resolve.
+         */
+        val NAMED_COLOR = Regex("""\bColor\.(White|Black|Red|Green|Blue|Yellow|Cyan|Magenta|Gray|LightGray|DarkGray|Transparent)\b""")
+
+        /**
+         * The files still holding named-color literals, and the only ones allowed to.
+         *
+         * These are the pre-redesign photo scrims: white text and a black gradient over grayscale
+         * imagery, which is genuinely theme-invariant but was never expressed as a role. They go
+         * when those cards are restyled — `LargeCard`/`RecipeListCard` in the shared-cards PR,
+         * `CategoryCard` in the search PR, which replaces its gradient with a flat ramp fill.
+         *
+         * This is an exact set, not a prefix allowlist: adding a named color anywhere fails, and
+         * *removing* the last one from a listed file fails too, with a message telling you to
+         * delete the entry. It can only shrink.
+         */
+        val NAMED_COLOR_LEGACY = setOf(
+            "com/tenmilelabs/chefai/core/ui/components/LargeCard.kt",
+            "com/tenmilelabs/chefai/core/ui/components/RecipeListCard.kt",
+            "com/tenmilelabs/chefai/search/ui/components/CategoryCard.kt",
+        )
 
         /**
          * `onBackground`/`onSurface`/`onSurfaceVariant` — or the raw ink token — with `.copy(alpha`
