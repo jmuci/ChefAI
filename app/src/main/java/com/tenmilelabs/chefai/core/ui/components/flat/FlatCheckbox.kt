@@ -41,8 +41,9 @@ import com.tenmilelabs.chefai.core.ui.theme.chefColors
  * FlatCheckbox(checked = rememberMe, onCheckedChange = onRememberMeChange)
  *
  * // 2. The whole row toggles — recipe ingredients, shopping-list items, cooked meals.
- * //    Pass null so the checkbox does not steal the row's click or double up its semantics.
- * Row(Modifier.flatClickable(onClick = onToggle, role = Role.Checkbox)) {
+ * //    Pass null so the checkbox does not steal the row's click or double up its semantics,
+ * //    and give the row flatToggleable so the checked state reaches the semantics tree.
+ * Row(Modifier.flatToggleable(checked = item.isChecked, onCheckedChange = onToggle)) {
  *     FlatCheckbox(checked = item.isChecked, onCheckedChange = null)
  *     …
  * }
@@ -51,7 +52,8 @@ import com.tenmilelabs.chefai.core.ui.theme.chefColors
  * Used on recipe detail (05), meal plan detail (16), shopping list (17) and log in (07).
  *
  * @param onCheckedChange `null` makes the checkbox a passive indicator — the enclosing row is then
- *   responsible for being clickable and for carrying [Role.Checkbox].
+ *   responsible for the click *and* for publishing the checked state, which is what
+ *   [flatToggleable] does.
  */
 @Composable
 fun FlatCheckbox(
@@ -159,7 +161,7 @@ private fun FlatCheckboxPreview() {
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = MinHitTarget)
-                    .flatClickable(onClick = {}, role = Role.Checkbox)
+                    .flatToggleable(checked = done, onCheckedChange = {})
                     .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),

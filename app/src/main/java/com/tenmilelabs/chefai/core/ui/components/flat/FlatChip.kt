@@ -14,7 +14,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.tenmilelabs.chefai.core.ui.theme.chefColors
@@ -35,14 +34,17 @@ import com.tenmilelabs.chefai.core.ui.theme.chefColors
  * ```
  *
  * Multi-select (dietary preferences) and single-select (max prep time, variety) look identical —
- * the difference lives in the state the screen keeps, not in the chip. Pass [Role.RadioButton] via
- * [singleSelect] when the group is a one-of-many choice so TalkBack announces it correctly.
+ * the difference lives in the state the screen keeps, not in the chip. Set [singleSelect] when the
+ * group is a one-of-many choice: the chip then reports itself as a selected/unselected radio
+ * option rather than a checked/unchecked box, and the group should carry
+ * `Modifier.selectableGroup()`.
  *
  * Used on wizard preferences (14), wizard advanced (15) and the recipe list filters (04).
  *
  * @param enabled `false` renders the chip at 45% opacity and stops accepting taps — the
  *   `collectionTooSmall` case on screen 14.
- * @param singleSelect `true` when this chip belongs to a radio-style group; affects semantics only.
+ * @param singleSelect `true` when this chip belongs to a radio-style group. Affects semantics
+ *   only — nothing about how the chip is drawn.
  */
 @Composable
 fun FlatChip(
@@ -54,28 +56,46 @@ fun FlatChip(
     singleSelect: Boolean = false,
 ) {
     val selectedFill = MaterialTheme.colorScheme.primary
+    val pressedTint = if (selected) {
+        MaterialTheme.colorScheme.secondary
+    } else {
+        MaterialTheme.chefColors.neutral.s200
+    }
+    // `toggleable`/`selectable` rather than `clickable`: in this design selection is carried by
+    // fill and weight alone, so if the state does not reach the semantics tree a screen-reader
+    // user has no way at all to tell a selected chip from an unselected one.
+    val selectionModifier = if (singleSelect) {
+        Modifier.flatSelectable(
+            selected = selected,
+            onClick = onClick,
+            enabled = enabled,
+            pressedTint = pressedTint,
+        )
+    } else {
+        Modifier.flatToggleable(
+            checked = selected,
+            onCheckedChange = { onClick() },
+            enabled = enabled,
+            pressedTint = pressedTint,
+        )
+    }
+
     Box(
         modifier = modifier
             .alpha(if (enabled) 1f else DISABLED_ALPHA)
             .heightIn(min = MinHitTarget)
+            // Fill before the selection modifier so the pressed tint replaces it; border after it
+            // so the tint does not paint over the 2dp rule the unselected chip is made of.
+            .then(if (selected) Modifier.background(selectedFill) else Modifier)
+            .then(selectionModifier)
             .then(
                 if (selected) {
-                    Modifier.background(selectedFill)
+                    Modifier
                 } else {
                     Modifier.border(
                         width = MaterialTheme.chefColors.sectionRuleWidth,
                         color = MaterialTheme.colorScheme.outline,
                     )
-                },
-            )
-            .flatClickable(
-                onClick = onClick,
-                enabled = enabled,
-                role = if (singleSelect) Role.RadioButton else Role.Checkbox,
-                pressedTint = if (selected) {
-                    MaterialTheme.colorScheme.secondary
-                } else {
-                    MaterialTheme.chefColors.neutral.s200
                 },
             )
             .padding(horizontal = ChipHorizontalPadding),

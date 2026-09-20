@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -98,44 +99,58 @@ fun FlatField(
         else -> MaterialTheme.colorScheme.outline
     }
 
-    Column(modifier = modifier.alpha(if (enabled) 1f else DISABLED_ALPHA)) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.size(LabelGap))
+    // Label, box and error message all live inside the decoration box, which puts them inside the
+    // text field's own semantics node. BasicTextField merges its descendants, so TalkBack
+    // announces "Email, edit box, alice@example.com" instead of an anonymous edit box — this is
+    // how Material's OutlinedTextField associates its label too, and rendering the label as a
+    // sibling Column child (as this did) silently drops the field's accessible name.
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier
+            .alpha(if (enabled) 1f else DISABLED_ALPHA)
+            .fillMaxWidth()
+            .semantics { if (errorText != null) error(errorText) },
+        enabled = enabled,
+        readOnly = readOnly,
+        textStyle = MaterialTheme.typography.bodyLarge.copy(
+            color = MaterialTheme.colorScheme.onBackground,
+        ),
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
+        singleLine = singleLine,
+        minLines = minLines,
+        maxLines = if (singleLine) 1 else Int.MAX_VALUE,
+        visualTransformation = visualTransformation,
+        interactionSource = interactionSource,
+        decorationBox = { innerTextField ->
+            Column {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(LabelGap))
 
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics { if (errorText != null) error(errorText) },
-            enabled = enabled,
-            readOnly = readOnly,
-            textStyle = MaterialTheme.typography.bodyLarge.copy(
-                color = MaterialTheme.colorScheme.onBackground,
-            ),
-            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            keyboardOptions = keyboardOptions,
-            keyboardActions = keyboardActions,
-            singleLine = singleLine,
-            minLines = minLines,
-            maxLines = if (singleLine) 1 else Int.MAX_VALUE,
-            visualTransformation = visualTransformation,
-            interactionSource = interactionSource,
-            decorationBox = { innerTextField ->
                 Row(
                     modifier = Modifier
+                        .fillMaxWidth()
                         .heightIn(min = FieldMinHeight)
                         .background(MaterialTheme.colorScheme.surfaceContainer)
                         .border(
                             width = MaterialTheme.chefColors.sectionRuleWidth,
                             color = borderColor,
                         )
-                        .padding(horizontal = FieldHorizontalPadding, vertical = FieldVerticalPadding),
-                    verticalAlignment = if (singleLine) Alignment.CenterVertically else Alignment.Top,
+                        .padding(
+                            horizontal = FieldHorizontalPadding,
+                            vertical = FieldVerticalPadding,
+                        ),
+                    verticalAlignment = if (singleLine) {
+                        Alignment.CenterVertically
+                    } else {
+                        Alignment.Top
+                    },
                     horizontalArrangement = Arrangement.spacedBy(IconGap),
                 ) {
                     if (leadingIcon != null) {
@@ -158,18 +173,18 @@ fun FlatField(
                     }
                     trailing?.invoke()
                 }
-            },
-        )
 
-        if (errorText != null) {
-            Spacer(Modifier.size(LabelGap))
-            Text(
-                text = errorText,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-    }
+                if (errorText != null) {
+                    Spacer(Modifier.height(LabelGap))
+                    Text(
+                        text = errorText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+    )
 }
 
 /** `.field > label { margin-bottom: 5px }`, on the 4dp scale. */

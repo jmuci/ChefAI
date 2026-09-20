@@ -47,9 +47,9 @@ import com.tenmilelabs.chefai.core.ui.theme.chefColors
  *         Row(
  *             Modifier
  *                 .heightIn(min = 44.dp)
- *                 .selectable(selected = …, role = Role.RadioButton, indication = null, …),
+ *                 .flatSelectable(selected = option == current, onClick = { onSelect(option) }),
  *         ) {
- *             FlatRadio(selected = …, onClick = null)
+ *             FlatRadio(selected = option == current, onClick = null)
  *             …
  *         }
  *     }
@@ -59,7 +59,7 @@ import com.tenmilelabs.chefai.core.ui.theme.chefColors
  * Used on Settings (10).
  *
  * @param onClick `null` makes the dot a passive indicator; the enclosing row then owns the click
- *   and [Role.RadioButton].
+ *   *and* publishes the selected state, which is what [flatSelectable] does.
  */
 @Composable
 fun FlatRadio(
@@ -154,7 +154,7 @@ private fun FlatRadioPreview() {
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = MinHitTarget)
-                        .flatClickable(onClick = {}, role = Role.RadioButton)
+                        .flatSelectable(selected = isSelected, onClick = {})
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
