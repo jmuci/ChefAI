@@ -300,6 +300,18 @@
     <string name="settings_units_imperial_example">Ounces, pounds, cups, spoons</string>
     <string name="settings_measurement_units_footnote">Weights marked \u2248 are estimated from a typical density, so they\'re a good guide rather than an exact figure. Amounts counted rather than measured \u2014 cloves, cans, slices \u2014 are never converted.</string>
     <string name="settings_menu_item">Settings</string>
+
+    <!-- Header / shell -->
+    <string name="header_navigate_back">Back</string>
+    <string name="header_close">Close</string>
+
+    <!-- Profile menu (screen 09) -->
+    <string name="profile_menu_open">Open profile menu</string>
+    <string name="profile_menu_signed_in_as">Signed in as</string>
+    <string name="profile_menu_logout">Logout</string>
+    <string name="profile_menu_guest">Guest</string>
+    <string name="profile_menu_login_register">Log in / Register</string>
+    <string name="profile_menu_loading">Loading\u2026</string>
     <string name="ingredient_amount_approximate">Approximately %1$s</string>
 
     <!-- Household -->

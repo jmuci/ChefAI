@@ -78,6 +78,7 @@ Read these from `MaterialTheme.chefColors` (`core/ui/theme/ChefColors.kt`).
 | `chefColors.sectionRuleWidth` | `2.dp` | The heavy rule. |
 | `chefColors.rowRuleWidth` | `1.dp` | The hairline between rows. |
 | `chefColors.cornerRadius` | `0.dp` | Rarely needed directly — the theme's `Shapes` already covers components. |
+| `chefColors.panelShadowElevation` | `12.dp` | `--shadow-lg`, on the profile-menu panel — the only shadow in the system. **`0.dp` in dark**, by design. |
 
 The ramps are generated in OKLCH on one shared lightness scale, so the same step of any ramp
 matches the others in visual value: `accent.s200` and `neutral.s200` are equally light. That is
@@ -86,6 +87,14 @@ what makes `accent.steps[index % 3]` legible as a set.
 The two widths and the radius live here, with the colors, because in this system a rule weight is
 a token exactly as much as a color is — the layout is *built* out of 2dp and 1dp lines. They are
 theme-invariant: a 2dp rule is 2dp on any ground. Only the rule's **color** changes with theme.
+
+`panelShadowElevation` is the exception to that invariance, and the one dark value the handoff
+actually *decides* rather than defers: *"shadows in particular read as noise on a dark surface; the
+profile-menu panel (screen 09) uses `--shadow-lg` plus a 2px border, and in dark the border should
+do the work."* So it is 12dp in light, 0dp in dark, and it is **not** a `TODO(dark)`. Cast it in
+`chefColors.neutral.s900` (the shadow is `#2d2b2b`, not black), and give a `Popup` that carries it
+room to draw — a shadow falls outside the content bounds, and a popup window sized to its content
+clips it away entirely. `UserProfileMenu` shows the pattern.
 
 ### 1.3 Spacing
 
@@ -621,3 +630,74 @@ Each resolves to the specified light value or within one ramp step of it:
 Everything else that needs a ramp step reads `chefColors.neutral.*`, which **is** filled in for
 dark. When the dark accent ramp is designed, revisit this table — these three may well go back to
 the literal steps.
+
+---
+
+## 9. The shell
+
+The header and the bottom nav wrap every screen. Neither is a Material component: `TopAppBar` and
+`NavigationBar` both bring a tonal surface, their own elevation and — in the nav item's case — a
+rounded pill indicator behind the active tab. None of that is configurable down to nothing, so
+both are assembled from § 8's primitives in `core/ui/navigation/`.
+
+### 9.1 Header — `ChefAITopAppBar.kt`
+
+Flush on the ground, left-aligned, 16dp padded on all four sides, closed by a `SectionRule`. No
+elevation, no tonal container, no centering.
+
+The design uses several header shapes, and they are **separate composables** rather than one
+function with six nullable parameters — the shape is a design decision, so a call site names the
+one it means:
+
+| Composable | Shape | Screens |
+| --- | --- | --- |
+| `ChefAITopAppBar` | title, optional trailing actions | 02, 04 |
+| `ChefAITopAppBarWithSubtitle` | title over a muted second line | 01, 16 |
+| `ChefAITopAppBarWithTag` | title with a trailing `FlatTag` | 19 |
+| `ChefAITopAppBarSurface` | the bare ground + padding + rule, as a slot | 13–15, 17 |
+
+`ChefAINavigation` is an orthogonal sealed axis — `None`, `Back`, `Close` — so any shape can carry
+a back arrow, an X, or neither. Back and X are not interchangeable: the arrow is for screens you
+came *through*, the X for screens you came *to* and will leave without a trail.
+
+Headers that stack content under the title row (the wizard's `WizardProgressBar`, the shopping
+list's completion bar) build on `ChefAITopAppBarSurface`. **Do not add a parameter to the variants
+for that** — that is what the slot is for.
+
+### 9.2 Bottom nav — `BottomNavigationBar.kt`
+
+Four tabs in the design's order — Home / Search / Recipes / Meal Plans, Search **second** — on the
+sage `chefColors.navSurface`, under a `SectionRule`. Lucide icons at 20dp over a 10dp/800 label;
+the active tab is accent, the rest full ink (not muted), and that color *is* the selected state —
+there is no indicator behind it.
+
+Each tab is `Modifier.flatSelectable`, not `flatClickable`: a tab has a state, and color is the
+only signal for it, so a screen reader gets nothing unless the state is in the semantics.
+
+One deviation from § 2 worth knowing: the nav labels are **not** the uppercase `labelSmall` the
+type scale documents. The design's own markup sets them in title case with tight tracking
+(`-.01em`), so the item takes `labelSmall`'s size and weight and overrides the tracking. That is
+the whole of it.
+
+`NavigationRailBar` is the same items in a column with the rule on the trailing edge. A rail is a
+layout change, not a different component.
+
+The sage has no dark value and renders magenta in dark, on purpose — see § 5.
+
+### 9.3 Profile menu — `auth/ui/UserProfileMenu.kt`
+
+Screen 09, and the system's **panel treatment**: 228dp wide, zero radius, a 2dp `onBackground`
+border — full-strength ink, not the divider — `--shadow-lg`, anchored flush under the avatar. The
+border is what makes it read as lifted off the page rather than as another ruled section of it,
+and in dark it is the only thing doing that job.
+
+Built on `Popup`, not `DropdownMenu`, for the usual reason: Material's menu is a rounded,
+tonally-elevated `Surface` with its own item metrics. The rows are `SectionRule`/`RowRule` and
+`flatClickable` like any other list group; the avatar is `CircleAvatar` + `avatarInitials`.
+
+All three `UserSession` states render as the same panel — the design styles the guest and loading
+variants identically, they just hold different rows. Logout takes `chefColors.accentText`.
+
+Not built: the handoff draws screen 09 over content dimmed to 30%. That scrim spans the whole
+screen, which a component living in the header's actions row cannot reach; it belongs to whoever
+owns the `Scaffold`.
