@@ -130,7 +130,9 @@ fun LargeCard(
                     Icon(
                         imageVector = if (isInCollection) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
                         contentDescription = stringResource(R.string.save_to_collection_content_description),
-                        tint = if (isInCollection) Color(0xFFFFD700) else Color.White
+                        // Accent-300 rather than the accent itself: this icon sits on a dark scrim over a photo,
+                        // where the full-strength teal does not separate. See docs/design/modernist.md.
+                        tint = if (isInCollection) MaterialTheme.colorScheme.inversePrimary else Color.White
                     )
                 }
             }
