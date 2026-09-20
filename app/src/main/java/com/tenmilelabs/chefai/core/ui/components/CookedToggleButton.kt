@@ -37,6 +37,9 @@ fun CookedToggleButton(
         modifier = modifier
             .testTag("CookedToggleButton")
             .semantics { role = Role.Checkbox },
+        // FilledIconToggleButton's default shape is a fixed circle (IconButtonDefaults.filledShape),
+        // not one Shapes() theming reaches — Modernist has zero radius everywhere but the avatar.
+        shape = MaterialTheme.shapes.extraSmall,
         colors = IconButtonDefaults.filledIconToggleButtonColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -59,6 +62,22 @@ fun CookedToggleButton(
 private fun CookedToggleButtonToCookPreview() {
     ChefAITheme(darkTheme = false) {
         CookedToggleButton(isCooked = false, onToggle = {})
+    }
+}
+
+@Preview(name = "To cook — Dark", showBackground = true)
+@Composable
+private fun CookedToggleButtonToCookDarkPreview() {
+    ChefAITheme(darkTheme = true) {
+        CookedToggleButton(isCooked = false, onToggle = {})
+    }
+}
+
+@Preview(name = "Cooked — Light", showBackground = true)
+@Composable
+private fun CookedToggleButtonCookedLightPreview() {
+    ChefAITheme(darkTheme = false) {
+        CookedToggleButton(isCooked = true, onToggle = {})
     }
 }
 

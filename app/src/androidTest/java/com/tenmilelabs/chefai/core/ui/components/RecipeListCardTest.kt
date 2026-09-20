@@ -58,9 +58,9 @@ class RecipeListCardTest {
 
     @Test
     fun modifier_parameter_isMerged_notShadowed() {
-        // A caller-supplied modifier (here, a testTag) must actually reach the rendered Card —
-        // proving RecipeListCard chains its own padding/height/fillMaxWidth onto the incoming
-        // modifier rather than replacing it outright.
+        // A caller-supplied modifier (here, a testTag) must actually reach the rendered row —
+        // proving RecipeListCard chains its own fillMaxWidth onto the incoming modifier rather
+        // than replacing it outright.
         composeTestRule.setContent {
             ChefAITheme {
                 RecipeListCard(
@@ -70,9 +70,8 @@ class RecipeListCardTest {
             }
         }
 
-        // The card's own hardcoded height (R.dimen.recipe_card_height) is chained AFTER the
-        // caller's modifier, so it wins — but the node must exist and be displayed at all, which
-        // is only true if the incoming modifier was actually applied rather than dropped.
+        // The node must exist and be displayed at all, which is only true if the incoming
+        // modifier was actually applied rather than dropped.
         composeTestRule.onNodeWithTag("CustomCardModifier")
             .assertIsDisplayed()
             .assertHeightIsAtLeast(1.dp)

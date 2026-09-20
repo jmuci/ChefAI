@@ -1,59 +1,53 @@
 package com.tenmilelabs.chefai.core.ui.components
 
-import androidx.compose.foundation.layout.Box
+import android.content.res.Configuration
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.dimensionResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
+import com.tenmilelabs.chefai.core.ui.theme.chefColors
 
+/**
+ * A section-opening label, matching the design's rule rhythm: the heavy 2dp rule that opens every
+ * section in the design, then an uppercase kicker and a muted subtitle beneath.
+ */
 @Composable
 fun SectionHeaderWithSubtitle(title: String, subtitle: String) {
-    Box(
-        modifier = Modifier
-            .height(dimensionResource(id = R.dimen.section_header_height))
-            .fillMaxWidth(),
-        contentAlignment = Alignment.TopStart
-    ) {
-        // Section title
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(
-                    horizontal = dimensionResource(id = R.dimen.padding_medium),
-                    vertical = dimensionResource(id = R.dimen.padding_small)
-
-                )
+    Column(modifier = Modifier.fillMaxWidth()) {
+        HorizontalDivider(
+            thickness = MaterialTheme.chefColors.sectionRuleWidth,
+            color = MaterialTheme.colorScheme.outline,
         )
-
+        Text(
+            text = title.uppercase(),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(
+                horizontal = dimensionResource(id = R.dimen.padding_medium),
+                vertical = dimensionResource(id = R.dimen.padding_small),
+            ),
+        )
         Text(
             text = subtitle,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.secondary,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(
-                    horizontal = 16.dp,
-                    vertical = dimensionResource(id = R.dimen.padding_extra_extra_small)
-                )
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(
+                horizontal = dimensionResource(id = R.dimen.padding_medium),
+                vertical = dimensionResource(id = R.dimen.padding_extra_extra_small),
+            ),
         )
     }
 }
 
-@Preview(showBackground = true)
+@Preview(name = "SectionHeaderWithSubtitle — Light", showBackground = true)
 @Composable
 private fun SectionHeaderWithSubtitlePreview() {
     ChefAITheme {
@@ -61,7 +55,11 @@ private fun SectionHeaderWithSubtitlePreview() {
     }
 }
 
-@Preview(showBackground = true)
+@Preview(
+    name = "SectionHeaderWithSubtitle — Dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
 @Composable
 private fun SectionHeaderWithSubtitleDarkPreview() {
     ChefAITheme(darkTheme = true) {

@@ -189,16 +189,15 @@ class NoLiteralColorsTest {
          *
          * These are the pre-redesign photo scrims: white text and a black gradient over grayscale
          * imagery, which is genuinely theme-invariant but was never expressed as a role. They go
-         * when those cards are restyled — `LargeCard`/`RecipeListCard` in the shared-cards PR,
-         * `CategoryCard` in the search PR, which replaces its gradient with a flat ramp fill.
+         * when those cards are restyled. `LargeCard`/`RecipeListCard` lost theirs in the
+         * shared-cards PR; `CategoryCard` is left for the search PR, which replaces its gradient
+         * with a flat ramp fill.
          *
          * This is an exact set, not a prefix allowlist: adding a named color anywhere fails, and
          * *removing* the last one from a listed file fails too, with a message telling you to
          * delete the entry. It can only shrink.
          */
         val NAMED_COLOR_LEGACY = setOf(
-            "com/tenmilelabs/chefai/core/ui/components/LargeCard.kt",
-            "com/tenmilelabs/chefai/core/ui/components/RecipeListCard.kt",
             "com/tenmilelabs/chefai/search/ui/components/CategoryCard.kt",
         )
 
