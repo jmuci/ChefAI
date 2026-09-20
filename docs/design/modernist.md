@@ -14,9 +14,10 @@ yourself typing a color, a font size, or a corner radius, stop and read § Addin
 
 - **Foundation (this PR):** `core/ui/theme/` — color schemes, `LocalChefColors`, Archivo type
   scale, zero-radius `Shapes`, plus the `NoLiteralColorsTest` guardrail.
-- **Not yet done:** the five custom components (`FlatChip`, `FlatSwitch`, `FlatField`,
-  `WizardProgressBar`, `SectionRule`) and all 19 screens. Screens today are stock Material 3 on
-  the new theme, so they look half-converted. That is expected.
+- **Components (second PR):** `core/ui/components/flat/` — the five custom components plus the
+  ones extracted from repeated patterns across the screens. See § 8.
+- **Not yet done:** all 19 screens. Screens today are stock Material 3 on the new theme, so they
+  look half-converted. That is expected.
 
 ---
 
@@ -181,8 +182,9 @@ HorizontalDivider(
 Rules run **full-bleed**, edge to edge — they are not inset to match the row's content padding.
 The row's own horizontal padding sits inside them.
 
-A `SectionRule` composable that wraps this is on the components list and is not built yet. Until
-it exists, write the dividers out; do not invent a local variant.
+Do not write this out by hand. `RuledGroup` in `core/ui/components/flat/SectionRule.kt` applies
+the whole rhythm for you, and `SectionRule()` / `RowRule()` are there for the `LazyColumn` case
+where the rows are not children of one `Column`. See § 8.
 
 ---
 
@@ -225,9 +227,10 @@ means here. It is not a color literal and the guardrail does not flag it.
 `:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }` — a 2dp accent
 ring, drawn **2dp outside** the component's bounds, on every interactive element.
 
-Compose has no `outline-offset`, so the ring is drawn manually, outside the content bounds. The
-component PR should land this as `core/ui/components/FocusRing.kt`; the implementation it should
-have:
+Compose has no `outline-offset`, so the ring is drawn manually, outside the content bounds. This
+shipped as `Modifier.modernistFocusRing` in `core/ui/components/flat/FlatInteraction.kt`, together
+with `Modifier.flatClickable`, which bundles the ring *and* the pressed tint *and* the
+no-indication `clickable` into the one modifier every tappable row should use:
 
 ```kotlin
 /**
@@ -252,10 +255,10 @@ fun Modifier.modernistFocusRing(
 }
 ```
 
-Call it with `focused` from `interactionSource.collectIsFocusedAsState()` and
-`color = MaterialTheme.colorScheme.primary`. Because the ring is drawn outside the bounds, leave
-2–4dp of breathing room around focusable elements in a tight grid, or it will be clipped by a
-`Modifier.clip` / scroll container upstream.
+Prefer the `Modifier.modernistFocusRing(interactionSource)` overload — it reads both the focus
+state and the accent itself, so there is nothing to pass wrong. Because the ring is drawn outside
+the bounds, leave 2–4dp of breathing room around focusable elements in a tight grid, or it will be
+clipped by a `Modifier.clip` / scroll container upstream.
 
 ### 4.3 Disabled
 
@@ -549,19 +552,43 @@ rendering the light ramp inside a dark screen.
 
 ---
 
-## 8. Component inventory (not built yet)
+## 8. The component library
 
-Five components have no zero-radius Material equivalent and are shared across screens. They are
-specified in the handoff's *New component work* section and should land together, before the
-screen PRs that use them:
+`core/ui/components/flat/` holds every piece of the system that Material 3 cannot express at zero
+radius. **Reach for these before writing a `Button`, `Chip`, `Switch`, `OutlinedTextField`,
+`Checkbox`, `RadioButton` or a hand-rolled `HorizontalDivider`.** If one of them does not fit,
+that is worth a conversation — it is more likely that the screen is drifting off-system than that
+the component is wrong.
 
-| Component | Replaces | Used on |
+| Composable | Replaces | Notes |
 | --- | --- | --- |
-| `FlatChip` | `FilterChip` | wizard preferences, advanced, recipe list filters |
-| `FlatSwitch` | `Switch` | wizard advanced |
-| `FlatField` | `OutlinedTextField` | login, register, invite, import, editor |
-| `WizardProgressBar` | the existing one | wizard steps 1–3 |
-| `SectionRule` | hand-written dividers | every list in the design |
+| `RuledGroup` / `SectionRule` / `RowRule` | hand-written dividers | § 3's rhythm in one call. Two forms: `RuledGroup(items) { item -> … }` and a `RuledGroup { row { } }` scope for heterogeneous rows. |
+| `FlatBlockButton` / `FlatButton` | `Button` / `OutlinedButton` / `TextButton` | `Primary` / `Secondary` / `Ghost` / `Destructive`. Block form is 52dp, full width, **label flush left**; inline wraps and centers. `loading = true` swaps the label for a spinner. |
+| `FlatChip` | `FilterChip` | Selected = accent fill + ExtraBold ground label; unselected = 2dp rule. 44dp, 14dp padding. |
+| `FlatSwitch` | `Switch` | 48×28 visual in a 44dp hit target. |
+| `FlatField` | `OutlinedTextField` | Label above the box, border carries focus/error, `errorText` alone drives the error state. `minLines > 1` makes it multiline. |
+| `FlatCheckbox` / `FlatRadio` | `Checkbox` / `RadioButton` | 18dp. Pass `onCheckedChange`/`onClick` as `null` when the enclosing row is the control. |
+| `FlatTag` | `AssistChip`, `Badge` | Non-interactive by construction — a tappable tag is a `FlatChip`. |
+| `SquareAvatar` / `CircleAvatar` | — | 36dp square initials tile; the 40dp circle is the one exception to zero radius. `avatarInitials(name)` derives the letters. |
+| `WizardProgressBar` | the old `LinearProgressIndicator` one | One segment per step, `currentStepIndex` is **zero-based**. |
+| `Modifier.flatClickable` / `Modifier.modernistFocusRing` | `clickable` + ripple | § 4. The row primitive: no ripple, flat pressed tint, focus ring. |
 
-Plus the two small ones this document has already sketched: `modernistFocusRing` (§ 4.2) and the
-flat radio dot (§ 7).
+Every one of them carries light **and** dark previews of every state. Dark is still un-designed;
+the dark previews exist to prove the components render and to keep the un-designed tokens visible.
+
+### Where the components deviate from a literal reading of the handoff
+
+Three pressed/tinted fills read a Material role instead of the `chefColors` ramp step the light
+design names, because the accent ramp is `DarkUnset` (magenta) in dark and a control that flashes
+magenta on every tap is noise rather than the honest signal an un-designed *resting* color is.
+Each resolves to the specified light value or within one ramp step of it:
+
+| Where | Design says | Code reads | Light resolves to |
+| --- | --- | --- | --- |
+| Primary button pressed | `accent-700` | `colorScheme.secondary` | `accent-700` — exact |
+| Ghost button pressed | `accent-200` | `colorScheme.primaryContainer` | `accent-100` — the hover step |
+| `FlatTag` accent tone | `accent-100` / `accent-800` | `primaryContainer` / `onPrimaryContainer` | `accent-100` / `accent-900` |
+
+Everything else that needs a ramp step reads `chefColors.neutral.*`, which **is** filled in for
+dark. When the dark accent ramp is designed, revisit this table — these three may well go back to
+the literal steps.

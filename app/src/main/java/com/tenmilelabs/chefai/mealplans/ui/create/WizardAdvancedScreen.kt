@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
-import com.tenmilelabs.chefai.mealplans.ui.components.WizardProgressBar
+import com.tenmilelabs.chefai.core.ui.components.flat.WizardProgressBar
 import com.tenmilelabs.chefai.mealplans.ui.create.components.PrepTimeSelector
 import com.tenmilelabs.chefai.mealplans.ui.create.components.ToggleOptionRow
 
@@ -61,8 +61,10 @@ private fun WizardAdvancedContent(
             .verticalScroll(rememberScrollState()),
     ) {
         WizardProgressBar(
-            currentStep = 2,
+            currentStepIndex = 2,
             totalSteps = uiState.totalSteps,
+            stepLabel = stringResource(R.string.wizard_step_extras),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
 
         Column(
