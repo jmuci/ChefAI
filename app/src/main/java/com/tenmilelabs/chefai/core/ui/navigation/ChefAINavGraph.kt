@@ -353,6 +353,16 @@ fun ChefAINavGraph(
     var isTopLevelDestination by rememberSaveable { mutableStateOf(false) }
     var currentRoute by rememberSaveable { mutableStateOf(startDestination) }
 
+    // The wizard draws its own header (WizardHeader — X, "New plan", step progress) and its own
+    // bottom nav exclusion below, so the Scaffold's generic bar would just duplicate it.
+    val wizardRoutes = remember {
+        setOf(
+            ScreenBaseRoutes.MEAL_PLAN_WIZARD_BASICS,
+            ScreenBaseRoutes.MEAL_PLAN_WIZARD_PREFERENCES,
+            ScreenBaseRoutes.MEAL_PLAN_WIZARD_ADVANCED,
+        )
+    }
+
     // Captured off the meal-plan-detail destination's own arguments so the shared FAB knows which
     // plan's shopping list to open — the Scaffold only otherwise tracks the route pattern, not its
     // filled-in path arguments.
@@ -376,11 +386,6 @@ fun ChefAINavGraph(
                     currentMealPlanId = arguments?.getString(AppDestinationArgs.MEAL_PLAN_ID_ARG)
                 }
 
-                val wizardRoutes = setOf(
-                    ScreenBaseRoutes.MEAL_PLAN_WIZARD_BASICS,
-                    ScreenBaseRoutes.MEAL_PLAN_WIZARD_PREFERENCES,
-                    ScreenBaseRoutes.MEAL_PLAN_WIZARD_ADVANCED,
-                )
                 titleRes = if (destination.route in wizardRoutes) {
                     R.string.app_dest_title_meal_plan_wizard
                 } else {
@@ -411,8 +416,11 @@ fun ChefAINavGraph(
         modifier,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            // Don't show top bar on login or register screens
-            if (currentRoute != AppDestinations.LOGIN.route && currentRoute != AppDestinations.REGISTER.route) {
+            // Don't show top bar on login, register, or the wizard's own-header screens
+            if (currentRoute != AppDestinations.LOGIN.route &&
+                currentRoute != AppDestinations.REGISTER.route &&
+                currentRoute !in wizardRoutes
+            ) {
                 ChefAITopAppBar(
                     title = stringResource(titleRes),
                     navigation = if (!isTopLevelDestination) {
@@ -459,11 +467,6 @@ fun ChefAINavGraph(
             }
         },
         bottomBar = {
-            val wizardRoutes = setOf(
-                ScreenBaseRoutes.MEAL_PLAN_WIZARD_BASICS,
-                ScreenBaseRoutes.MEAL_PLAN_WIZARD_PREFERENCES,
-                ScreenBaseRoutes.MEAL_PLAN_WIZARD_ADVANCED,
-            )
             val hideNav = currentRoute == AppDestinations.LOGIN.route ||
                 currentRoute == AppDestinations.REGISTER.route ||
                 currentRoute == AppDestinations.IMPORT_RECIPE.route ||

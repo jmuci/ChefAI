@@ -11,26 +11,27 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatChip
-import com.tenmilelabs.chefai.mealplans.domain.model.DietaryRestriction
+import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun DietaryChipGroup(
-    selectedRestrictions: Set<DietaryRestriction>,
-    onToggle: (DietaryRestriction) -> Unit,
+fun VarietyPreferenceSelector(
+    selectedPreference: VarietyPreference,
+    onPreferenceSelected: (VarietyPreference) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        WizardSectionLabel(stringResource(R.string.wizard_dietary_title))
+        WizardSectionLabel(stringResource(R.string.wizard_variety_title))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            DietaryRestriction.entries.forEach { restriction ->
+            VarietyPreference.entries.forEach { preference ->
                 FlatChip(
-                    label = restriction.label,
-                    selected = restriction in selectedRestrictions,
-                    onClick = { onToggle(restriction) },
+                    label = preference.label,
+                    selected = selectedPreference == preference,
+                    onClick = { onPreferenceSelected(preference) },
+                    singleSelect = true,
                 )
             }
         }

@@ -1,28 +1,26 @@
 package com.tenmilelabs.chefai.mealplans.ui.create
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
-import com.tenmilelabs.chefai.core.ui.components.flat.WizardProgressBar
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatBlockButton
+import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.mealplans.ui.create.components.DayLengthSelector
 import com.tenmilelabs.chefai.mealplans.ui.create.components.MealTypeSelector
 import com.tenmilelabs.chefai.mealplans.ui.create.components.ServingsSelector
+import com.tenmilelabs.chefai.mealplans.ui.create.components.WizardHeader
 
 @Composable
 fun WizardBasicsScreen(
@@ -37,6 +35,7 @@ fun WizardBasicsScreen(
         uiState = uiState,
         onAction = viewModel::onAction,
         onNext = onNext,
+        onBack = onBack,
         modifier = modifier,
     )
 }
@@ -46,31 +45,24 @@ private fun WizardBasicsContent(
     uiState: CreateMealPlanUiState,
     onAction: (WizardAction) -> Unit,
     onNext: () -> Unit,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-    ) {
-        WizardProgressBar(
+    Column(modifier = modifier.fillMaxSize()) {
+        WizardHeader(
             currentStepIndex = 0,
             totalSteps = uiState.totalSteps,
             stepLabel = stringResource(R.string.wizard_step_basics),
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            onClose = onBack,
         )
 
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(32.dp),
         ) {
-            Text(
-                text = "Let's plan your meals! 🍳",
-                style = MaterialTheme.typography.headlineSmall,
-            )
-
             DayLengthSelector(
                 selectedDays = uiState.planLengthDays,
                 onDaysSelected = { onAction(WizardAction.SetPlanLength(it)) },
@@ -87,13 +79,24 @@ private fun WizardBasicsContent(
             )
         }
 
-        Button(
+        FlatBlockButton(
+            text = stringResource(R.string.wizard_next),
             onClick = onNext,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-        ) {
-            Text(stringResource(R.string.wizard_next))
-        }
+            modifier = Modifier.padding(16.dp),
+        )
+    }
+}
+
+@Preview(name = "Wizard basics — light")
+@Preview(name = "Wizard basics — dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun WizardBasicsPreview() {
+    ChefAITheme {
+        WizardBasicsContent(
+            uiState = CreateMealPlanUiState(),
+            onAction = {},
+            onNext = {},
+            onBack = {},
+        )
     }
 }
