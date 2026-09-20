@@ -13,10 +13,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
@@ -45,6 +41,7 @@ import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatBlockButton
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatField
 import com.tenmilelabs.chefai.core.ui.components.flat.flatClickable
+import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
 import com.tenmilelabs.chefai.core.ui.navigation.ChefAINavigation
 import com.tenmilelabs.chefai.core.ui.navigation.ChefAITopAppBarWithWordmark
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
@@ -255,9 +252,7 @@ private fun UsernameTextField(
         value = username,
         onValueChange = onUsernameChange,
         label = stringResource(R.string.label_username),
-        // FlatField's leadingIcon is an ImageVector, not the drawable-backed ChefAIIcons —
-        // Material's icon here rather than the vendored Lucide user glyph. See PR notes.
-        leadingIcon = Icons.Default.AccountCircle,
+        leadingIcon = ChefAIIcons.CircleUserRound,
         errorText = error,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
         keyboardActions = KeyboardActions(onNext = { onNext() }),
@@ -278,7 +273,7 @@ private fun EmailTextField(
         onValueChange = onEmailChange,
         label = stringResource(R.string.label_email),
         placeholder = stringResource(R.string.placeholder_email),
-        leadingIcon = Icons.Default.MailOutline,
+        leadingIcon = ChefAIIcons.Mail,
         errorText = error,
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Email,
@@ -303,7 +298,7 @@ private fun PasswordTextField(
         value = password,
         onValueChange = onPasswordChange,
         label = stringResource(R.string.label_password),
-        leadingIcon = Icons.Default.Lock,
+        leadingIcon = ChefAIIcons.Lock,
         trailing = { PasswordVisibilityToggle(isVisible = isVisible, onToggle = onVisibilityToggle) },
         visualTransformation = if (isVisible) VisualTransformation.None else PasswordVisualTransformation(),
         errorText = error,
@@ -330,7 +325,7 @@ private fun ConfirmPasswordTextField(
         value = password,
         onValueChange = onPasswordChange,
         label = stringResource(R.string.label_confirm_password),
-        leadingIcon = Icons.Default.Lock,
+        leadingIcon = ChefAIIcons.Lock,
         trailing = { PasswordVisibilityToggle(isVisible = isVisible, onToggle = onVisibilityToggle) },
         visualTransformation = if (isVisible) VisualTransformation.None else PasswordVisualTransformation(),
         errorText = error,

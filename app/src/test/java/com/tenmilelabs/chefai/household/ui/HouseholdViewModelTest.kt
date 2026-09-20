@@ -9,6 +9,7 @@ import com.tenmilelabs.chefai.core.domain.model.HouseholdRole
 import com.tenmilelabs.chefai.core.testutil.createTestSessionManagerWithAuthSource
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import com.tenmilelabs.chefai.household.domain.model.Household
+import com.tenmilelabs.chefai.household.domain.model.HouseholdInvite
 import com.tenmilelabs.chefai.household.domain.model.HouseholdInviteLink
 import com.tenmilelabs.chefai.household.domain.model.HouseholdJoinOutcome
 import com.tenmilelabs.chefai.household.domain.model.HouseholdMember
@@ -81,6 +82,17 @@ class HouseholdViewModelTest {
             val state = awaitItem().let { if (it is HouseholdUiState.Loading) awaitItem() else it }
             assertThat(state).isInstanceOf(HouseholdUiState.Success::class.java)
             assertThat((state as HouseholdUiState.Success).myRole).isEqualTo(HouseholdRole.OWNER)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `Success carries the caller's own user id`() = runTest {
+        householdRepository.seedHousehold(householdWithMe(HouseholdRole.OWNER))
+
+        createViewModel().uiState.test {
+            val state = awaitItem().let { if (it is HouseholdUiState.Loading) awaitItem() else it }
+            assertThat((state as HouseholdUiState.Success).currentUserId).isEqualTo(userId)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -326,6 +338,73 @@ class HouseholdViewModelTest {
 
         viewModel.events.test {
             viewModel.onDeclinePendingInvite(UuidV7Generator.newId())
+            assertThat(awaitItem()).isInstanceOf(HouseholdEvent.ShowError::class.java)
+        }
+    }
+
+    // --- Outstanding invites (owner's own management view) ---
+
+    private fun outstandingInvite() = HouseholdInvite(
+        inviteId = UuidV7Generator.newId(),
+        inviteeEmail = "sam@example.com",
+        singleUse = true,
+        maxUses = null,
+        useCount = 0,
+        expiresAt = System.currentTimeMillis() + 999_999L,
+        createdAt = System.currentTimeMillis(),
+    )
+
+    @Test
+    fun `outstandingInvites loads for an owner after refresh`() = runTest {
+        householdRepository.seedHousehold(householdWithMe(HouseholdRole.OWNER))
+        val invite = outstandingInvite()
+        householdRepository.listOutstandingInvitesResult = Result.success(listOf(invite))
+
+        createViewModel().outstandingInvites.test {
+            assertThat(awaitItem()).containsExactly(invite)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `outstandingInvites stays empty for a MEMBER`() = runTest {
+        householdRepository.seedHousehold(householdWithMe(HouseholdRole.MEMBER))
+        householdRepository.listOutstandingInvitesResult =
+            Result.success(listOf(outstandingInvite()))
+
+        createViewModel().outstandingInvites.test {
+            assertThat(awaitItem()).isEmpty()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onRevokeInvite success reloads outstandingInvites`() = runTest {
+        householdRepository.seedHousehold(householdWithMe(HouseholdRole.OWNER))
+        val invite = outstandingInvite()
+        householdRepository.listOutstandingInvitesResult = Result.success(listOf(invite))
+        householdRepository.revokeInviteResult = Result.success(Unit)
+        val viewModel = createViewModel()
+
+        viewModel.outstandingInvites.test {
+            assertThat(awaitItem()).containsExactly(invite)
+
+            householdRepository.listOutstandingInvitesResult = Result.success(emptyList())
+            viewModel.onRevokeInvite(invite.inviteId)
+            assertThat(awaitItem()).isEmpty()
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertThat(householdRepository.lastRevokedInviteId).isEqualTo(invite.inviteId)
+    }
+
+    @Test
+    fun `onRevokeInvite failure emits ShowError`() = runTest {
+        householdRepository.seedHousehold(householdWithMe(HouseholdRole.OWNER))
+        householdRepository.revokeInviteResult = Result.failure(RuntimeException("boom"))
+        val viewModel = createViewModel()
+
+        viewModel.events.test {
+            viewModel.onRevokeInvite(UuidV7Generator.newId())
             assertThat(awaitItem()).isInstanceOf(HouseholdEvent.ShowError::class.java)
         }
     }

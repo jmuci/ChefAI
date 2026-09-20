@@ -12,9 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
@@ -256,9 +253,7 @@ private fun EmailTextField(
             },
             label = stringResource(R.string.label_email),
             placeholder = stringResource(R.string.placeholder_email),
-            // FlatField's leadingIcon is an ImageVector, not the drawable-backed ChefAIIcons —
-            // Material's icon here rather than the vendored Lucide mail glyph. See PR notes.
-            leadingIcon = Icons.Default.MailOutline,
+            leadingIcon = ChefAIIcons.Mail,
             errorText = error,
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Email,
@@ -309,7 +304,7 @@ private fun PasswordTextField(
         value = password,
         onValueChange = onPasswordChange,
         label = stringResource(R.string.label_password),
-        leadingIcon = Icons.Default.Lock,
+        leadingIcon = ChefAIIcons.Lock,
         trailing = { PasswordVisibilityToggle(isVisible = isVisible, onToggle = onVisibilityToggle) },
         visualTransformation = if (isVisible) VisualTransformation.None else PasswordVisualTransformation(),
         errorText = error,

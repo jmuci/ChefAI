@@ -2,30 +2,18 @@ package com.tenmilelabs.chefai.household.ui
 
 import android.content.Intent
 import android.text.format.DateUtils
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.Link
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,18 +22,28 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.dimensionResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.domain.model.HouseholdRole
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatBlockButton
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatButton
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatButtonVariant
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatField
+import com.tenmilelabs.chefai.core.ui.components.flat.RuledGroup
+import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
+import com.tenmilelabs.chefai.core.ui.theme.chefColors
 import com.tenmilelabs.chefai.core.util.LoadingContent
 import com.tenmilelabs.chefai.household.domain.model.Household
+import com.tenmilelabs.chefai.household.domain.model.HouseholdInvite
 import com.tenmilelabs.chefai.household.domain.model.HouseholdMember
 import com.tenmilelabs.chefai.household.domain.model.PendingHouseholdInvite
 import java.util.UUID
@@ -60,6 +58,7 @@ fun HouseholdScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val pendingInvites by viewModel.pendingInvites.collectAsStateWithLifecycle()
+    val outstandingInvites by viewModel.outstandingInvites.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     LaunchedEffect(Unit) {
@@ -101,9 +100,12 @@ fun HouseholdScreen(
         is HouseholdUiState.Success -> HouseholdContent(
             household = state.household,
             myRole = state.myRole,
+            currentUserId = state.currentUserId,
+            outstandingInvites = outstandingInvites,
             onInviteClick = viewModel::onInviteByLink,
             onInviteByEmail = viewModel::onInviteByEmail,
             onRemoveMember = viewModel::onRemoveMember,
+            onRevokeInvite = viewModel::onRevokeInvite,
             onLeaveClick = viewModel::onLeaveHousehold,
             modifier = modifier,
         )
@@ -119,9 +121,12 @@ fun HouseholdScreen(
 fun HouseholdContent(
     household: Household,
     myRole: HouseholdRole,
+    currentUserId: UUID?,
+    outstandingInvites: List<HouseholdInvite>,
     onInviteClick: () -> Unit,
     onInviteByEmail: (String) -> Unit,
     onRemoveMember: (UUID) -> Unit,
+    onRevokeInvite: (UUID) -> Unit,
     onLeaveClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -130,59 +135,87 @@ fun HouseholdContent(
     var memberPendingRemoval by remember { mutableStateOf<HouseholdMember?>(null) }
     val isOwner = myRole == HouseholdRole.OWNER
 
-    Column(modifier = modifier.fillMaxSize()) {
-        Text(
-            text = household.name,
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(dimensionResource(R.dimen.padding_medium)),
-        )
-
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(bottom = dimensionResource(R.dimen.padding_medium)),
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
         ) {
-            items(household.members, key = { it.userId }) { member ->
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = household.name,
+                    style = MaterialTheme.typography.displaySmall,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+                Text(
+                    text = pluralStringResource(
+                        R.plurals.household_members_count,
+                        household.members.size,
+                        household.members.size,
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            RuledGroup(items = household.members, key = { it.userId }) { member ->
                 HouseholdMemberRow(
                     member = member,
+                    isCurrentUser = member.userId == currentUserId,
                     canRemove = isOwner && member.role != HouseholdRole.OWNER,
                     onRemove = { memberPendingRemoval = member },
                 )
             }
-        }
 
-        HorizontalDivider()
-
-        Column(
-            modifier = Modifier.padding(dimensionResource(R.dimen.padding_medium)),
-            verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.padding_small)),
-        ) {
             if (isOwner) {
-                Button(onClick = onInviteClick, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.Link, contentDescription = null)
-                    Text(
-                        text = stringResource(R.string.household_invite_link_button),
-                        modifier = Modifier.padding(start = dimensionResource(R.dimen.padding_small)),
-                    )
-                }
-                OutlinedButton(
-                    onClick = { showInviteEmailDialog = true },
-                    modifier = Modifier.fillMaxWidth(),
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Icon(Icons.Default.Email, contentDescription = null)
-                    Text(
+                    FlatBlockButton(
+                        text = stringResource(R.string.household_invite_link_button),
+                        onClick = onInviteClick,
+                        leadingIcon = ChefAIIcons.Link,
+                        modifier = Modifier.weight(1f),
+                    )
+                    FlatBlockButton(
                         text = stringResource(R.string.household_invite_email_button),
-                        modifier = Modifier.padding(start = dimensionResource(R.dimen.padding_small)),
+                        onClick = { showInviteEmailDialog = true },
+                        variant = FlatButtonVariant.Secondary,
+                        leadingIcon = ChefAIIcons.Mail,
+                        modifier = Modifier.weight(1f),
                     )
                 }
-            }
-            OutlinedButton(onClick = { showLeaveConfirm = true }, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null)
-                Text(
-                    text = stringResource(R.string.household_leave_button),
-                    modifier = Modifier.padding(start = dimensionResource(R.dimen.padding_small)),
-                )
+
+                if (outstandingInvites.isNotEmpty()) {
+                    Text(
+                        text = stringResource(R.string.household_pending_invites_title).uppercase(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.chefColors.accentText,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                    RuledGroup(items = outstandingInvites, key = { it.inviteId }) { invite ->
+                        OutstandingInviteRow(
+                            invite = invite,
+                            onRevoke = { onRevokeInvite(invite.inviteId) },
+                        )
+                    }
+                }
             }
         }
+
+        FlatBlockButton(
+            text = stringResource(R.string.household_leave_button),
+            onClick = { showLeaveConfirm = true },
+            variant = FlatButtonVariant.Destructive,
+            modifier = Modifier.padding(16.dp),
+        )
     }
 
     if (showInviteEmailDialog) {
@@ -255,12 +288,11 @@ private fun InviteByEmailDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.household_invite_email_dialog_title)) },
         text = {
-            OutlinedTextField(
+            FlatField(
                 value = email,
                 onValueChange = { email = it },
-                label = { Text(stringResource(R.string.household_invite_email_dialog_label)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                label = stringResource(R.string.household_invite_email_dialog_label),
+                leadingIcon = ChefAIIcons.Mail,
             )
         },
         confirmButton = {
@@ -279,6 +311,47 @@ private fun InviteByEmailDialog(
     )
 }
 
+/** The owner's-eye row for one of their own outstanding invites — email, expiry, ghost Revoke. */
+@Composable
+private fun OutstandingInviteRow(
+    invite: HouseholdInvite,
+    onRevoke: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = invite.inviteeEmail ?: stringResource(R.string.household_pending_invite_link_label),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Text(
+                text = stringResource(
+                    R.string.household_pending_invite_expires,
+                    DateUtils.formatDateTime(
+                        context,
+                        invite.expiresAt,
+                        DateUtils.FORMAT_ABBREV_MONTH or DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_NO_YEAR,
+                    ),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        FlatButton(
+            text = stringResource(R.string.household_revoke_invite_button),
+            onClick = onRevoke,
+            variant = FlatButtonVariant.Ghost,
+        )
+    }
+}
+
 @Composable
 private fun HouseholdCreateContent(
     pendingInvites: List<PendingHouseholdInvite>,
@@ -293,64 +366,49 @@ private fun HouseholdCreateContent(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
-            .padding(dimensionResource(R.dimen.padding_large)),
+            .padding(16.dp),
     ) {
-        Icon(
-            imageVector = Icons.Default.Group,
-            contentDescription = null,
-            modifier = Modifier.padding(bottom = dimensionResource(R.dimen.padding_medium)),
-        )
         Text(
             text = stringResource(R.string.household_no_household_title),
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.headlineLarge,
+            color = MaterialTheme.colorScheme.onBackground,
         )
         Text(
             text = stringResource(R.string.household_no_household_subtitle),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(
-                top = dimensionResource(R.dimen.padding_small),
-                bottom = dimensionResource(R.dimen.padding_large),
-            ),
+            modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
         )
-        OutlinedTextField(
+        FlatField(
             value = name,
             onValueChange = { name = it },
-            label = { Text(stringResource(R.string.household_create_name_label)) },
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = dimensionResource(R.dimen.padding_medium)),
+            label = stringResource(R.string.household_create_name_label),
+            modifier = Modifier.padding(bottom = 16.dp),
         )
-        Button(
+        FlatBlockButton(
+            text = stringResource(R.string.household_create_button),
             onClick = { onCreateHousehold(name) },
             enabled = name.isNotBlank(),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.household_create_button))
-        }
+        )
 
-        OutlinedButton(
+        FlatBlockButton(
+            text = stringResource(R.string.household_enter_code_button),
             onClick = onEnterInviteCode,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = dimensionResource(R.dimen.padding_small)),
-        ) {
-            Text(stringResource(R.string.household_enter_code_button))
-        }
+            variant = FlatButtonVariant.Ghost,
+            modifier = Modifier.padding(top = 8.dp),
+        )
 
         if (pendingInvites.isNotEmpty()) {
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = dimensionResource(R.dimen.padding_large)),
-            )
             Text(
-                text = stringResource(R.string.household_pending_invites_title),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(bottom = dimensionResource(R.dimen.padding_small)),
+                text = stringResource(R.string.household_pending_invites_title).uppercase(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.chefColors.accentText,
+                modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
             )
-            pendingInvites.forEach { invite ->
-                PendingInviteRow(
+            RuledGroup(items = pendingInvites, key = { it.inviteId }) { invite ->
+                InboxInviteRow(
                     invite = invite,
                     onAccept = { onAcceptInvite(invite.inviteId) },
                     onDecline = { onDeclineInvite(invite.inviteId) },
@@ -360,17 +418,19 @@ private fun HouseholdCreateContent(
     }
 }
 
+/** The invitee's-eye row for an in-app invite addressed to this user — see [PendingHouseholdInvite]. */
 @Composable
-private fun PendingInviteRow(
+private fun InboxInviteRow(
     invite: PendingHouseholdInvite,
     onAccept: () -> Unit,
     onDecline: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = dimensionResource(R.dimen.padding_small)),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = stringResource(
@@ -382,18 +442,18 @@ private fun PendingInviteRow(
                 ),
             ),
             style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.weight(1f),
         )
-        Column(
-            modifier = Modifier.padding(top = dimensionResource(R.dimen.padding_extra_small)),
-            verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.padding_extra_small)),
-        ) {
-            Button(onClick = onAccept, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.household_accept_button))
-            }
-            OutlinedButton(onClick = onDecline, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.household_decline_button))
-            }
-        }
+        FlatButton(
+            text = stringResource(R.string.household_decline_button),
+            onClick = onDecline,
+            variant = FlatButtonVariant.Ghost,
+        )
+        FlatButton(
+            text = stringResource(R.string.household_accept_button),
+            onClick = onAccept,
+        )
     }
 }
 
@@ -406,52 +466,67 @@ private fun HouseholdErrorContent(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(dimensionResource(R.dimen.padding_large)),
+            .background(MaterialTheme.colorScheme.background)
+            .padding(16.dp),
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
             text = stringResource(R.string.household_error_title),
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.headlineLarge,
+            color = MaterialTheme.colorScheme.onBackground,
         )
         Text(
             text = message,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(
-                top = dimensionResource(R.dimen.padding_small),
-                bottom = dimensionResource(R.dimen.padding_medium),
-            ),
+            modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
         )
-        Button(onClick = onRetry) {
-            Text(stringResource(R.string.household_retry_button))
-        }
+        FlatBlockButton(
+            text = stringResource(R.string.household_retry_button),
+            onClick = onRetry,
+        )
     }
 }
 
+// ── previews ──────────────────────────────────────────────────────────────────────────────────
+
 private fun previewHousehold() = Household(
     uuid = UUID.randomUUID(),
-    name = "The Test Kitchen",
+    name = "The Muci Kitchen",
     ownerId = UUID.randomUUID(),
     members = listOf(
-        HouseholdMember(UUID.randomUUID(), "Chef Owner", "", HouseholdRole.OWNER),
-        HouseholdMember(UUID.randomUUID(), "Chef Member", "", HouseholdRole.MEMBER),
+        HouseholdMember(UUID.randomUUID(), "JM Muci", "", HouseholdRole.OWNER),
+        HouseholdMember(UUID.randomUUID(), "Ana Muci", "", HouseholdRole.MEMBER),
+        HouseholdMember(UUID.randomUUID(), "Luca Pini", "", HouseholdRole.MEMBER),
     ),
+)
+
+private fun previewOutstandingInvite() = HouseholdInvite(
+    inviteId = UUID.randomUUID(),
+    inviteeEmail = "sam@example.com",
+    singleUse = true,
+    maxUses = null,
+    useCount = 0,
+    expiresAt = System.currentTimeMillis() + 4 * DateUtils.DAY_IN_MILLIS,
+    createdAt = System.currentTimeMillis(),
 )
 
 @Preview(name = "Household – owner, light", showBackground = true)
 @Composable
 private fun HouseholdContentOwnerPreview() {
+    val household = previewHousehold()
     ChefAITheme {
-        Surface {
-            HouseholdContent(
-                household = previewHousehold(),
-                myRole = HouseholdRole.OWNER,
-                onInviteClick = {},
-                onInviteByEmail = {},
-                onRemoveMember = {},
-                onLeaveClick = {},
-            )
-        }
+        HouseholdContent(
+            household = household,
+            myRole = HouseholdRole.OWNER,
+            currentUserId = household.members.first().userId,
+            outstandingInvites = listOf(previewOutstandingInvite()),
+            onInviteClick = {},
+            onInviteByEmail = {},
+            onRemoveMember = {},
+            onRevokeInvite = {},
+            onLeaveClick = {},
+        )
     }
 }
 
@@ -462,17 +537,19 @@ private fun HouseholdContentOwnerPreview() {
 )
 @Composable
 private fun HouseholdContentMemberDarkPreview() {
+    val household = previewHousehold()
     ChefAITheme {
-        Surface {
-            HouseholdContent(
-                household = previewHousehold(),
-                myRole = HouseholdRole.MEMBER,
-                onInviteClick = {},
-                onInviteByEmail = {},
-                onRemoveMember = {},
-                onLeaveClick = {},
-            )
-        }
+        HouseholdContent(
+            household = household,
+            myRole = HouseholdRole.MEMBER,
+            currentUserId = household.members[1].userId,
+            outstandingInvites = emptyList(),
+            onInviteClick = {},
+            onInviteByEmail = {},
+            onRemoveMember = {},
+            onRevokeInvite = {},
+            onLeaveClick = {},
+        )
     }
 }
 
@@ -480,15 +557,13 @@ private fun HouseholdContentMemberDarkPreview() {
 @Composable
 private fun HouseholdCreateContentPreview() {
     ChefAITheme {
-        Surface {
-            HouseholdCreateContent(
-                pendingInvites = emptyList(),
-                onCreateHousehold = {},
-                onAcceptInvite = {},
-                onDeclineInvite = {},
-                onEnterInviteCode = {},
-            )
-        }
+        HouseholdCreateContent(
+            pendingInvites = emptyList(),
+            onCreateHousehold = {},
+            onAcceptInvite = {},
+            onDeclineInvite = {},
+            onEnterInviteCode = {},
+        )
     }
 }
 
@@ -500,15 +575,13 @@ private fun HouseholdCreateContentPreview() {
 @Composable
 private fun HouseholdCreateContentDarkPreview() {
     ChefAITheme {
-        Surface {
-            HouseholdCreateContent(
-                pendingInvites = emptyList(),
-                onCreateHousehold = {},
-                onAcceptInvite = {},
-                onDeclineInvite = {},
-                onEnterInviteCode = {},
-            )
-        }
+        HouseholdCreateContent(
+            pendingInvites = emptyList(),
+            onCreateHousehold = {},
+            onAcceptInvite = {},
+            onDeclineInvite = {},
+            onEnterInviteCode = {},
+        )
     }
 }
 
@@ -523,15 +596,13 @@ private fun previewPendingInvite() = PendingHouseholdInvite(
 @Composable
 private fun HouseholdCreateContentWithInvitesPreview() {
     ChefAITheme {
-        Surface {
-            HouseholdCreateContent(
-                pendingInvites = listOf(previewPendingInvite()),
-                onCreateHousehold = {},
-                onAcceptInvite = {},
-                onDeclineInvite = {},
-                onEnterInviteCode = {},
-            )
-        }
+        HouseholdCreateContent(
+            pendingInvites = listOf(previewPendingInvite()),
+            onCreateHousehold = {},
+            onAcceptInvite = {},
+            onDeclineInvite = {},
+            onEnterInviteCode = {},
+        )
     }
 }
 
@@ -543,14 +614,12 @@ private fun HouseholdCreateContentWithInvitesPreview() {
 @Composable
 private fun HouseholdCreateContentWithInvitesDarkPreview() {
     ChefAITheme {
-        Surface {
-            HouseholdCreateContent(
-                pendingInvites = listOf(previewPendingInvite()),
-                onCreateHousehold = {},
-                onAcceptInvite = {},
-                onDeclineInvite = {},
-                onEnterInviteCode = {},
-            )
-        }
+        HouseholdCreateContent(
+            pendingInvites = listOf(previewPendingInvite()),
+            onCreateHousehold = {},
+            onAcceptInvite = {},
+            onDeclineInvite = {},
+            onEnterInviteCode = {},
+        )
     }
 }
