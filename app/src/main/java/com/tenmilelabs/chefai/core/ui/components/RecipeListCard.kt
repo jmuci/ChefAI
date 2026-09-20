@@ -12,9 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,6 +40,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
+import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
 import com.tenmilelabs.chefai.core.ui.preview.RecipePreviewProvider
 import com.tenmilelabs.chefai.core.ui.recipeImageModel
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
@@ -128,7 +126,9 @@ fun RecipeListCard(
                     modifier = Modifier.testTag("SaveToCollectionButton"),
                 ) {
                     Icon(
-                        imageVector = if (isInCollection) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                        painter = painterResource(
+                            if (isInCollection) ChefAIIcons.BookmarkFilled else ChefAIIcons.Bookmark,
+                        ),
                         contentDescription = stringResource(R.string.save_to_collection_content_description),
                         // Accent as an icon directly on the ground needs the AA-safe step, not the
                         // brand fill — see ChefColors.accentText.

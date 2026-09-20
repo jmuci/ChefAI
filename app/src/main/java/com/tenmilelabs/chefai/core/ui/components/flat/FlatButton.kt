@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.core.ui.components.flat
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -10,9 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
@@ -22,13 +20,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
 import com.tenmilelabs.chefai.core.ui.theme.chefColors
 
 /**
@@ -86,7 +85,7 @@ fun FlatBlockButton(
     variant: FlatButtonVariant = FlatButtonVariant.Primary,
     enabled: Boolean = true,
     loading: Boolean = false,
-    leadingIcon: ImageVector? = null,
+    @DrawableRes leadingIcon: Int? = null,
 ) {
     FlatButtonBody(
         text = text,
@@ -116,7 +115,7 @@ fun FlatButton(
     variant: FlatButtonVariant = FlatButtonVariant.Primary,
     enabled: Boolean = true,
     loading: Boolean = false,
-    leadingIcon: ImageVector? = null,
+    @DrawableRes leadingIcon: Int? = null,
 ) {
     FlatButtonBody(
         text = text,
@@ -143,7 +142,7 @@ private fun FlatButtonBody(
     variant: FlatButtonVariant,
     enabled: Boolean,
     loading: Boolean,
-    leadingIcon: ImageVector?,
+    @DrawableRes leadingIcon: Int?,
     horizontalPadding: Dp,
     horizontalArrangement: Arrangement.Horizontal,
 ) {
@@ -177,7 +176,7 @@ private fun FlatButtonBody(
         } else {
             if (leadingIcon != null) {
                 Icon(
-                    imageVector = leadingIcon,
+                    painter = painterResource(leadingIcon),
                     contentDescription = null,
                     tint = contentColor,
                     modifier = Modifier.size(IconSize),
@@ -280,7 +279,7 @@ private fun FlatBlockButtonPreview() {
         FlatBlockButton(
             text = "Shopping list · 24 items",
             onClick = {},
-            leadingIcon = Icons.Default.ShoppingCart,
+            leadingIcon = ChefAIIcons.ShoppingCart,
         )
         PreviewStateLabel("Primary — loading")
         FlatBlockButton(text = "Create Plan", onClick = {}, loading = true)
@@ -291,7 +290,7 @@ private fun FlatBlockButtonPreview() {
             text = "Invite via link",
             onClick = {},
             variant = FlatButtonVariant.Secondary,
-            leadingIcon = Icons.Default.Link,
+            leadingIcon = ChefAIIcons.Link,
         )
         PreviewStateLabel("Ghost")
         FlatBlockButton(

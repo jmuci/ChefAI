@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.core.ui.components
 
 import android.content.res.Configuration
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -12,9 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.People
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -26,7 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -39,6 +36,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
+import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
 import com.tenmilelabs.chefai.core.ui.preview.PreviewData
 import com.tenmilelabs.chefai.core.ui.recipeImageModel
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
@@ -137,11 +135,11 @@ fun LargeCard(
                     modifier = Modifier.padding(bottom = 12.dp),
                 ) {
                     RecipeMeta(
-                        icon = Icons.Default.AccessTime,
+                        icon = ChefAIIcons.Clock,
                         text = "${recipe.prepTimeMinutes + recipe.cookTimeMinutes}m",
                     )
                     RecipeMeta(
-                        icon = Icons.Default.People,
+                        icon = ChefAIIcons.Users,
                         text = stringResource(R.string.recipe_servings_format, recipe.servings),
                     )
                 }
@@ -158,13 +156,13 @@ fun LargeCard(
 }
 
 @Composable
-private fun RecipeMeta(icon: ImageVector, text: String) {
+private fun RecipeMeta(@DrawableRes icon: Int, text: String) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            imageVector = icon,
+            painter = painterResource(icon),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.height(15.dp),

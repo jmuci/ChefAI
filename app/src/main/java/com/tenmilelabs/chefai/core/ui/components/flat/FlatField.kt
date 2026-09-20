@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.core.ui.components.flat
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -17,9 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,12 +28,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
 import com.tenmilelabs.chefai.core.ui.theme.chefColors
 
 /**
@@ -56,7 +55,7 @@ import com.tenmilelabs.chefai.core.ui.theme.chefColors
  *     onValueChange = { onAction(EmailChanged(it)) },
  *     label = stringResource(R.string.label_email),
  *     placeholder = "alice@example.com",
- *     leadingIcon = Icons.Default.MailOutline,
+ *     leadingIcon = ChefAIIcons.Mail,
  *     errorText = uiState.emailError?.let { stringResource(it) },
  *     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
  * )
@@ -79,7 +78,7 @@ fun FlatField(
     label: String,
     modifier: Modifier = Modifier,
     placeholder: String? = null,
-    leadingIcon: ImageVector? = null,
+    @DrawableRes leadingIcon: Int? = null,
     trailing: (@Composable () -> Unit)? = null,
     errorText: String? = null,
     enabled: Boolean = true,
@@ -155,7 +154,7 @@ fun FlatField(
                 ) {
                     if (leadingIcon != null) {
                         Icon(
-                            imageVector = leadingIcon,
+                            painter = painterResource(leadingIcon),
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(LeadingIconSize),
@@ -211,21 +210,21 @@ private fun FlatFieldPreview() {
             onValueChange = {},
             label = "Email",
             placeholder = "alice@example.com",
-            leadingIcon = Icons.Default.MailOutline,
+            leadingIcon = ChefAIIcons.Mail,
         )
         PreviewStateLabel("Filled")
         FlatField(
             value = "alice@example.com",
             onValueChange = {},
             label = "Email",
-            leadingIcon = Icons.Default.MailOutline,
+            leadingIcon = ChefAIIcons.Mail,
         )
         PreviewStateLabel("Password — masked, with a trailing slot")
         FlatField(
             value = "hunter2hunter2",
             onValueChange = {},
             label = "Password",
-            leadingIcon = Icons.Default.Lock,
+            leadingIcon = ChefAIIcons.Lock,
             visualTransformation = PasswordVisualTransformation(),
             trailing = {
                 Text(
@@ -240,7 +239,7 @@ private fun FlatFieldPreview() {
             value = "not-an-email",
             onValueChange = {},
             label = "Email",
-            leadingIcon = Icons.Default.MailOutline,
+            leadingIcon = ChefAIIcons.Mail,
             errorText = "Enter a valid email address",
         )
         PreviewStateLabel("Disabled")
