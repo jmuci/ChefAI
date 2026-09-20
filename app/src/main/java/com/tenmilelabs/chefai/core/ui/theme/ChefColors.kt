@@ -54,6 +54,8 @@ data class ChefRamp(
  *   organizes by rule weight rather than by shadow or fill, so the two widths are as much a token
  *   as any color is. They are theme-invariant: identical in light and dark by design, because a
  *   2dp rule is 2dp on any ground. Only the divider *color* (`colorScheme.outline`) changes.
+ * - **[panelShadowElevation]** — the one place this system casts a shadow, and the one dark value
+ *   the handoff actually *decides* rather than defers. See the property.
  *
  * Read it through [chefColors]:
  * ```
@@ -82,6 +84,7 @@ data class ChefColors(
     val sectionRuleWidth: Dp,
     val rowRuleWidth: Dp,
     val cornerRadius: Dp,
+    val panelShadowElevation: Dp,
 )
 
 /** The light tokens — the designed ones. */
@@ -113,6 +116,7 @@ internal val LightChefColors = ChefColors(
     sectionRuleWidth = ChefRuleWidths.Section,
     rowRuleWidth = ChefRuleWidths.Row,
     cornerRadius = ChefRuleWidths.CornerRadius,
+    panelShadowElevation = ChefRuleWidths.PanelShadow,
 )
 
 /**
@@ -175,6 +179,10 @@ internal val DarkChefColors = ChefColors(
     sectionRuleWidth = ChefRuleWidths.Section,
     rowRuleWidth = ChefRuleWidths.Row,
     cornerRadius = ChefRuleWidths.CornerRadius,
+    // Not a TODO(dark) — the handoff decides this one: "shadows in particular read as noise on a
+    // dark surface; the profile-menu panel (screen 09) uses --shadow-lg plus a 2px border, and in
+    // dark the border should do the work". Zero, deliberately.
+    panelShadowElevation = 0.dp,
 )
 
 /**
@@ -190,6 +198,15 @@ private object ChefRuleWidths {
 
     /** 0dp, everywhere. The system has no rounded corners; the avatar circle is the one exception. */
     val CornerRadius = 0.dp
+
+    /**
+     * 12dp — the light value for `--shadow-lg` (`0 12px 32px #2d2b2b/22%`), the only shadow the
+     * design uses: the profile-menu panel floating over dimmed content. Everything else in this
+     * system is flush on the ground and separated by rules.
+     *
+     * Dark is **not** a TODO: the handoff decides it explicitly at 0dp — see [DarkChefColors].
+     */
+    val PanelShadow = 12.dp
 }
 
 /**

@@ -18,6 +18,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import com.tenmilelabs.chefai.auth.ui.UserProfileMenu
+import com.tenmilelabs.chefai.core.ui.sync.SyncStatusIndicator
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavGraphBuilder
@@ -412,9 +414,9 @@ fun ChefAINavGraph(
             // Don't show top bar on login or register screens
             if (currentRoute != AppDestinations.LOGIN.route && currentRoute != AppDestinations.REGISTER.route) {
                 ChefAITopAppBar(
-                    titleRes,
-                    onNavigationClick = if (!isTopLevelDestination) {
-                        {
+                    title = stringResource(titleRes),
+                    navigation = if (!isTopLevelDestination) {
+                        ChefAINavigation.Back {
                             // Route through the system back dispatcher rather than
                             // popping directly, so screens with their own BackHandler
                             // (e.g. RecipeEditorScreen's unsaved-changes check) get a
@@ -423,19 +425,10 @@ fun ChefAINavGraph(
                                 ?: navController.popBackStack()
                         }
                     } else {
-                        null
+                        ChefAINavigation.None
                     },
-                    onLogout = {},
-                    onLogin = {
-                        navActions.navigateToLogin()
-                    },
-                    onSettings = {
-                        navActions.navigateToSettings()
-                    },
-                    onHousehold = {
-                        navActions.navigateToHousehold()
-                    },
-                    extraActions = {
+                    actions = {
+                        // Screen-specific actions (e.g. print), closest to the title.
                         if (currentRoute == AppDestinations.MEAL_PLAN_DETAIL.route) {
                             navController.currentBackStackEntry?.let { entry ->
                                 val printViewModel: MealPlanDetailViewModel = hiltViewModel(entry)
@@ -452,6 +445,15 @@ fun ChefAINavGraph(
                                 }
                             }
                         }
+                        // Sync status indicator (hidden when idle)
+                        SyncStatusIndicator()
+                        // User profile menu on the right side
+                        UserProfileMenu(
+                            onLogout = {},
+                            onLogin = { navActions.navigateToLogin() },
+                            onSettings = { navActions.navigateToSettings() },
+                            onHousehold = { navActions.navigateToHousehold() },
+                        )
                     },
                 )
             }
