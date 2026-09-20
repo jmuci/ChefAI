@@ -43,9 +43,13 @@ role — they are what the theme resolves to, never what you type.
 
 Two deliberate choices in that table:
 
-- **`surfaceTint` is `Color.Transparent`.** Material tints a surface toward `surfaceTint` as its
-  elevation rises. A flat system has no elevation tint, so an elevated `Surface` stays exactly the
-  ground color and the rules remain the only depth cue.
+- **`surfaceTint` is the surface color itself.** Material composites `surfaceTint` over the
+  surface as elevation rises, so tinting *with the ground* makes tonal elevation a no-op and an
+  elevated `Surface` stays exactly the ground. The rules remain the only depth cue.
+  Do **not** "disable" it with `Color.Transparent` — that is `Color(0, 0, 0, 0)`, and Material's
+  `surfaceTint.copy(alpha = …)` turns it into *black* at that alpha, dimming every elevated
+  surface. `MainActivity`'s `Surface(tonalElevation = 5.dp)` rendered the ground at `#DAD9D9`
+  instead of `#F3F2F2` that way.
 - **`secondary` and `tertiary` are accent steps** (accent-700 and accent-800), not new hues. The
   system is mono. If a screen needs a second color, it needs a different *step*, not a different
   *hue*.

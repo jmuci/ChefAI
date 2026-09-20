@@ -170,10 +170,15 @@ internal val lightScheme = lightColorScheme(
     inverseOnSurface = ModernistPalette.Ground,
     inversePrimary = ModernistPalette.Accent300,
 
-    // Flat by rule: Material's tonal elevation overlay tints a surface toward `surfaceTint` as it
-    // rises. Transparent composites to the surface unchanged, so an elevated Surface stays exactly
-    // the ground color and the 2dp rules remain the only depth cue in the system.
-    surfaceTint = Color.Transparent,
+    // Flat by rule: Material's tonal elevation overlay composites `surfaceTint` over the surface
+    // as elevation rises (`surfaceTint.copy(alpha = f(elevation)).compositeOver(surface)`). Setting
+    // the tint *to the surface color* makes that a no-op at every elevation, so an elevated
+    // `Surface` stays exactly the ground and the 2dp rules remain the only depth cue.
+    //
+    // Not `Color.Transparent`: that is `Color(0, 0, 0, 0)`, and `.copy(alpha = …)` on it yields
+    // **black** at that alpha. It dims every elevated surface instead of leaving it flat —
+    // MainActivity's `Surface(tonalElevation = 5.dp)` rendered the ground at #DAD9D9 that way.
+    surfaceTint = ModernistPalette.Ground,
 
     surfaceDim = ModernistPalette.Neutral300,
     surfaceBright = ModernistPalette.Neutral100,
@@ -238,7 +243,8 @@ internal val darkScheme = darkColorScheme(
     inverseOnSurface = ModernistPalette.Ink,
     inversePrimary = ModernistPalette.Accent600,
 
-    surfaceTint = Color.Transparent,
+    // See the light scheme: the tint is the surface, so tonal elevation is a no-op.
+    surfaceTint = ModernistPalette.DarkGround,
 
     surfaceDim = ModernistPalette.DarkGround,
     surfaceBright = ModernistPalette.Neutral800,
