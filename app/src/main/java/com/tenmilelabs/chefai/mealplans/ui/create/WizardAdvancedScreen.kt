@@ -1,34 +1,30 @@
 package com.tenmilelabs.chefai.mealplans.ui.create
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
-import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
-import com.tenmilelabs.chefai.core.ui.components.flat.WizardProgressBar
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatBlockButton
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatButtonVariant
+import com.tenmilelabs.chefai.core.ui.components.flat.RuledGroup
+import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.mealplans.ui.create.components.PrepTimeSelector
 import com.tenmilelabs.chefai.mealplans.ui.create.components.ToggleOptionRow
+import com.tenmilelabs.chefai.mealplans.ui.create.components.VarietyPreferenceSelector
+import com.tenmilelabs.chefai.mealplans.ui.create.components.WizardHeader
 
 @Composable
 fun WizardAdvancedScreen(
@@ -47,7 +43,6 @@ fun WizardAdvancedScreen(
     )
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun WizardAdvancedContent(
     uiState: CreateMealPlanUiState,
@@ -55,99 +50,96 @@ private fun WizardAdvancedContent(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-    ) {
-        WizardProgressBar(
+    Column(modifier = modifier.fillMaxSize()) {
+        WizardHeader(
             currentStepIndex = 2,
             totalSteps = uiState.totalSteps,
             stepLabel = stringResource(R.string.wizard_step_extras),
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            onClose = onBack,
         )
 
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            Text(
-                text = "Final touches ✨",
-                style = MaterialTheme.typography.headlineSmall,
-            )
-
-            ToggleOptionRow(
-                title = stringResource(R.string.wizard_batch_cooking_title),
-                subtitle = stringResource(R.string.wizard_batch_cooking_subtitle),
-                checked = uiState.batchCooking,
-                onCheckedChange = { onAction(WizardAction.SetBatchCooking(it)) },
-            )
-
-            ToggleOptionRow(
-                title = stringResource(R.string.wizard_leftover_title),
-                subtitle = stringResource(R.string.wizard_leftover_subtitle),
-                checked = uiState.leftoverFriendly,
-                onCheckedChange = { onAction(WizardAction.SetLeftoverFriendly(it)) },
-            )
+            RuledGroup {
+                row {
+                    ToggleOptionRow(
+                        title = stringResource(R.string.wizard_batch_cooking_title),
+                        subtitle = stringResource(R.string.wizard_batch_cooking_subtitle),
+                        checked = uiState.batchCooking,
+                        onCheckedChange = { onAction(WizardAction.SetBatchCooking(it)) },
+                    )
+                }
+                row {
+                    ToggleOptionRow(
+                        title = stringResource(R.string.wizard_leftover_title),
+                        subtitle = stringResource(R.string.wizard_leftover_subtitle),
+                        checked = uiState.leftoverFriendly,
+                        onCheckedChange = { onAction(WizardAction.SetLeftoverFriendly(it)) },
+                    )
+                }
+            }
 
             PrepTimeSelector(
                 selectedMinutes = uiState.maxPrepTimeMinutes,
                 onMinutesSelected = { onAction(WizardAction.SetMaxPrepTime(it)) },
             )
 
-            Column {
-                Text(
-                    text = stringResource(R.string.wizard_variety_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(bottom = 12.dp),
-                )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    VarietyPreference.entries.forEach { pref ->
-                        FilterChip(
-                            selected = uiState.varietyPreference == pref,
-                            onClick = { onAction(WizardAction.SetVarietyPreference(pref)) },
-                            label = { Text("${pref.emoji} ${pref.label}") },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            ),
-                        )
-                    }
-                }
-            }
+            VarietyPreferenceSelector(
+                selectedPreference = uiState.varietyPreference,
+                onPreferenceSelected = { onAction(WizardAction.SetVarietyPreference(it)) },
+            )
         }
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+                .padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            OutlinedButton(
+            FlatBlockButton(
+                text = stringResource(R.string.wizard_back),
                 onClick = onBack,
-                modifier = Modifier.weight(1f),
+                variant = FlatButtonVariant.Secondary,
                 enabled = !uiState.isSaving,
-            ) {
-                Text(stringResource(R.string.wizard_back))
-            }
-            Button(
+                modifier = Modifier.weight(1f),
+            )
+            FlatBlockButton(
+                text = stringResource(R.string.wizard_create_plan),
                 onClick = { onAction(WizardAction.SaveMealPlan) },
-                modifier = Modifier.weight(1f),
                 enabled = !uiState.isSaving,
-            ) {
-                if (uiState.isSaving) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                } else {
-                    Text(stringResource(R.string.wizard_create_plan))
-                }
-            }
+                loading = uiState.isSaving,
+                modifier = Modifier.weight(1.4f),
+            )
         }
+    }
+}
+
+@Preview(name = "Wizard advanced — light")
+@Preview(name = "Wizard advanced — dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun WizardAdvancedPreview() {
+    ChefAITheme {
+        WizardAdvancedContent(
+            uiState = CreateMealPlanUiState(),
+            onAction = {},
+            onBack = {},
+        )
+    }
+}
+
+@Preview(name = "Wizard advanced — saving")
+@Composable
+private fun WizardAdvancedSavingPreview() {
+    ChefAITheme {
+        WizardAdvancedContent(
+            uiState = CreateMealPlanUiState(isSaving = true),
+            onAction = {},
+            onBack = {},
+        )
     }
 }
