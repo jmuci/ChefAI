@@ -24,38 +24,33 @@ class MealPlanBoardTest {
     private val recipes = listOf(lunch0, dinner0, lunch1, dinner1)
         .associateWith { preview(it) }
 
-    // --- Nothing cooked ---
-
     @Test
-    fun `a fresh plan puts every meal in upcoming, grouped by day`() {
+    fun `a fresh plan lists every meal, none cooked`() {
         val board = MealPlanBoard.from(twoFullDays(), recipes)
 
-        assertThat(board.cooked).isEmpty()
-        assertThat(board.upcoming).hasSize(2)
+        assertThat(board.meals).hasSize(4)
+        assertThat(board.meals.none { it.isCooked }).isTrue()
         assertThat(board.totalCount).isEqualTo(4)
         assertThat(board.progress).isEqualTo(0f)
     }
 
     @Test
-    fun `day headings are one-based`() {
+    fun `meals are ordered by day, then lunch before dinner`() {
         val board = MealPlanBoard.from(twoFullDays(), recipes)
 
-        assertThat(board.upcoming.map { it.label }).containsExactly("Day 1", "Day 2").inOrder()
-    }
-
-    @Test
-    fun `lunch is listed before dinner`() {
-        val board = MealPlanBoard.from(twoFullDays(), recipes)
-
-        assertThat(board.upcoming.first().meals.map { it.slot })
-            .containsExactly(MealSlot.LUNCH, MealSlot.DINNER).inOrder()
+        assertThat(board.meals.map { it.dayIndex to it.slot }).containsExactly(
+            0 to MealSlot.LUNCH,
+            0 to MealSlot.DINNER,
+            1 to MealSlot.LUNCH,
+            1 to MealSlot.DINNER,
+        ).inOrder()
     }
 
     @Test
     fun `recipes are resolved onto their meals`() {
         val board = MealPlanBoard.from(twoFullDays(), recipes)
 
-        assertThat(board.upcoming.flatMap { it.meals }.all { it.recipe != null }).isTrue()
+        assertThat(board.meals.all { it.recipe != null }).isTrue()
     }
 
     @Test
@@ -68,14 +63,12 @@ class MealPlanBoardTest {
             mealType = MealType.DINNER,
         )
 
-        assertThat(MealPlanBoard.from(plan, recipes).upcoming.map { it.dayIndex })
+        assertThat(MealPlanBoard.from(plan, recipes).meals.map { it.dayIndex })
             .containsExactly(0, 2).inOrder()
     }
 
-    // --- Cooking moves meals to the bottom ---
-
     @Test
-    fun `a cooked meal leaves upcoming and joins the cooked list`() {
+    fun `a cooked meal stays in place, struck through rather than moved`() {
         val plan = plan(
             listOf(
                 day(0, lunch = lunch0, dinner = dinner0, lunchCookedAt = 100L),
@@ -85,8 +78,14 @@ class MealPlanBoardTest {
 
         val board = MealPlanBoard.from(plan, recipes)
 
-        assertThat(board.cooked.map { it.slot }).containsExactly(MealSlot.LUNCH)
-        assertThat(board.upcoming.first().meals.map { it.slot }).containsExactly(MealSlot.DINNER)
+        assertThat(board.meals.map { it.dayIndex to it.slot }).containsExactly(
+            0 to MealSlot.LUNCH,
+            0 to MealSlot.DINNER,
+            1 to MealSlot.LUNCH,
+            1 to MealSlot.DINNER,
+        ).inOrder()
+        assertThat(board.meals.first { it.dayIndex == 0 && it.slot == MealSlot.LUNCH }.isCooked).isTrue()
+        assertThat(board.meals.first { it.dayIndex == 0 && it.slot == MealSlot.DINNER }.isCooked).isFalse()
     }
 
     @Test
@@ -106,46 +105,21 @@ class MealPlanBoardTest {
     }
 
     @Test
-    fun `a fully cooked day disappears from upcoming`() {
-        val plan = plan(
-            listOf(
-                day(0, lunch = lunch0, dinner = dinner0, lunchCookedAt = 1L, dinnerCookedAt = 2L),
-                day(1, lunch = lunch1, dinner = dinner1),
-            )
-        )
-
-        val board = MealPlanBoard.from(plan, recipes)
-
-        assertThat(board.upcoming.map { it.dayIndex }).containsExactly(1)
-        assertThat(board.cooked).hasSize(2)
-    }
-
-    @Test
-    fun `cooked meals are listed most recently cooked first`() {
-        val plan = plan(
-            listOf(day(0, lunch = lunch0, dinner = dinner0, lunchCookedAt = 1L, dinnerCookedAt = 2L))
-        )
-
-        assertThat(MealPlanBoard.from(plan, recipes).cooked.map { it.cookedAt })
-            .containsExactly(2L, 1L).inOrder()
-    }
-
-    @Test
     fun `a cooked meal remembers which day it came from`() {
         val plan = plan(listOf(day(1, lunch = lunch1, lunchCookedAt = 5L)))
 
-        assertThat(MealPlanBoard.from(plan, recipes).cooked.single().dayLabel).isEqualTo("Day 2")
+        assertThat(MealPlanBoard.from(plan, recipes).meals.single().dayLabel).isEqualTo("Day 2")
     }
 
     @Test
-    fun `a fully cooked plan reports complete progress and an empty upcoming list`() {
+    fun `a fully cooked plan reports complete progress`() {
         val plan = plan(
             listOf(day(0, lunch = lunch0, dinner = dinner0, lunchCookedAt = 1L, dinnerCookedAt = 2L))
         )
 
         val board = MealPlanBoard.from(plan, recipes)
 
-        assertThat(board.upcoming).isEmpty()
+        assertThat(board.meals.all { it.isCooked }).isTrue()
         assertThat(board.progress).isEqualTo(1f)
     }
 
@@ -155,8 +129,7 @@ class MealPlanBoardTest {
     fun `an empty plan has nothing to show and does not divide by zero`() {
         val board = MealPlanBoard.from(plan(emptyList()), recipes)
 
-        assertThat(board.upcoming).isEmpty()
-        assertThat(board.cooked).isEmpty()
+        assertThat(board.meals).isEmpty()
         assertThat(board.totalCount).isEqualTo(0)
         assertThat(board.progress).isEqualTo(0f)
     }
@@ -168,7 +141,7 @@ class MealPlanBoardTest {
         val board = MealPlanBoard.from(plan, recipes)
 
         assertThat(board.totalCount).isEqualTo(1)
-        assertThat(board.upcoming.single().meals.single().slot).isEqualTo(MealSlot.DINNER)
+        assertThat(board.meals.single().slot).isEqualTo(MealSlot.DINNER)
     }
 
     @Test
@@ -176,7 +149,18 @@ class MealPlanBoardTest {
         val board = MealPlanBoard.from(twoFullDays(), recipeMap = emptyMap())
 
         assertThat(board.totalCount).isEqualTo(4)
-        assertThat(board.upcoming.flatMap { it.meals }.all { it.recipe == null }).isTrue()
+        assertThat(board.meals.all { it.recipe == null }).isTrue()
+    }
+
+    @Test
+    fun `mealPlanDateFor treats createdAt as day zero`() {
+        // 2024-01-01T00:00:00Z, well clear of any timezone rolling it to a different calendar day.
+        val createdAt = 1_704_110_400_000L
+
+        val day0 = mealPlanDateFor(createdAt, 0)
+        val day2 = mealPlanDateFor(createdAt, 2)
+
+        assertThat(day2).isEqualTo(day0.plusDays(2))
     }
 
     // --- Helpers ---

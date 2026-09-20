@@ -8,44 +8,41 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatCheckbox
+import com.tenmilelabs.chefai.core.ui.components.flat.flatToggleable
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 
-/** How much of its normal opacity a picked-up row keeps. Matches MealPlanMealRow's COOKED_ALPHA. */
-private const val CHECKED_ALPHA = 0.45f
+/** How much of its normal opacity a picked-up row keeps — "struck through at 50% ink". */
+private const val CHECKED_ALPHA = 0.5f
 private const val STRIKE_ANIM_MS = 240
 
 /**
- * One line of the shopping list: checkbox, ingredient, quantity.
+ * One line of the shopping list: an 18dp checkbox, the ingredient, a right-aligned quantity.
  *
- * Ticking sweeps a strike-through across the text left-to-right and fades the row back, rather than
- * snapping to `TextDecoration.LineThrough` — the sweep is what makes a tick feel like crossing
- * something off a paper list.
+ * Ticking sweeps a strike-through across the name left-to-right and fades the row back, rather
+ * than snapping to `TextDecoration.LineThrough` — the sweep is what makes a tick feel like
+ * crossing something off a paper list.
  */
 @Composable
 fun ShoppingListRow(
@@ -68,7 +65,7 @@ fun ShoppingListRow(
         targetValue = if (isChecked) {
             MaterialTheme.colorScheme.onSurfaceVariant
         } else {
-            MaterialTheme.colorScheme.onSurface
+            MaterialTheme.colorScheme.onBackground
         },
         animationSpec = tween(STRIKE_ANIM_MS),
         label = "rowContentColor",
@@ -77,22 +74,15 @@ fun ShoppingListRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .toggleable(
-                value = isChecked,
-                onValueChange = { onToggle() },
-                role = Role.Checkbox,
-            )
-            .semantics {
-                stateDescription = if (isChecked) "Picked up" else "Still to buy"
-            }
-            .padding(vertical = 6.dp, horizontal = 4.dp),
+            .heightIn(min = 44.dp)
+            .flatToggleable(checked = isChecked, onCheckedChange = { onToggle() })
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // onCheckedChange = null: the row owns the click via toggleable, so the box must not
+        // onCheckedChange = null: the row owns the click via flatToggleable, so the box must not
         // register a second, competing semantics node.
-        Checkbox(checked = isChecked, onCheckedChange = null)
+        FlatCheckbox(checked = isChecked, onCheckedChange = null)
 
         Column(
             modifier = Modifier
@@ -108,25 +98,6 @@ fun ShoppingListRow(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.sweepingStrikeThrough(contentColor) { strike.value },
             )
-            if (quantityLabel != null) {
-                // "≈" marks a total that rests on an assumed density, exactly as the recipe
-                // screen marks one; a screen reader gets the word, which it would skip as a glyph.
-                val spokenAmount = if (isApproximate) {
-                    stringResource(R.string.ingredient_amount_approximate, quantityLabel)
-                } else {
-                    null
-                }
-                Text(
-                    text = if (isApproximate) "≈ $quantityLabel" else quantityLabel,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = if (spokenAmount != null) {
-                        Modifier.semantics { contentDescription = spokenAmount }
-                    } else {
-                        Modifier
-                    },
-                )
-            }
             if (checkedByName != null) {
                 Text(
                     text = stringResource(R.string.shopping_list_checked_by, checkedByName),
@@ -134,6 +105,26 @@ fun ShoppingListRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+
+        if (quantityLabel != null) {
+            // "≈" marks a total that rests on an assumed density, exactly as the recipe
+            // screen marks one; a screen reader gets the word, which it would skip as a glyph.
+            val spokenAmount = if (isApproximate) {
+                stringResource(R.string.ingredient_amount_approximate, quantityLabel)
+            } else {
+                null
+            }
+            Text(
+                text = if (isApproximate) "≈ $quantityLabel" else quantityLabel,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = if (spokenAmount != null) {
+                    Modifier.semantics { contentDescription = spokenAmount }
+                } else {
+                    Modifier
+                },
+            )
         }
     }
 }
@@ -166,7 +157,6 @@ private fun ShoppingListRowToBuyPreview() {
             quantityLabel = "2 tbsp",
             isChecked = false,
             onToggle = {},
-            modifier = Modifier.padding(16.dp),
         )
     }
 }
@@ -180,7 +170,6 @@ private fun ShoppingListRowCheckedPreview() {
             quantityLabel = "500 g",
             isChecked = true,
             onToggle = {},
-            modifier = Modifier.padding(16.dp),
         )
     }
 }
@@ -194,7 +183,6 @@ private fun ShoppingListRowToBuyDarkPreview() {
             quantityLabel = null,
             isChecked = false,
             onToggle = {},
-            modifier = Modifier.padding(16.dp),
         )
     }
 }
@@ -208,7 +196,20 @@ private fun ShoppingListRowCheckedDarkPreview() {
             quantityLabel = "500 g",
             isChecked = true,
             onToggle = {},
-            modifier = Modifier.padding(16.dp),
+        )
+    }
+}
+
+@Preview(name = "Approximate weight — Light", showBackground = true)
+@Composable
+private fun ShoppingListRowApproximatePreview() {
+    ChefAITheme(darkTheme = false) {
+        ShoppingListRow(
+            name = "Beef mince",
+            quantityLabel = "900 g",
+            isApproximate = true,
+            isChecked = false,
+            onToggle = {},
         )
     }
 }
@@ -223,7 +224,6 @@ private fun ShoppingListRowCheckedByPreview() {
             isChecked = true,
             checkedByName = "Alex",
             onToggle = {},
-            modifier = Modifier.padding(16.dp),
         )
     }
 }
@@ -238,7 +238,6 @@ private fun ShoppingListRowCheckedByDarkPreview() {
             isChecked = true,
             checkedByName = "Alex",
             onToggle = {},
-            modifier = Modifier.padding(16.dp),
         )
     }
 }
