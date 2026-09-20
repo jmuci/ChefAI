@@ -1,7 +1,5 @@
 package com.tenmilelabs.chefai.auth.ui
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,31 +7,24 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,7 +40,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -59,7 +50,16 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.core.ui.components.ChefAIWordmark
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatBlockButton
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatCheckbox
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatField
+import com.tenmilelabs.chefai.core.ui.components.flat.MinHitTarget
+import com.tenmilelabs.chefai.core.ui.components.flat.flatClickable
+import com.tenmilelabs.chefai.core.ui.components.flat.flatToggleable
+import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
+import com.tenmilelabs.chefai.core.ui.theme.chefColors
 
 @Composable
 fun LoginScreen(
@@ -127,38 +127,29 @@ fun LoginScreenContent(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
+        // Flush left, vertically centered — Modernist forbids centered hero copy.
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .testTag("LoginScreen")
-                .padding(dimensionResource(id = R.dimen.padding_large)),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .padding(
+                    horizontal = dimensionResource(id = R.dimen.padding_medium),
+                    vertical = dimensionResource(id = R.dimen.padding_large),
+                ),
+            horizontalAlignment = Alignment.Start,
             verticalArrangement = Arrangement.Center
         ) {
-            // Logo
-            Image(
-                painter = painterResource(
-                    if (isSystemInDarkTheme()) {
-                        R.drawable.ic_chef_hat_white_24dp
-                    } else {
-                        R.drawable.ic_chef_hat_black_24dp
-                    }
-                ),
-                contentDescription = "ChefAI Logo",
-                modifier = Modifier.size(120.dp)
-            )
+            ChefAIWordmark()
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(AuthMetrics.WordmarkToTitleGap))
 
-            // Title
             Text(
                 text = stringResource(R.string.welcome_back),
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.displayMedium,
                 color = MaterialTheme.colorScheme.onBackground,
-                fontWeight = FontWeight.Bold
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(AuthMetrics.TitleToSubtitleGap))
 
             Text(
                 text = stringResource(R.string.login_subtitle),
@@ -166,7 +157,7 @@ fun LoginScreenContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(AuthMetrics.SubtitleToFieldsGap))
 
             // Email Field with autocomplete dropdown
             EmailTextField(
@@ -180,7 +171,7 @@ fun LoginScreenContent(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(AuthMetrics.FieldGap))
 
             // Password Field
             PasswordTextField(
@@ -193,68 +184,46 @@ fun LoginScreenContent(
                 onDone = onLoginClick
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(AuthMetrics.FieldGap))
 
-            // Remember Me Checkbox
-            RememberMeCheckbox(
+            // Remember Me row
+            RememberMeRow(
                 isChecked = uiState.rememberMe,
                 onCheckedChange = onRememberMeChange
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(AuthMetrics.FieldGap))
 
             // Login Button
-            Button(
+            FlatBlockButton(
+                text = stringResource(R.string.login_button),
                 onClick = onLoginClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("LoginButton")
-                    .height(56.dp),
-                enabled = !uiState.isLoading,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            ) {
-                if (uiState.isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text(
-                        stringResource(R.string.login_button),
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                }
-            }
+                loading = uiState.isLoading,
+                modifier = Modifier.testTag("LoginButton"),
+            )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(AuthMetrics.ButtonToFooterGap))
 
             // Create Account Link
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
+                horizontalArrangement = Arrangement.spacedBy(AuthMetrics.FooterItemGap),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = stringResource(R.string.dont_have_account),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                TextButton(
-                    onClick = onCreateAccountClick,
-                    modifier = Modifier.testTag("CreateAccountButton")
-                ) {
-                    Text(
-                        stringResource(R.string.create_account),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
+                Text(
+                    text = stringResource(R.string.create_account),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.chefColors.accentText,
+                    modifier = Modifier
+                        .flatClickable(onClick = onCreateAccountClick, role = Role.Button)
+                        .testTag("CreateAccountButton"),
+                )
             }
         }
     }
@@ -279,26 +248,18 @@ private fun EmailTextField(
         onExpandedChange = { if (!it) onDismissSuggestions() },
         modifier = modifier
     ) {
-        OutlinedTextField(
+        FlatField(
             value = email,
             onValueChange = {
                 onEmailChange(it)
                 expanded = true
             },
-            modifier = Modifier
-                .fillMaxWidth()
-                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
-            label = { Text(stringResource(R.string.label_email)) },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Email,
-                    contentDescription = null
-                )
-            },
-            isError = error != null,
-            supportingText = if (error != null) {
-                { Text(text = error, color = MaterialTheme.colorScheme.error) }
-            } else null,
+            label = stringResource(R.string.label_email),
+            placeholder = stringResource(R.string.placeholder_email),
+            // FlatField's leadingIcon is an ImageVector, not the drawable-backed ChefAIIcons —
+            // Material's icon here rather than the vendored Lucide mail glyph. See PR notes.
+            leadingIcon = Icons.Default.MailOutline,
+            errorText = error,
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Email,
                 imeAction = ImeAction.Next
@@ -309,7 +270,9 @@ private fun EmailTextField(
                     onNext()
                 }
             ),
-            singleLine = true
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
         )
 
         ExposedDropdownMenu(
@@ -332,7 +295,6 @@ private fun EmailTextField(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PasswordTextField(
     password: String,
@@ -343,30 +305,14 @@ private fun PasswordTextField(
     modifier: Modifier = Modifier,
     onDone: () -> Unit
 ) {
-    OutlinedTextField(
+    FlatField(
         value = password,
         onValueChange = onPasswordChange,
-        modifier = modifier,
-        label = { Text(stringResource(R.string.label_password)) },
-        leadingIcon = {
-            Icon(
-                imageVector = Icons.Default.Lock,
-                contentDescription = null
-            )
-        },
-        trailingIcon = {
-            IconButton(onClick = onVisibilityToggle) {
-                Icon(
-                    imageVector = if (isVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                    contentDescription = if (isVisible) "Hide password" else "Show password"
-                )
-            }
-        },
+        label = stringResource(R.string.label_password),
+        leadingIcon = Icons.Default.Lock,
+        trailing = { PasswordVisibilityToggle(isVisible = isVisible, onToggle = onVisibilityToggle) },
         visualTransformation = if (isVisible) VisualTransformation.None else PasswordVisualTransformation(),
-        isError = error != null,
-        supportingText = if (error != null) {
-            { Text(text = error, color = MaterialTheme.colorScheme.error) }
-        } else null,
+        errorText = error,
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Password,
             imeAction = ImeAction.Done
@@ -374,34 +320,79 @@ private fun PasswordTextField(
         keyboardActions = KeyboardActions(
             onDone = { onDone() }
         ),
-        singleLine = true
+        modifier = modifier,
     )
 }
 
+/**
+ * The eye / eye-off trailing toggle shared by every password field in the auth flow (07, 08).
+ * 17dp glyph, matching the field's own leading-icon size; the clickable bounds are left at the
+ * icon's size since [FlatField]'s trailing slot sits inside the 48dp-tall border already.
+ */
 @Composable
-private fun RememberMeCheckbox(
+internal fun PasswordVisibilityToggle(isVisible: Boolean, onToggle: () -> Unit) {
+    Icon(
+        painter = painterResource(if (isVisible) ChefAIIcons.Eye else ChefAIIcons.EyeOff),
+        contentDescription = stringResource(
+            if (isVisible) R.string.content_description_hide_password else R.string.content_description_show_password,
+        ),
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .size(FieldIconSize)
+            .flatClickable(onClick = onToggle, role = Role.Button),
+    )
+}
+
+private val FieldIconSize = 17.dp
+
+@Composable
+private fun RememberMeRow(
     isChecked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = dimensionResource(id = R.dimen.padding_extra_small)),
-        verticalAlignment = Alignment.CenterVertically
+            .heightIn(min = MinHitTarget)
+            .flatToggleable(checked = isChecked, onCheckedChange = onCheckedChange),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AuthMetrics.RememberMeGap),
     ) {
-        androidx.compose.material3.Checkbox(
-            checked = isChecked,
-            onCheckedChange = onCheckedChange
-        )
-
-        Spacer(modifier = Modifier.size(8.dp))
-
+        FlatCheckbox(checked = isChecked, onCheckedChange = null)
         Text(
             stringResource(R.string.remember_me),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onBackground,
         )
     }
+}
+
+/**
+ * The auth shell's vertical rhythm, transcribed from the handoff's CSS margins (screens 07/08 in
+ * `ChefAI Redesign.dc.html`). CSS collapses adjacent margins to their max; these are already that
+ * resolved value, not a straight copy of each element's own margin.
+ */
+internal object AuthMetrics {
+    /** `h2 { margin: var(--space-3) 0 6px }` — the wordmark's own margin is 0, so this wins. */
+    val WordmarkToTitleGap = 12.dp
+
+    /** `h2`'s bottom margin. */
+    val TitleToSubtitleGap = 6.dp
+
+    /** The subtitle's `margin: 0 0 var(--space-6)`. */
+    val SubtitleToFieldsGap = 24.dp
+
+    /** `.field { margin-bottom: var(--space-3) }`. */
+    val FieldGap = 12.dp
+
+    /** `margin-top: var(--space-4)` on the footer row. */
+    val ButtonToFooterGap = 16.dp
+
+    /** `gap: 6px` between the footer's prompt and its link. */
+    val FooterItemGap = 6.dp
+
+    /** `label { gap: 10px }` on the remember-me row. */
+    val RememberMeGap = 10.dp
 }
 
 @Preview(showBackground = true)
