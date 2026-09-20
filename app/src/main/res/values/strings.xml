@@ -248,9 +248,13 @@
 
     <!-- Meal Plan Wizard -->
     <string name="app_dest_title_meal_plan_wizard">Create Meal Plan</string>
-    <string name="wizard_step_basics">📋 The Basics</string>
-    <string name="wizard_step_preferences">🎯 Preferences</string>
-    <string name="wizard_step_extras">✨ Final Touches</string>
+    <!-- Modernist drops emoji from UI copy; the glyphs these carried were stripped with the
+         redesign's WizardProgressBar. -->
+    <string name="wizard_step_basics">The Basics</string>
+    <string name="wizard_step_preferences">Preferences</string>
+    <string name="wizard_step_extras">Final Touches</string>
+    <!-- %1$d = current step (1-based), %2$d = total steps, %3$s = this step's name. -->
+    <string name="wizard_step_caption">Step %1$d of %2$d · %3$s</string>
     <string name="wizard_plan_length_title">📅 How many days?</string>
     <string name="wizard_meal_type_title">🍽️ Which meals?</string>
     <string name="wizard_servings_title">👥 How many servings?</string>
