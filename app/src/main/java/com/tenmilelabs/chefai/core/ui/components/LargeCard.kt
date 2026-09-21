@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.core.ui.components
 import android.content.res.Configuration
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -74,7 +75,11 @@ fun LargeCard(
     BoxWithConstraints(modifier = modifier) {
         val isCompact = maxWidth < CompactWidthThreshold
 
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(onClick = { onClick(recipe.uuid) }),
+        ) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(recipeImageModel(recipe.localImagePath, recipe.imageUrlThumbnail))
