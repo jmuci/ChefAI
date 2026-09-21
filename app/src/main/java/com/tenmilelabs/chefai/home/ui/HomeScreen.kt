@@ -24,6 +24,9 @@ import com.tenmilelabs.chefai.core.util.EmptyContent
 import com.tenmilelabs.chefai.core.util.LoadingContent
 import com.tenmilelabs.chefai.home.data.model.ComponentModel
 import com.tenmilelabs.chefai.home.ui.components.ComponentRenderer
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import java.util.UUID
 
 /**
@@ -115,6 +118,16 @@ fun HomeContent(
             )
         }
     }
+}
+
+/**
+ * "Wednesday, August 12" — today's date, shown under the "ChefAI" wordmark. Exposed so the app
+ * shell's header, which owns the Home top bar, can build the same subtitle it shows next to the
+ * title (see `mealPlanDetailSubtitle` for the equivalent on the meal-plan-detail header).
+ */
+fun homeDateSubtitle(): String {
+    val formatter = DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.getDefault())
+    return formatter.format(LocalDate.now())
 }
 
 @Preview(showBackground = true)

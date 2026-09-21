@@ -52,6 +52,7 @@ import com.tenmilelabs.chefai.core.ui.components.flat.FlatButtonVariant
 import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
 import com.tenmilelabs.chefai.core.ui.navigation.ChefAITopAppBarWithSubtitle
 import com.tenmilelabs.chefai.home.ui.HomeScreen
+import com.tenmilelabs.chefai.home.ui.homeDateSubtitle
 import com.tenmilelabs.chefai.household.ui.AcceptInviteScreen
 import com.tenmilelabs.chefai.household.ui.HouseholdScreen
 import com.tenmilelabs.chefai.mealplans.ui.MealPlansScreen
@@ -460,6 +461,18 @@ fun ChefAINavGraph(
                 }
 
                 when (currentRoute) {
+                    AppDestinations.HOME.route -> {
+                        // "ChefAI" wordmark + today's date (01) — the one other screen using
+                        // ChefAITopAppBarWithSubtitle, alongside meal-plan detail below. The app
+                        // name, not titleRes ("Home"): the design shows the wordmark here, not a
+                        // screen title.
+                        ChefAITopAppBarWithSubtitle(
+                            title = stringResource(R.string.app_name),
+                            subtitle = homeDateSubtitle(),
+                            navigation = navigation,
+                            actions = trailingActions,
+                        )
+                    }
                     AppDestinations.MEAL_PLAN_DETAIL.route -> {
                         // The plan's name/date-range/sharing subtitle (16) needs the same state the
                         // print action already reads here, so both come from one hoisted view model.
