@@ -24,8 +24,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -86,7 +84,6 @@ fun RecipeListCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val grayscale = remember { ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }) }
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(recipeImageModel(recipe.localImagePath, recipe.imageUrlThumbnail))
@@ -96,7 +93,6 @@ fun RecipeListCard(
                 error = painterResource(R.drawable.ic_img_error),
                 contentDescription = stringResource(R.string.recipe_image_content_description),
                 contentScale = ContentScale.Crop,
-                colorFilter = grayscale,
                 modifier = Modifier
                     .size(width = ThumbnailWidth, height = ThumbnailHeight)
                     .background(MaterialTheme.colorScheme.surfaceVariant),
