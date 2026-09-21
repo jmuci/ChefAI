@@ -42,6 +42,8 @@ import com.tenmilelabs.chefai.recipes.domain.repository.RecipeImporter
 import com.tenmilelabs.chefai.recipes.domain.repository.RenderedHtmlFetcher
 import com.tenmilelabs.chefai.recipes.domain.repository.RenderedImageFetcher
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
+import com.tenmilelabs.chefai.mealplans.data.repository.DataStoreMealPlanPreferencesRepository
+import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanPreferencesRepository
 import com.tenmilelabs.chefai.search.data.repository.DefaultRecipeSearchRepository
 import com.tenmilelabs.chefai.search.domain.repository.RecipeSearchRepository
 import dagger.Binds
@@ -116,6 +118,11 @@ abstract class RepositoryModule {
     @Singleton
     @Binds
     abstract fun bindHouseholdNetworkDataSource(service: HouseholdApiService): HouseholdNetworkDataSource
+
+    @Binds
+    abstract fun bindMealPlanPreferencesRepository(
+        repository: DataStoreMealPlanPreferencesRepository
+    ): MealPlanPreferencesRepository
 }
 
 

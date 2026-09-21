@@ -265,6 +265,27 @@
     <string name="meal_plan_generating">Building your meal plan…</string>
     <string name="meal_plan_print">Print meal plan</string>
     <string name="meal_plan_shared_by">Shared by %1$s</string>
+
+    <!-- Meal Plans week view (screen 06) -->
+    <string name="meal_plans_basis_just_me">Just me</string>
+    <string name="meal_plans_basis_family">Family</string>
+    <string name="meal_plans_basis_label">Whose meals to show</string>
+    <string name="meal_plans_previous_week">Previous week</string>
+    <string name="meal_plans_next_week">Next week</string>
+    <string name="meal_plans_add_meal">+ Add meal</string>
+    <string name="meal_plans_grocery_list_label">Grocery list</string>
+    <string name="meal_plans_grocery_summary">%1$s · %2$s</string>
+    <string name="meal_plans_generate_grocery_list">Generate Grocery List</string>
+    <string name="meal_plans_grocery_unavailable_empty">Plan a meal this week to build a list</string>
+    <string name="meal_plans_grocery_unavailable_multi">This week spans more than one plan — open a plan to shop for it</string>
+    <plurals name="meal_plans_meals_planned">
+        <item quantity="one">%d meal planned</item>
+        <item quantity="other">%d meals planned</item>
+    </plurals>
+    <plurals name="meal_plans_ingredient_count">
+        <item quantity="one">%d ingredient</item>
+        <item quantity="other">%d ingredients</item>
+    </plurals>
     <string name="meal_plan_shopping_list_button">Shopping list · %1$d items</string>
 
     <!-- Shopping List -->
