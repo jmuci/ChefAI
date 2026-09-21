@@ -3,26 +3,29 @@ package com.tenmilelabs.chefai.search.ui.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
+import com.tenmilelabs.chefai.core.ui.theme.chefColors
 import com.tenmilelabs.chefai.search.ui.model.SearchCategory
 import com.tenmilelabs.chefai.search.ui.model.SearchCategoryGroup
+
+/** 8dp, per the handoff's category-card grid gap. */
+private val GridGap = 8.dp
 
 /**
  * The Search tab's landing page: browse shortcuts grouped into sections, two cards per row.
@@ -40,10 +43,22 @@ fun SearchBrowseContent(
             .fillMaxSize()
             .testTag("SearchBrowseContent"),
         contentPadding = contentPadding,
-        horizontalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.padding_small)),
-        verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.padding_small)),
+        horizontalArrangement = Arrangement.spacedBy(GridGap),
+        verticalArrangement = Arrangement.spacedBy(GridGap),
     ) {
-        SearchCategoryGroup.entries.forEach { group ->
+        SearchCategoryGroup.entries.forEachIndexed { groupIndex, group ->
+            if (groupIndex > 0) {
+                item(
+                    key = "rule_${group.name}",
+                    span = { GridItemSpan(maxLineSpan) },
+                ) {
+                    HorizontalDivider(
+                        thickness = MaterialTheme.chefColors.sectionRuleWidth,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
             item(
                 key = "header_${group.name}",
                 span = { GridItemSpan(maxLineSpan) },
@@ -70,13 +85,10 @@ private fun BrowseSectionHeader(
     modifier: Modifier = Modifier,
 ) {
     Text(
-        text = title,
-        style = MaterialTheme.typography.headlineSmall,
-        fontWeight = FontWeight.Bold,
-        modifier = modifier.padding(
-            horizontal = dimensionResource(R.dimen.padding_extra_small),
-            vertical = dimensionResource(R.dimen.padding_medium),
-        ),
+        text = title.uppercase(),
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.padding(vertical = 12.dp),
     )
 }
 

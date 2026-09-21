@@ -39,11 +39,16 @@ class SearchBrowseContentTest {
             }
         }
 
-        composeTestRule.onNodeWithText(context.getString(R.string.search_section_by_meal))
-            .assertIsDisplayed()
-        composeTestRule.onNodeWithText(context.getString(R.string.search_section_popular_categories))
-            .performScrollTo()
-            .assertIsDisplayed()
+        // Modernist section labels are rendered uppercase (titleSmall's tracking assumes it) —
+        // ignoreCase so this test doesn't hardcode that transform.
+        composeTestRule.onNodeWithText(
+            context.getString(R.string.search_section_by_meal),
+            ignoreCase = true,
+        ).assertIsDisplayed()
+        composeTestRule.onNodeWithText(
+            context.getString(R.string.search_section_popular_categories),
+            ignoreCase = true,
+        ).performScrollTo().assertIsDisplayed()
     }
 
     @Test

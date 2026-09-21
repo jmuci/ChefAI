@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -205,14 +207,19 @@ class RecipeDetailsScreenTest {
             }
         }
 
+        // The visible label is the bare count (05's stat-bar column shows "4", not "4 portions");
+        // the plural wording still reaches TalkBack via the node's content description.
         composeTestRule.onNodeWithTag(SERVINGS_COUNT_TAG)
             .performScrollTo()
             .assertIsDisplayed()
-        composeTestRule.onNodeWithText(
-            context.resources.getQuantityString(
-                R.plurals.portions_count,
-                RecipeData.recipe.servings,
-                RecipeData.recipe.servings,
+            .assertTextEquals(RecipeData.recipe.servings.toString())
+        composeTestRule.onNode(
+            hasContentDescription(
+                context.resources.getQuantityString(
+                    R.plurals.portions_count,
+                    RecipeData.recipe.servings,
+                    RecipeData.recipe.servings,
+                )
             )
         ).assertIsDisplayed()
     }
