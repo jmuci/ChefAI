@@ -423,11 +423,16 @@ fun ChefAINavGraph(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             // Don't show the generic Back bar on login, register, the wizard's own-header
-            // screens, or accept-invite — the last draws its own close (X) header, screen 12's
-            // "you came *to* this screen and will leave without a trail" shape rather than Back.
+            // screens, accept-invite, or a recipe's details — accept-invite draws its own close
+            // (X) header (screen 12's "you came *to* this screen and will leave without a trail"
+            // shape rather than Back), and recipe details (05) draws its back arrow overlaid on
+            // its full-bleed hero image instead, which a generic bar above it would duplicate.
             if (currentRoute != AppDestinations.LOGIN.route &&
                 currentRoute != AppDestinations.REGISTER.route &&
                 currentRoute != AppDestinations.ACCEPT_INVITE.route &&
+                currentRoute != AppDestinations.RECIPE_DETAILS.route &&
+                currentRoute != AppDestinations.HOME_RECIPE_DETAIL.route &&
+                currentRoute != AppDestinations.MEAL_PLAN_RECIPE_DETAIL.route &&
                 currentRoute !in wizardRoutes
             ) {
                 val navigation = if (!isTopLevelDestination) {

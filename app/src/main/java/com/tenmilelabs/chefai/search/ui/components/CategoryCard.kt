@@ -5,31 +5,41 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.dimensionResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
-import com.tenmilelabs.chefai.R
+import androidx.compose.ui.unit.dp
+import com.tenmilelabs.chefai.core.ui.components.flat.flatClickable
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
+import com.tenmilelabs.chefai.core.ui.theme.chefColors
 
-/** Background/foreground pairing for a [CategoryCard]; cycled across the grid so adjacent cards differ. */
+/** Which step of the accent ramp a [CategoryCard] fills with; cycled across the grid by index. */
 enum class CategoryCardTone { PRIMARY, SECONDARY, TERTIARY }
 
-/** A browse shortcut on the Search tab, rendered as a themed gradient card. */
+/** 76px min height, per the handoff's category-card spec. */
+private val CardMinHeight = 76.dp
+
+/**
+ * A browse shortcut on the Search tab: a flat accent-ramp tile, label flush left and
+ * bottom-aligned. Replaces the pre-redesign gradient card — Modernist forbids both gradients and
+ * corner radius.
+ *
+ * TODO(dark): one of the three cases the handoff says will not invert mechanically — light tints
+ *  cycle the *shallow* end of the ramp (accent-100/200/300) with accent-900 text; on a dark ground
+ *  the fill has to come from the *deep* end with light text, so the ramp direction flips rather
+ *  than darkening. [MaterialTheme.chefColors]'s accent ramp is `DarkUnset` (magenta) in dark for
+ *  exactly this reason — see docs/design/modernist.md § 5.
+ */
 @Composable
 fun CategoryCard(
     title: String,
@@ -37,50 +47,34 @@ fun CategoryCard(
     modifier: Modifier = Modifier,
     tone: CategoryCardTone = CategoryCardTone.PRIMARY,
 ) {
-    val colorScheme = MaterialTheme.colorScheme
-    val (startColor, endColor, contentColor) = when (tone) {
-        CategoryCardTone.PRIMARY -> Triple(
-            colorScheme.primaryContainer,
-            colorScheme.secondaryContainer,
-            colorScheme.onPrimaryContainer,
-        )
-        CategoryCardTone.SECONDARY -> Triple(
-            colorScheme.secondaryContainer,
-            colorScheme.tertiaryContainer,
-            colorScheme.onSecondaryContainer,
-        )
-        CategoryCardTone.TERTIARY -> Triple(
-            colorScheme.tertiaryContainer,
-            colorScheme.primaryContainer,
-            colorScheme.onTertiaryContainer,
-        )
+    val accent = MaterialTheme.chefColors.accent
+    val fill: Color = when (tone) {
+        CategoryCardTone.PRIMARY -> accent.s100
+        CategoryCardTone.SECONDARY -> accent.s200
+        CategoryCardTone.TERTIARY -> accent.s300
     }
 
-    Card(
-        onClick = onClick,
-        modifier = modifier.testTag("CategoryCard"),
-        shape = RoundedCornerShape(dimensionResource(R.dimen.card_corner_radius)),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+    Box(
+        modifier = modifier
+            .testTag("CategoryCard")
+            .fillMaxWidth()
+            .heightIn(min = CardMinHeight)
+            .background(fill)
+            .flatClickable(onClick = onClick, role = Role.Button)
+            .padding(CardPadding),
+        contentAlignment = Alignment.BottomStart,
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(dimensionResource(R.dimen.category_card_height))
-                .background(Brush.linearGradient(listOf(startColor, endColor))),
-            contentAlignment = Alignment.CenterStart,
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = contentColor,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(dimensionResource(R.dimen.padding_medium)),
-            )
-        }
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge,
+            color = accent.s900,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
+
+private val CardPadding = 12.dp
 
 @Preview(name = "Light", showBackground = true)
 @Composable
@@ -118,8 +112,40 @@ private fun CategoryCardTonesPreview() {
     ChefAITheme {
         Surface {
             Row(
-                modifier = Modifier.padding(dimensionResource(R.dimen.padding_small)),
-                horizontalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.padding_small)),
+                modifier = Modifier.padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                CategoryCard(
+                    title = "Breakfast",
+                    onClick = {},
+                    modifier = Modifier.weight(1f),
+                    tone = CategoryCardTone.PRIMARY,
+                )
+                CategoryCard(
+                    title = "Lunch",
+                    onClick = {},
+                    modifier = Modifier.weight(1f),
+                    tone = CategoryCardTone.SECONDARY,
+                )
+                CategoryCard(
+                    title = "Dinner",
+                    onClick = {},
+                    modifier = Modifier.weight(1f),
+                    tone = CategoryCardTone.TERTIARY,
+                )
+            }
+        }
+    }
+}
+
+@Preview(name = "All tones — dark", showBackground = true)
+@Composable
+private fun CategoryCardTonesDarkPreview() {
+    ChefAITheme(darkTheme = true) {
+        Surface {
+            Row(
+                modifier = Modifier.padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 CategoryCard(
                     title = "Breakfast",

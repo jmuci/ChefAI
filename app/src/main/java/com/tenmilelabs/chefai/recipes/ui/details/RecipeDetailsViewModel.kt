@@ -111,6 +111,16 @@ sealed interface RecipeDetailsAction {
     data object DismissDeleteDialog : RecipeDetailsAction
     data object ToggleCooked : RecipeDetailsAction
     data class ServingsChanged(val servings: Int) : RecipeDetailsAction
+    data object NavigateBack : RecipeDetailsAction
+
+    /**
+     * Neither flow exists yet — there is no meal-plan picker to add a recipe into, and no
+     * per-recipe grocery list separate from a meal plan's own (see [ShoppingListBuilder]). Both
+     * buttons render per the redesign (05) and currently no-op; see the GitHub issue filed
+     * alongside that screen's redesign for what each needs.
+     */
+    data object AddToMealPlanClicked : RecipeDetailsAction
+    data object AddToGroceryListClicked : RecipeDetailsAction
 }
 
 /** One-shot side effects emitted by [RecipeDetailsViewModel], consumed by the UI. */

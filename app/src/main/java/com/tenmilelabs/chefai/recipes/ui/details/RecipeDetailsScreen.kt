@@ -2,13 +2,16 @@ package com.tenmilelabs.chefai.recipes.ui.details
 
 import android.content.res.Configuration
 import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,43 +19,36 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.dimensionResource
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -70,11 +66,17 @@ import com.tenmilelabs.chefai.core.ui.components.CookedToggleButton
 import com.tenmilelabs.chefai.core.ui.components.InfoChip
 import com.tenmilelabs.chefai.core.ui.components.InfoChipType
 import com.tenmilelabs.chefai.core.ui.components.RecipePrivacyBadge
-import com.tenmilelabs.chefai.core.ui.components.NutritionRow
-import com.tenmilelabs.chefai.core.ui.components.RecipeTimeRow
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatBlockButton
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatCheckbox
+import com.tenmilelabs.chefai.core.ui.components.flat.RuledGroup
+import com.tenmilelabs.chefai.core.ui.components.flat.SectionRule
+import com.tenmilelabs.chefai.core.ui.components.flat.flatClickable
+import com.tenmilelabs.chefai.core.ui.components.flat.flatToggleable
+import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
 import com.tenmilelabs.chefai.core.ui.preview.RecipeData
 import com.tenmilelabs.chefai.core.ui.recipeImageModel
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
+import com.tenmilelabs.chefai.core.ui.theme.chefColors
 import com.tenmilelabs.chefai.core.ui.timer.RecipeTimerViewModel
 import com.tenmilelabs.chefai.core.ui.timer.rememberNotificationPermissionRequester
 import com.tenmilelabs.chefai.core.util.EmptyContent
@@ -82,7 +84,7 @@ import com.tenmilelabs.chefai.core.util.LoadingContent
 import com.tenmilelabs.chefai.core.util.parseStepDurationSeconds
 import com.tenmilelabs.chefai.recipes.domain.scaling.RecipeScaling
 import com.tenmilelabs.chefai.recipes.ui.components.DeleteConfirmationDialog
-import com.tenmilelabs.chefai.recipes.ui.details.components.ServingsStepper
+import com.tenmilelabs.chefai.recipes.ui.details.components.RecipeStatsBar
 import timber.log.Timber
 
 
@@ -127,6 +129,11 @@ fun RecipeDetailsScreen(
                         RecipeDetailsAction.ToggleCooked -> viewModel.onToggleCooked()
                         is RecipeDetailsAction.ServingsChanged ->
                             viewModel.onServingsChange(action.servings)
+                        // Neither flow is designed yet (no meal-plan picker, no per-recipe grocery
+                        // list) — see the GitHub issue filed alongside this screen's redesign.
+                        RecipeDetailsAction.AddToMealPlanClicked,
+                        RecipeDetailsAction.AddToGroceryListClicked -> Unit
+                        RecipeDetailsAction.NavigateBack -> onNavigateBack?.invoke()
                     }
                 },
                 servings = uiState.servings,
@@ -221,154 +228,312 @@ fun RecipeDetailsContent(
         }
     }
 
-    val tabTitles = listOf(stringResource(R.string.ingredients), stringResource(R.string.steps))
-    var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
+    // Local-only: checking off an ingredient while cooking has no server-side counterpart (the
+    // handoff doesn't specify one either), so this is scoped to the composition, not the
+    // ViewModel. Keyed by the ingredient list's identity so a re-scale or a unit-system change —
+    // which rebuilds the list above but preserves row order — doesn't carry stale indices over
+    // from a previous recipe.
+    var checkedIngredients by rememberSaveable(ingredients) { mutableStateOf(emptySet<Int>()) }
 
     Box(modifier = Modifier.fillMaxSize()) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-    ) {
-        Column(modifier = Modifier.padding(horizontal = dimensionResource(id = R.dimen.padding_medium))) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = dimensionResource(id = R.dimen.padding_medium)),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = recipe.title,
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.weight(1f)
-                )
-                if (showCookedToggle) {
-                    CookedToggleButton(
-                        isCooked = isCooked,
-                        onToggle = { onAction(RecipeDetailsAction.ToggleCooked) },
-                        modifier = Modifier.padding(end = dimensionResource(id = R.dimen.padding_extra_small)),
-                    )
-                }
-                IconButton(onClick = { onAction(RecipeDetailsAction.ToggleBookmark) }) {
-                    Icon(
-                        imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
-                        contentDescription = stringResource(
-                            if (isBookmarked) R.string.remove_from_collection_content_description
-                            else R.string.save_to_collection_content_description
-                        ),
-                        tint = if (isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (canDelete) {
-                    IconButton(
-                        onClick = { onAction(RecipeDetailsAction.DeleteClicked) },
-                        enabled = !isDeleting,
-                        modifier = Modifier.testTag("DeleteRecipeButton"),
-                    ) {
-                        if (isDeleting) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = stringResource(R.string.delete_recipe_button),
-                                tint = MaterialTheme.colorScheme.error,
-                            )
-                        }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                // Leaves room for the sticky footer so the last instruction row isn't hidden
+                // behind it.
+                .padding(bottom = FooterClearance),
+        ) {
+            RecipeHero(
+                recipe = recipe,
+                isBookmarked = isBookmarked,
+                showCookedToggle = showCookedToggle,
+                isCooked = isCooked,
+                canDelete = canDelete,
+                isDeleting = isDeleting,
+                onAction = onAction,
+            )
+
+            Column(modifier = Modifier.padding(horizontal = ScreenHorizontalPadding)) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    RecipePrivacyBadge(privacy = recipe.privacy)
+                    recipe.labels.forEach { label ->
+                        InfoChip(text = label.displayName, type = InfoChipType.LABEL)
+                    }
+                    recipe.tags.forEach { tag ->
+                        InfoChip(text = tag.displayName, type = InfoChipType.TAG)
                     }
                 }
-            }
 
-            AsyncImage(
-                model = recipeImageModel(recipe.localImagePath, recipe.imageUrl),
-                placeholder = painterResource(R.drawable.ic_img_placeholder),
-                error = painterResource(R.drawable.ic_img_error),
-                contentDescription = stringResource(R.string.recipe_image_content_description),
-                contentScale = ContentScale.Crop,
-                alignment = Alignment.Center,
-                modifier = Modifier
-                    .padding(vertical = dimensionResource(id = R.dimen.padding_small))
-                    .height(200.dp)
-                    .fillMaxWidth()
-            )
-            Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_small)))
-            RecipeTimeRow(recipe.prepTimeMinutes, recipe.cookTimeMinutes)
-            NutritionRow(recipe.caloriesPerServing, recipe.proteinGramsPerServing)
-            Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_small)))
+                Text(
+                    text = recipe.title,
+                    style = MaterialTheme.typography.displayMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
 
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_extra_small)),
-                verticalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_extra_small))
-            ) {
-                RecipePrivacyBadge(privacy = recipe.privacy)
-                recipe.labels.forEach { label ->
-                    InfoChip(text = label.displayName, type = InfoChipType.LABEL)
-                }
-                recipe.tags.forEach { tag ->
-                    InfoChip(text = tag.displayName, type = InfoChipType.TAG)
+                if (recipe.description.isNotEmpty()) {
+                    RecipeDescription(
+                        description = recipe.description,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
                 }
             }
-            Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_medium)))
-            if (!recipe.description.isEmpty()) {
-                RecipeDescription(recipe.description)
-                Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_medium)))
-            }
 
-            ServingsStepper(
+            Spacer(modifier = Modifier.height(16.dp))
+
+            RecipeStatsBar(
+                prepTimeMinutes = recipe.prepTimeMinutes,
+                cookTimeMinutes = recipe.cookTimeMinutes,
                 servings = servings.current,
-                range = servings.range,
+                servingsRange = servings.range,
                 onServingsChange = { onAction(RecipeDetailsAction.ServingsChanged(it)) },
-                isEstimated = servings.isEstimated,
+                isServingsEstimated = servings.isEstimated,
             )
-            Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.padding_medium)))
+
+            SectionHeader(
+                text = stringResource(R.string.ingredients),
+                modifier = Modifier.padding(horizontal = ScreenHorizontalPadding),
+            )
+            IngredientsList(
+                ingredients = ingredients,
+                checkedIndices = checkedIngredients,
+                onToggle = { index ->
+                    checkedIngredients = if (index in checkedIngredients) {
+                        checkedIngredients - index
+                    } else {
+                        checkedIngredients + index
+                    }
+                },
+            )
+
+            SectionHeader(
+                text = stringResource(R.string.recipe_section_instructions),
+                modifier = Modifier.padding(
+                    start = ScreenHorizontalPadding,
+                    end = ScreenHorizontalPadding,
+                    top = 16.dp,
+                ),
+            )
+            StepsList(steps = recipe.steps)
         }
 
-        TabRow(selectedTabIndex = selectedTabIndex) {
-            tabTitles.forEachIndexed { index, title ->
-                Tab(
-                    selected = selectedTabIndex == index,
-                    onClick = { selectedTabIndex = index },
-                    text = { Text(text = title) }
+        RecipeDetailsFooter(
+            onAddToMealPlanClick = { onAction(RecipeDetailsAction.AddToMealPlanClicked) },
+            onAddToGroceryListClick = { onAction(RecipeDetailsAction.AddToGroceryListClicked) },
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
+
+        if (canEdit) {
+            FloatingActionButton(
+                onClick = { onAction(RecipeDetailsAction.EditClicked) },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = FooterClearance + 16.dp),
+            ) {
+                Icon(
+                    painter = painterResource(ChefAIIcons.SquarePen),
+                    contentDescription = stringResource(R.string.edit_button),
                 )
             }
         }
-
-        // Plain content, not its own scrollable — it's part of the single scroll on the outer
-        // Column above so the whole screen (header + tab content) scrolls as one, rather than the
-        // tab section being squeezed into whatever space is left and scrolling independently.
-        when (selectedTabIndex) {
-            0 -> IngredientsList(ingredients = ingredients)
-            1 -> StepsList(steps = recipe.steps)
-        }
     }
+}
 
-    if (canEdit) {
-        FloatingActionButton(
-            onClick = { onAction(RecipeDetailsAction.EditClicked) },
+/** Space reserved at the bottom of the scrolling content for the sticky footer. */
+private val FooterClearance = 84.dp
+private val ScreenHorizontalPadding = 16.dp
+
+/**
+ * The full-bleed 4:3 hero (05): grayscale photo, back and save icon buttons overlaid at the top
+ * corners. The cooked toggle and delete — situational, and not drawn in the design — join the
+ * overlay's trailing group rather than crowding a header row the design doesn't have.
+ */
+@Composable
+private fun RecipeHero(
+    recipe: Recipe,
+    isBookmarked: Boolean,
+    showCookedToggle: Boolean,
+    isCooked: Boolean,
+    canDelete: Boolean,
+    isDeleting: Boolean,
+    onAction: (RecipeDetailsAction) -> Unit,
+) {
+    val grayscale = remember { ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }) }
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        AsyncImage(
+            model = recipeImageModel(recipe.localImagePath, recipe.imageUrl),
+            placeholder = painterResource(R.drawable.ic_img_placeholder),
+            error = painterResource(R.drawable.ic_img_error),
+            contentDescription = stringResource(R.string.recipe_image_content_description),
+            contentScale = ContentScale.Crop,
+            colorFilter = grayscale,
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp),
+                .fillMaxWidth()
+                .aspectRatio(4f / 3f)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        )
+
+        HeroOverlayIconButton(
+            icon = ChefAIIcons.ArrowLeft,
+            contentDescription = stringResource(R.string.header_navigate_back),
+            onClick = { onAction(RecipeDetailsAction.NavigateBack) },
+            modifier = Modifier.align(Alignment.TopStart).padding(16.dp),
+        )
+
+        Row(
+            modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(
-                Icons.Default.Edit,
-                contentDescription = stringResource(R.string.edit_button),
+            if (showCookedToggle) {
+                CookedToggleButton(
+                    isCooked = isCooked,
+                    onToggle = { onAction(RecipeDetailsAction.ToggleCooked) },
+                )
+            }
+            if (canDelete) {
+                HeroOverlayIconButton(
+                    icon = ChefAIIcons.Trash,
+                    contentDescription = stringResource(R.string.delete_recipe_button),
+                    onClick = { onAction(RecipeDetailsAction.DeleteClicked) },
+                    enabled = !isDeleting,
+                    loading = isDeleting,
+                    testTag = "DeleteRecipeButton",
+                )
+            }
+            HeroOverlayIconButton(
+                icon = if (isBookmarked) ChefAIIcons.BookmarkFilled else ChefAIIcons.Bookmark,
+                contentDescription = stringResource(
+                    if (isBookmarked) R.string.remove_from_collection_content_description
+                    else R.string.save_to_collection_content_description
+                ),
+                onClick = { onAction(RecipeDetailsAction.ToggleBookmark) },
+                tint = if (isBookmarked) MaterialTheme.chefColors.accentText else MaterialTheme.colorScheme.onBackground,
             )
         }
     }
-    } // Box
+}
+
+/**
+ * A 40dp ground-filled square button floated over a photo — the back arrow and the bookmark on
+ * the hero. Filled rather than transparent so it reads against grayscale imagery of any tone; a
+ * bare icon with no backing shape would wash out over a light photo.
+ */
+@Composable
+private fun HeroOverlayIconButton(
+    icon: Int,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    loading: Boolean = false,
+    tint: Color = MaterialTheme.colorScheme.onBackground,
+    testTag: String? = null,
+) {
+    Box(
+        modifier = modifier
+            .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
+            .alpha(if (enabled) 1f else 0.45f)
+            .size(HeroOverlayButtonSize)
+            .background(MaterialTheme.colorScheme.background)
+            .flatClickable(onClick = onClick, enabled = enabled && !loading, role = Role.Button)
+            .border(
+                width = MaterialTheme.chefColors.sectionRuleWidth,
+                color = MaterialTheme.colorScheme.outline,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (loading) {
+            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+        } else {
+            Icon(
+                painter = painterResource(icon),
+                contentDescription = contentDescription,
+                tint = tint,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+private val HeroOverlayButtonSize = 40.dp
+
+@Composable
+private fun SectionHeader(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onBackground,
+        modifier = modifier.padding(vertical = 8.dp),
+    )
+}
+
+/**
+ * The sticky footer (05): a full-width primary "Add to Meal Plan" plus a secondary icon-only
+ * button for the grocery list — neither flow is wired up yet (no meal-plan picker, no per-recipe
+ * grocery list exists), so both are visual only. See the GitHub issue filed alongside this
+ * screen's redesign.
+ */
+@Composable
+private fun RecipeDetailsFooter(
+    onAddToMealPlanClick: () -> Unit,
+    onAddToGroceryListClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background),
+    ) {
+        SectionRule()
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            FlatBlockButton(
+                text = stringResource(R.string.recipe_add_to_meal_plan),
+                onClick = onAddToMealPlanClick,
+                modifier = Modifier.weight(1f),
+            )
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .flatClickable(onClick = onAddToGroceryListClick, role = Role.Button)
+                    .border(
+                        width = MaterialTheme.chefColors.sectionRuleWidth,
+                        color = MaterialTheme.colorScheme.outline,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(ChefAIIcons.ShoppingCart),
+                    contentDescription = stringResource(
+                        R.string.recipe_add_to_grocery_list_content_description,
+                    ),
+                    tint = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+    }
 }
 
 private const val DESCRIPTION_COLLAPSED_MAX_LINES = 4
 
 @Composable
-private fun RecipeDescription(description: String) {
+private fun RecipeDescription(description: String, modifier: Modifier = Modifier) {
     var isExpanded by rememberSaveable(description) { mutableStateOf(false) }
     var isOverflowing by remember(description) { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = modifier.fillMaxWidth()) {
         Text(
             text = description,
             style = MaterialTheme.typography.bodyLarge,
@@ -382,11 +547,11 @@ private fun RecipeDescription(description: String) {
         if (isOverflowing || isExpanded) {
             Text(
                 text = stringResource(if (isExpanded) R.string.view_less else R.string.view_more),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Medium,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.chefColors.accentText,
+                fontWeight = FontWeight.ExtraBold,
                 modifier = Modifier
-                    .padding(top = dimensionResource(id = R.dimen.padding_extra_small))
+                    .padding(top = 4.dp)
                     .clickable { isExpanded = !isExpanded },
             )
         }
@@ -401,50 +566,67 @@ data class IngredientRowUi(
     val isApproximate: Boolean = false,
 )
 
+/**
+ * The checklist (05): checkbox, name, quantity, 1dp row dividers — tappable to check off while
+ * cooking. [checkedIndices] and [onToggle] are index-based; see the local-only state comment where
+ * this is called from [RecipeDetailsContent].
+ */
 @Composable
-fun IngredientsList(ingredients: List<IngredientRowUi>) {
+fun IngredientsList(
+    ingredients: List<IngredientRowUi>,
+    checkedIndices: Set<Int> = emptySet(),
+    onToggle: (Int) -> Unit = {},
+) {
     if (ingredients.isEmpty()) {
         Text(
             text = stringResource(R.string.no_ingredients_listed),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_medium)),
+            modifier = Modifier.padding(horizontal = ScreenHorizontalPadding, vertical = 8.dp),
         )
         return
     }
-    Column(modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_medium))) {
-        ingredients.forEach { ingredient ->
-            Row {
-                Text(
-                    text = ingredient.name,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(vertical = dimensionResource(id = R.dimen.padding_small)),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                // "≈" marks a weight arrived at through a typical density rather than measured.
-                // A screen reader gets the word rather than the glyph, which it would skip.
-                val spokenAmount = if (ingredient.isApproximate) {
-                    stringResource(R.string.ingredient_amount_approximate, ingredient.amountLabel)
+    RuledGroup(items = ingredients.withIndex().toList(), key = { it.index }) { (index, ingredient) ->
+        val checked = index in checkedIndices
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .flatToggleable(checked = checked, onCheckedChange = { onToggle(index) })
+                .padding(horizontal = ScreenHorizontalPadding, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            FlatCheckbox(checked = checked, onCheckedChange = null)
+            Text(
+                text = ingredient.name,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (checked) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
                 } else {
-                    null
-                }
-                Text(
-                    text = if (ingredient.isApproximate) "≈ ${ingredient.amountLabel}" else ingredient.amountLabel,
-                    modifier = Modifier
-                        .padding(vertical = dimensionResource(id = R.dimen.padding_small))
-                        .then(
-                            if (spokenAmount != null) {
-                                Modifier.semantics { contentDescription = spokenAmount }
-                            } else {
-                                Modifier
-                            }
-                        ),
-                    textAlign = TextAlign.End,
-                    style = MaterialTheme.typography.bodyLarge
-                )
+                    MaterialTheme.colorScheme.onBackground
+                },
+                modifier = Modifier.weight(1f),
+            )
+            // "≈" marks a weight arrived at through a typical density rather than measured. A
+            // screen reader gets the word rather than the glyph, which it would skip.
+            val spokenAmount = if (ingredient.isApproximate) {
+                stringResource(R.string.ingredient_amount_approximate, ingredient.amountLabel)
+            } else {
+                null
             }
-            HorizontalDivider()
+            Text(
+                text = if (ingredient.isApproximate) "≈ ${ingredient.amountLabel}" else ingredient.amountLabel,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.End,
+                modifier = Modifier.then(
+                    if (spokenAmount != null) {
+                        Modifier.semantics { contentDescription = spokenAmount }
+                    } else {
+                        Modifier
+                    },
+                ),
+            )
         }
     }
 }
@@ -456,7 +638,7 @@ fun StepsList(steps: List<RecipeStep>) {
             text = stringResource(R.string.no_steps_listed),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_medium)),
+            modifier = Modifier.padding(horizontal = ScreenHorizontalPadding, vertical = 8.dp),
         )
         return
     }
@@ -467,27 +649,29 @@ fun StepsList(steps: List<RecipeStep>) {
     val requestNotificationPermission = rememberNotificationPermissionRequester()
     val context = LocalContext.current
     val timerReplacedMessage = stringResource(R.string.step_timer_replaced_message)
-    Column(modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_medium))) {
-        steps.sortedBy { it.orderIndex }.forEach { step ->
-            val stepLabel = stringResource(R.string.step_timer_label_format, step.orderIndex + 1)
-            StepListItem(
-                step = step,
-                onStartTimer = { totalSeconds ->
-                    requestNotificationPermission()
-                    val replaced = timerViewModel?.start(
-                        stepLabel = stepLabel,
-                        totalSeconds = totalSeconds,
-                    )
-                    if (replaced != null) {
-                        val message = timerReplacedMessage.format(replaced.stepLabel)
-                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                    }
-                },
-            )
-            HorizontalDivider()
-        }
+
+    val orderedSteps = steps.sortedBy { it.orderIndex }
+    RuledGroup(items = orderedSteps, key = { it.uuid }) { step ->
+        val stepLabel = stringResource(R.string.step_timer_label_format, step.orderIndex + 1)
+        StepListItem(
+            step = step,
+            onStartTimer = { totalSeconds ->
+                requestNotificationPermission()
+                val replaced = timerViewModel?.start(
+                    stepLabel = stepLabel,
+                    totalSeconds = totalSeconds,
+                )
+                if (replaced != null) {
+                    val message = timerReplacedMessage.format(replaced.stepLabel)
+                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                }
+            },
+        )
     }
 }
+
+/** 26dp accent-filled square number badge, per the handoff's numbered-instruction spec. */
+private val StepBadgeSize = 26.dp
 
 @Composable
 private fun StepListItem(step: RecipeStep, onStartTimer: (Long) -> Unit) {
@@ -495,33 +679,63 @@ private fun StepListItem(step: RecipeStep, onStartTimer: (Long) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = dimensionResource(id = R.dimen.padding_medium)),
-        verticalAlignment = Alignment.Top
+            .padding(horizontal = ScreenHorizontalPadding, vertical = 14.dp),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(
-            text = "${step.orderIndex + 1}.",
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(end = dimensionResource(id = R.dimen.padding_small))
-        )
+        Box(
+            modifier = Modifier
+                .size(StepBadgeSize)
+                .background(MaterialTheme.colorScheme.primary),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = (step.orderIndex + 1).toString(),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onPrimary,
+            )
+        }
         Text(
             text = step.instruction,
             style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.weight(1f),
         )
         if (durationSeconds != null) {
-            IconButton(onClick = { onStartTimer(durationSeconds) }) {
-                Icon(
-                    imageVector = Icons.Default.Timer,
-                    contentDescription = stringResource(R.string.start_step_timer_content_description),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
+            HeroOverlayIconButtonPlain(
+                icon = ChefAIIcons.Timer,
+                contentDescription = stringResource(R.string.start_step_timer_content_description),
+                onClick = { onStartTimer(durationSeconds) },
+            )
         }
     }
 }
 
+/** A borderless icon button matching this row's tap target, without [HeroOverlayIconButton]'s
+ * ground-fill-and-border chrome (there is no photo behind it here to contrast against). */
+@Composable
+private fun HeroOverlayIconButtonPlain(
+    icon: Int,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .flatClickable(onClick = onClick, role = Role.Button),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painter = painterResource(icon),
+            contentDescription = contentDescription,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp),
+        )
+    }
+}
+
 @Preview(showBackground = true)
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun RecipeDetailsFullScreenPreview() {
     ChefAITheme {
@@ -530,6 +744,7 @@ fun RecipeDetailsFullScreenPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun RecipeDetailsBookmarkedPreview() {
     ChefAITheme {
@@ -538,6 +753,11 @@ fun RecipeDetailsBookmarkedPreview() {
 }
 
 @Preview(name = "From meal plan — to cook", showBackground = true)
+@Preview(
+    name = "From meal plan — to cook, dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
 @Composable
 fun RecipeDetailsCookedToggleToCookPreview() {
     ChefAITheme {
@@ -546,6 +766,11 @@ fun RecipeDetailsCookedToggleToCookPreview() {
 }
 
 @Preview(name = "From meal plan — cooked", showBackground = true)
+@Preview(
+    name = "From meal plan — cooked, dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
 @Composable
 fun RecipeDetailsCookedToggleCookedPreview() {
     ChefAITheme {
@@ -554,6 +779,7 @@ fun RecipeDetailsCookedToggleCookedPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun RecipeDetailsDeleteConfirmationPreview() {
     ChefAITheme {
@@ -595,6 +821,7 @@ fun RecipeDetailsEstimatedServingsPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun RecipeDetailsPrivatePreview() {
     ChefAITheme {

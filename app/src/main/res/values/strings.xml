@@ -94,6 +94,11 @@
     <string name="recipe_hyperlink">See original recipe online</string>
     <string name="recipe_image_content_description">Recipe Image</string>
     <string name="recipe_not_found_error">Recipe Not Found!</string>
+    <string name="recipe_stat_prep">Prep</string>
+    <string name="recipe_stat_cook">Cook</string>
+    <string name="recipe_stat_servings">Servings</string>
+    <string name="recipe_time_minutes_format">%1$dm</string>
+    <string name="recipe_section_instructions">Instructions</string>
     <string name="recipe_timer_notification_channel_name">Recipe timers</string>
     <string name="recipe_timer_notification_title">Timer done</string>
     <string name="recipe_timer_widget_content_description">Recipe step timer</string>
@@ -107,6 +112,10 @@
     <string name="recipes_screen_title">Recipes</string>
     <string name="recipes_subtitle">Browse recipes and pick your next meal.</string>
     <string name="recipes_title">Ready to cook?</string>
+    <string name="recipe_filter_all">All</string>
+    <string name="recipe_filter_seafood">Seafood</string>
+    <string name="recipe_add_to_meal_plan">Add to Meal Plan</string>
+    <string name="recipe_add_to_grocery_list_content_description">Add to grocery list</string>
     <string name="save_button">Save</string>
     <string name="search_added_to_collection">Added to your collection</string>
     <string name="search_clear_content_description">Clear search</string>
@@ -116,6 +125,10 @@
     <string name="search_offline_results">Showing results saved on this device</string>
     <string name="search_recipe_not_yet_synced">This recipe hasn\'t synced to your device yet</string>
     <string name="search_recipe_unavailable">This recipe isn\'t available right now</string>
+    <plurals name="search_results_count">
+        <item quantity="one">%1$d result</item>
+        <item quantity="other">%1$d results</item>
+    </plurals>
 
     <!-- Search tab — browse sections -->
     <string name="search_section_by_meal">Search by Meal</string>
