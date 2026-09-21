@@ -147,6 +147,29 @@ object RecipeEditorReducer {
             )
         ).revalidate().markDirty()
 
+        // The drag handle moves one row at a time per threshold crossing — see
+        // DragReorderColumn — so a multi-row drag dispatches this repeatedly rather than needing
+        // an arbitrary from/to action. Mirrors MoveStepUp/MoveStepDown below.
+        is EditorAction.MoveIngredientUp -> {
+            val currentIndex = state.ingredients.selectedIngredients.indexOf(action.ingredient)
+            if (currentIndex > 0) {
+                val reordered = state.ingredients.selectedIngredients.toMutableList()
+                reordered.removeAt(currentIndex)
+                reordered.add(currentIndex - 1, action.ingredient)
+                state.copy(ingredients = state.ingredients.copy(selectedIngredients = reordered)).markDirty()
+            } else state
+        }
+
+        is EditorAction.MoveIngredientDown -> {
+            val currentIndex = state.ingredients.selectedIngredients.indexOf(action.ingredient)
+            if (currentIndex in 0 until state.ingredients.selectedIngredients.size - 1) {
+                val reordered = state.ingredients.selectedIngredients.toMutableList()
+                reordered.removeAt(currentIndex)
+                reordered.add(currentIndex + 1, action.ingredient)
+                state.copy(ingredients = state.ingredients.copy(selectedIngredients = reordered)).markDirty()
+            } else state
+        }
+
         // --- Steps ---
 
         is EditorAction.StepInputChanged -> state.copy(

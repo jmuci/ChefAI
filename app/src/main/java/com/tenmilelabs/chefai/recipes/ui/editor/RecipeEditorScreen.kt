@@ -4,44 +4,28 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Public
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,10 +34,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.dimensionResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -65,16 +51,32 @@ import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.Label
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
+import com.tenmilelabs.chefai.core.ui.components.flat.DragReorderColumn
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatBlockButton
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatButtonVariant
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatChip
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatField
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatTag
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatTagTone
+import com.tenmilelabs.chefai.core.ui.components.flat.RowRule
+import com.tenmilelabs.chefai.core.ui.components.flat.SectionRule
+import com.tenmilelabs.chefai.core.ui.components.flat.flatClickable
+import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
+import com.tenmilelabs.chefai.core.ui.navigation.ChefAINavigation
+import com.tenmilelabs.chefai.core.ui.navigation.ChefAITopAppBarWithTag
+import com.tenmilelabs.chefai.core.ui.theme.chefColors
 import com.tenmilelabs.chefai.core.util.LoadingContent
+import com.tenmilelabs.chefai.core.util.QuantityFormat
 import com.tenmilelabs.chefai.recipes.domain.model.EditorMode
 import com.tenmilelabs.chefai.recipes.ui.components.DeleteConfirmationDialog
-import com.tenmilelabs.chefai.recipes.ui.editor.components.UnsavedChangesDialog
 import com.tenmilelabs.chefai.recipes.ui.editor.components.AutocompleteInput
+import com.tenmilelabs.chefai.recipes.ui.editor.components.IngredientAddForm
+import com.tenmilelabs.chefai.recipes.ui.editor.components.IngredientRow
 import com.tenmilelabs.chefai.recipes.ui.editor.components.ImageUploadContent
-import com.tenmilelabs.chefai.recipes.ui.editor.components.IngredientInput
 import com.tenmilelabs.chefai.recipes.ui.editor.components.StepCard
+import com.tenmilelabs.chefai.recipes.ui.editor.components.UnsavedChangesDialog
+import kotlin.math.abs
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecipeEditorScreen(
     onNavigateBack: () -> Unit,
@@ -84,7 +86,10 @@ fun RecipeEditorScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showUnsavedDialog by remember { mutableStateOf(false) }
 
-    // Handle one-shot effects
+    val attemptClose = {
+        if (state.isDirty) showUnsavedDialog = true else onNavigateBack()
+    }
+
     LaunchedEffect(Unit) {
         viewModel.effects.collect { effect ->
             when (effect) {
@@ -101,11 +106,7 @@ fun RecipeEditorScreen(
         }
     }
 
-    // Back navigation with dirty check
-    BackHandler(enabled = true) {
-        if (state.isDirty) showUnsavedDialog = true
-        else onNavigateBack()
-    }
+    BackHandler(enabled = true) { attemptClose() }
 
     if (showUnsavedDialog) {
         UnsavedChangesDialog(
@@ -121,14 +122,12 @@ fun RecipeEditorScreen(
         )
     }
 
-    // Image picker launcher — must be at composable scope
     val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.GetContent(),
     ) { uri: Uri? ->
         viewModel.dispatch(EditorAction.ImageSelected(uri?.toString()))
     }
 
-    // Check for save errors
     state.saveError?.let { message ->
         val snackBarText = stringResource(R.string.snackbar_save_error)
         LaunchedEffect(snackbarHostState, message, snackBarText) {
@@ -144,175 +143,199 @@ fun RecipeEditorScreen(
 
     if (state.isLoading) {
         LoadingContent()
-    } else {
-        Column(modifier = Modifier.testTag("RecipeEditorScreen")) {
-            EditorActionBar(
-                mode = state.mode,
-                onSave = {
-                    focusManager.clearFocus()
-                    viewModel.dispatch(EditorAction.Save)
-                },
-                saveEnabled = state.isFormValid && !state.isSaving,
-                isSaving = state.isSaving,
-                onDelete = if (state.mode is EditorMode.Edit) {
-                    { viewModel.dispatch(EditorAction.Delete) }
-                } else {
-                    null
-                },
-                isDeleting = state.isDeleting,
+        return
+    }
+
+    Column(
+        modifier = Modifier
+            .testTag("RecipeEditorScreen")
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+    ) {
+        ChefAITopAppBarWithTag(
+            title = if (state.mode is EditorMode.Edit) {
+                stringResource(R.string.edit_recipe_header)
+            } else {
+                stringResource(R.string.recipe_editor_new_title)
+            },
+            tag = stringResource(R.string.recipe_editor_draft_tag),
+            navigation = ChefAINavigation.Close(onClick = attemptClose),
+            actions = {
+                if (state.mode is EditorMode.Edit) {
+                    DeleteAction(
+                        isDeleting = state.isDeleting,
+                        enabled = !state.isSaving,
+                        onClick = { viewModel.dispatch(EditorAction.Delete) },
+                    )
+                }
+            },
+        )
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
+            ImageUploadSection(
+                recipeState = state.recipeFields,
+                onImageUrlChange = { viewModel.dispatch(EditorAction.ImageUrlChanged(it)) },
+                onSelectImage = { imagePickerLauncher.launch("image/*") },
+                onClearImage = { viewModel.dispatch(EditorAction.ClearImage) },
             )
 
-            Column(
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Spacer(modifier = Modifier.height(8.dp))
+            CoreRecipeForm(
+                recipeState = state.recipeFields,
+                onTitleChange = { viewModel.dispatch(EditorAction.TitleChanged(it)) },
+                onDescriptionChange = { viewModel.dispatch(EditorAction.DescriptionChanged(it)) },
+                onPrepTimeChange = { viewModel.dispatch(EditorAction.PrepTimeChanged(it)) },
+                onCookTimeChange = { viewModel.dispatch(EditorAction.CookTimeChanged(it)) },
+                onServingsChange = { viewModel.dispatch(EditorAction.ServingsChanged(it)) },
+                onCaloriesChange = { viewModel.dispatch(EditorAction.CaloriesChanged(it)) },
+                onProteinChange = { viewModel.dispatch(EditorAction.ProteinChanged(it)) },
+                onExternalUrlChange = { viewModel.dispatch(EditorAction.ExternalUrlChanged(it)) },
+            )
 
-                CoreRecipeForm(
-                    recipeState = state.recipeFields,
-                    onTitleChange = { viewModel.dispatch(EditorAction.TitleChanged(it)) },
-                    onDescriptionChange = { viewModel.dispatch(EditorAction.DescriptionChanged(it)) },
-                    onPrepTimeChange = { viewModel.dispatch(EditorAction.PrepTimeChanged(it)) },
-                    onCookTimeChange = { viewModel.dispatch(EditorAction.CookTimeChanged(it)) },
-                    onServingsChange = { viewModel.dispatch(EditorAction.ServingsChanged(it)) },
-                    onCaloriesChange = { viewModel.dispatch(EditorAction.CaloriesChanged(it)) },
-                    onProteinChange = { viewModel.dispatch(EditorAction.ProteinChanged(it)) },
-                    onExternalUrlChange = { viewModel.dispatch(EditorAction.ExternalUrlChanged(it)) },
-                )
+            VisibilitySection(
+                privacy = state.recipeFields.privacy,
+                onPrivacyChange = { viewModel.dispatch(EditorAction.PrivacyChanged(it)) },
+            )
 
-                VisibilitySection(
-                    privacy = state.recipeFields.privacy,
-                    onPrivacyChange = { viewModel.dispatch(EditorAction.PrivacyChanged(it)) },
-                )
+            IngredientsSection(
+                ingredientsState = state.ingredients,
+                onIngredientInputChange = { viewModel.dispatch(EditorAction.IngredientInputChanged(it)) },
+                onIngredientQuantityChange = { viewModel.dispatch(EditorAction.IngredientQuantityChanged(it)) },
+                onIngredientUnitChange = { viewModel.dispatch(EditorAction.IngredientUnitChanged(it)) },
+                onIngredientSelected = { viewModel.selectIngredient(it) },
+                onRemoveIngredient = { viewModel.dispatch(EditorAction.RemoveIngredient(it)) },
+                onReorderIngredient = { from, to ->
+                    reorderRows<RecipeIngredient, EditorAction>(
+                        rows = state.ingredients.selectedIngredients,
+                        from = from,
+                        to = to,
+                        dispatchUp = { EditorAction.MoveIngredientUp(it) },
+                        dispatchDown = { EditorAction.MoveIngredientDown(it) },
+                        dispatch = viewModel::dispatch,
+                    )
+                },
+            )
 
-                ImageUploadSection(
-                    recipeState = state.recipeFields,
-                    onImageUrlChange = { viewModel.dispatch(EditorAction.ImageUrlChanged(it)) },
-                    onSelectImage = { imagePickerLauncher.launch("image/*") },
-                    onClearImage = { viewModel.dispatch(EditorAction.ClearImage) },
-                )
+            StepsSection(
+                stepsState = state.steps,
+                onStepInputChange = { viewModel.dispatch(EditorAction.StepInputChanged(it)) },
+                onAddStep = { viewModel.dispatch(EditorAction.AddStep) },
+                onRemoveStep = { viewModel.dispatch(EditorAction.RemoveStep(it)) },
+                onReorderStep = { from, to ->
+                    reorderRows<RecipeStep, EditorAction>(
+                        rows = state.steps.steps,
+                        from = from,
+                        to = to,
+                        dispatchUp = { EditorAction.MoveStepUp(it) },
+                        dispatchDown = { EditorAction.MoveStepDown(it) },
+                        dispatch = viewModel::dispatch,
+                    )
+                },
+            )
 
-                IngredientsForm(
-                    ingredientsState = state.ingredients,
-                    onIngredientInputChange = { viewModel.dispatch(EditorAction.IngredientInputChanged(it)) },
-                    onIngredientQuantityChange = { viewModel.dispatch(EditorAction.IngredientQuantityChanged(it)) },
-                    onIngredientUnitChange = { viewModel.dispatch(EditorAction.IngredientUnitChanged(it)) },
-                    onIngredientSelected = { viewModel.selectIngredient(it) },
-                    onRemoveIngredient = { viewModel.dispatch(EditorAction.RemoveIngredient(it)) },
-                )
+            TagsSection(
+                tags = state.tags,
+                onTagInputChange = { viewModel.dispatch(EditorAction.TagInputChanged(it)) },
+                onAddTag = { viewModel.addTagByName(it) },
+                onRemoveTag = { viewModel.dispatch(EditorAction.RemoveTag(it)) },
+            )
 
-                StepsForm(
-                    stepsState = state.steps,
-                    onStepInputChange = { viewModel.dispatch(EditorAction.StepInputChanged(it)) },
-                    onAddStep = { viewModel.dispatch(EditorAction.AddStep) },
-                    onRemoveStep = { viewModel.dispatch(EditorAction.RemoveStep(it)) },
-                    onMoveStepUp = { viewModel.dispatch(EditorAction.MoveStepUp(it)) },
-                    onMoveStepDown = { viewModel.dispatch(EditorAction.MoveStepDown(it)) },
-                )
+            LabelsSection(
+                labels = state.labels,
+                onLabelInputChange = { viewModel.dispatch(EditorAction.LabelInputChanged(it)) },
+                onAddLabel = { viewModel.addLabelByName(it) },
+                onRemoveLabel = { viewModel.dispatch(EditorAction.RemoveLabel(it)) },
+            )
 
-                TagsForm(
-                    tags = state.tags,
-                    onTagInputChange = { viewModel.dispatch(EditorAction.TagInputChanged(it)) },
-                    onAddTag = { viewModel.addTagByName(it) },
-                    onRemoveTag = { viewModel.dispatch(EditorAction.RemoveTag(it)) },
-                )
+            Spacer(Modifier.height(8.dp))
+        }
 
-                LabelsForm(
-                    labels = state.labels,
-                    onLabelInputChange = { viewModel.dispatch(EditorAction.LabelInputChanged(it)) },
-                    onAddLabel = { viewModel.addLabelByName(it) },
-                    onRemoveLabel = { viewModel.dispatch(EditorAction.RemoveLabel(it)) },
-                )
+        SaveFooter(
+            enabled = state.isFormValid && !state.isSaving,
+            isSaving = state.isSaving,
+            onSave = {
+                focusManager.clearFocus()
+                viewModel.dispatch(EditorAction.Save)
+            },
+        )
+    }
+}
 
-                Spacer(modifier = Modifier.height(16.dp))
-            }
+/**
+ * Turns one drag gesture's (from, to) into the right number of dispatched single-step moves — see
+ * [DragReorderColumn] for why the reducer only needs to know how to move a row by one, not to an
+ * arbitrary index.
+ */
+private fun <T, A> reorderRows(
+    rows: List<T>,
+    from: Int,
+    to: Int,
+    dispatchUp: (T) -> A,
+    dispatchDown: (T) -> A,
+    dispatch: (A) -> Unit,
+) {
+    val row = rows.getOrNull(from) ?: return
+    val step = if (to > from) dispatchDown else dispatchUp
+    repeat(abs(to - from)) { dispatch(step(row)) }
+}
+
+@Composable
+private fun DeleteAction(
+    isDeleting: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(44.dp)
+            .flatClickable(onClick = onClick, enabled = enabled && !isDeleting, role = Role.Button),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (isDeleting) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+        } else {
+            Icon(
+                painter = painterResource(ChefAIIcons.Trash),
+                contentDescription = stringResource(R.string.delete_recipe_button),
+                tint = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.size(20.dp),
+            )
         }
     }
 }
 
 @Composable
-private fun EditorActionBar(
-    mode: EditorMode,
-    onSave: () -> Unit,
-    saveEnabled: Boolean,
-    isSaving: Boolean,
-    onDelete: (() -> Unit)?,
-    isDeleting: Boolean,
-    modifier: Modifier = Modifier,
+private fun SectionLabel(text: String) {
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.chefColors.accentText,
+        modifier = Modifier.padding(horizontal = 16.dp),
+    )
+}
+
+@Composable
+private fun ImageUploadSection(
+    recipeState: RecipeFields,
+    onImageUrlChange: (String) -> Unit,
+    onSelectImage: () -> Unit,
+    onClearImage: () -> Unit,
 ) {
-    Row(
-        modifier = modifier
-            .height(dimensionResource(R.dimen.row_height_medium))
-            .padding(horizontal = dimensionResource(R.dimen.padding_small))
-            .fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = stringResource(
-                if (mode is EditorMode.Edit) R.string.edit_recipe_header
-                else R.string.create_recipe_header
-            ),
-            style = MaterialTheme.typography.bodyMedium,
-        )
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (onDelete != null) {
-                TextButton(
-                    onClick = onDelete,
-                    enabled = !isDeleting && !isSaving,
-                ) {
-                    if (isDeleting) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                        )
-                    } else {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = stringResource(R.string.delete_recipe_button),
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                }
-            }
-
-            Button(
-                onClick = onSave,
-                enabled = saveEnabled,
-                modifier = Modifier.padding(end = 8.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                } else {
-                    Icon(
-                        Icons.Default.Check,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        stringResource(R.string.save_button),
-                        style = MaterialTheme.typography.labelLarge,
-                    )
-                }
-            }
-        }
-    }
+    ImageUploadContent(
+        localImagePath = recipeState.localImagePath,
+        imageUrl = recipeState.imageUrl,
+        onImageUrlChange = onImageUrlChange,
+        onSelectImage = onSelectImage,
+        onClearImage = onClearImage,
+    )
 }
 
 @Composable
@@ -327,154 +350,118 @@ private fun CoreRecipeForm(
     onProteinChange: (String) -> Unit,
     onExternalUrlChange: (String) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        SectionHeader(title = stringResource(R.string.section_basic_information))
-
-        OutlinedTextField(
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        FlatField(
             value = recipeState.title,
             onValueChange = onTitleChange,
-            label = { Text(stringResource(R.string.label_recipe_title)) },
-            placeholder = { Text(stringResource(R.string.placeholder_recipe_title)) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
+            label = stringResource(R.string.label_recipe_title),
+            placeholder = stringResource(R.string.placeholder_recipe_title),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
         )
-
-        OutlinedTextField(
+        FlatField(
             value = recipeState.description,
             onValueChange = onDescriptionChange,
-            label = { Text(stringResource(R.string.label_description)) },
-            placeholder = { Text(stringResource(R.string.placeholder_description)) },
-            modifier = Modifier.fillMaxWidth(),
+            label = stringResource(R.string.label_description),
+            placeholder = stringResource(R.string.placeholder_description),
             minLines = 3,
-            maxLines = 5,
         )
-
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            OutlinedTextField(
+            FlatField(
                 value = recipeState.prepTimeMinutes,
                 onValueChange = onPrepTimeChange,
-                label = { Text(stringResource(R.string.label_prep_time)) },
-                placeholder = { Text(stringResource(R.string.placeholder_minutes)) },
+                label = stringResource(R.string.label_prep_time),
+                placeholder = stringResource(R.string.placeholder_minutes),
                 modifier = Modifier.weight(1f),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Number,
-                    imeAction = ImeAction.Next,
-                ),
-                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
             )
-
-            OutlinedTextField(
+            FlatField(
                 value = recipeState.cookTimeMinutes,
                 onValueChange = onCookTimeChange,
-                label = { Text(stringResource(R.string.label_cook_time)) },
-                placeholder = { Text(stringResource(R.string.placeholder_minutes)) },
+                label = stringResource(R.string.label_cook_time),
+                placeholder = stringResource(R.string.placeholder_minutes),
                 modifier = Modifier.weight(1f),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Number,
-                    imeAction = ImeAction.Next,
-                ),
-                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
             )
-
-            OutlinedTextField(
+            FlatField(
                 value = recipeState.servings,
                 onValueChange = onServingsChange,
-                label = { Text(stringResource(R.string.label_servings)) },
-                placeholder = { Text(stringResource(R.string.placeholder_servings)) },
+                label = stringResource(R.string.label_servings),
+                placeholder = stringResource(R.string.placeholder_servings),
                 modifier = Modifier.weight(1f),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Number,
-                    imeAction = ImeAction.Next,
-                ),
-                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
             )
         }
 
         // Optional and per-serving — as published by the source or entered by hand, never computed
-        // from ingredients. Blank is a valid, common state, unlike prep/cook time and servings above.
+        // from ingredients. Not part of the handoff's screen 19; kept and restyled rather than
+        // dropped, since nothing asked for these fields to go away.
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            OutlinedTextField(
+            FlatField(
                 value = recipeState.caloriesPerServing,
                 onValueChange = onCaloriesChange,
-                label = { Text(stringResource(R.string.label_calories)) },
-                placeholder = { Text(stringResource(R.string.placeholder_calories)) },
+                label = stringResource(R.string.label_calories),
+                placeholder = stringResource(R.string.placeholder_calories),
                 modifier = Modifier.weight(1f),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Number,
-                    imeAction = ImeAction.Next,
-                ),
-                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
             )
-
-            OutlinedTextField(
+            FlatField(
                 value = recipeState.proteinGramsPerServing,
                 onValueChange = onProteinChange,
-                label = { Text(stringResource(R.string.label_protein)) },
-                placeholder = { Text(stringResource(R.string.placeholder_protein)) },
+                label = stringResource(R.string.label_protein),
+                placeholder = stringResource(R.string.placeholder_protein),
                 modifier = Modifier.weight(1f),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Number,
-                    imeAction = ImeAction.Next,
-                ),
-                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
             )
         }
 
-        OutlinedTextField(
+        FlatField(
             value = recipeState.externalUrl,
             onValueChange = onExternalUrlChange,
-            label = { Text(stringResource(R.string.label_external_url)) },
-            placeholder = { Text(stringResource(R.string.placeholder_external_url)) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
+            label = stringResource(R.string.label_external_url),
+            placeholder = stringResource(R.string.placeholder_external_url),
+            leadingIcon = ChefAIIcons.Link,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
         )
     }
 }
 
-/** Left-to-right order is deliberate: Private first, so the more restrictive option reads as the
- *  default rather than an afterthought — [RecipeFields.privacy] defaults to PRIVATE for the same
- *  reason. [RecipePrivacy.entries] declares PUBLIC first, so this iterates an explicit local order
- *  rather than the enum's declaration order. */
+/** Left-to-right order is deliberate: Private first — see [RecipeFields.privacy]'s default. */
 private val PRIVACY_OPTIONS = listOf(RecipePrivacy.PRIVATE, RecipePrivacy.PUBLIC)
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun VisibilitySection(
     privacy: RecipePrivacy,
     onPrivacyChange: (RecipePrivacy) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionHeader(title = stringResource(R.string.section_visibility))
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            PRIVACY_OPTIONS.forEachIndexed { index, option ->
-                SegmentedButton(
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.section_visibility).uppercase(),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.chefColors.accentText,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PRIVACY_OPTIONS.forEach { option ->
+                FlatChip(
+                    label = stringResource(
+                        if (option == RecipePrivacy.PRIVATE) R.string.privacy_private else R.string.privacy_public
+                    ),
                     selected = privacy == option,
                     onClick = { onPrivacyChange(option) },
-                    shape = SegmentedButtonDefaults.itemShape(index, PRIVACY_OPTIONS.size),
-                    icon = {
-                        Icon(
-                            imageVector = if (option == RecipePrivacy.PRIVATE) Icons.Default.Lock else Icons.Default.Public,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    },
+                    singleSelect = true,
                     modifier = Modifier.testTag("PrivacyOption_${option.name}"),
-                ) {
-                    Text(
-                        stringResource(
-                            if (option == RecipePrivacy.PRIVATE) R.string.privacy_private
-                            else R.string.privacy_public
-                        )
-                    )
-                }
+                )
             }
         }
         Text(
@@ -489,256 +476,300 @@ private fun VisibilitySection(
 }
 
 @Composable
-private fun ImageUploadSection(
-    recipeState: RecipeFields,
-    onImageUrlChange: (String) -> Unit,
-    onSelectImage: () -> Unit,
-    onClearImage: () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        SectionHeader(title = stringResource(R.string.section_recipe_photo))
-        ImageUploadContent(
-            localImagePath = recipeState.localImagePath,
-            imageUrl = recipeState.imageUrl,
-            onImageUrlChange = onImageUrlChange,
-            onSelectImage = onSelectImage,
-            onClearImage = onClearImage,
-        )
-    }
-}
-
-@Composable
-private fun IngredientsForm(
+private fun IngredientsSection(
     ingredientsState: IngredientsFields,
     onIngredientInputChange: (String) -> Unit,
     onIngredientQuantityChange: (String) -> Unit,
     onIngredientUnitChange: (String) -> Unit,
     onIngredientSelected: (String) -> Unit,
     onRemoveIngredient: (RecipeIngredient) -> Unit,
+    onReorderIngredient: (from: Int, to: Int) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        SectionHeader(title = stringResource(R.string.section_ingredients))
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = stringResource(R.string.section_ingredients).uppercase(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.chefColors.accentText,
+            )
+            Text(
+                text = pluralIngredientCount(ingredientsState.selectedIngredients.size),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
-        IngredientInput(
-            ingredientInput = ingredientsState.input,
-            onIngredientInputChange = onIngredientInputChange,
-            ingredientQuantity = ingredientsState.quantity,
-            onIngredientQuantityChange = onIngredientQuantityChange,
-            ingredientUnit = ingredientsState.unit,
-            onIngredientUnitChange = onIngredientUnitChange,
-            suggestions = ingredientsState.suggestions,
-            onSuggestionClick = onIngredientSelected,
-            onAddIngredient = {
-                if (ingredientsState.input.isNotBlank()) {
-                    onIngredientSelected(ingredientsState.input)
+        if (ingredientsState.selectedIngredients.isNotEmpty()) {
+            SectionRule()
+            DragReorderColumn(
+                items = ingredientsState.selectedIngredients,
+                itemKey = { it.ingredientId },
+                onMove = onReorderIngredient,
+            ) { ingredient, index, dragHandle ->
+                Column {
+                    if (index > 0) RowRule()
+                    IngredientRow(
+                        quantityText = QuantityFormat.decimal(ingredient.quantity),
+                        unit = ingredient.unit,
+                        name = ingredient.ingredientDisplayName,
+                        dragHandle = dragHandle,
+                        onDelete = { onRemoveIngredient(ingredient) },
+                    )
                 }
-            },
-        )
+            }
+            SectionRule()
+        }
 
-        IngredientChips(
-            ingredients = ingredientsState.selectedIngredients,
-            onRemove = onRemoveIngredient,
-        )
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            IngredientAddForm(
+                ingredientInput = ingredientsState.input,
+                onIngredientInputChange = onIngredientInputChange,
+                ingredientQuantity = ingredientsState.quantity,
+                onIngredientQuantityChange = onIngredientQuantityChange,
+                ingredientUnit = ingredientsState.unit,
+                onIngredientUnitChange = onIngredientUnitChange,
+                suggestions = ingredientsState.suggestions,
+                onSuggestionClick = onIngredientSelected,
+                onAddIngredient = {
+                    if (ingredientsState.input.isNotBlank()) onIngredientSelected(ingredientsState.input)
+                },
+            )
+            FlatBlockButton(
+                text = stringResource(R.string.button_add_ingredient),
+                onClick = {
+                    if (ingredientsState.input.isNotBlank()) onIngredientSelected(ingredientsState.input)
+                },
+                variant = FlatButtonVariant.Secondary,
+                enabled = ingredientsState.input.isNotBlank() && ingredientsState.quantity.isNotBlank(),
+                leadingIcon = ChefAIIcons.Plus,
+            )
+        }
     }
 }
 
 @Composable
-private fun StepsForm(
+private fun pluralIngredientCount(count: Int): String {
+    val context = LocalContext.current
+    return context.resources.getQuantityString(R.plurals.ingredient_count, count, count)
+}
+
+@Composable
+private fun StepsSection(
     stepsState: StepsFields,
     onStepInputChange: (String) -> Unit,
     onAddStep: () -> Unit,
     onRemoveStep: (RecipeStep) -> Unit,
-    onMoveStepUp: (RecipeStep) -> Unit,
-    onMoveStepDown: (RecipeStep) -> Unit,
+    onReorderStep: (from: Int, to: Int) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        SectionHeader(title = stringResource(R.string.section_instructions))
+        SectionLabel(stringResource(R.string.section_instructions))
 
-        stepsState.steps.forEachIndexed { index, step ->
-            StepCard(
-                stepNumber = index + 1,
-                step = step,
-                onDelete = { onRemoveStep(step) },
-                onMoveUp = if (index > 0) {
-                    { onMoveStepUp(step) }
-                } else null,
-                onMoveDown = if (index < stepsState.steps.size - 1) {
-                    { onMoveStepDown(step) }
-                } else null,
-            )
-        }
-
-        OutlinedTextField(
-            value = stepsState.input,
-            onValueChange = onStepInputChange,
-            label = { Text(stringResource(R.string.label_add_step)) },
-            placeholder = { Text(stringResource(R.string.placeholder_add_step)) },
-            modifier = Modifier.fillMaxWidth(),
-            minLines = 2,
-            maxLines = 5,
-            trailingIcon = {
-                IconButton(
-                    onClick = onAddStep,
-                    enabled = stepsState.input.isNotBlank(),
-                ) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = stringResource(R.string.content_description_add_step),
+        if (stepsState.steps.isNotEmpty()) {
+            SectionRule()
+            DragReorderColumn(
+                items = stepsState.steps,
+                itemKey = { it.uuid },
+                onMove = onReorderStep,
+            ) { step, index, dragHandle ->
+                Column {
+                    if (index > 0) RowRule()
+                    StepCard(
+                        stepNumber = index + 1,
+                        step = step,
+                        dragHandle = dragHandle,
+                        onDelete = { onRemoveStep(step) },
                     )
                 }
-            },
-            keyboardActions = KeyboardActions(onDone = { onAddStep() }),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-        )
+            }
+            SectionRule()
+        }
+
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            FlatField(
+                value = stepsState.input,
+                onValueChange = onStepInputChange,
+                label = stringResource(R.string.label_add_step),
+                placeholder = stringResource(R.string.placeholder_add_step),
+                minLines = 2,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { onAddStep() }),
+            )
+            FlatBlockButton(
+                text = stringResource(R.string.label_add_step),
+                onClick = onAddStep,
+                variant = FlatButtonVariant.Secondary,
+                enabled = stepsState.input.isNotBlank(),
+                leadingIcon = ChefAIIcons.Plus,
+            )
+        }
     }
 }
 
 @Composable
-private fun TagsForm(
+private fun TagsSection(
     tags: TagsFields,
     onTagInputChange: (String) -> Unit,
     onAddTag: (String) -> Unit,
     onRemoveTag: (Tag) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        SectionHeader(title = stringResource(R.string.section_tags))
-
-        AutocompleteInput(
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        SectionLabel(stringResource(R.string.section_tags))
+        RemovableTagRow(
+            items = tags.selectedTags,
+            displayText = { it.displayName },
+            tone = FlatTagTone.Accent,
+            onRemove = onRemoveTag,
+            addLabel = stringResource(R.string.label_add_tags_chip),
+        )
+        TagAutocomplete(
             value = tags.input,
             onValueChange = onTagInputChange,
             suggestions = tags.suggestions,
             onSuggestionClick = onAddTag,
             onEnterPressed = { onAddTag(tags.input) },
             label = stringResource(R.string.label_add_tags),
+            chipLabel = stringResource(R.string.label_add_tags_chip),
             placeholder = stringResource(R.string.placeholder_add_tags),
-        )
-
-        ChipGroup(
-            items = tags.selectedTags,
-            onRemove = onRemoveTag,
-            displayText = { it.displayName },
         )
     }
 }
 
 @Composable
-private fun LabelsForm(
+private fun LabelsSection(
     labels: LabelsFields,
     onLabelInputChange: (String) -> Unit,
     onAddLabel: (String) -> Unit,
     onRemoveLabel: (Label) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        SectionHeader(title = stringResource(R.string.section_labels))
-
-        AutocompleteInput(
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        SectionLabel(stringResource(R.string.section_labels))
+        RemovableTagRow(
+            items = labels.selectedLabels,
+            displayText = { it.displayName },
+            tone = FlatTagTone.Neutral,
+            onRemove = onRemoveLabel,
+            addLabel = stringResource(R.string.label_add_labels_chip),
+        )
+        TagAutocomplete(
             value = labels.input,
             onValueChange = onLabelInputChange,
             suggestions = labels.suggestions,
             onSuggestionClick = onAddLabel,
             onEnterPressed = { onAddLabel(labels.input) },
             label = stringResource(R.string.label_add_labels),
+            chipLabel = stringResource(R.string.label_add_labels_chip),
             placeholder = stringResource(R.string.placeholder_add_labels),
         )
-
-        ChipGroup(
-            items = labels.selectedLabels,
-            onRemove = onRemoveLabel,
-            displayText = { it.displayName },
-        )
     }
 }
 
 @Composable
-private fun SectionHeader(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleLarge,
-        color = MaterialTheme.colorScheme.primary,
-    )
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun IngredientChips(
-    ingredients: List<RecipeIngredient>,
-    onRemove: (RecipeIngredient) -> Unit,
+private fun TagAutocomplete(
+    value: String,
+    onValueChange: (String) -> Unit,
+    suggestions: List<String>,
+    onSuggestionClick: (String) -> Unit,
+    onEnterPressed: () -> Unit,
+    label: String,
+    chipLabel: String,
+    placeholder: String,
 ) {
-    if (ingredients.isEmpty()) return
-
-    FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        ingredients.forEach { ingredient ->
-            FilterChip(
+    var expanded by remember { mutableStateOf(false) }
+    Column {
+        if (expanded) {
+            AutocompleteInput(
+                value = value,
+                onValueChange = onValueChange,
+                suggestions = suggestions,
+                onSuggestionClick = {
+                    onSuggestionClick(it)
+                    expanded = false
+                },
+                onEnterPressed = {
+                    onEnterPressed()
+                    expanded = false
+                },
+                label = label,
+                placeholder = placeholder,
+            )
+        } else {
+            FlatChip(
+                label = chipLabel,
                 selected = false,
-                onClick = { },
-                label = {
-                    Text(
-                        stringResource(
-                            R.string.ingredient_display_format,
-                            ingredient.quantity,
-                            ingredient.unit,
-                            ingredient.ingredientDisplayName,
-                        )
-                    )
-                },
-                trailingIcon = {
-                    IconButton(
-                        onClick = { onRemove(ingredient) },
-                        modifier = Modifier.size(18.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = stringResource(R.string.content_description_remove),
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                },
+                onClick = { expanded = true },
             )
         }
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+/**
+ * The saved-item chips: each as a non-interactive [FlatTag] — "it does not take an `onClick`, and
+ * that is the point" — paired with a small, separate trash affordance so removing one is still
+ * possible without making the tag itself a [FlatChip].
+ */
 @Composable
-private fun <T> ChipGroup(
+private fun <T> RemovableTagRow(
     items: List<T>,
-    onRemove: (T) -> Unit,
     displayText: (T) -> String,
+    tone: FlatTagTone,
+    onRemove: (T) -> Unit,
+    addLabel: String,
 ) {
-    if (items.isEmpty()) {
-        Text(
-            text = stringResource(R.string.no_items_added),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        return
-    }
-
+    if (items.isEmpty()) return
     FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         items.forEach { item ->
-            FilterChip(
-                selected = false,
-                onClick = { },
-                label = { Text(displayText(item)) },
-                trailingIcon = {
-                    IconButton(
-                        onClick = { onRemove(item) },
-                        modifier = Modifier.size(18.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = stringResource(R.string.content_description_remove),
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                },
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                FlatTag(text = displayText(item), tone = tone)
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .flatClickable(onClick = { onRemove(item) }, role = Role.Button),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter = painterResource(ChefAIIcons.X),
+                        contentDescription = stringResource(R.string.content_description_remove),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(12.dp),
+                    )
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun SaveFooter(
+    enabled: Boolean,
+    isSaving: Boolean,
+    onSave: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        SectionRule()
+        FlatBlockButton(
+            text = stringResource(R.string.button_save_recipe),
+            onClick = onSave,
+            enabled = enabled,
+            loading = isSaving,
+            modifier = Modifier.padding(16.dp),
+        )
     }
 }
