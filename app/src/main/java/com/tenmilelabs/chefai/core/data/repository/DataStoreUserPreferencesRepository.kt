@@ -1,11 +1,9 @@
 package com.tenmilelabs.chefai.core.data.repository
 
 import android.content.Context
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
+import com.tenmilelabs.chefai.core.data.local.prefs.userPreferencesDataStore
 import com.tenmilelabs.chefai.core.domain.repository.UserPreferencesRepository
 import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -16,15 +14,6 @@ import timber.log.Timber
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
-
-/**
- * A plain, unencrypted DataStore — a sibling of
- * [com.tenmilelabs.chefai.auth.data.local.SecurePreferences] rather than a change to it. That store
- * holds tokens and is Keystore-encrypted for it; nothing in here is worth a cipher.
- */
-private val Context.userPreferencesDataStore: DataStore<Preferences> by preferencesDataStore(
-    name = "chefai_user_prefs"
-)
 
 @Singleton
 class DataStoreUserPreferencesRepository @Inject constructor(

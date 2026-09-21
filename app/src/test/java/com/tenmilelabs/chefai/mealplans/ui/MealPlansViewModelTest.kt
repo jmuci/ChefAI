@@ -2,28 +2,41 @@ package com.tenmilelabs.chefai.mealplans.ui
 
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
-import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.core.data.repository.FakeUserPreferencesRepository
+import com.tenmilelabs.chefai.core.domain.model.HouseholdRole
+import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import com.tenmilelabs.chefai.household.domain.model.Household
 import com.tenmilelabs.chefai.household.domain.model.HouseholdMember
 import com.tenmilelabs.chefai.household.domain.repository.FakeHouseholdRepository
-import com.tenmilelabs.chefai.core.domain.model.HouseholdRole
+import com.tenmilelabs.chefai.mealplans.data.repository.FakeMealPlanPreferencesRepository
 import com.tenmilelabs.chefai.mealplans.data.repository.FakeMealPlanRepository
+import com.tenmilelabs.chefai.mealplans.data.repository.FakeShoppingListRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.DietaryRestriction
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
+import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
+import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanServingBasis
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
+import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.PlannedIngredient
+import com.tenmilelabs.chefai.mealplans.domain.week.weekStartFor
+import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import java.time.Clock
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.temporal.WeekFields
+import java.util.Locale
 import java.util.UUID
 
 @ExperimentalCoroutinesApi
@@ -32,165 +45,295 @@ class MealPlansViewModelTest {
     @get:Rule
     val mainCoroutineRule = MainCoroutineRule()
 
+    /** Wednesday 2026-08-12 — the date the design's own screenshot shows as current. */
+    private val today: LocalDate = LocalDate.of(2026, 8, 12)
+
+    /**
+     * Derived rather than hard-coded: the screen starts a week on the locale's first day, so a
+     * test that assumed Monday would fail on a JVM defaulting to `en-US`, where it is Sunday.
+     */
+    private val weekStart: LocalDate =
+        weekStartFor(today, WeekFields.of(Locale.getDefault()).firstDayOfWeek)
+
+    /**
+     * Pinned, so "which week do we open on" and "which row is today" are decided by the test
+     * rather than by the day it runs on.
+     */
+    private val clock: Clock = Clock.fixed(
+        today.atStartOfDay(ZoneOffset.UTC).toInstant(),
+        ZoneOffset.UTC,
+    )
+
     private lateinit var repository: FakeMealPlanRepository
+    private lateinit var recipesRepository: FakeRecipesRepository
+    private lateinit var shoppingListRepository: FakeShoppingListRepository
     private lateinit var householdRepository: FakeHouseholdRepository
+    private lateinit var mealPlanPreferences: FakeMealPlanPreferencesRepository
     private lateinit var sessionManager: SessionManager
     private lateinit var viewModel: MealPlansViewModel
 
     @Before
     fun setup() {
         repository = FakeMealPlanRepository()
+        recipesRepository = FakeRecipesRepository()
+        shoppingListRepository = FakeShoppingListRepository()
         householdRepository = FakeHouseholdRepository()
+        mealPlanPreferences = FakeMealPlanPreferencesRepository()
         sessionManager = createTestSessionManager(CoroutineScope(mainCoroutineRule.testDispatcher))
-        viewModel = MealPlansViewModel(
-            mealPlanRepository = repository,
-            householdRepository = householdRepository,
-            sessionManager = sessionManager,
-        )
+        viewModel = buildViewModel()
     }
 
-    private fun makePlan(
-        userId: UUID,
-        name: String = "Test Plan",
-        status: MealPlanStatus = MealPlanStatus.DRAFT,
-        householdId: UUID? = null,
-    ) = MealPlan(
-        uuid = UUID.randomUUID(),
-        userId = userId,
-        name = name,
-        preferences = MealPlanPreferences(
-            planLengthDays = 5,
-            mealType = MealType.DINNER,
-            dietaryRestrictions = emptySet<DietaryRestriction>(),
-            recipeSource = RecipeSource.COLLECTION_ONLY,
-            maxPrepTimeMinutes = null,
-            servingsPerMeal = 2,
-            batchCooking = false,
-            leftoverFriendly = false,
-            varietyPreference = VarietyPreference.MEDIUM,
-        ),
-        status = status,
-        createdAt = System.currentTimeMillis(),
-        updatedAt = System.currentTimeMillis(),
-        days = emptyList(),
-        householdId = householdId,
+    private fun buildViewModel() = MealPlansViewModel(
+        mealPlanRepository = repository,
+        recipesRepository = recipesRepository,
+        shoppingListRepository = shoppingListRepository,
+        householdRepository = householdRepository,
+        mealPlanPreferencesRepository = mealPlanPreferences,
+        userPreferencesRepository = FakeUserPreferencesRepository(),
+        sessionManager = sessionManager,
+        clock = clock,
     )
 
-    // --- Initial state ---
+    // --- The week ---
 
     @Test
-    fun `initial uiState is Loading or immediately Success when session is pre-loaded`() = runTest {
-        // With UnconfinedTestDispatcher + a pre-loaded session the upstream emits synchronously,
-        // so the first observable state is Success(empty) rather than Loading.
+    fun `opens on the week containing today`() = runTest {
+        repository.emitPlans()
+
         viewModel.uiState.test {
-            val first = awaitItem()
-            assertThat(first is MealPlansUiState.Loading || first is MealPlansUiState.Success).isTrue()
+            val state = awaitSuccess()
+            assertThat(state.week.weekStart).isEqualTo(weekStart)
+            assertThat(state.week.weekEnd).isEqualTo(weekStart.plusDays(6))
+            assertThat(state.today).isEqualTo(today)
             cancelAndIgnoreRemainingEvents()
         }
     }
 
-    // --- Success states ---
+    @Test
+    fun `an empty week still reaches Success rather than sticking on Loading`() = runTest {
+        repository.emitPlans()
+
+        viewModel.uiState.test {
+            val state = awaitSuccess()
+            assertThat(state.week.days).hasSize(7)
+            assertThat(state.mealCount).isEqualTo(0)
+            assertThat(state.ingredientCount).isEqualTo(0)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 
     @Test
-    fun `uiState is Success with empty list when no plans exist for user`() = runTest {
+    fun `a plan's days land on the week`() = runTest {
         val userId = sessionManager.getCurrentUserId()!!
-        repository.emitPlans() // empty
-
-        viewModel.uiState.test {
-            val state = awaitItem().let { if (it is MealPlansUiState.Loading) awaitItem() else it }
-            assertThat(state).isInstanceOf(MealPlansUiState.Success::class.java)
-            assertThat((state as MealPlansUiState.Success).mealPlans).isEmpty()
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun `uiState is Success with plans for the current user`() = runTest {
-        val userId = sessionManager.getCurrentUserId()!!
-        val plan1 = makePlan(userId, "Plan A")
-        val plan2 = makePlan(userId, "Plan B")
-        repository.emitPlans(plan1, plan2)
-
-        viewModel.uiState.test {
-            val state = awaitItem().let { if (it is MealPlansUiState.Loading) awaitItem() else it }
-            assertThat(state).isInstanceOf(MealPlansUiState.Success::class.java)
-            val plans = (state as MealPlansUiState.Success).mealPlans
-            assertThat(plans).hasSize(2)
-            assertThat(plans.map { it.name }).containsExactly("Plan A", "Plan B")
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun `uiState excludes plans belonging to a different user`() = runTest {
-        val currentUserId = sessionManager.getCurrentUserId()!!
-        val otherUserId = UUID.randomUUID()
+        val recipe = preview("Classic Spaghetti Carbonara")
+        recipesRepository.setRecipePreviewsToEmit(listOf(recipe))
         repository.emitPlans(
-            makePlan(currentUserId, "My Plan"),
-            makePlan(otherUserId, "Other Plan"),
+            makePlan(userId, createdAt = weekStart, days = listOf(day(0, dinner = recipe.uuid))),
         )
 
         viewModel.uiState.test {
-            val state = awaitItem().let { if (it is MealPlansUiState.Loading) awaitItem() else it }
-            val plans = (state as MealPlansUiState.Success).mealPlans
-            assertThat(plans).hasSize(1)
-            assertThat(plans.first().name).isEqualTo("My Plan")
+            val state = awaitSuccess { it.mealCount == 1 }
+            val meal = state.week.days.first().meals.single()
+            assertThat(meal.recipe?.title).isEqualTo("Classic Spaghetti Carbonara")
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun `uiState updates reactively when plans change`() = runTest {
-        val userId = sessionManager.getCurrentUserId()!!
-        val plan1 = makePlan(userId, "Plan A")
-        repository.emitPlans(plan1)
+    fun `next and previous week shift the window by seven days`() = runTest {
+        repository.emitPlans()
 
         viewModel.uiState.test {
-            // Consume initial emission (1 plan)
-            val first = awaitItem().let { if (it is MealPlansUiState.Loading) awaitItem() else it }
-            assertThat((first as MealPlansUiState.Success).mealPlans).hasSize(1)
+            assertThat(awaitSuccess().week.weekStart).isEqualTo(weekStart)
 
-            // Add a second plan
-            val plan2 = makePlan(userId, "Plan B")
-            repository.emitPlans(plan1, plan2)
-            val updated = awaitItem()
-            assertThat((updated as MealPlansUiState.Success).mealPlans).hasSize(2)
+            viewModel.onNextWeek()
+            assertThat(awaitSuccess().week.weekStart).isEqualTo(weekStart.plusDays(7))
 
+            viewModel.onPreviousWeek()
+            assertThat(awaitSuccess().week.weekStart).isEqualTo(weekStart)
+
+            viewModel.onPreviousWeek()
+            assertThat(awaitSuccess().week.weekStart).isEqualTo(weekStart.minusDays(7))
             cancelAndIgnoreRemainingEvents()
         }
     }
 
-    // --- Household ---
+    @Test
+    fun `plans belonging to another user are excluded`() = runTest {
+        val recipe = preview("Mine")
+        recipesRepository.setRecipePreviewsToEmit(listOf(recipe))
+        repository.emitPlans(
+            makePlan(UUID.randomUUID(), createdAt = weekStart, days = listOf(day(0, dinner = recipe.uuid))),
+        )
+
+        viewModel.uiState.test {
+            assertThat(awaitSuccess().mealCount).isEqualTo(0)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // --- The serving basis ---
 
     @Test
-    fun `uiState carries the cached household alongside the plans`() = runTest {
+    fun `just me shows personal plans and hides household ones`() = runTest {
         val userId = sessionManager.getCurrentUserId()!!
-        val household = Household(
-            uuid = UUID.randomUUID(),
-            name = "The Test Kitchen",
-            ownerId = userId,
-            members = listOf(
-                HouseholdMember(userId, "Chef Owner", "", HouseholdRole.OWNER),
+        val mine = preview("Mine")
+        val ours = preview("Ours")
+        recipesRepository.setRecipePreviewsToEmit(listOf(mine, ours))
+        repository.emitPlans(
+            makePlan(userId, createdAt = weekStart, days = listOf(day(0, dinner = mine.uuid))),
+            makePlan(
+                userId,
+                createdAt = weekStart,
+                days = listOf(day(1, dinner = ours.uuid)),
+                householdId = UUID.randomUUID(),
             ),
         )
-        householdRepository.seedHousehold(household)
-        repository.emitPlans(makePlan(userId, householdId = household.uuid))
 
         viewModel.uiState.test {
-            val state = awaitItem().let { if (it is MealPlansUiState.Loading) awaitItem() else it }
-            assertThat((state as MealPlansUiState.Success).household).isEqualTo(household)
+            val state = awaitSuccess { it.mealCount > 0 }
+            assertThat(state.servingBasis).isEqualTo(MealPlanServingBasis.JUST_ME)
+            assertThat(state.week.days.flatMap { it.meals }.map { it.recipe?.title })
+                .containsExactly("Mine")
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun `uiState household is null when nothing is cached`() = runTest {
+    fun `family shows household plans once a household is cached`() = runTest {
         val userId = sessionManager.getCurrentUserId()!!
-        repository.emitPlans(makePlan(userId))
+        val household = household(userId, size = 4)
+        householdRepository.seedHousehold(household)
+        mealPlanPreferences = FakeMealPlanPreferencesRepository(MealPlanServingBasis.FAMILY)
+        viewModel = buildViewModel()
+
+        val mine = preview("Mine")
+        val ours = preview("Ours")
+        recipesRepository.setRecipePreviewsToEmit(listOf(mine, ours))
+        repository.emitPlans(
+            makePlan(userId, createdAt = weekStart, days = listOf(day(0, dinner = mine.uuid))),
+            makePlan(
+                userId,
+                createdAt = weekStart,
+                days = listOf(day(1, dinner = ours.uuid)),
+                householdId = household.uuid,
+            ),
+        )
 
         viewModel.uiState.test {
-            val state = awaitItem().let { if (it is MealPlansUiState.Loading) awaitItem() else it }
-            assertThat((state as MealPlansUiState.Success).household).isNull()
+            val state = awaitSuccess { it.mealCount > 0 }
+            assertThat(state.week.days.flatMap { it.meals }.map { it.recipe?.title })
+                .containsExactly("Ours")
+            assertThat(state.canSelectFamily).isTrue()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `family falls back to just me when there is no household`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        mealPlanPreferences = FakeMealPlanPreferencesRepository(MealPlanServingBasis.FAMILY)
+        viewModel = buildViewModel()
+
+        val mine = preview("Mine")
+        recipesRepository.setRecipePreviewsToEmit(listOf(mine))
+        repository.emitPlans(
+            makePlan(userId, createdAt = weekStart, days = listOf(day(0, dinner = mine.uuid))),
+        )
+
+        viewModel.uiState.test {
+            val state = awaitSuccess { it.mealCount > 0 }
+            // Family with nothing to switch to would otherwise empty the screen while the toggle
+            // claimed a household existed.
+            assertThat(state.servingBasis).isEqualTo(MealPlanServingBasis.JUST_ME)
+            assertThat(state.canSelectFamily).isFalse()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onServingBasisChange persists the choice`() = runTest {
+        repository.emitPlans()
+
+        viewModel.onServingBasisChange(MealPlanServingBasis.FAMILY)
+
+        assertThat(mealPlanPreferences.current).isEqualTo(MealPlanServingBasis.FAMILY)
+    }
+
+    // --- The grocery summary ---
+
+    @Test
+    fun `the ingredient count aggregates across the whole week`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        val first = preview("First")
+        val second = preview("Second")
+        recipesRepository.setRecipePreviewsToEmit(listOf(first, second))
+        shoppingListRepository.setIngredientsForRecipe(
+            first.uuid,
+            listOf(ingredient(first.uuid, "Flour", 200.0, "g"), ingredient(first.uuid, "Salt", 1.0, "tsp")),
+        )
+        shoppingListRepository.setIngredientsForRecipe(
+            second.uuid,
+            // Flour repeats, so it aggregates onto one line rather than counting twice.
+            listOf(ingredient(second.uuid, "Flour", 100.0, "g")),
+        )
+        repository.emitPlans(
+            makePlan(
+                userId,
+                createdAt = weekStart,
+                days = listOf(day(0, dinner = first.uuid), day(1, dinner = second.uuid)),
+            ),
+        )
+
+        viewModel.uiState.test {
+            val state = awaitSuccess { it.ingredientCount > 0 }
+            assertThat(state.mealCount).isEqualTo(2)
+            assertThat(state.ingredientCount).isEqualTo(2)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `generating a grocery list needs exactly one plan`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        val recipe = preview("Only")
+        recipesRepository.setRecipePreviewsToEmit(listOf(recipe))
+        val plan = makePlan(userId, createdAt = weekStart, days = listOf(day(0, dinner = recipe.uuid)))
+        repository.emitPlans(plan)
+
+        viewModel.uiState.test {
+            val state = awaitSuccess { it.mealCount > 0 }
+            assertThat(state.canGenerateGroceryList).isTrue()
+            assertThat(state.week.singlePlanId).isEqualTo(plan.uuid)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `an empty week cannot generate a grocery list`() = runTest {
+        repository.emitPlans()
+
+        viewModel.uiState.test {
+            assertThat(awaitSuccess().canGenerateGroceryList).isFalse()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `a week spanning two plans cannot generate a grocery list`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        val a = preview("A")
+        val b = preview("B")
+        recipesRepository.setRecipePreviewsToEmit(listOf(a, b))
+        repository.emitPlans(
+            makePlan(userId, createdAt = weekStart, days = listOf(day(0, dinner = a.uuid))),
+            makePlan(userId, createdAt = weekStart.plusDays(3), days = listOf(day(0, dinner = b.uuid))),
+        )
+
+        viewModel.uiState.test {
+            val state = awaitSuccess { it.mealCount == 2 }
+            assertThat(state.week.planIds).hasSize(2)
+            assertThat(state.canGenerateGroceryList).isFalse()
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -198,68 +341,103 @@ class MealPlansViewModelTest {
     // --- Error state ---
 
     @Test
-    fun `uiState is Error when repository throws`() = runTest {
-        val errorRepository = FakeMealPlanRepository().also { it.shouldThrowOnObserve = true }
-        val errorViewModel = MealPlansViewModel(
-            mealPlanRepository = errorRepository,
-            householdRepository = householdRepository,
-            sessionManager = sessionManager,
-        )
+    fun `uiState is Error when the plan repository throws`() = runTest {
+        repository = FakeMealPlanRepository().also { it.shouldThrowOnObserve = true }
+        viewModel = buildViewModel()
 
-        errorViewModel.uiState.test {
-            val state = awaitItem().let { if (it is MealPlansUiState.Loading) awaitItem() else it }
+        viewModel.uiState.test {
+            var state = awaitItem()
+            while (state is MealPlansUiState.Loading) state = awaitItem()
             assertThat(state).isInstanceOf(MealPlansUiState.Error::class.java)
             cancelAndIgnoreRemainingEvents()
         }
     }
 
-    // --- Delete ---
+    // --- Helpers ---
 
-    @Test
-    fun `onDeleteMealPlan removes plan from repository`() = runTest {
-        val userId = sessionManager.getCurrentUserId()!!
-        val plan = makePlan(userId, "To Delete")
-        repository.emitPlans(plan)
-
-        viewModel.uiState.test {
-            awaitItem().let { if (it is MealPlansUiState.Loading) awaitItem() else it }
-
-            viewModel.onDeleteMealPlan(plan.uuid)
-
-            val updated = awaitItem()
-            assertThat((updated as MealPlansUiState.Success).mealPlans).isEmpty()
-            cancelAndIgnoreRemainingEvents()
+    /**
+     * Skips `Loading` and, optionally, the intermediate `Success` states the layered flows emit
+     * while the recipe and ingredient queries resolve.
+     */
+    private suspend fun app.cash.turbine.TurbineTestContext<MealPlansUiState>.awaitSuccess(
+        until: (MealPlansUiState.Success) -> Boolean = { true },
+    ): MealPlansUiState.Success {
+        while (true) {
+            val state = awaitItem()
+            if (state is MealPlansUiState.Success && until(state)) return state
         }
     }
 
-    @Test
-    fun `onDeleteMealPlan emits ShowSnackbar with deleted message on success`() = runTest {
-        val userId = sessionManager.getCurrentUserId()!!
-        val plan = makePlan(userId)
-        repository.emitPlans(plan)
+    private fun day(index: Int, dinner: UUID? = null, lunch: UUID? = null) = MealPlanDay(
+        uuid = UUID.randomUUID(),
+        dayIndex = index,
+        dinnerRecipeId = dinner,
+        lunchRecipeId = lunch,
+    )
 
-        viewModel.uiEvents.test {
-            viewModel.onDeleteMealPlan(plan.uuid)
-            val event = awaitItem()
-            assertThat(event).isInstanceOf(MealPlansEvent.ShowSnackbar::class.java)
-            assertThat((event as MealPlansEvent.ShowSnackbar).message)
-                .isEqualTo(R.string.meal_plan_deleted)
-        }
+    private fun makePlan(
+        userId: UUID,
+        createdAt: LocalDate,
+        days: List<MealPlanDay>,
+        householdId: UUID? = null,
+    ): MealPlan {
+        val millis = createdAt.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        return MealPlan(
+            uuid = UUID.randomUUID(),
+            userId = userId,
+            name = "Week plan",
+            preferences = MealPlanPreferences(
+                planLengthDays = days.size,
+                mealType = MealType.DINNER,
+                dietaryRestrictions = emptySet<DietaryRestriction>(),
+                recipeSource = RecipeSource.COLLECTION_ONLY,
+                maxPrepTimeMinutes = null,
+                servingsPerMeal = 2,
+                batchCooking = false,
+                leftoverFriendly = false,
+                varietyPreference = VarietyPreference.MEDIUM,
+            ),
+            status = MealPlanStatus.READY,
+            createdAt = millis,
+            updatedAt = millis,
+            days = days,
+            householdId = householdId,
+        )
     }
 
-    @Test
-    fun `onDeleteMealPlan emits ShowSnackbar with error message when repository throws`() = runTest {
-        repository.shouldThrowOnDelete = true
-        val userId = sessionManager.getCurrentUserId()!!
-        val plan = makePlan(userId)
-        repository.emitPlans(plan)
+    private fun household(userId: UUID, size: Int) = Household(
+        uuid = UUID.randomUUID(),
+        name = "The Test Kitchen",
+        ownerId = userId,
+        members = (0 until size).map { index ->
+            HouseholdMember(
+                if (index == 0) userId else UUID.randomUUID(),
+                "Member $index",
+                "",
+                HouseholdRole.OWNER,
+            )
+        },
+    )
 
-        viewModel.uiEvents.test {
-            viewModel.onDeleteMealPlan(plan.uuid)
-            val event = awaitItem()
-            assertThat(event).isInstanceOf(MealPlansEvent.ShowSnackbar::class.java)
-            assertThat((event as MealPlansEvent.ShowSnackbar).message)
-                .isEqualTo(R.string.meal_plan_error)
-        }
-    }
+    private fun preview(title: String) = RecipePreview(
+        uuid = UUID.randomUUID(),
+        title = title,
+        description = "",
+        imageUrlThumbnail = "",
+        prepTimeMinutes = 10,
+        cookTimeMinutes = 15,
+        servings = 4,
+        creatorId = UUID.randomUUID(),
+        tags = emptyList(),
+        labels = emptyList(),
+    )
+
+    private fun ingredient(recipeId: UUID, name: String, quantity: Double, unit: String) =
+        PlannedIngredient(
+            recipeId = recipeId,
+            displayName = name,
+            quantity = quantity,
+            unit = unit,
+            recipeServings = 4,
+        )
 }

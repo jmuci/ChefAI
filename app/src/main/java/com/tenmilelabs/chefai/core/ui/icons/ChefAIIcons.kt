@@ -19,6 +19,8 @@ object ChefAIIcons {
     @DrawableRes val Check: Int = R.drawable.ic_lucide_check
     @DrawableRes val ChefHat: Int = R.drawable.ic_lucide_chef_hat
     @DrawableRes val ChevronDown: Int = R.drawable.ic_lucide_chevron_down
+    @DrawableRes val ChevronLeft: Int = R.drawable.ic_lucide_chevron_left
+    @DrawableRes val ChevronRight: Int = R.drawable.ic_lucide_chevron_right
     @DrawableRes val CircleAlert: Int = R.drawable.ic_lucide_circle_alert
     @DrawableRes val CircleUserRound: Int = R.drawable.ic_lucide_circle_user_round
     @DrawableRes val Clock: Int = R.drawable.ic_lucide_clock

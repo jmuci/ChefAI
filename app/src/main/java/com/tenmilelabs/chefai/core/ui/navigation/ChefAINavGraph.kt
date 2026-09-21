@@ -56,6 +56,9 @@ import com.tenmilelabs.chefai.home.ui.homeDateSubtitle
 import com.tenmilelabs.chefai.household.ui.AcceptInviteScreen
 import com.tenmilelabs.chefai.household.ui.HouseholdScreen
 import com.tenmilelabs.chefai.mealplans.ui.MealPlansScreen
+import com.tenmilelabs.chefai.mealplans.ui.MealPlansUiState
+import com.tenmilelabs.chefai.mealplans.ui.MealPlansViewModel
+import com.tenmilelabs.chefai.mealplans.ui.components.ServingBasisToggle
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailScreen
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailUiState
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailViewModel
@@ -159,8 +162,14 @@ fun ChefAINavGraph(
         composable(route = AppDestinations.MEAL_PLANS.route) {
             MealPlansScreen(
                 onCreateMealPlan = { navActions.navigateToMealPlanWizard() },
-                onMealPlanClick = { mealPlanId -> navActions.navigateToMealPlanDetail(mealPlanId) },
-                snackbarHostState = snackbarHostState,
+                // The week view's rows are meals, not plans, so a tap opens the recipe on the
+                // plan-scoped route — which carries the day and slot the cooked toggle acts on.
+                onMealClick = { meal ->
+                    navActions.navigateToMealPlanRecipeDetail(meal.recipeId, meal.dayId, meal.slot)
+                },
+                onShoppingListClick = { planId ->
+                    navActions.navigateToMealPlanShoppingList(planId)
+                },
             )
         }
         composable(route = AppDestinations.MEAL_PLAN_DETAIL.route) { backStackEntry ->
@@ -472,6 +481,29 @@ fun ChefAINavGraph(
                             navigation = navigation,
                             actions = trailingActions,
                         )
+                    }
+                    AppDestinations.MEAL_PLANS.route -> {
+                        // The "Just me" / "Family" toggle lives in the header (screen 06), so the
+                        // week's view model is hoisted here the same way the plan detail's is.
+                        navController.currentBackStackEntry?.let { entry ->
+                            val weekViewModel: MealPlansViewModel = hiltViewModel(entry)
+                            val weekState by weekViewModel.uiState.collectAsStateWithLifecycle()
+                            val week = weekState as? MealPlansUiState.Success
+                            ChefAITopAppBar(
+                                title = stringResource(titleRes),
+                                navigation = navigation,
+                                actions = {
+                                    if (week != null) {
+                                        ServingBasisToggle(
+                                            basis = week.servingBasis,
+                                            onBasisChange = weekViewModel::onServingBasisChange,
+                                            canSelectFamily = week.canSelectFamily,
+                                        )
+                                    }
+                                    trailingActions()
+                                },
+                            )
+                        }
                     }
                     AppDestinations.MEAL_PLAN_DETAIL.route -> {
                         // The plan's name/date-range/sharing subtitle (16) needs the same state the
