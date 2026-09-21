@@ -40,6 +40,7 @@ fun SduiCarousel(
                     recipes = recipes,
                     bookmarkedRecipeIds = bookmarkedRecipeIds,
                     onAction = onAction,
+                    isCarouselItem = true,
                 )
             }
         }
