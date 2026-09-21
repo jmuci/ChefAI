@@ -10,10 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -36,7 +33,7 @@ import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import java.util.UUID
 
 /**
- * The Recipes tab's grid card (04): a 4:3 grayscale photo, title and meta line. Distinct from
+ * The Recipes tab's grid card (04): a 4:3 photo, title and meta line. Distinct from
  * [com.tenmilelabs.chefai.core.ui.components.RecipeListCard] — that one is the fixed-thumbnail row
  * used by search results and Home's "This Week" list; this is the two-column browse tile.
  */
@@ -46,8 +43,6 @@ fun RecipeGridCard(
     onClick: (UUID) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val grayscale = remember { ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }) }
-
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -63,7 +58,6 @@ fun RecipeGridCard(
             error = painterResource(R.drawable.ic_img_error),
             contentDescription = stringResource(R.string.recipe_image_content_description),
             contentScale = ContentScale.Crop,
-            colorFilter = grayscale,
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(4f / 3f)

@@ -22,8 +22,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -46,13 +44,13 @@ import java.util.UUID
  * Below this width there isn't room for the full "Tonight" hero layout (tags, meta row, a
  * full-width button) — [LargeCard] also renders the small square tile used in horizontal
  * carousels ([com.tenmilelabs.chefai.home.data.model.ComponentModel.SquaredCard]), which has no
- * dedicated design in this batch. That case degrades to image + title only, still flat and
- * grayscale, rather than clipping the full stack.
+ * dedicated design in this batch. That case degrades to image + title only, still flat, rather
+ * than clipping the full stack.
  */
 private val CompactWidthThreshold = 250.dp
 
 /**
- * The "Tonight" hero card: a full-width grayscale photo, two tags, title, a time/servings meta
+ * The "Tonight" hero card: a full-width photo, two tags, title, a time/servings meta
  * row, and a full-width "View Recipe" button — no card container, no gradient overlay. See
  * docs/design/modernist.md; the design has no bookmark affordance on this card.
  *
@@ -73,8 +71,6 @@ fun LargeCard(
     onClick: (UUID) -> Unit = {},
     onSaveToCollection: (UUID) -> Unit = {}
 ) {
-    val grayscale = remember { ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }) }
-
     BoxWithConstraints(modifier = modifier) {
         val isCompact = maxWidth < CompactWidthThreshold
 
@@ -88,7 +84,6 @@ fun LargeCard(
                 error = painterResource(R.drawable.ic_img_error),
                 contentDescription = stringResource(R.string.recipe_image_content_description),
                 contentScale = ContentScale.Crop,
-                colorFilter = grayscale,
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surfaceVariant)

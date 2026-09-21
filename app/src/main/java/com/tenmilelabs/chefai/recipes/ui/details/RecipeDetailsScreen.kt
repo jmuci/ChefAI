@@ -37,8 +37,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
@@ -350,7 +348,7 @@ private val FooterClearance = 84.dp
 private val ScreenHorizontalPadding = 16.dp
 
 /**
- * The full-bleed 4:3 hero (05): grayscale photo, back and save icon buttons overlaid at the top
+ * The full-bleed 4:3 hero (05): photo, back and save icon buttons overlaid at the top
  * corners. The cooked toggle and delete — situational, and not drawn in the design — join the
  * overlay's trailing group rather than crowding a header row the design doesn't have.
  */
@@ -364,8 +362,6 @@ private fun RecipeHero(
     isDeleting: Boolean,
     onAction: (RecipeDetailsAction) -> Unit,
 ) {
-    val grayscale = remember { ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }) }
-
     Box(modifier = Modifier.fillMaxWidth()) {
         AsyncImage(
             model = recipeImageModel(recipe.localImagePath, recipe.imageUrl),
@@ -373,7 +369,6 @@ private fun RecipeHero(
             error = painterResource(R.drawable.ic_img_error),
             contentDescription = stringResource(R.string.recipe_image_content_description),
             contentScale = ContentScale.Crop,
-            colorFilter = grayscale,
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(4f / 3f)
@@ -422,8 +417,8 @@ private fun RecipeHero(
 
 /**
  * A 40dp ground-filled square button floated over a photo — the back arrow and the bookmark on
- * the hero. Filled rather than transparent so it reads against grayscale imagery of any tone; a
- * bare icon with no backing shape would wash out over a light photo.
+ * the hero. Filled rather than transparent so it reads against photos of any tone; a bare icon
+ * with no backing shape would wash out over a light photo.
  */
 @Composable
 private fun HeroOverlayIconButton(
