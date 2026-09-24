@@ -26,11 +26,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
@@ -84,13 +81,14 @@ class RecipeSearchViewModel @Inject constructor(
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
 
-    private val _uiEvent = MutableSharedFlow<SearchUiEvent>(replay = 1)
-    val uiEvents: SharedFlow<SearchUiEvent> = _uiEvent.asSharedFlow()
+    // A Channel, not a replaying SharedFlow: replay = 1 re-delivered the last snackbar every time
+    // the screen re-subscribed (back navigation, rotation, tab switch).
+    private val _uiEvent = Channel<SearchUiEvent>(Channel.BUFFERED)
+    val uiEvents: Flow<SearchUiEvent> = _uiEvent.receiveAsFlow()
 
     /**
-     * One-shot, not replayed (unlike [uiEvents]) — a stale navigation event replaying into a
-     * freshly recomposed collector would silently re-navigate the user to a recipe they already
-     * backed out of.
+     * One-shot, not replayed — a stale navigation event replaying into a freshly recomposed
+     * collector would silently re-navigate the user to a recipe they already backed out of.
      */
     private val _navigateToRecipe = Channel<UUID>(Channel.BUFFERED)
     val navigateToRecipe: Flow<UUID> = _navigateToRecipe.receiveAsFlow()
@@ -115,13 +113,15 @@ class RecipeSearchViewModel @Inject constructor(
                 flow {
                     emit(SearchUiState.Searching)
                     emit(runSearch(trimmed))
+                }.catch { e ->
+                    // Caught per query, inside flatMapLatest: a catch on the outer flow would
+                    // complete it, and search would stop reacting to typing until the ViewModel
+                    // was re-created.
+                    if (e is CancellationException) throw e
+                    Timber.e(e, "Search failed")
+                    emit(SearchUiState.Error(R.string.search_error))
                 }
             }
-        }
-        .catch { e ->
-            if (e is CancellationException) throw e
-            Timber.e(e, "Search failed")
-            emit(SearchUiState.Error(R.string.search_error))
         }
 
     val uiState: StateFlow<SearchUiState> = combine(_searchResult, _bookmarkedIds) { result, bookmarkedIds ->
@@ -163,12 +163,12 @@ class RecipeSearchViewModel @Inject constructor(
             when (recipesRepository.getOrFetchRecipe(recipeId)) {
                 is RecipeFetchResult.Found -> _navigateToRecipe.send(recipeId)
                 RecipeFetchResult.NotAvailable ->
-                    _uiEvent.emit(SearchUiEvent.ShowSnackbar(R.string.search_recipe_unavailable))
+                    _uiEvent.send(SearchUiEvent.ShowSnackbar(R.string.search_recipe_unavailable))
                 RecipeFetchResult.NetworkError -> {
                     // Harmless no-op for an anonymous session; a real retry path for an
                     // authenticated one, since a later full sync could still succeed.
                     syncScheduler.requestImmediateSync()
-                    _uiEvent.emit(SearchUiEvent.ShowSnackbar(R.string.search_recipe_not_yet_synced))
+                    _uiEvent.send(SearchUiEvent.ShowSnackbar(R.string.search_recipe_not_yet_synced))
                 }
             }
         }
@@ -190,24 +190,24 @@ class RecipeSearchViewModel @Inject constructor(
         viewModelScope.launch {
             when (recipesRepository.getOrFetchRecipe(recipeId)) {
                 RecipeFetchResult.NotAvailable -> {
-                    _uiEvent.emit(SearchUiEvent.ShowSnackbar(R.string.search_recipe_unavailable))
+                    _uiEvent.send(SearchUiEvent.ShowSnackbar(R.string.search_recipe_unavailable))
                     return@launch
                 }
                 RecipeFetchResult.NetworkError -> {
                     syncScheduler.requestImmediateSync()
-                    _uiEvent.emit(SearchUiEvent.ShowSnackbar(R.string.search_recipe_not_yet_synced))
+                    _uiEvent.send(SearchUiEvent.ShowSnackbar(R.string.search_recipe_not_yet_synced))
                     return@launch
                 }
                 is RecipeFetchResult.Found -> Unit // fall through to bookmarking below
             }
             try {
                 collectionsRepository.addBookmark(userId, recipeId)
-                _uiEvent.emit(SearchUiEvent.ShowSnackbar(R.string.search_added_to_collection))
+                _uiEvent.send(SearchUiEvent.ShowSnackbar(R.string.search_added_to_collection))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: SQLiteConstraintException) {
                 Timber.w(e, "Bookmark failed for $recipeId — recipe not yet synced")
-                _uiEvent.emit(SearchUiEvent.ShowSnackbar(R.string.search_recipe_not_yet_synced))
+                _uiEvent.send(SearchUiEvent.ShowSnackbar(R.string.search_recipe_not_yet_synced))
             }
         }
     }

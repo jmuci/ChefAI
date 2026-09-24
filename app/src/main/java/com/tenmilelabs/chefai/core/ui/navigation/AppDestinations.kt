@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.core.ui.navigation
 
+import android.net.Uri
 import androidx.annotation.StringRes
 import androidx.navigation.NavHostController
 import com.tenmilelabs.chefai.R
@@ -179,7 +180,9 @@ class NavigationActions(private val navController: NavHostController) {
         if (prefillUrl == null) {
             navController.navigate(ScreenBaseRoutes.IMPORT_RECIPE)
         } else {
-            val encoded = URLEncoder.encode(prefillUrl, "UTF-8")
+            // Uri.encode, not URLEncoder: Navigation already percent-decodes the argument exactly
+            // once (and doesn't turn '+' back into a space), so the ViewModel reads the raw URL.
+            val encoded = Uri.encode(prefillUrl)
             navController.navigate("${ScreenBaseRoutes.IMPORT_RECIPE}?${PREFILL_URL_ARG}=$encoded")
         }
     }
@@ -189,7 +192,7 @@ class NavigationActions(private val navController: NavHostController) {
      * HTTP fetch and the off-screen browser were refused.
      */
     fun navigateToBrowserImport(url: String) {
-        val encoded = URLEncoder.encode(url, "UTF-8")
+        val encoded = Uri.encode(url)
         navController.navigate("${ScreenBaseRoutes.IMPORT_RECIPE_BROWSER}/$encoded")
     }
 

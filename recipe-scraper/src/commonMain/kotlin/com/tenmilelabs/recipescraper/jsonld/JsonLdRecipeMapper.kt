@@ -69,21 +69,28 @@ private fun JsonElement.yieldStrings(): List<String> = when (this) {
  * `HowToSupply`-typed entries with a `name`/`text` field), and ingredients grouped into nested
  * arrays — mirroring how [toInstructionSteps] already handles a typed/nested shape.
  */
-private fun JsonElement.toIngredients(): List<ScrapedIngredient> =
+private fun JsonElement.toIngredients(depth: Int = 0): List<ScrapedIngredient> =
     when (this) {
-        is JsonArray -> flatMap { it.toIngredients() }
+        is JsonArray -> if (depth >= MAX_NESTING_DEPTH) emptyList() else flatMap { it.toIngredients(depth + 1) }
         is JsonObject -> listOfNotNull(cleanHtmlText(stringOrNull("name") ?: stringOrNull("text")))
             .map(::parseIngredient)
 
         is JsonPrimitive -> listOfNotNull(contentOrNull?.let(::cleanHtmlText)).map(::parseIngredient)
     }
 
-private fun JsonElement.toInstructionSteps(): List<String> = when (this) {
-    is JsonArray -> flatMap { it.toInstructionSteps() }
+/**
+ * How deep nested arrays / `HowToSection`s are followed. Real pages nest two or three levels; the
+ * cap stops a hostile page from nesting tens of thousands deep and overflowing the stack — a
+ * `StackOverflowError` is not an `Exception`, so RecipeHtmlParser's catch wouldn't contain it.
+ */
+internal const val MAX_NESTING_DEPTH = 32
+
+private fun JsonElement.toInstructionSteps(depth: Int = 0): List<String> = if (depth >= MAX_NESTING_DEPTH) emptyList() else when (this) {
+    is JsonArray -> flatMap { it.toInstructionSteps(depth + 1) }
 
     is JsonObject -> {
         if (typeNames().any { it.equals("HowToSection", ignoreCase = true) }) {
-            this["itemListElement"]?.toInstructionSteps().orEmpty()
+            this["itemListElement"]?.toInstructionSteps(depth + 1).orEmpty()
         } else {
             listOfNotNull(cleanHtmlText(stringOrNull("text") ?: stringOrNull("name")))
         }

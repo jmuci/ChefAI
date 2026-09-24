@@ -165,7 +165,8 @@ class DefaultRecipeRepositoryTest {
                 sessionManager,
                 recipeImageStore,
                 syncManager,
-                syncOrchestrator
+                syncOrchestrator,
+                FakeTransactionRunner(),
             )
 
         // Seed the fake DAO with our test data.

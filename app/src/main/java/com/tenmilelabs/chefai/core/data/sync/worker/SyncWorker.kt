@@ -14,6 +14,8 @@ import com.tenmilelabs.chefai.core.data.sync.network.SyncHttpException
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 
 @HiltWorker
@@ -28,11 +30,16 @@ class SyncWorker @AssistedInject constructor(
 
     companion object {
         private const val MAX_RETRY_COUNT = 3
+        private const val SESSION_LOAD_TIMEOUT_MS = 10_000L
     }
 
     override suspend fun doWork(): Result {
-        // Only sync when authenticated
-        val session = sessionManager.userSession.value
+        // Only sync when authenticated. SessionManager restores the session asynchronously, so a
+        // worker started in a fresh process (periodic run, backoff retry) would otherwise nearly
+        // always see Loading and skip — reporting success, so it is never retried either.
+        val session = withTimeoutOrNull(SESSION_LOAD_TIMEOUT_MS) {
+            sessionManager.userSession.first { it !is UserSession.Loading }
+        }
         if (session !is UserSession.Authenticated) {
             Timber.d("SyncWorker: Skipping sync — user is not authenticated")
             return Result.success()

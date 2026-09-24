@@ -70,7 +70,11 @@ class RecipeEditorViewModel @Inject constructor(
             mode = mode,
             recipeId = (mode as? EditorMode.Edit)?.recipeId
                 ?: draftIdArg?.toUuidOrNull()
-                ?: UuidV7Generator.newId(),
+                // Persisted so a process-death restore gets the same id back — autosave writes the
+                // draft under it, and restoreDraftIfExists would otherwise look up a fresh id and
+                // find nothing, losing the user's work and orphaning the draft row.
+                ?: (savedStateHandle.get<String>(KEY_NEW_RECIPE_ID)?.toUuidOrNull()
+                    ?: UuidV7Generator.newId().also { savedStateHandle[KEY_NEW_RECIPE_ID] = it.toString() }),
             isLoading = mode is EditorMode.Edit,
         )
     )
@@ -466,6 +470,7 @@ class RecipeEditorViewModel @Inject constructor(
 
     companion object {
         const val AUTO_SAVE_INTERVAL_MS = 10_000L
+        private const val KEY_NEW_RECIPE_ID = "editor_new_recipe_id"
     }
 }
 

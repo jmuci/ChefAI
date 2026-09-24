@@ -50,11 +50,12 @@ class FakeMealPlanDao : MealPlanDao {
     override suspend fun getAllDirty(): List<MealPlanEntity> =
         plans.values.filter { it.syncState == SyncState.PENDING || it.syncState == SyncState.DELETED }
 
-    override suspend fun updateSyncState(uuid: UUID, syncState: SyncState, updatedAt: Long) {
-        plans[uuid]?.let {
-            plans[uuid] = it.copy(syncState = syncState, updatedAt = updatedAt)
-        }
+    override suspend fun updateSyncState(uuid: UUID, syncState: SyncState, updatedAt: Long, expectedUpdatedAt: Long?): Int {
+        val existing = plans[uuid] ?: return 0
+        if (expectedUpdatedAt != null && existing.updatedAt != expectedUpdatedAt) return 0
+        plans[uuid] = existing.copy(syncState = syncState, updatedAt = updatedAt)
         notifyChange()
+        return 1
     }
 
     override suspend fun reassignUserAndMarkPending(oldUserId: UUID, newUserId: UUID, updatedAt: Long) {

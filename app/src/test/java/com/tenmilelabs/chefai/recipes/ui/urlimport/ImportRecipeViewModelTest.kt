@@ -19,7 +19,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import java.net.URLEncoder
 import java.util.UUID
 
 @ExperimentalCoroutinesApi
@@ -42,7 +41,7 @@ class ImportRecipeViewModelTest {
     private fun createViewModel(prefillUrl: String? = null): ImportRecipeViewModel {
         val savedStateHandle = SavedStateHandle().apply {
             if (prefillUrl != null) {
-                set(AppDestinationArgs.PREFILL_URL_ARG, URLEncoder.encode(prefillUrl, "UTF-8"))
+                set(AppDestinationArgs.PREFILL_URL_ARG, prefillUrl)
             }
         }
         return ImportRecipeViewModel(

@@ -1,6 +1,8 @@
 package com.tenmilelabs.chefai.core.data.local.room.dao
 
 import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
@@ -54,6 +56,14 @@ interface IngredientDao {
 
     @Upsert
     suspend fun upsertAll(ingredients: List<IngredientEntity>)
+
+    /**
+     * Inserts [ingredient] only when no row with its uuid exists yet. Ingredients are shared
+     * reference data: a recipe save must never overwrite a pulled row, which would reset it to
+     * PENDING (dropping it from the push via [getSyncedExistingIds]) and null its allergen/source.
+     */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIfAbsent(ingredient: IngredientEntity)
 
     @Query("SELECT * FROM ingredients WHERE syncState = 'PENDING'")
     suspend fun getDirty(): List<IngredientEntity>

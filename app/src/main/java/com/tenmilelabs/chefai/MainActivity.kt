@@ -69,7 +69,9 @@ class MainActivity : ComponentActivity() {
      */
     private fun consumeShareIntent(intent: Intent) {
         if (intent.action != Intent.ACTION_SEND || intent.type != "text/plain") return
-        pendingSharedUrl = extractSharedRecipeUrl(intent.getStringExtra(Intent.EXTRA_TEXT))
+        // getCharSequenceExtra: some senders put a Spanned in EXTRA_TEXT, which getStringExtra
+        // returns as null.
+        pendingSharedUrl = extractSharedRecipeUrl(intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString())
         intent.removeExtra(Intent.EXTRA_TEXT)
     }
 

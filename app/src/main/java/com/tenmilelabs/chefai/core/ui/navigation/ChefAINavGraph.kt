@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -80,6 +81,7 @@ import com.tenmilelabs.chefai.search.ui.SearchScreen
 import com.tenmilelabs.chefai.settings.ui.SettingsScreen
 import timber.log.Timber
 import java.util.UUID
+import kotlinx.coroutines.launch
 
 @Composable
 fun ChefAINavGraph(
@@ -118,6 +120,9 @@ fun ChefAINavGraph(
     // Home is always the start destination (anonymous-first model).
     // Login/Register are available via profile menu or settings.
     val startDestination = AppDestinations.HOME.route
+    // Outlives any single destination, so a snackbar raised while leaving a screen isn't cancelled
+    // with it.
+    val navScope = rememberCoroutineScope()
 
     // Shared by every recipe-details entry point so they all get edit + back navigation wired
     // in the same way; MEAL_PLAN_RECIPE_DETAIL is the only one with extra route args.
@@ -132,6 +137,10 @@ fun ChefAINavGraph(
                     navActions.navigateToEditRecipe(recipeId)
                 },
                 onNavigateBack = { navController.popBackStack() },
+                onRecipeDeleted = { message ->
+                    navController.popBackStack()
+                    navScope.launch { snackbarHostState.showSnackbar(message) }
+                },
             )
         }
     }
@@ -284,6 +293,14 @@ fun ChefAINavGraph(
             RecipeEditorScreen(
                 onNavigateBack = { navController.popBackStack() },
                 snackbarHostState = snackbarHostState,
+                onRecipeDeleted = {
+                    navController.popBackStack()
+                    // Edit mode is only reachable from a recipe details screen; landing back on it
+                    // would show "Recipe not found" for the recipe just deleted.
+                    if (navController.currentBackStackEntry?.destination?.route in recipeDetailRoutes) {
+                        navController.popBackStack()
+                    }
+                },
             )
         }
         composable(
@@ -440,9 +457,7 @@ fun ChefAINavGraph(
             if (currentRoute != AppDestinations.LOGIN.route &&
                 currentRoute != AppDestinations.REGISTER.route &&
                 currentRoute != AppDestinations.ACCEPT_INVITE.route &&
-                currentRoute != AppDestinations.RECIPE_DETAILS.route &&
-                currentRoute != AppDestinations.HOME_RECIPE_DETAIL.route &&
-                currentRoute != AppDestinations.MEAL_PLAN_RECIPE_DETAIL.route &&
+                currentRoute !in recipeDetailRoutes &&
                 currentRoute !in wizardRoutes
             ) {
                 val navigation = if (!isTopLevelDestination) {
@@ -630,3 +645,11 @@ fun ChefAINavGraph(
 
 // Preview not available - ChefAINavGraph requires SessionManager injection from Hilt
 // which can't be easily mocked in Composable previews
+
+/** Every route that shows a recipe's details screen (it draws its own back arrow over the hero). */
+private val recipeDetailRoutes = setOf(
+    AppDestinations.RECIPE_DETAILS.route,
+    AppDestinations.HOME_RECIPE_DETAIL.route,
+    AppDestinations.SEARCH_RECIPE_DETAIL.route,
+    AppDestinations.MEAL_PLAN_RECIPE_DETAIL.route,
+)

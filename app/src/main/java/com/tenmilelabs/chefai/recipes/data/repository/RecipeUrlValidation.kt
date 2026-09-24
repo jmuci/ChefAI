@@ -123,12 +123,20 @@ internal fun String.isSafeHost(hostResolver: HostResolver): Boolean {
     return addresses.none { it.isBlockedAddress() }
 }
 
-private fun InetAddress.isBlockedAddress(): Boolean {
+internal fun InetAddress.isBlockedAddress(): Boolean {
     if (isLoopbackAddress || isLinkLocalAddress || isSiteLocalAddress || isAnyLocalAddress || isMulticastAddress) {
         return true
     }
+    val bytes = address
+    if (bytes.size == 4) {
+        val first = bytes[0].toInt() and 0xFF
+        val second = bytes[1].toInt() and 0xFF
+        return first == 0 || // 0.0.0.0/8 — "this network"; isAnyLocalAddress only covers 0.0.0.0
+            (first == 100 && second in 64..127) || // 100.64.0.0/10 — CGNAT / Tailscale tailnets
+            (first == 198 && second in 18..19) || // 198.18.0.0/15 — benchmarking
+            (first == 255) // broadcast
+    }
     // IPv6 unique local addresses, fc00::/7 — isSiteLocalAddress above only recognizes the
     // deprecated IPv6 site-local range (fec0::/10), not this one.
-    val bytes = address
     return bytes.size == 16 && (bytes[0].toInt() and 0xFE) == 0xFC
 }

@@ -7,6 +7,7 @@ import coil3.ImageLoader
 import coil3.request.ImageRequest
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.ui.recipeImageModel
@@ -63,9 +64,16 @@ class HomeViewModel @Inject constructor(
     private val _uiEvent = Channel<HomeUiEvent>()
     val uiEvents = _uiEvent.receiveAsFlow()
 
-    private val _bookmarkedIds = sessionManager.getCurrentUserId()
-        ?.let { collectionsRepository.observeBookmarkedRecipeIds(it) }
-        ?: flowOf(emptySet())
+    // Follows the session rather than reading the user id once: on a cold start the session is
+    // still Loading when Home is built, and it changes again on login/logout.
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val _bookmarkedIds = sessionManager.userSession.flatMapLatest { session ->
+        when (session) {
+            is UserSession.Loading -> flowOf(emptySet())
+            is UserSession.Anonymous -> collectionsRepository.observeBookmarkedRecipeIds(session.localUserId)
+            is UserSession.Authenticated -> collectionsRepository.observeBookmarkedRecipeIds(session.user.uuid)
+        }
+    }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<HomeUiState> = homeLayoutRepository.getHomeLayout()

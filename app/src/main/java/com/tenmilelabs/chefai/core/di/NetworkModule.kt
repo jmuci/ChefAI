@@ -7,6 +7,7 @@ import com.tenmilelabs.chefai.recipes.data.network.ChefAIApiService
 import com.tenmilelabs.chefai.recipes.data.network.RecipeDetailApiService
 import com.tenmilelabs.chefai.recipes.data.network.RecipeDetailNetworkDataSource
 import com.tenmilelabs.chefai.recipes.data.network.RecipeNetworkDataSource
+import com.tenmilelabs.chefai.recipes.data.network.SsrfSafeDns
 import com.tenmilelabs.chefai.search.data.network.RecipeSearchApiService
 import com.tenmilelabs.chefai.search.data.network.RecipeSearchNetworkDataSource
 import com.tenmilelabs.recipescraper.RecipeHtmlParser
@@ -129,6 +130,10 @@ object NetworkModule {
         expectSuccess = true
         followRedirects = false
 
+        engine {
+            config { dns(SsrfSafeDns()) }
+        }
+
         install(HttpTimeout) {
             requestTimeoutMillis = 15_000
             connectTimeoutMillis = 10_000
@@ -137,12 +142,17 @@ object NetworkModule {
 
         install(HttpRequestRetry) {
             retryOnServerErrors(maxRetries = 2)
-            exponentialDelay()
+            // A hostile page's `Retry-After: 3600` would otherwise stall the import (and the
+            // backfill worker) for as long as it asks — maxDelayMs doesn't cap that part.
+            exponentialDelay(respectRetryAfterHeader = false)
         }
 
-        install(Logging) {
-            logger = Logger.SIMPLE
-            level = LogLevel.INFO
+        // Every imported URL would otherwise go to logcat in release builds.
+        if (BuildConfig.DEBUG) {
+            install(Logging) {
+                logger = Logger.SIMPLE
+                level = LogLevel.INFO
+            }
         }
 
         defaultRequest {

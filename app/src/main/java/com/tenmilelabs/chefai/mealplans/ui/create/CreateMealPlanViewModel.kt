@@ -14,14 +14,15 @@ import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.usecase.GenerateMealPlanUseCase
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import java.util.UUID
 import java.util.concurrent.CancellationException
 import javax.inject.Inject
@@ -37,8 +38,11 @@ class CreateMealPlanViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(CreateMealPlanUiState())
     val uiState: StateFlow<CreateMealPlanUiState> = _uiState.asStateFlow()
 
-    private val _uiEvent = MutableSharedFlow<CreateMealPlanEvent>()
-    val uiEvents: SharedFlow<CreateMealPlanEvent> = _uiEvent.asSharedFlow()
+    // Buffered Channel: generation takes seconds, and an event emitted into a rendezvous
+    // SharedFlow while the collector is being re-created (rotation) was dropped — leaving the user
+    // on the wizard with the plan already saved, one tap away from a duplicate.
+    private val _uiEvent = Channel<CreateMealPlanEvent>(Channel.BUFFERED)
+    val uiEvents: Flow<CreateMealPlanEvent> = _uiEvent.receiveAsFlow()
 
     init {
         loadRecipeCount()
@@ -131,17 +135,25 @@ class CreateMealPlanViewModel @Inject constructor(
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 _uiState.update { it.copy(isSaving = false) }
-                _uiEvent.emit(CreateMealPlanEvent.ShowError(R.string.meal_plan_save_error))
+                _uiEvent.send(CreateMealPlanEvent.ShowError(R.string.meal_plan_save_error))
                 return@launch
             }
 
             // Plan saved locally — now attempt immediate generation, then DRAFT so the user can
             // retry from the detail screen. Which generation path runs depends on session type and
             // recipeSource: see GenerateMealPlanUseCase's doc.
-            val filled = generateMealPlanUseCase(mealPlanId, preferences)
+            // The plan is already saved; a failure here (e.g. the local fallback's Room reads)
+            // just leaves it as a draft the detail screen can retry, rather than crashing.
+            val filled = try {
+                generateMealPlanUseCase(mealPlanId, preferences)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "Meal plan generation failed for $mealPlanId")
+                false
+            }
 
             _uiState.update { it.copy(isSaving = false) }
-            _uiEvent.emit(
+            _uiEvent.send(
                 if (filled) {
                     CreateMealPlanEvent.MealPlanReady(mealPlanId)
                 } else {

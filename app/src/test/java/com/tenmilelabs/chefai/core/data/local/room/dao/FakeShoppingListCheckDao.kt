@@ -55,10 +55,12 @@ class FakeShoppingListCheckDao : ShoppingListCheckDao {
     override suspend fun getAllDirty(): List<ShoppingListCheckEntity> =
         checks.values.filter { it.syncState == SyncState.PENDING || it.syncState == SyncState.DELETED }
 
-    override suspend fun updateSyncState(mealPlanId: UUID, itemKey: String, state: SyncState, updatedAt: Long) {
+    override suspend fun updateSyncState(mealPlanId: UUID, itemKey: String, state: SyncState, updatedAt: Long, expectedUpdatedAt: Long?): Int {
         val key = mealPlanId to itemKey
-        val existing = checks[key] ?: return
+        val existing = checks[key] ?: return 0
+        if (expectedUpdatedAt != null && existing.updatedAt != expectedUpdatedAt) return 0
         checks[key] = existing.copy(syncState = state, updatedAt = updatedAt)
         notifyChange()
+        return 1
     }
 }

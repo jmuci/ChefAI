@@ -92,14 +92,21 @@ fun RecipeDetailsScreen(
     snackbarHostState: SnackbarHostState,
     onEditClick: ((java.util.UUID) -> Unit)? = null,
     onNavigateBack: (() -> Unit)? = null,
+    /**
+     * Leaves the screen after a delete and shows [message] from a scope that outlives it. When
+     * null, the snackbar is shown here first — the screen shows a spinner meanwhile.
+     */
+    onRecipeDeleted: ((message: String) -> Unit)? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val recipeDeletedText = stringResource(R.string.recipe_deleted)
-    LaunchedEffect(viewModel, snackbarHostState, onNavigateBack, recipeDeletedText) {
+    LaunchedEffect(viewModel, snackbarHostState, onNavigateBack, onRecipeDeleted, recipeDeletedText) {
         viewModel.effects.collect { effect ->
             when (effect) {
-                RecipeDetailsEffect.RecipeDeleted -> {
+                RecipeDetailsEffect.RecipeDeleted -> if (onRecipeDeleted != null) {
+                    onRecipeDeleted(recipeDeletedText)
+                } else {
                     snackbarHostState.showSnackbar(
                         message = recipeDeletedText,
                         duration = SnackbarDuration.Short,
@@ -228,10 +235,10 @@ fun RecipeDetailsContent(
 
     // Local-only: checking off an ingredient while cooking has no server-side counterpart (the
     // handoff doesn't specify one either), so this is scoped to the composition, not the
-    // ViewModel. Keyed by the ingredient list's identity so a re-scale or a unit-system change —
-    // which rebuilds the list above but preserves row order — doesn't carry stale indices over
-    // from a previous recipe.
-    var checkedIngredients by rememberSaveable(ingredients) { mutableStateOf(emptySet<Int>()) }
+    // ViewModel. Keyed by the recipe's own ingredient list, not the scaled/converted `ingredients`
+    // above: a re-scale or unit-system change rebuilds that list but preserves row order, so the
+    // checks stay valid; only a different recipe (or an edited ingredient list) resets them.
+    var checkedIngredients by rememberSaveable(recipe.uuid, recipe.ingredients) { mutableStateOf(emptySet<Int>()) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(

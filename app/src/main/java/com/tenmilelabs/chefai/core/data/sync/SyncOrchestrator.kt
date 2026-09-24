@@ -151,6 +151,15 @@ class SyncOrchestrator @Inject constructor(
         val syncRecipes = dirtyRecipes.map { recipe -> buildSyncRecipeDto(recipe) }
         val syncBookmarks = dirtyBookmarks.map { it.toSyncPushDto() }
 
+        // The local `updatedAt` each row had when it was read for this push. Accepting a row only
+        // marks it SYNCED if it still has this value — see RecipeDao.updateSyncState.
+        val pushedVersions = PushedVersions(
+            recipes = dirtyRecipes.associate { it.uuid to it.updatedAt },
+            bookmarks = dirtyBookmarks.associate { (it.userId to it.recipeId) to it.updatedAt },
+            mealPlans = dirtyMealPlans.associate { it.uuid to it.updatedAt },
+            groceryItems = dirtyGroceryItems.associate { (it.mealPlanId to it.itemKey) to it.updatedAt },
+        )
+
         var totalAccepted = 0
         var totalConflicts = 0
         var totalErrors = 0
@@ -169,7 +178,7 @@ class SyncOrchestrator @Inject constructor(
             val response = syncNetworkDataSource.pushRecipes(
                 SyncPushRequest(recipeBatch, bookmarkBatch, mealPlanBatch, groceryBatch)
             )
-            processPushResponse(response, recipeBatch)
+            processPushResponse(response, recipeBatch, pushedVersions)
             totalAccepted += response.accepted.size
             totalConflicts += response.conflicts.size
             totalErrors += response.errors.size
@@ -215,7 +224,18 @@ class SyncOrchestrator @Inject constructor(
         return recipe.toSyncDto(steps, ingredients, tags, labels)
     }
 
-    private suspend fun processPushResponse(response: SyncPushResponse, pushedRecipes: List<SyncRecipeDto>) {
+    private class PushedVersions(
+        val recipes: Map<UUID, Long>,
+        val bookmarks: Map<Pair<UUID, UUID>, Long>,
+        val mealPlans: Map<UUID, Long>,
+        val groceryItems: Map<Pair<UUID, String>, Long>,
+    )
+
+    private suspend fun processPushResponse(
+        response: SyncPushResponse,
+        pushedRecipes: List<SyncRecipeDto>,
+        pushedVersions: PushedVersions,
+    ) {
         // Unlike steps/tags/labels, ingredient refs are filtered before push (buildSyncRecipeDto
         // only sends ones already known to the server; see #101) — so "recipe X was accepted"
         // doesn't mean every local ingredient ref for X was actually sent. Blanket-marking every
@@ -231,16 +251,25 @@ class SyncOrchestrator @Inject constructor(
         for (accepted in response.accepted) {
             val uuid = UUID.fromString(accepted.uuid)
             transactionRunner {
-                recipeDao.updateSyncState(uuid, SyncState.SYNCED, accepted.serverUpdatedAt)
-                recipeStepDao.updateSyncStateForRecipe(uuid, SyncState.SYNCED, accepted.serverUpdatedAt)
-                val pushedIngredientIds = pushedIngredientIdsByRecipe[accepted.uuid].orEmpty()
-                if (pushedIngredientIds.isNotEmpty()) {
-                    recipeIngredientDao.updateSyncStateForRecipeIngredients(
-                        uuid, pushedIngredientIds, SyncState.SYNCED, accepted.serverUpdatedAt
-                    )
+                val marked = recipeDao.updateSyncState(
+                    uuid, SyncState.SYNCED, accepted.serverUpdatedAt,
+                    expectedUpdatedAt = pushedVersions.recipes[uuid],
+                )
+                if (marked == 0) {
+                    // Edited (or deleted) while the push was in flight: leave the whole aggregate
+                    // PENDING so the next push carries the newer version.
+                    Timber.d("Push: recipe $uuid changed during push, leaving it PENDING")
+                } else {
+                    recipeStepDao.updateSyncStateForRecipe(uuid, SyncState.SYNCED, accepted.serverUpdatedAt)
+                    val pushedIngredientIds = pushedIngredientIdsByRecipe[accepted.uuid].orEmpty()
+                    if (pushedIngredientIds.isNotEmpty()) {
+                        recipeIngredientDao.updateSyncStateForRecipeIngredients(
+                            uuid, pushedIngredientIds, SyncState.SYNCED, accepted.serverUpdatedAt
+                        )
+                    }
+                    recipeTagCrossRefDao.updateSyncStateForRecipe(uuid, SyncState.SYNCED, accepted.serverUpdatedAt)
+                    recipeLabelCrossRefDao.updateSyncStateForRecipe(uuid, SyncState.SYNCED, accepted.serverUpdatedAt)
                 }
-                recipeTagCrossRefDao.updateSyncStateForRecipe(uuid, SyncState.SYNCED, accepted.serverUpdatedAt)
-                recipeLabelCrossRefDao.updateSyncStateForRecipe(uuid, SyncState.SYNCED, accepted.serverUpdatedAt)
             }
         }
 
@@ -261,7 +290,10 @@ class SyncOrchestrator @Inject constructor(
         for (accepted in response.bookmarkedRecipes) {
             val userId = UUID.fromString(accepted.userId)
             val recipeId = UUID.fromString(accepted.recipeId)
-            bookmarkedRecipeDao.updateSyncState(userId, recipeId, SyncState.SYNCED, accepted.serverUpdatedAt)
+            bookmarkedRecipeDao.updateSyncState(
+                userId, recipeId, SyncState.SYNCED, accepted.serverUpdatedAt,
+                expectedUpdatedAt = pushedVersions.bookmarks[userId to recipeId],
+            )
         }
 
         // Log bookmark errors — keep them as PENDING for retry
@@ -272,7 +304,10 @@ class SyncOrchestrator @Inject constructor(
         // Process accepted meal plans
         for (accepted in response.mealPlans.accepted) {
             val uuid = UUID.fromString(accepted.uuid)
-            mealPlanDao.updateSyncState(uuid, SyncState.SYNCED, accepted.serverUpdatedAt)
+            mealPlanDao.updateSyncState(
+                uuid, SyncState.SYNCED, accepted.serverUpdatedAt,
+                expectedUpdatedAt = pushedVersions.mealPlans[uuid],
+            )
         }
 
         // Meal plan conflicts: server wins — next pull will overwrite
@@ -287,11 +322,13 @@ class SyncOrchestrator @Inject constructor(
 
         // Process accepted grocery items
         for (accepted in response.groceryListItems.accepted) {
+            val mealPlanId = UUID.fromString(accepted.mealPlanId)
             shoppingListCheckDao.updateSyncState(
-                UUID.fromString(accepted.mealPlanId),
+                mealPlanId,
                 accepted.itemKey,
                 SyncState.SYNCED,
                 accepted.serverUpdatedAt,
+                expectedUpdatedAt = pushedVersions.groceryItems[mealPlanId to accepted.itemKey],
             )
         }
 

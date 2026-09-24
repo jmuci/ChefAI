@@ -37,24 +37,33 @@ class FakeBookmarkedRecipeDao : BookmarkedRecipeDao {
     override suspend fun getAllDirty(): List<BookmarkedRecipeEntity> =
         store.values.filter { it.syncState == SyncState.PENDING || it.syncState == SyncState.DELETED }
 
-    override suspend fun updateSyncState(userId: UUID, recipeId: UUID, state: SyncState, updatedAt: Long) {
+    override suspend fun updateSyncState(userId: UUID, recipeId: UUID, state: SyncState, updatedAt: Long, expectedUpdatedAt: Long?): Int {
         val key = userId to recipeId
-        store[key]?.let {
-            store[key] = it.copy(syncState = state, updatedAt = updatedAt)
-        }
+        val existing = store[key] ?: return 0
+        if (expectedUpdatedAt != null && existing.updatedAt != expectedUpdatedAt) return 0
+        store[key] = existing.copy(syncState = state, updatedAt = updatedAt)
+        notifyChange()
+        return 1
+    }
+
+    override suspend fun copyLiveBookmarksToUser(oldUserId: UUID, newUserId: UUID, updatedAt: Long) {
+        store.entries.filter { it.key.first == oldUserId && it.value.deletedAt == null }.toList()
+            .forEach { (key, entity) ->
+                store[newUserId to key.second] = entity.copy(
+                    userId = newUserId,
+                    deletedAt = null,
+                    syncState = SyncState.PENDING,
+                    updatedAt = updatedAt
+                )
+            }
         notifyChange()
     }
 
-    override suspend fun reassignUserAndMarkPending(oldUserId: UUID, newUserId: UUID, updatedAt: Long) {
-        val toReassign = store.entries.filter { it.key.first == oldUserId }.toList()
-        for ((key, entity) in toReassign) {
-            store.remove(key)
-            store[newUserId to key.second] = entity.copy(
-                userId = newUserId,
-                syncState = SyncState.PENDING,
-                updatedAt = updatedAt
-            )
-        }
+    override suspend fun countLiveForUser(userId: UUID): Int =
+        store.count { it.key.first == userId && it.value.deletedAt == null }
+
+    override suspend fun deleteAllForUser(userId: UUID) {
+        store.keys.filter { it.first == userId }.toList().forEach { store.remove(it) }
         notifyChange()
     }
 }

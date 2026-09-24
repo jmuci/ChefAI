@@ -259,11 +259,12 @@ class FakeRecipeDao : RecipeDao {
         return recipes.values.filter { it.syncState == SyncState.PENDING || it.syncState == SyncState.DELETED }
     }
 
-    override suspend fun updateSyncState(uuid: UUID, syncState: SyncState, updatedAt: Long) {
-        recipes[uuid]?.let {
-            recipes[uuid] = it.copy(syncState = syncState, updatedAt = updatedAt)
-        }
+    override suspend fun updateSyncState(uuid: UUID, syncState: SyncState, updatedAt: Long, expectedUpdatedAt: Long?): Int {
+        val existing = recipes[uuid] ?: return 0
+        if (expectedUpdatedAt != null && existing.updatedAt != expectedUpdatedAt) return 0
+        recipes[uuid] = existing.copy(syncState = syncState, updatedAt = updatedAt)
         triggerUpdate()
+        return 1
     }
 
     override suspend fun softDelete(uuid: UUID, deletedAt: Long) {
@@ -284,7 +285,7 @@ class FakeRecipeDao : RecipeDao {
         scanLimit: Int
     ): List<RecipeImageCandidate> = recipes.values
         .filter { it.deletedAt == null && (it.imageUrl.isNotEmpty() || it.imageBlobId != null) }
-        .sortedByDescending { it.updatedAt }
+        .sortedWith(compareByDescending<RecipeEntity> { it.localImagePath == null }.thenByDescending { it.updatedAt })
         .take(scanLimit)
         .map { RecipeImageCandidate(it.uuid, it.imageUrl, it.localImagePath, it.imageBlobId) }
 
@@ -302,7 +303,11 @@ class FakeRecipeDao : RecipeDao {
         scanLimit: Int
     ): List<RecipeImageUploadCandidate> = recipes.values
         .filter { it.deletedAt == null && it.localImagePath != null && it.syncState == SyncState.SYNCED }
-        .sortedWith(compareByDescending<RecipeEntity> { it.imageUrl.isEmpty() }.thenByDescending { it.updatedAt })
+        .sortedWith(
+            compareByDescending<RecipeEntity> { it.imageBlobId == null }
+                .thenByDescending { it.imageUrl.isEmpty() }
+                .thenByDescending { it.updatedAt }
+        )
         .take(scanLimit)
         .map {
             RecipeImageUploadCandidate(

@@ -62,11 +62,17 @@ interface ShoppingListCheckDao {
     @Query("SELECT * FROM shopping_list_checks WHERE syncState IN ('PENDING', 'DELETED')")
     suspend fun getAllDirty(): List<ShoppingListCheckEntity>
 
+    /**
+     * Marks a pushed row with the server's timestamp. Pass [expectedUpdatedAt] — the `updatedAt`
+     * the row had when it was pushed — so an edit made while the push was in flight (which bumps
+     * `updatedAt`) is left PENDING for the next push instead of being silently marked SYNCED.
+     * @return the number of rows updated (0 when the row changed since it was pushed).
+     */
     @Query(
         "UPDATE shopping_list_checks SET syncState = :state, updatedAt = :updatedAt " +
-            "WHERE mealPlanId = :mealPlanId AND itemKey = :itemKey"
+            "WHERE mealPlanId = :mealPlanId AND itemKey = :itemKey AND (:expectedUpdatedAt IS NULL OR updatedAt = :expectedUpdatedAt)"
     )
-    suspend fun updateSyncState(mealPlanId: UUID, itemKey: String, state: SyncState, updatedAt: Long)
+    suspend fun updateSyncState(mealPlanId: UUID, itemKey: String, state: SyncState, updatedAt: Long, expectedUpdatedAt: Long? = null): Int
 }
 
 data class CheckedItemRow(val itemKey: String, val checkedBy: UUID?)

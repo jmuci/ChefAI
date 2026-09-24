@@ -64,7 +64,11 @@ class AccountUpgradeUseCase @Inject constructor(
         val recipeCount = recipeDao.countRecipesForUser(anonymousUserId)
         val mealPlanCount = mealPlanDao.countMealPlansForUser(anonymousUserId)
 
-        if (recipeCount == 0 && mealPlanCount == 0) {
+        val bookmarkCount = bookmarkedRecipeDao.countLiveForUser(anonymousUserId)
+
+        // Bookmarks count too: an anonymous user who only saved search results would otherwise
+        // lose them on sign-in.
+        if (recipeCount == 0 && mealPlanCount == 0 && bookmarkCount == 0) {
             Timber.d("No anonymous data to upgrade (new device or empty). Creating auth user only.")
             ensureAuthenticatedUserEntity(authenticatedUser)
             return 0
