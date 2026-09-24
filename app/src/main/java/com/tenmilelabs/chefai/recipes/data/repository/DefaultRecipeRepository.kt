@@ -1,9 +1,9 @@
 package com.tenmilelabs.chefai.recipes.data.repository
 
-import androidx.room.Transaction
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
+import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.IngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.LabelDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeDao
@@ -55,7 +55,9 @@ class DefaultRecipeRepository @Inject constructor(
     private val sessionManager: SessionManager,
     private val recipeImageStore: RecipeImageStore,
     private val syncManager: SyncScheduler,
-    private val syncOrchestrator: SyncOrchestrator) : RecipesRepository {
+    private val syncOrchestrator: SyncOrchestrator,
+    private val transactionRunner: TransactionRunner,
+) : RecipesRepository {
 
     override fun getRecipesPreviewStream(): Flow<List<RecipePreview>> {
         // TODO pass the userId to only show recipes from the user when filtering.
@@ -148,8 +150,15 @@ class DefaultRecipeRepository @Inject constructor(
         }
     }
 
-    @Transaction
+    // `androidx.room.Transaction` is only honoured on DAO methods, so the aggregate write is wrapped
+    // explicitly — otherwise a concurrent push can read a half-written recipe (e.g. steps deleted
+    // but not yet re-inserted) and mark it SYNCED.
     override suspend fun createRecipe(recipe: Recipe) {
+        transactionRunner { writeNewRecipe(recipe) }
+        syncManager.requestMutationSync()
+    }
+
+    private suspend fun writeNewRecipe(recipe: Recipe) {
         // Save the recipe entity
         recipeDao.upsertRecipe(recipe.toRoomEntity())
 
@@ -165,7 +174,7 @@ class DefaultRecipeRepository @Inject constructor(
 
         // Save all ingredients (if they don't exist)
         recipe.ingredients.forEach { ingredient ->
-            ingredientDao.upsertIngredient(ingredient.toRoomEntity())
+            ingredientDao.insertIfAbsent(ingredient.toRoomEntity())
         }
 
         // Save recipe steps
@@ -204,12 +213,14 @@ class DefaultRecipeRepository @Inject constructor(
                 )
             )
         }
+    }
 
+    override suspend fun updateRecipe(recipe: Recipe) {
+        transactionRunner { writeUpdatedRecipe(recipe) }
         syncManager.requestMutationSync()
     }
 
-    @Transaction
-    override suspend fun updateRecipe(recipe: Recipe) {
+    private suspend fun writeUpdatedRecipe(recipe: Recipe) {
         // Update the recipe entity
         recipeDao.upsertRecipe(recipe.toRoomEntity())
 
@@ -221,7 +232,7 @@ class DefaultRecipeRepository @Inject constructor(
 
         // Upsert ingredients (ensure ingredient entities exist)
         recipe.ingredients.forEach { ingredient ->
-            ingredientDao.upsertIngredient(ingredient.toRoomEntity())
+            ingredientDao.insertIfAbsent(ingredient.toRoomEntity())
         }
 
         // Replace ingredient cross-references
@@ -263,8 +274,6 @@ class DefaultRecipeRepository @Inject constructor(
                 )
             )
         }
-
-        syncManager.requestMutationSync()
     }
 
     override suspend fun deleteAllRecipes() {

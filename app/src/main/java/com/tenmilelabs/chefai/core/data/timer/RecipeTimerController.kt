@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.core.data.timer
 
+import android.os.SystemClock
 import com.tenmilelabs.chefai.core.di.ApplicationScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -13,6 +14,8 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.ceil
+import kotlin.time.AbstractLongTimeSource
+import kotlin.time.DurationUnit
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
@@ -45,7 +48,7 @@ class RecipeTimerController @Inject constructor(
      * hatch [com.tenmilelabs.chefai.auth.domain.SessionManager.uuidGenerator] uses, and for the
      * same reason: Hilt has no binding for it and it needs none.
      */
-    internal var timeSource: TimeSource = TimeSource.Monotonic
+    internal var timeSource: TimeSource = ElapsedRealtimeTimeSource
 
     private val _state = MutableStateFlow<RecipeTimerState?>(null)
     val state: StateFlow<RecipeTimerState?> = _state.asStateFlow()
@@ -64,9 +67,11 @@ class RecipeTimerController @Inject constructor(
      * carried on counting from a value minutes out of date. Reading a deadline instead means the
      * first tick after any stall reports the truth, and fires immediately if the time has passed.
      *
-     * Still not fixed by this, and not fixable in the process: a device in deep sleep advances
-     * neither the ticks nor `TimeSource.Monotonic`, so the completion notification is late by
-     * however long the device slept. Only an `AlarmManager` alarm delivers that on time.
+     * The clock is [ElapsedRealtimeTimeSource], which — unlike `TimeSource.Monotonic`
+     * (`System.nanoTime`) — keeps counting while the device is in deep sleep, so the countdown is
+     * right as soon as the device wakes. Still not fixable in the process: the ticks themselves
+     * stop in deep sleep, so the completion notification is late by however long the device
+     * slept. Only an `AlarmManager` alarm delivers that on time.
      */
     private var deadline: TimeMark? = null
 
@@ -93,8 +98,12 @@ class RecipeTimerController @Inject constructor(
         val current = _state.value ?: return
         if (!current.isRunning) return
         tickJob?.cancel()
+        // Freeze the true remaining time, not the last tick's value — that can be up to a second
+        // old, or far older if the process was frozen and hasn't ticked since. Floor at 1 so a
+        // timer paused at its very end still completes (and notifies) on resume.
+        val remaining = deadline?.let { remainingSecondsUntil(it).coerceAtLeast(1) } ?: current.remainingSeconds
         deadline = null
-        _state.update { it?.copy(isRunning = false) }
+        _state.update { it?.copy(remainingSeconds = remaining, isRunning = false) }
     }
 
     fun resume() {
@@ -134,4 +143,9 @@ class RecipeTimerController @Inject constructor(
      */
     private fun remainingSecondsUntil(due: TimeMark): Long =
         ceil(-due.elapsedNow().inWholeMilliseconds / 1000.0).toLong()
+}
+
+/** Backed by `SystemClock.elapsedRealtimeNanos()`, which — unlike `System.nanoTime()` — includes deep sleep. */
+private object ElapsedRealtimeTimeSource : AbstractLongTimeSource(DurationUnit.NANOSECONDS) {
+    override fun read(): Long = SystemClock.elapsedRealtimeNanos()
 }

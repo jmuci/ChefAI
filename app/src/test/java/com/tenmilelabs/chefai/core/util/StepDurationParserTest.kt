@@ -57,4 +57,21 @@ class StepDurationParserTest {
         assertThat(parseStepDurationSeconds("Preheat oven to 350 degrees")).isNull()
         assertThat(parseStepDurationSeconds("Slice into 8 pieces")).isNull()
     }
+
+    @Test
+    fun `does not add durations from separate clauses`() {
+        assertThat(parseStepDurationSeconds("Marinate for 2 hours, then grill 10 minutes")).isEqualTo(2 * 3600L)
+    }
+
+    @Test
+    fun `joins compound durations separated by and`() {
+        assertThat(parseStepDurationSeconds("Roast for 1 hour and 20 minutes")).isEqualTo(80 * 60L)
+    }
+
+    @Test
+    fun `parses mixed-number and vulgar fractions`() {
+        assertThat(parseStepDurationSeconds("Simmer 1 1/2 hours")).isEqualTo(90 * 60L)
+        assertThat(parseStepDurationSeconds("Simmer 1½ hours")).isEqualTo(90 * 60L)
+        assertThat(parseStepDurationSeconds("Rest for ½ hour")).isEqualTo(30 * 60L)
+    }
 }

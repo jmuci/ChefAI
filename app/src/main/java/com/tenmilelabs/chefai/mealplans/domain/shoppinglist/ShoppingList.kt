@@ -130,6 +130,7 @@ object ShoppingListBuilder {
                         val display = UnitNormalizer.normalize(spelling)?.canonical ?: spelling
                         display to unitRows.sumOf { it.amount }
                     }
+                    .mergeSameDimension()
                     .entries
                     .sortedWith(compareBy({ it.key.isEmpty() }, { it.key }))
                     .mapNotNull { (_, unitAndSum) ->
@@ -179,3 +180,30 @@ object ShoppingListBuilder {
  * rather than the cooking fractions a single recipe's quantities use. See [QuantityFormat].
  */
 internal fun formatQuantity(value: Double): String = QuantityFormat.decimal(value)
+
+/**
+ * Collapses unit buckets that measure the same dimension in the same system into one — conversion
+ * picks each row's unit by its own magnitude, so "500 g" and "1 kg" (or "1¼ cup" and "2 tbsp") of
+ * one ingredient would otherwise be listed as two amounts joined by "+". Summed in base units and
+ * re-expressed once. Buckets with nothing to merge with are left exactly as they were.
+ */
+private fun Map<String, Pair<String, Double>>.mergeSameDimension(): Map<String, Pair<String, Double>> {
+    val groups = entries.groupBy { (_, unitAndSum) ->
+        UnitNormalizer.normalize(unitAndSum.first)?.let { it.dimension to it.system }
+    }
+    return buildMap {
+        for ((dimensionAndSystem, bucket) in groups) {
+            if (dimensionAndSystem == null || bucket.size < 2) {
+                bucket.forEach { put(it.key, it.value) }
+                continue
+            }
+            val totalInBase = bucket.sumOf { (_, unitAndSum) ->
+                val unit = requireNotNull(UnitNormalizer.normalize(unitAndSum.first)) { "grouped as a known unit" }
+                unitAndSum.second * unit.inBaseUnits
+            }
+            val (dimension, system) = dimensionAndSystem
+            val merged = UnitConversion.present(totalInBase, dimension, system)
+            put(merged.unit, merged.unit to merged.quantity)
+        }
+    }
+}

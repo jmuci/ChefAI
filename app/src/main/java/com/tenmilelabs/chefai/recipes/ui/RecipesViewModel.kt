@@ -15,11 +15,11 @@ import com.tenmilelabs.chefai.core.util.WhileUiSubscribed
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emptyFlow
@@ -57,8 +57,10 @@ class RecipesViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _isLoading = MutableStateFlow(false)
-    private val _uiEvent = MutableSharedFlow<RecipesUiEvent>(replay = 1)
-    val uiEvents: SharedFlow<RecipesUiEvent> = _uiEvent.asSharedFlow()
+    // A Channel, not a replaying SharedFlow: replay = 1 re-delivered the last snackbar every time
+    // the screen re-subscribed (back navigation, rotation, tab switch).
+    private val _uiEvent = Channel<RecipesUiEvent>(Channel.BUFFERED)
+    val uiEvents: Flow<RecipesUiEvent> = _uiEvent.receiveAsFlow()
 
     private val _recipesAsync = sessionManager.userSession
         .flatMapLatest { session ->
@@ -76,7 +78,7 @@ class RecipesViewModel @Inject constructor(
             // Emitted here rather than from the combine below: that transform re-runs on every
             // emission of *any* of its sources, so raising the snackbar from it repeated the same
             // error for each unrelated isLoading/syncStatus change while the failure persisted.
-            _uiEvent.emit(RecipesUiEvent.ShowSnackbar(R.string.loading_recipes_error))
+            _uiEvent.send(RecipesUiEvent.ShowSnackbar(R.string.loading_recipes_error))
             emit(Async.Error(R.string.loading_recipes_error))
         }
 

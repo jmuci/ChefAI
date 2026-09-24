@@ -30,8 +30,14 @@ interface MealPlanDao {
     @Query("SELECT * FROM meal_plans WHERE syncState IN ('PENDING', 'DELETED')")
     suspend fun getAllDirty(): List<MealPlanEntity>
 
-    @Query("UPDATE meal_plans SET syncState = :syncState, updatedAt = :updatedAt WHERE uuid = :uuid")
-    suspend fun updateSyncState(uuid: UUID, syncState: SyncState, updatedAt: Long)
+    /**
+     * Marks a pushed row with the server's timestamp. Pass [expectedUpdatedAt] — the `updatedAt`
+     * the row had when it was pushed — so an edit made while the push was in flight (which bumps
+     * `updatedAt`) is left PENDING for the next push instead of being silently marked SYNCED.
+     * @return the number of rows updated (0 when the row changed since it was pushed).
+     */
+    @Query("UPDATE meal_plans SET syncState = :syncState, updatedAt = :updatedAt WHERE uuid = :uuid AND (:expectedUpdatedAt IS NULL OR updatedAt = :expectedUpdatedAt)")
+    suspend fun updateSyncState(uuid: UUID, syncState: SyncState, updatedAt: Long, expectedUpdatedAt: Long? = null): Int
 
     @Query("UPDATE meal_plans SET userId = :newUserId, syncState = 'PENDING', updatedAt = :updatedAt WHERE userId = :oldUserId")
     suspend fun reassignUserAndMarkPending(oldUserId: UUID, newUserId: UUID, updatedAt: Long)

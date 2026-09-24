@@ -129,8 +129,14 @@ interface RecipeDao {
     @Query("SELECT * FROM recipes WHERE syncState IN ('PENDING', 'DELETED')")
     suspend fun getAllDirty(): List<RecipeEntity>
 
-    @Query("UPDATE recipes SET syncState = :syncState, updatedAt = :updatedAt WHERE uuid = :uuid")
-    suspend fun updateSyncState(uuid: UUID, syncState: SyncState, updatedAt: Long)
+    /**
+     * Marks a pushed row with the server's timestamp. Pass [expectedUpdatedAt] — the `updatedAt`
+     * the row had when it was pushed — so an edit made while the push was in flight (which bumps
+     * `updatedAt`) is left PENDING for the next push instead of being silently marked SYNCED.
+     * @return the number of rows updated (0 when the row changed since it was pushed).
+     */
+    @Query("UPDATE recipes SET syncState = :syncState, updatedAt = :updatedAt WHERE uuid = :uuid AND (:expectedUpdatedAt IS NULL OR updatedAt = :expectedUpdatedAt)")
+    suspend fun updateSyncState(uuid: UUID, syncState: SyncState, updatedAt: Long, expectedUpdatedAt: Long? = null): Int
 
     @Query("UPDATE recipes SET deletedAt = :deletedAt, syncState = 'DELETED', updatedAt = :deletedAt WHERE uuid = :uuid")
     suspend fun softDelete(uuid: UUID, deletedAt: Long)
@@ -165,7 +171,9 @@ interface RecipeDao {
         WHERE r.deletedAt IS NULL
           AND (r.imageUrl != '' OR r.imageBlobId IS NOT NULL)
           AND COALESCE(s.attempts, 0) < :maxAttempts
-        ORDER BY r.updatedAt DESC
+        -- Rows with no cached file first: once the newest :scanLimit rows are all cached they would
+        -- otherwise fill the window forever and older recipes would never be scanned.
+        ORDER BY (r.localImagePath IS NULL) DESC, r.updatedAt DESC
         LIMIT :scanLimit
         """
     )
@@ -199,7 +207,9 @@ interface RecipeDao {
           AND r.localImagePath IS NOT NULL
           AND r.syncState = 'SYNCED'
           AND COALESCE(s.uploadAttempts, 0) < :maxAttempts
-        ORDER BY (r.imageUrl = '') DESC, r.updatedAt DESC
+        -- Never-uploaded rows first, for the same reason as the backfill query: rows that already
+        -- have a blob would otherwise fill the window and starve older recipes.
+        ORDER BY (r.imageBlobId IS NULL) DESC, (r.imageUrl = '') DESC, r.updatedAt DESC
         LIMIT :scanLimit
         """
     )

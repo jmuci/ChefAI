@@ -68,6 +68,12 @@ class FakeIngredientDao : IngredientDao {
         ingredientsFlow.value = currentList
     }
 
+    override suspend fun insertIfAbsent(ingredient: IngredientEntity) {
+        if (ingredientsFlow.value.none { it.uuid == ingredient.uuid }) {
+            ingredientsFlow.value = ingredientsFlow.value + ingredient
+        }
+    }
+
     override suspend fun upsertAll(ingredients: List<IngredientEntity>) {
         val currentList = ingredientsFlow.value.toMutableList()
         ingredients.forEach { ingredient ->

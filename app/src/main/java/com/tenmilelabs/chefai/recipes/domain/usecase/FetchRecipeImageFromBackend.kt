@@ -6,7 +6,7 @@ import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import com.tenmilelabs.chefai.recipes.data.network.readImageBodyCapped
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.expectSuccess
-import io.ktor.client.request.get
+import io.ktor.client.request.prepareGet
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.CoroutineDispatcher
@@ -46,22 +46,23 @@ class FetchRecipeImageFromBackend @Inject constructor(
     /** @return the stored file's absolute path, or `null` if the image could not be fetched. */
     suspend operator fun invoke(recipeId: UUID): String? = withContext(ioDispatcher) {
         try {
-            val response = client.get("${BuildConfig.API_BASE_URL}/recipes/$recipeId/image") {
+            // Streamed so the size cap bounds memory; a plain get() buffers the whole body first.
+            val bytes = client.prepareGet("${BuildConfig.API_BASE_URL}/recipes/$recipeId/image") {
                 expectSuccess = false
-            }
-
-            if (!response.status.isSuccess()) {
-                Timber.d("Backend has no image for %s (%s)", recipeId, response.status)
-                return@withContext null
-            }
-
-            val mimeType = response.contentType()?.withoutParameters()?.toString().orEmpty()
-            if (!mimeType.startsWith("image/")) {
-                Timber.w("Backend returned %s for %s, not an image", mimeType, recipeId)
-                return@withContext null
-            }
-
-            val bytes = response.readImageBodyCapped() ?: return@withContext null
+            }.execute { response ->
+                val mimeType = response.contentType()?.withoutParameters()?.toString().orEmpty()
+                when {
+                    !response.status.isSuccess() -> {
+                        Timber.d("Backend has no image for %s (%s)", recipeId, response.status)
+                        null
+                    }
+                    !mimeType.startsWith("image/") -> {
+                        Timber.w("Backend returned %s for %s, not an image", mimeType, recipeId)
+                        null
+                    }
+                    else -> response.readImageBodyCapped()
+                }
+            } ?: return@withContext null
             recipeImageStore.write(recipeId, bytes)
         } catch (e: CancellationException) {
             throw e

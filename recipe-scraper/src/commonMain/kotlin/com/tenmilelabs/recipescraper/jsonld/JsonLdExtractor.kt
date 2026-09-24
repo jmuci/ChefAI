@@ -15,17 +15,21 @@ import kotlinx.serialization.json.contentOrNull
  *
  * A "candidate miss" — a `Recipe`-typed object with no usable `name` — does not abort the search;
  * the next candidate (in the same block's `@graph`, or a later script block) is tried instead.
- * A malformed block is skipped rather than failing the whole extraction.
+ * The first candidate that also has ingredients wins; a name-only stub that appears before the
+ * real recipe is returned only if nothing better turns up. A malformed block is skipped rather than
+ * failing the whole extraction.
  */
 internal fun extractJsonLdRecipe(document: Document, sourceUrl: String): ScrapedRecipe? {
+    var fallback: ScrapedRecipe? = null
     for (script in document.select("script[type=application/ld+json]")) {
         val root = runCatching { LENIENT_JSON.parseToJsonElement(script.data()) }.getOrNull() ?: continue
         for (candidate in findRecipeCandidates(root)) {
-            val recipe = mapJsonLdRecipe(candidate, sourceUrl)
-            if (recipe != null) return recipe
+            val recipe = mapJsonLdRecipe(candidate, sourceUrl) ?: continue
+            if (recipe.ingredients.isNotEmpty()) return recipe
+            if (fallback == null) fallback = recipe
         }
     }
-    return null
+    return fallback
 }
 
 private val LENIENT_JSON = Json {
@@ -35,18 +39,20 @@ private val LENIENT_JSON = Json {
 
 /**
  * Walks a parsed JSON-LD document looking for `Recipe`-typed objects, in document order. Handles a
- * bare object, a top-level array, an `@graph` wrapper, and an `@graph` nested inside an array
- * element.
+ * bare object, a top-level array, an `@graph` wrapper, an `@graph` nested inside an array element,
+ * and a recipe hung off a `WebPage`'s `mainEntity`. Depth-capped like the mapper's walkers.
  */
-private fun findRecipeCandidates(element: JsonElement): List<JsonObject> = when (element) {
-    is JsonObject -> buildList {
-        if (element.isRecipeType()) add(element)
-        (element["@graph"] as? JsonArray)?.let { addAll(findRecipeCandidates(it)) }
-    }
+private fun findRecipeCandidates(element: JsonElement, depth: Int = 0): List<JsonObject> =
+    if (depth >= MAX_NESTING_DEPTH) emptyList() else when (element) {
+        is JsonObject -> buildList {
+            if (element.isRecipeType()) add(element)
+            (element["@graph"] as? JsonArray)?.let { addAll(findRecipeCandidates(it, depth + 1)) }
+            element["mainEntity"]?.let { addAll(findRecipeCandidates(it, depth + 1)) }
+        }
 
-    is JsonArray -> element.flatMap { findRecipeCandidates(it) }
-    else -> emptyList()
-}
+        is JsonArray -> element.flatMap { findRecipeCandidates(it, depth + 1) }
+        else -> emptyList()
+    }
 
 private fun JsonObject.isRecipeType(): Boolean = typeNames().any { it.equals("Recipe", ignoreCase = true) }
 

@@ -17,7 +17,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.RedirectResponseException
 import io.ktor.client.plugins.ResponseException
-import io.ktor.client.request.get
+import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.HttpHeaders
@@ -153,18 +153,22 @@ class DefaultRecipeImporter @Inject constructor(
         return FetchOutcome.Failure(RecipeImportResult.NetworkError("Too many redirects"))
     }
 
+    // prepareGet().execute { } streams the body: a plain get() reads the whole response into memory
+    // first, so a huge (or gzip-bomb) page would OOM before readBodyCapped ever ran.
     private suspend fun fetchOnce(url: String): FetchStep = try {
-        val response = httpClient.get(url)
-        val contentType = response.contentType()
-        val mimeType = contentType?.withoutParameters()?.toString().orEmpty()
-        val outcome = if (!mimeType.equals("text/html", ignoreCase = true) &&
-            !mimeType.equals("application/xhtml+xml", ignoreCase = true)
-        ) {
-            FetchOutcome.Failure(RecipeImportResult.NetworkError("Not an HTML page"))
-        } else {
-            FetchOutcome.Html(response.readBodyCapped(contentType?.charset()))
+        httpClient.prepareGet(url).execute { response ->
+            // A malformed Content-Type header makes contentType() throw; treat it as "not HTML".
+            val contentType = runCatching { response.contentType() }.getOrNull()
+            val mimeType = contentType?.withoutParameters()?.toString().orEmpty()
+            val outcome = if (!mimeType.equals("text/html", ignoreCase = true) &&
+                !mimeType.equals("application/xhtml+xml", ignoreCase = true)
+            ) {
+                FetchOutcome.Failure(RecipeImportResult.NetworkError("Not an HTML page"))
+            } else {
+                FetchOutcome.Html(response.readBodyCapped(contentType?.charset()))
+            }
+            FetchStep.Terminal(outcome)
         }
-        FetchStep.Terminal(outcome)
     } catch (e: CancellationException) {
         throw e
     } catch (e: RedirectResponseException) {
@@ -188,6 +192,11 @@ class DefaultRecipeImporter @Inject constructor(
     } catch (e: IOException) {
         Timber.w(e, "Recipe import network error")
         FetchStep.Terminal(FetchOutcome.Failure(RecipeImportResult.NetworkError(e.message ?: "Network error")))
+    } catch (e: Exception) {
+        // Anything else (e.g. a malformed header Ktor refuses to parse) must not escape into the
+        // ViewModel's launch, which has no handler and would crash the app.
+        Timber.w(e, "Recipe import failed unexpectedly")
+        FetchStep.Terminal(FetchOutcome.Failure(RecipeImportResult.NetworkError(e.message ?: "Request failed")))
     }
 
     /**

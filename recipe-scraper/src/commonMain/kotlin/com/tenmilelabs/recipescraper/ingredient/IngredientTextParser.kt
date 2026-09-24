@@ -163,7 +163,8 @@ private fun normalizeUnit(token: String): String? {
 
 private val DASHES = listOf('-', '–', '—')
 
-private val RANGE_WORDS = setOf("to", "or")
+// Dashes too, for ranges written with spaces around them ("1 - 2 tablespoons").
+private val RANGE_WORDS = setOf("to", "or", "-", "–", "—")
 
 private val VULGAR_FRACTIONS: Map<Char, Double> = mapOf(
     '½' to 0.5,          // ½

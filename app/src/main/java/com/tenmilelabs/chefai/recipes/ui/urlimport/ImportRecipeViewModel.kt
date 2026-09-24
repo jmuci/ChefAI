@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.net.URLDecoder
 import javax.inject.Inject
 
 @HiltViewModel
@@ -29,8 +28,8 @@ class ImportRecipeViewModel @Inject constructor(
 ) : ViewModel() {
 
     /** Set when the screen was opened via the share sheet, e.g. Chrome's "Share" → Pocket Chef. */
+    // Already decoded by Navigation — decoding again would corrupt URLs containing %-escapes.
     private val prefillUrl: String? = savedStateHandle.get<String>(AppDestinationArgs.PREFILL_URL_ARG)
-        ?.let { runCatching { URLDecoder.decode(it, "UTF-8") }.getOrNull() }
         ?.takeIf { it.isNotBlank() }
 
     private val _state = MutableStateFlow(ImportRecipeState(url = prefillUrl.orEmpty()))

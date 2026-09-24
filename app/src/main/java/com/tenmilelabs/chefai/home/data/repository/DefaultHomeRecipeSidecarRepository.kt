@@ -55,15 +55,18 @@ class DefaultHomeRecipeSidecarRepository @Inject constructor(
             tagDao.upsertAll(sidecar.tags.map { it.toTagEntity() })
             labelDao.upsertAll(sidecar.labels.map { it.toLabelEntity() })
 
-            // 2. Determine which recipes to skip. Only PENDING (unpushed local edits) is skipped —
-            //    SYNCED rows are still overwritten so a later sidecar delivery can complete detail
-            //    (e.g. ingredients/steps) an earlier delivery omitted. This mirrors
-            //    SyncOrchestrator.applyPulledRecipe, which also overwrites SYNCED rows from server data.
+            // 2. Determine which recipes to skip: PENDING rows (unpushed local edits) and any recipe
+            //    that already has detail (steps or ingredients) — i.e. one that arrived complete via
+            //    sync, fetch, or an earlier sidecar. The sidecar synthesizes its own step/ingredient
+            //    ids, so writing over such a recipe would duplicate every step and ingredient. Only
+            //    detail-less rows are (re)written, so a later delivery can still fill them in.
             val recipeUuids = sidecar.recipes.mapNotNull { runCatching { UUID.fromString(it.uuid) }.getOrNull() }
-            val skipIds = recipeUuids.filter { uuid ->
-                val existing = recipeDao.getRecipeById(uuid)
-                existing != null && existing.syncState == SyncState.PENDING
-            }.toSet()
+            val existingById = recipeUuids.mapNotNull { recipeDao.getRecipeById(it) }.associateBy { it.uuid }
+            val skipIds = existingById.values.filter { existing ->
+                existing.syncState == SyncState.PENDING ||
+                    recipeStepDao.getStepsForRecipe(existing.uuid).isNotEmpty() ||
+                    recipeIngredientDao.getIngredientsForRecipe(existing.uuid).isNotEmpty()
+            }.mapTo(mutableSetOf()) { it.uuid }
 
             val recipesToWrite = sidecar.recipes.filter { dto ->
                 val uuid = runCatching { UUID.fromString(dto.uuid) }.getOrNull() ?: return@filter false
@@ -75,8 +78,16 @@ class DefaultHomeRecipeSidecarRepository @Inject constructor(
                 return@transactionRunner 0
             }
 
-            // 3. Upsert recipes
-            val recipeEntities = recipesToWrite.map { it.toRecipeEntity() }
+            // 3. Upsert recipes, keeping device-local columns the sidecar knows nothing about.
+            val recipeEntities = recipesToWrite.map { dto ->
+                val entity = dto.toRecipeEntity()
+                existingById[entity.uuid]?.let { existing ->
+                    entity.copy(
+                        localImagePath = existing.localImagePath,
+                        imageBlobId = existing.imageBlobId,
+                    )
+                } ?: entity
+            }
             recipeDao.upsertAll(recipeEntities)
 
             // 4. Upsert cross-refs for written recipes only

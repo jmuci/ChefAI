@@ -49,6 +49,10 @@ private const val MAX_PLAUSIBLE_SERVINGS = 999
  */
 internal fun firstNutritionIntOrNull(raw: String?, maxPlausibleValue: Int): Int? {
     if (raw.isNullOrBlank()) return null
-    val digits = FIRST_INT.find(raw)?.value ?: return null
+    // Comma-grouped thousands first ("1,200 calories" → 1200, not 1). Only commas, and only a
+    // non-zero leading group, so "0.125 g" and "12.5 g" still read as decimals.
+    val digits = FIRST_NUTRITION_INT.find(raw)?.value?.replace(",", "") ?: return null
     return digits.toIntOrNull()?.takeIf { it in 0..maxPlausibleValue }
 }
+
+private val FIRST_NUTRITION_INT = Regex("[1-9]\\d{0,2}(?:,\\d{3})+(?![\\d,])|\\d+")

@@ -18,7 +18,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import java.net.URLEncoder
 import java.util.UUID
 
 private const val BLOCKED_URL = "https://blocked.example.com/recipe"
@@ -42,7 +41,7 @@ class BrowserImportViewModelTest {
 
     private fun createViewModel(url: String = BLOCKED_URL): BrowserImportViewModel {
         val savedStateHandle = SavedStateHandle().apply {
-            set(AppDestinationArgs.IMPORT_URL_ARG, URLEncoder.encode(url, "UTF-8"))
+            set(AppDestinationArgs.IMPORT_URL_ARG, url)
         }
         return BrowserImportViewModel(
             recipeImporter = recipeImporter,

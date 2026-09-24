@@ -85,6 +85,9 @@ private suspend fun WebView.awaitImageDataUrl(): String? = suspendCancellableCor
 
 /** Decodes the base64 payload of a `data:<mime>;base64,<payload>` URL, or `null` if malformed. */
 private fun String.toImageBytesOrNull(): ByteArray? {
+    // The result is read from a global in the page's own JS context, which the page can overwrite;
+    // at minimum refuse anything that doesn't even claim to be an image.
+    if (!startsWith("data:image/", ignoreCase = true)) return null
     val base64 = substringAfter(delimiter = ",", missingDelimiterValue = "")
     if (base64.isEmpty()) return null
     return runCatching { Base64.decode(base64, Base64.DEFAULT) }.getOrNull()

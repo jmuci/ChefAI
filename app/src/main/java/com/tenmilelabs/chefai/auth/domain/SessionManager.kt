@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.auth.domain
 import com.tenmilelabs.chefai.auth.data.local.SecurePreferencesInterface
 import com.tenmilelabs.chefai.auth.data.mapper.toAuthToken
 import com.tenmilelabs.chefai.auth.data.mapper.toUser
+import com.tenmilelabs.chefai.auth.data.network.AuthHttpException
 import com.tenmilelabs.chefai.auth.data.network.AuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.data.network.dto.LoginRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RefreshTokenRequest
@@ -144,9 +145,17 @@ class SessionManager @Inject constructor(
                         Timber.d("Session refreshed successfully")
                         syncSchedulerProvider.get().requestImmediateSync()
                         syncSchedulerProvider.get().schedulePeriodicSync()
-                    } else {
-                        Timber.w("Failed to refresh session, falling back to anonymous")
+                    } else if (refreshResult.exceptionOrNull().isRefreshRejection()) {
+                        Timber.w("Refresh token rejected, falling back to anonymous")
                         enterAnonymousSession()
+                    } else {
+                        // Offline / timeout / 5xx: the credentials are still good, only the access
+                        // token is stale. Dropping to anonymous here would hide the account's data
+                        // and orphan anything created meanwhile under the anonymous id. Stay
+                        // signed in; the sync worker refreshes on its first 401.
+                        Timber.w("Could not refresh session (transient), staying authenticated")
+                        syncSchedulerProvider.get().requestImmediateSync()
+                        syncSchedulerProvider.get().schedulePeriodicSync()
                     }
                 } else {
                     Timber.d("Session loaded successfully for user: ${user.uuid}")
@@ -584,3 +593,10 @@ class SessionManager @Inject constructor(
         return currentTime >= (session.authToken.expiresAt - bufferMillis)
     }
 }
+
+/**
+ * Whether a failed refresh means the server rejected the refresh token (4xx), as opposed to a
+ * transient failure — offline, timeout, 5xx — after which the stored credentials are still valid.
+ */
+private fun Throwable?.isRefreshRejection(): Boolean =
+    this is AuthHttpException && statusCode in 400..499

@@ -89,6 +89,23 @@ object UnitConversion {
     }
 
     /**
+     * [amountInBase] grams (mass) or millilitres (volume) expressed in the best-fitting unit of
+     * [system] — the same unit choice and rounding [convert] applies. Used to re-express a total
+     * summed from amounts that ended up in different units of one system ("500 g" + "1 kg").
+     */
+    fun present(amountInBase: Double, dimension: UnitDimension, system: UnitSystem): ConvertedAmount =
+        when (system) {
+            UnitSystem.METRIC -> when (dimension) {
+                UnitDimension.MASS -> metricMass(amountInBase, isApproximate = false)
+                UnitDimension.VOLUME -> metricVolume(amountInBase)
+            }
+            UnitSystem.IMPERIAL -> when (dimension) {
+                UnitDimension.MASS -> imperialMass(amountInBase)
+                UnitDimension.VOLUME -> imperialVolume(amountInBase)
+            }
+        }
+
+    /**
      * Whether to step up to the larger unit is decided on the **rounded** figure, not the raw one.
      * 2.2 lb is 997.9 g, which rounds to 1000 — and "1000 g" sitting in a list where everything
      * else promotes reads as though the promotion had silently failed at the one boundary it

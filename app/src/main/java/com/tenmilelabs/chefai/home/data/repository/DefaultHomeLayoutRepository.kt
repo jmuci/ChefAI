@@ -36,7 +36,19 @@ class DefaultHomeLayoutRepository @Inject constructor(
         }
 
         // 2. Revalidate against backend checksum using If-None-Match/ETag
-        when (val networkResult = networkDataSource.fetchLayout(ifNoneMatch = cached?.layoutChecksum)) {
+        // A failed revalidation (offline, 5xx) must not replace an already-emitted cached layout
+        // with the bundled one — only rethrow into the bundled fallback when there's no cache.
+        val networkResult = try {
+            networkDataSource.fetchLayout(ifNoneMatch = cached?.layoutChecksum)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            if (cached == null) throw e
+            Timber.w(e, "SDUI: revalidation failed, keeping cached layout")
+            null
+        }
+        when (networkResult) {
+            null -> Unit
             HomeLayoutNetworkResult.NotModified -> { // HTTP 304
                 Timber.d("SDUI: BE layout: NOT MODIFIED. BE Result ${networkResult} == Cached Checksum: ${cached?.layoutChecksum} and ${cached?.components?.size ?: 0} components.")
                 //Unit

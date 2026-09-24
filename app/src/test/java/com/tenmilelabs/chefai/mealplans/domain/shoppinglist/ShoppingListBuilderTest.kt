@@ -61,6 +61,22 @@ class ShoppingListBuilderTest {
     }
 
     @Test
+    fun `different units of the same dimension and system merge into one amount`() {
+        val recipeA = UUID.randomUUID()
+        val recipeB = UUID.randomUUID()
+        val ingredients = listOf(
+            ingredient(recipeA, 0, "potatoes", 500.0, "g"),
+            ingredient(recipeB, 0, "potatoes", 1.0, "kg"),
+        )
+
+        val list = ShoppingListBuilder.build(
+            ingredients, mapOf(recipeA to 1, recipeB to 1), 0, emptySet(), MeasurementSystem.METRIC,
+        )
+
+        assertThat(list.allItems().single().quantityLabel).isEqualTo("1.5 kg")
+    }
+
+    @Test
     fun `a unit with no canonical form keeps its own wording`() {
         val recipeId = UUID.randomUUID()
         val ingredients = listOf(ingredient(recipeId, 0, "garlic", 3.0, "cloves"))

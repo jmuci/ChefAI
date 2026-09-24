@@ -12,7 +12,7 @@ import com.tenmilelabs.chefai.recipes.domain.repository.RenderedImageFetcher
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.RedirectResponseException
 import io.ktor.client.plugins.ResponseException
-import io.ktor.client.request.get
+import io.ktor.client.request.prepareGet
 import io.ktor.client.request.headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
@@ -104,17 +104,20 @@ class CacheRecipeImage @Inject constructor(
     }
 
     private suspend fun fetchOnce(url: String): FetchStep = try {
-        val response = httpClient.get(url) {
+        // Streamed (prepareGet().execute { }) so readImageBodyCapped's cap actually bounds memory —
+        // a plain get() buffers the whole body first.
+        httpClient.prepareGet(url) {
             headers { set(HttpHeaders.Accept, IMAGE_ACCEPT_HEADER) }
+        }.execute { response ->
+            val mimeType = response.contentType()?.withoutParameters()?.toString().orEmpty()
+            val outcome = if (!mimeType.startsWith("image/")) {
+                FetchOutcome.Failure(looksLikeBotWall = false)
+            } else {
+                val bytes = response.readImageBodyCapped()
+                if (bytes != null) FetchOutcome.Bytes(bytes) else FetchOutcome.Failure(looksLikeBotWall = false)
+            }
+            FetchStep.Terminal(outcome)
         }
-        val mimeType = response.contentType()?.withoutParameters()?.toString().orEmpty()
-        val outcome = if (!mimeType.startsWith("image/")) {
-            FetchOutcome.Failure(looksLikeBotWall = false)
-        } else {
-            val bytes = response.readImageBodyCapped()
-            if (bytes != null) FetchOutcome.Bytes(bytes) else FetchOutcome.Failure(looksLikeBotWall = false)
-        }
-        FetchStep.Terminal(outcome)
     } catch (e: CancellationException) {
         throw e
     } catch (e: RedirectResponseException) {

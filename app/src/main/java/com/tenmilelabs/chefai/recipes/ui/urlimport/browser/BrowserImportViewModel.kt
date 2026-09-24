@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
-import java.net.URLDecoder
 import javax.inject.Inject
 
 /**
@@ -35,9 +34,8 @@ class BrowserImportViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
-    private val url: String = savedStateHandle.get<String>(AppDestinationArgs.IMPORT_URL_ARG)
-        ?.let { runCatching { URLDecoder.decode(it, "UTF-8") }.getOrNull() }
-        .orEmpty()
+    // Already decoded by Navigation — decoding again would corrupt URLs containing %-escapes.
+    private val url: String = savedStateHandle.get<String>(AppDestinationArgs.IMPORT_URL_ARG).orEmpty()
 
     private val _state = MutableStateFlow(BrowserImportState(url = url))
     val state: StateFlow<BrowserImportState> = _state.asStateFlow()
