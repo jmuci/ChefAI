@@ -34,6 +34,8 @@ import com.tenmilelabs.chefai.recipes.domain.repository.RenderedImageFetcher
 import com.tenmilelabs.chefai.search.data.repository.DefaultRecipeSearchRepository
 import com.tenmilelabs.chefai.search.domain.repository.RecipeSearchRepository
 import dagger.Binds
+import com.tenmilelabs.chefai.mealplans.data.repository.DataStoreMealPlanPreferencesRepository
+import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanPreferencesRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.components.SingletonComponent
@@ -218,4 +220,14 @@ abstract class TestRepositoryModule {
     @Binds
     @Singleton
     abstract fun bindHouseholdNetworkDataSource(service: HouseholdApiService): HouseholdNetworkDataSource
+
+    /**
+     * Binds the meal plan preferences repository (same as production) — required for Hilt's
+     * shared test component to resolve `MealPlansViewModel`'s graph since the week view (#250)
+     * started injecting it. See docs/claude/gotchas.md #21.
+     */
+    @Binds
+    abstract fun bindMealPlanPreferencesRepository(
+        repository: DataStoreMealPlanPreferencesRepository
+    ): MealPlanPreferencesRepository
 }
