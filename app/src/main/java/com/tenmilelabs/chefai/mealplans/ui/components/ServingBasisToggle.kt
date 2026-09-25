@@ -5,7 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -54,7 +56,10 @@ fun ServingBasisToggle(
                 width = MaterialTheme.chefColors.rowRuleWidth,
                 color = MaterialTheme.colorScheme.outline,
             )
-            .heightIn(min = SegmentHeight),
+            .heightIn(min = SegmentHeight)
+            // VerticalDivider is fillMaxHeight(): without an intrinsic height the Row takes every
+            // pixel its parent allows, and in the Meal Plans top bar that is the whole screen.
+            .height(IntrinsicSize.Min),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         MealPlanServingBasis.entries.forEachIndexed { index, entry ->
