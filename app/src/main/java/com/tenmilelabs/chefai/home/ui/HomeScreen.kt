@@ -4,14 +4,10 @@ import android.content.res.Configuration.UI_MODE_NIGHT_YES
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
@@ -20,15 +16,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
+import com.tenmilelabs.chefai.core.ui.components.Panel
+import com.tenmilelabs.chefai.core.ui.components.PanelMetrics
 import com.tenmilelabs.chefai.core.ui.preview.PreviewData
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.core.ui.theme.chefColors
@@ -122,17 +118,17 @@ fun HomeContent(
             .background(MaterialTheme.chefColors.panelGround)
             .animateContentSize(),
         contentPadding = PaddingValues(
-            start = HomeMetrics.PanelInset,
-            end = HomeMetrics.PanelInset,
-            bottom = HomeMetrics.PanelGap,
+            start = PanelMetrics.Inset,
+            end = PanelMetrics.Inset,
+            bottom = PanelMetrics.Gap,
         ),
-        verticalArrangement = Arrangement.spacedBy(HomeMetrics.PanelGap),
+        verticalArrangement = Arrangement.spacedBy(PanelMetrics.Gap),
     ) {
         items(
             items = sections,
             key = { section -> section.key },
         ) { section ->
-            HomePanel(modifier = Modifier.animateItem()) {
+            Panel(modifier = Modifier.animateItem()) {
                 section.components.forEach { component ->
                     ComponentRenderer(
                         component = component,
@@ -144,34 +140,6 @@ fun HomeContent(
             }
         }
     }
-}
-
-/** One section's surface: `chefColors.panelSurface` with `chefColors.panelRadius` corners. */
-@Composable
-private fun HomePanel(
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(MaterialTheme.chefColors.panelRadius))
-            .background(MaterialTheme.chefColors.panelSurface)
-            .padding(vertical = HomeMetrics.PanelVerticalPadding),
-        verticalArrangement = Arrangement.spacedBy(HomeMetrics.PanelContentGap),
-    ) {
-        content()
-    }
-}
-
-private object HomeMetrics {
-    /** Page margin around the panels, and the gap between two of them. */
-    val PanelInset = 12.dp
-    val PanelGap = 12.dp
-
-    /** Inside a panel: top/bottom padding, and the gap between its header and its carousel. */
-    val PanelVerticalPadding = 16.dp
-    val PanelContentGap = 12.dp
 }
 
 /**

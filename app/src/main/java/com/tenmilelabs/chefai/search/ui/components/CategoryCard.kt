@@ -7,12 +7,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -31,8 +33,8 @@ private val CardMinHeight = 76.dp
 
 /**
  * A browse shortcut on the Search tab: a flat accent-ramp tile, label flush left and
- * bottom-aligned. Replaces the pre-redesign gradient card — Modernist forbids both gradients and
- * corner radius.
+ * bottom-aligned, with `chefColors.mediaRadius` corners — it stands in for card artwork, so it
+ * rounds like an image does (docs/design/modernist.md § 1.4). No gradient.
  *
  * TODO(dark): one of the three cases the handoff says will not invert mechanically — light tints
  *  cycle the *shallow* end of the ramp (accent-100/200/300) with accent-900 text; on a dark ground
@@ -59,6 +61,7 @@ fun CategoryCard(
             .testTag("CategoryCard")
             .fillMaxWidth()
             .heightIn(min = CardMinHeight)
+            .clip(RoundedCornerShape(MaterialTheme.chefColors.mediaRadius))
             .background(fill)
             .flatClickable(onClick = onClick, role = Role.Button)
             .padding(CardPadding),

@@ -234,8 +234,17 @@ space**:
 - A paneled screen's header passes `containerColor = chefColors.panelGround` so it continues the
   page.
 
-Home is the reference implementation (`HomeContent` / `HomePanel` in `home/ui/HomeScreen.kt`). The
-SDUI payload stays flat; `groupIntoSections` groups each header with what follows it client-side.
+Build with `core/ui/components/Panel.kt`: `Panel` for a section composed whole, `PanelMetrics`
+for the inset and gaps, and `Modifier.panelSegment(isFirst, isLast)` for a lazy list that has to
+read as one panel (each item paints its slice; the ends take the corners). Header routes that use
+the plain `ChefAITopAppBar` join `paneledRoutes` in `ChefAINavGraph.kt`.
+
+Converted so far:
+
+| Screen | Notes |
+| --- | --- |
+| Home | Reference implementation. The SDUI payload stays flat; `groupIntoSections` groups each header with what follows it client-side. |
+| Search | One panel per browse group. The field is a square `panelSurface` fill, no border; results are one segmented panel. Category tiles round at `mediaRadius` — they stand in for artwork. |
 
 ---
 

@@ -39,8 +39,7 @@ class SearchBrowseContentTest {
             }
         }
 
-        // Modernist section labels are rendered uppercase (titleSmall's tracking assumes it) —
-        // ignoreCase so this test doesn't hardcode that transform.
+        // ignoreCase so this test doesn't hardcode how the panel header cases its title.
         composeTestRule.onNodeWithText(
             context.getString(R.string.search_section_by_meal),
             ignoreCase = true,

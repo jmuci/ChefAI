@@ -60,7 +60,8 @@ private val ThumbnailHeight = 60.dp
  * recipe UUID. Left null (the default) at this card's three existing call sites, which don't want
  * inline save — introduced for search results, where saving without opening the recipe matters.
  * @param showDivider Whether to draw the 1dp row rule under the row. On by default for the ruled
- * lists; off inside a panel (Home), where rows separate by spacing instead.
+ * lists; off inside a panel (Home, Search results), where rows separate by spacing instead — and
+ * where the press tint sinks to `chefColors.panelGround` rather than lifting to neutral-100.
  */
 @Composable
 fun RecipeListCard(
@@ -73,13 +74,20 @@ fun RecipeListCard(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
+    // neutral-100 lifts a row off the plain ground, but it *is* the panel surface in light — on a
+    // panel the press has to sink to the page tone instead to show at all.
+    val pressedFill = if (showDivider) {
+        MaterialTheme.chefColors.neutral.s100
+    } else {
+        MaterialTheme.chefColors.panelGround
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = ThumbnailHeight)
-                .background(if (pressed) MaterialTheme.chefColors.neutral.s100 else Color.Unspecified)
+                .background(if (pressed) pressedFill else Color.Unspecified)
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,

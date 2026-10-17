@@ -102,15 +102,18 @@ private object HeaderMetrics {
  *
  * Headers that stack extra content beneath the title row (the wizard's progress bar, the shopping
  * list's completion bar) build on [ChefAITopAppBarSurface] rather than growing a parameter here.
+ *
+ * @param containerColor the header's ground; see [ChefAITopAppBarWithSubtitle].
  */
 @Composable
 fun ChefAITopAppBar(
     title: String,
     modifier: Modifier = Modifier,
     navigation: ChefAINavigation = ChefAINavigation.None,
+    containerColor: Color = MaterialTheme.colorScheme.background,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
-    ChefAITopAppBarSurface(modifier = modifier) {
+    ChefAITopAppBarSurface(modifier = modifier, containerColor = containerColor) {
         HeaderRow(navigation = navigation, actions = actions) {
             HeaderTitle(title)
         }
@@ -125,7 +128,7 @@ fun ChefAITopAppBar(
  * title block does not push the back arrow off the first line.
  *
  * @param containerColor the header's ground. Defaults to the screen ground; a paneled screen
- *   (Home) passes `chefColors.panelGround` so the header continues the page behind its panels.
+ *   (Home, Search) passes `chefColors.panelGround` so the header continues the page behind its panels.
  */
 @Composable
 fun ChefAITopAppBarWithSubtitle(
