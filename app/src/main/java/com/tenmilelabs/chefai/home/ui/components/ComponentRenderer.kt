@@ -92,6 +92,10 @@ fun ComponentRenderer(
                 recipe = recipe,
                 // Home rows sit inside a panel and separate by spacing, not a rule.
                 showDivider = false,
+                // An all-list-card carousel stacks vertically (SduiCarousel.rendersAsList); a
+                // list card mixed into a horizontal carousel needs a bounded width, or its
+                // weighted text column measures to zero under the LazyRow.
+                modifier = if (isCarouselItem) modifier.width(300.dp) else modifier,
                 navigateToDetail = { onAction(HomeAction.CardClicked(it.toString())) },
             )
         }
