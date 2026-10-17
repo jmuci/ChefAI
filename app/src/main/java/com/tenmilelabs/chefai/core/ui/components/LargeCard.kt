@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -39,6 +41,7 @@ import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
 import com.tenmilelabs.chefai.core.ui.preview.PreviewData
 import com.tenmilelabs.chefai.core.ui.recipeImageModel
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
+import com.tenmilelabs.chefai.core.ui.theme.chefColors
 import java.util.UUID
 
 /**
@@ -73,7 +76,9 @@ fun LargeCard(
     onSaveToCollection: (UUID) -> Unit = {}
 ) {
     BoxWithConstraints(modifier = modifier) {
-        val isCompact = maxWidth < CompactWidthThreshold
+        // A fixed height means a carousel tile, however wide: the hero stack only fits when it can
+        // wrap its own height, and 300×220 tiles were rendering it clipped.
+        val isCompact = constraints.hasBoundedHeight || maxWidth < CompactWidthThreshold
 
         Column(
             modifier = Modifier
@@ -91,6 +96,7 @@ fun LargeCard(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clip(RoundedCornerShape(MaterialTheme.chefColors.mediaRadius))
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .let { if (isCompact) it.weight(1f) else it.aspectRatio(16f / 10f) },
             )

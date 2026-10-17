@@ -48,8 +48,13 @@ data class ChefRamp(
  *   accent-600, which measures 4.26:1 on the ground and fails AA below large-text sizes. Accent
  *   *text* is a different role from accent *fill*, so it gets its own token rather than a note in
  *   a doc that a call site can miss.
- * - **[navSurface]** — the bottom-nav sage. Deliberately not the teal accent, and with no
- *   counterpart anywhere else in the system, so one named role covers it.
+ * - **[panelGround] / [panelSurface] / [panelRadius] / [mediaRadius]** — the surface model a
+ *   screen opts into instead of rules: a slightly sunken page with lighter, rounded panels on it,
+ *   separated by color and space rather than lines. Home uses it; the ruled screens do not yet.
+ *   See docs/design/modernist.md § 3.1.
+ * - **[navSurface] / [navIndicator] / [navActiveContent] / [navShade]** — the bottom nav: a
+ *   panel-toned bar with a soft shade cast upward instead of a rule, and a tinted pill behind the
+ *   active tab.
  * - **[sectionRuleWidth] / [rowRuleWidth] / [cornerRadius]** — the layout constants. This system
  *   organizes by rule weight rather than by shadow or fill, so the two widths are as much a token
  *   as any color is. They are theme-invariant: identical in light and dark by design, because a
@@ -80,10 +85,28 @@ data class ChefColors(
      * number badges, selected chips) where ground-colored text sits on top of it.
      */
     val accentText: Color,
+    /** The page *behind* panels — one step darker than a panel so the panels lift by tone. */
+    val panelGround: Color,
+    /** A panel's fill — the lighter surface a section sits on. */
+    val panelSurface: Color,
+    /** The bottom nav's (and rail's) fill. */
     val navSurface: Color,
+    /** The pill behind the active nav tab's icon. */
+    val navIndicator: Color,
+    /** The active nav tab's icon and label — AA-safe on [navIndicator] and [navSurface]. */
+    val navActiveContent: Color,
+    /**
+     * The shade the nav casts upward onto the content beneath it, in place of a rule.
+     * [Color.Transparent] in dark, where shadows read as noise and tone does the work.
+     */
+    val navShade: Color,
     val sectionRuleWidth: Dp,
     val rowRuleWidth: Dp,
     val cornerRadius: Dp,
+    /** A panel's corner radius. Containers only — controls (buttons, inputs, chips) stay square. */
+    val panelRadius: Dp,
+    /** A recipe image's corner radius, one step tighter than [panelRadius] so it nests inside one. */
+    val mediaRadius: Dp,
     val panelShadowElevation: Dp,
 )
 
@@ -112,10 +135,17 @@ internal val LightChefColors = ChefColors(
         s900 = ModernistPalette.Neutral900,
     ),
     accentText = ModernistPalette.Accent700,
-    navSurface = ModernistPalette.NavSage,
+    panelGround = ModernistPalette.GroundSunken,
+    panelSurface = ModernistPalette.Neutral100,
+    navSurface = ModernistPalette.Neutral100,
+    navIndicator = ModernistPalette.Accent100,
+    navActiveContent = ModernistPalette.Accent700,
+    navShade = ModernistPalette.NavShade,
     sectionRuleWidth = ChefRuleWidths.Section,
     rowRuleWidth = ChefRuleWidths.Row,
     cornerRadius = ChefRuleWidths.CornerRadius,
+    panelRadius = ChefRuleWidths.PanelRadius,
+    mediaRadius = ChefRuleWidths.MediaRadius,
     panelShadowElevation = ChefRuleWidths.PanelShadow,
 )
 
@@ -132,16 +162,16 @@ private val DarkUnset = Color(0xFFFF00FF)
 /**
  * The dark tokens — **not designed**. See docs/design/modernist.md § Dark mode.
  *
- * TODO(dark): the accent ramp and the nav surface are the two things the handoff says will not
- *  invert mechanically, so they are left as [DarkUnset] rather than guessed:
+ * TODO(dark): the accent ramp is the thing the handoff says will not invert mechanically, so it
+ *  is left as [DarkUnset] rather than guessed:
  *
  *  - **The accent ramp.** In light, tinted fills come from the shallow end (accent-100/200/300)
  *    with accent-900 text. On a dark ground the fill has to come from the *deep* end with light
  *    text — the ramp direction flips, it does not just darken. Darkening each step one-for-one
  *    produces fills that vanish into the ground and text that fails contrast.
- *  - **The nav sage.** It has no dark counterpart at all. It is a lighter treatment chosen to set
- *    the nav bar apart from the ground, and what plays that role on a dark ground is an open
- *    question — possibly not a tint at all, possibly a rule.
+ *
+ *  The panel and nav surfaces *are* filled in — derived, not designed: a deep page with raised
+ *  panels on it, so they separate by tone, and no nav shade. Provisional like the rest of dark.
  *
  *  The neutral ramp *is* filled in, mechanically inverted (100 ↔ 900), because a mono ramp does
  *  invert cleanly. It is still provisional: it has not been checked against the dark ground for
@@ -174,11 +204,20 @@ internal val DarkChefColors = ChefColors(
     // TODO(dark): the ramp flips on a dark ground, so the legible accent step is not accent-700
     //  there. Blocked on the same decision as the ramp above.
     accentText = DarkUnset,
-    navSurface = DarkUnset,
+    // TODO(dark): derived, not designed — the panels lift off a deeper page by tone alone.
+    panelGround = ModernistPalette.DarkGroundDeep,
+    panelSurface = ModernistPalette.DarkGroundRaised,
+    navSurface = ModernistPalette.DarkGroundRaised,
+    // The ramp flips on a dark ground: a deep fill with a shallow accent on it.
+    navIndicator = ModernistPalette.Accent800,
+    navActiveContent = ModernistPalette.Accent300,
+    navShade = Color.Transparent,
     // Theme-invariant: a rule is the same weight on any ground. Only its color changes.
     sectionRuleWidth = ChefRuleWidths.Section,
     rowRuleWidth = ChefRuleWidths.Row,
     cornerRadius = ChefRuleWidths.CornerRadius,
+    panelRadius = ChefRuleWidths.PanelRadius,
+    mediaRadius = ChefRuleWidths.MediaRadius,
     // Not a TODO(dark) — the handoff decides this one: "shadows in particular read as noise on a
     // dark surface; the profile-menu panel (screen 09) uses --shadow-lg plus a 2px border, and in
     // dark the border should do the work". Zero, deliberately.
@@ -196,8 +235,17 @@ private object ChefRuleWidths {
     /** 1dp — between rows inside a group. */
     val Row = 1.dp
 
-    /** 0dp, everywhere. The system has no rounded corners; the avatar circle is the one exception. */
+    /**
+     * 0dp — controls (buttons, inputs, chips) and everything Material shapes from the theme. Only
+     * the containers below round; the avatar circle stays the one other exception.
+     */
     val CornerRadius = 0.dp
+
+    /** 12dp — a panel's corners. */
+    val PanelRadius = 12.dp
+
+    /** 8dp — a recipe image's corners: [PanelRadius] minus a step, so it nests inside a panel. */
+    val MediaRadius = 8.dp
 
     /**
      * 12dp — the light value for `--shadow-lg` (`0 12px 32px #2d2b2b/22%`), the only shadow the

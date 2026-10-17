@@ -49,7 +49,8 @@ class NoLiteralColorsTest {
             |  neutral-200 fill    -> MaterialTheme.colorScheme.surfaceVariant
             |  accent ramp step    -> MaterialTheme.chefColors.accent.s100 … .s900
             |  neutral ramp step   -> MaterialTheme.chefColors.neutral.s100 … .s900
-            |  nav sage #e7f0e0    -> MaterialTheme.chefColors.navSurface
+            |  nav bar fill        -> MaterialTheme.chefColors.navSurface
+            |  panel / page behind -> MaterialTheme.chefColors.panelSurface / .panelGround
             |
             |If the color you need genuinely has no role yet, add one to ChefColors (and its dark
             |counterpart) in core/ui/theme/ rather than allowlisting the call site. The full table

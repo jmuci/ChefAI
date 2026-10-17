@@ -90,6 +90,8 @@ fun ComponentRenderer(
             val recipe = component.recipeId?.let { recipes[it] } ?: return
             RecipeListCard(
                 recipe = recipe,
+                // Home rows sit inside a panel and separate by spacing, not a rule.
+                showDivider = false,
                 navigateToDetail = { onAction(HomeAction.CardClicked(it.toString())) },
             )
         }

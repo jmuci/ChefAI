@@ -3,6 +3,12 @@
 The app is being restyled onto **Modernist**: flat, architectural, organized by ruled lines rather
 than by cards and shadows, Archivo throughout, zero corner radius.
 
+> **Revision (Oct 2026) — fewer lines.** After living with the ruled screens, the lines read as
+> too many and too loud. The system is moving to **surfaces**: sections separate by color and
+> space on rounded panels, the header and nav lose their rules, and the nav separates by a soft
+> shade instead. Landed so far: the tokens (§ 1.2), the shell (§ 9) and Home. The other screens
+> still use the rule rhythm (§ 3) and convert in follow-up PRs. See § 3.1.
+
 This document is the contract for that work. The source of truth is the design handoff
 (`~/Projects/design_handoff_chefai_redesign with_dark_mode/`: `README.md`, `styles.css`, and the
 19-screen prototype `ChefAI Redesign.dc.html`); this is its Compose translation. Where they
@@ -74,7 +80,14 @@ Read these from `MaterialTheme.chefColors` (`core/ui/theme/ChefColors.kt`).
 | `chefColors.accent.s100 … .s900` | `#E3F0EF` → `#053232` | Tinted fills, deep-accent text, the search cards' `index % 3` cycle. |
 | `chefColors.neutral.s100 … .s900` | `#F8F4F4` → `#2D2B2B` | Neutral tiles, member initials, disabled segments, thumbnails. |
 | `chefColors.accentText` | `#0A6363` | Accent as text or an icon on the ground. Accent-700, not the brand accent-600. |
-| `chefColors.navSurface` | `#E7F0E0` | The bottom-nav bar. A light sage, deliberately *not* the teal. |
+| `chefColors.panelGround` | `#EAE9E9` | The page *behind* panels on a paneled screen (Home). One step below a panel. |
+| `chefColors.panelSurface` | `#F8F4F4` | A panel's fill. |
+| `chefColors.panelRadius` | `12.dp` | A panel's corners. Containers only — controls stay square. |
+| `chefColors.mediaRadius` | `8.dp` | A recipe image's corners; nests inside a panel. |
+| `chefColors.navSurface` | `#F8F4F4` | The bottom-nav bar and rail. Panel-toned; the old sage is gone. |
+| `chefColors.navIndicator` | `#E3F0EF` | The pill behind the active tab's icon. |
+| `chefColors.navActiveContent` | `#0A6363` | The active tab's icon and label. |
+| `chefColors.navShade` | ink at 8% | The shade the nav casts upward onto the content. Transparent in dark. |
 | `chefColors.sectionRuleWidth` | `2.dp` | The heavy rule. |
 | `chefColors.rowRuleWidth` | `1.dp` | The hairline between rows. |
 | `chefColors.cornerRadius` | `0.dp` | Rarely needed directly — the theme's `Shapes` already covers components. |
@@ -119,8 +132,10 @@ sized to it in the design. Primary block buttons are 52dp.
 component that resolves its shape from the theme is square without a `shape =` argument. **Passing
 `RoundedCornerShape(0.dp)` at a call site is duplicating the theme, not obeying it** — delete it.
 
-The one exception in the entire design is the user avatar, which is a circle because it is an
-avatar, not because it is a container. Use `CircleShape` there, explicitly.
+**Containers round; controls do not.** Since the Oct 2026 revision a panel takes
+`chefColors.panelRadius` (12dp), a recipe image `chefColors.mediaRadius` (8dp), and the nav's
+active-tab pill is a `CircleShape`. Buttons, inputs, chips and tags stay square, which is why the
+theme's `Shapes` stays at 0dp. The user avatar remains a circle.
 
 ---
 
@@ -205,6 +220,22 @@ The row's own horizontal padding sits inside them.
 Do not write this out by hand. `RuledGroup` in `core/ui/components/flat/SectionRule.kt` applies
 the whole rhythm for you, and `SectionRule()` / `RowRule()` are there for the `LazyColumn` case
 where the rows are not children of one `Column`. See § 8.
+
+### 3.1 Surfaces — the replacement (Oct 2026)
+
+The rule rhythm above is being retired screen by screen. Its replacement separates by **color and
+space**:
+
+- The page is `chefColors.panelGround`; each section sits on a panel of `chefColors.panelSurface`
+  with `chefColors.panelRadius` corners, 12dp in from the screen edges and 12dp apart.
+- Inside a panel: 16dp top/bottom padding, a title-case heading (`titleLarge`) over a muted
+  `bodySmall` subtitle, then the content. No rules — rows separate by spacing
+  (`RecipeListCard(showDivider = false)`).
+- A paneled screen's header passes `containerColor = chefColors.panelGround` so it continues the
+  page.
+
+Home is the reference implementation (`HomeContent` / `HomePanel` in `home/ui/HomeScreen.kt`). The
+SDUI payload stays flat; `groupIntoSections` groups each header with what follows it client-side.
 
 ---
 
@@ -314,7 +345,8 @@ So, three rules:
 | Token | State | Why a mechanical inversion is wrong |
 | --- | --- | --- |
 | `chefColors.accent.*` (dark) | **magenta** | Light tinted fills come from the *shallow* end (accent-100/200/300) with accent-900 text. On a dark ground the fill must come from the *deep* end with light text. The ramp direction **flips**; it does not just darken. Darkening each step one-for-one gives fills that vanish into the ground and text that fails contrast. Affects the Search category cards and the Import error banner. |
-| `chefColors.navSurface` (dark) | **magenta** | The sage has no dark counterpart at all. It is a lighter treatment chosen to set the nav bar apart from the ground; what plays that role on a dark ground is open — possibly not a tint at all, possibly a rule. |
+| `chefColors.panelGround` / `panelSurface` / `navSurface` (dark) | provisional, derived | `#121110` page under `#242322` panels and nav — they lift by tone alone, since dark casts no shadows (`navShade` is transparent). Derived, not designed; tune by eye. |
+| `chefColors.navIndicator` / `navActiveContent` (dark) | provisional accent-800 / accent-300 | The ramp flips on a dark ground: a deep pill with a shallow accent on it. |
 | `colorScheme.outline` (dark) | provisional `#716F6F` | The 2dp rules carry the entire layout. In dark they must read *as assertive as they do in light*, which is not the same relative contrast. Tune this by eye; do not derive it. |
 | `chefColors.accentText` (dark) | **magenta** | Same blocker as the ramp: the legible accent step on a dark ground is not accent-700, and which step it *is* depends on where the ramp lands. |
 | `chefColors.neutral.*` (dark) | provisional, inverted 100↔900 | A mono ramp does invert cleanly, so this one is filled in — but it has not been contrast-checked at the steps that carry text. |
@@ -642,8 +674,10 @@ both are assembled from § 8's primitives in `core/ui/navigation/`.
 
 ### 9.1 Header — `ChefAITopAppBar.kt`
 
-Flush on the ground, left-aligned, 16dp padded on all four sides, closed by a `SectionRule`. No
-elevation, no tonal container, no centering.
+Flush on the ground, left-aligned, 16dp padded on all four sides. **No rule beneath it** (removed
+in the Oct 2026 revision) — the content below separates itself. No elevation, no tonal container,
+no centering. `ChefAITopAppBarWithSubtitle` and `ChefAITopAppBarSurface` take a `containerColor`
+(default `colorScheme.background`) so a paneled screen can match its page.
 
 The design uses several header shapes, and they are **separate composables** rather than one
 function with six nullable parameters — the shape is a design decision, so a call site names the
@@ -654,7 +688,7 @@ one it means:
 | `ChefAITopAppBar` | title, optional trailing actions | 02, 04 |
 | `ChefAITopAppBarWithSubtitle` | title over a muted second line | 01, 16 |
 | `ChefAITopAppBarWithTag` | title with a trailing `FlatTag` | 19 |
-| `ChefAITopAppBarSurface` | the bare ground + padding + rule, as a slot | 13–15, 17 |
+| `ChefAITopAppBarSurface` | the bare ground + padding, as a slot | 13–15, 17 |
 
 `ChefAINavigation` is an orthogonal sealed axis — `None`, `Back`, `Close` — so any shape can carry
 a back arrow, an X, or neither. Back and X are not interchangeable: the arrow is for screens you
@@ -666,10 +700,13 @@ for that** — that is what the slot is for.
 
 ### 9.2 Bottom nav — `BottomNavigationBar.kt`
 
-Four tabs in the design's order — Home / Search / Recipes / Meal Plans, Search **second** — on the
-sage `chefColors.navSurface`, under a `SectionRule`. Lucide icons at 20dp over a 10dp/800 label;
-the active tab is accent, the rest full ink (not muted), and that color *is* the selected state —
-there is no indicator behind it.
+Four tabs in the design's order — Home / Search / Recipes / Meal Plans, Search **second** — on
+`chefColors.navSurface`, with **no rule**: the bar casts a soft 16dp shade (`chefColors.navShade`)
+upward onto the content instead. It is drawn with `drawBehind` outside the bar's bounds, not a
+`shadow()` modifier — Android casts elevation shadows downward, so a bottom bar's barely shows.
+Lucide icons at 20dp over a 10dp/800 label; the active tab takes `chefColors.navActiveContent`
+with a `chefColors.navIndicator` pill behind its icon, the rest are muted ink. The pill is always
+laid out (transparent when inactive) so switching tabs never shifts an icon.
 
 Each tab is `Modifier.flatSelectable`, not `flatClickable`: a tab has a state, and color is the
 only signal for it, so a screen reader gets nothing unless the state is in the semantics.
@@ -679,10 +716,9 @@ type scale documents. The design's own markup sets them in title case with tight
 (`-.01em`), so the item takes `labelSmall`'s size and weight and overrides the tracking. That is
 the whole of it.
 
-`NavigationRailBar` is the same items in a column with the rule on the trailing edge. A rail is a
-layout change, not a different component.
-
-The sage has no dark value and renders magenta in dark, on purpose — see § 5.
+`NavigationRailBar` is the same items in a column, with neither rule nor shade — beside the content
+rather than over it, the tone change is enough. A rail is a layout change, not a different
+component.
 
 ### 9.3 Profile menu — `auth/ui/UserProfileMenu.kt`
 

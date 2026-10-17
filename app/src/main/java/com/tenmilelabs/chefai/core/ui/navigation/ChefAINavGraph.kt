@@ -52,6 +52,7 @@ import com.tenmilelabs.chefai.core.ui.components.flat.FlatButton
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatButtonVariant
 import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
 import com.tenmilelabs.chefai.core.ui.navigation.ChefAITopAppBarWithSubtitle
+import com.tenmilelabs.chefai.core.ui.theme.chefColors
 import com.tenmilelabs.chefai.home.ui.HomeScreen
 import com.tenmilelabs.chefai.home.ui.homeDateSubtitle
 import com.tenmilelabs.chefai.household.ui.AcceptInviteScreen
@@ -494,6 +495,9 @@ fun ChefAINavGraph(
                             title = stringResource(R.string.app_name),
                             subtitle = homeDateSubtitle(),
                             navigation = navigation,
+                            // Home is the paneled screen: the header continues the page its
+                            // panels sit on rather than the plain ground.
+                            containerColor = MaterialTheme.chefColors.panelGround,
                             actions = trailingActions,
                         )
                     }

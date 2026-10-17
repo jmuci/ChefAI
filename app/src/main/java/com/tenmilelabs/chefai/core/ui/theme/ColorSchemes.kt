@@ -93,11 +93,11 @@ internal object ModernistPalette {
     val Neutral900 = Color(0xFF2D2B2B)
 
     /**
-     * The bottom-nav surface — a light sage, deliberately *not* the teal accent. It is the one
-     * color in the system with no counterpart anywhere else, which is why it lives behind a single
-     * named role ([ChefColors.navSurface]) that one edit can retheme.
+     * The soft shade the bottom nav casts *upward* onto the content scrolling beneath it — ink at
+     * 8% (`0x14`). The one alpha color in the palette, on purpose: a shade has to let the content
+     * show through it, which an opaque value cannot. Light only; dark separates the nav by tone.
      */
-    val NavSage = Color(0xFFE7F0E0)
+    val NavShade = Color(0x14201E1D)
 
     // ── Dark — PROVISIONAL ────────────────────────────────────────────────────────────────────
     // TODO(dark): none of the values below were designed. The handoff ships a light palette only
@@ -108,8 +108,14 @@ internal object ModernistPalette {
     /** TODO(dark): provisional dark ground — ink stepped down, not a designed value. */
     val DarkGround = Color(0xFF1A1918)
 
-    /** TODO(dark): provisional sunken dark ground. */
+    /** TODO(dark): provisional sunken dark ground. Also the dark panel and nav surface. */
     val DarkGroundRaised = Color(0xFF242322)
+
+    /**
+     * TODO(dark): provisional — the page *behind* panels in dark, one step below [DarkGround] so
+     * the [DarkGroundRaised] panels on it lift by tone alone (dark casts no shadows).
+     */
+    val DarkGroundDeep = Color(0xFF121110)
 
     /**
      * TODO(dark): provisional muted ink for dark — the light ground at 65% over [DarkGround]
@@ -262,7 +268,7 @@ internal val darkScheme = darkColorScheme(
 
     surfaceDim = ModernistPalette.DarkGround,
     surfaceBright = ModernistPalette.Neutral800,
-    surfaceContainerLowest = Color(0xFF121110),
+    surfaceContainerLowest = ModernistPalette.DarkGroundDeep,
     surfaceContainerLow = ModernistPalette.DarkGround,
     surfaceContainer = ModernistPalette.DarkGroundRaised,
     surfaceContainerHigh = Color(0xFF2E2C2B),

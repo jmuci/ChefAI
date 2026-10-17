@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -30,7 +31,6 @@ import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.components.ChefAIWordmark
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatTag
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatTagTone
-import com.tenmilelabs.chefai.core.ui.components.flat.SectionRule
 import com.tenmilelabs.chefai.core.ui.components.flat.flatClickable
 import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
@@ -73,14 +73,15 @@ private object HeaderMetrics {
 }
 
 /**
- * The Modernist header: title, a 2dp rule beneath it, and nothing else.
+ * The Modernist header: a title flush on the screen's ground, and nothing else — no rule beneath
+ * it. The content below separates itself (by its own rules on a ruled screen, by its panels on a
+ * paneled one), so a line here only doubled up.
  *
  * Deliberately **not** `TopAppBar`/`CenterAlignedTopAppBar`. Material's bar is a tonal `Surface`
  * that composites `surfaceTint` as it elevates and centers or insets its title to its own spec.
  * This design has no elevation, no tonal container and no centering: every header is flush on the
- * ground, left-aligned, 16dp padded, and separated from the content by the same 2dp rule that
- * separates every other section in the system. Keeping Material's bar and overriding all of that
- * leaves its insets and height behind, so the header is built from primitives.
+ * ground, left-aligned and 16dp padded. Keeping Material's bar and overriding all of that leaves
+ * its insets and height behind, so the header is built from primitives.
  *
  * ### The variants
  *
@@ -94,7 +95,7 @@ private object HeaderMetrics {
  * | [ChefAITopAppBarWithSubtitle] | title over a muted second line | Home (01), Meal plan detail (16) |
  * | [ChefAITopAppBarWithTag] | title with a trailing status tag | Recipe editor (19) |
  * | [ChefAITopAppBarWithWordmark] | back arrow, accent wordmark instead of a title | Create account (08) |
- * | [ChefAITopAppBarSurface] | the bare ground + padding + rule, as a slot | wizard (13–15), shopping list (17) |
+ * | [ChefAITopAppBarSurface] | the bare ground + padding, as a slot | wizard (13–15), shopping list (17) |
  *
  * [ChefAINavigation] is orthogonal to all of them — any shape can carry a back arrow, an X, or
  * neither.
@@ -122,6 +123,9 @@ fun ChefAITopAppBar(
  *
  * The leading control and the title block are top-aligned rather than centered, so a two-line
  * title block does not push the back arrow off the first line.
+ *
+ * @param containerColor the header's ground. Defaults to the screen ground; a paneled screen
+ *   (Home) passes `chefColors.panelGround` so the header continues the page behind its panels.
  */
 @Composable
 fun ChefAITopAppBarWithSubtitle(
@@ -129,9 +133,10 @@ fun ChefAITopAppBarWithSubtitle(
     subtitle: String,
     modifier: Modifier = Modifier,
     navigation: ChefAINavigation = ChefAINavigation.None,
+    containerColor: Color = MaterialTheme.colorScheme.background,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
-    ChefAITopAppBarSurface(modifier = modifier) {
+    ChefAITopAppBarSurface(modifier = modifier, containerColor = containerColor) {
         HeaderRow(
             navigation = navigation,
             verticalAlignment = Alignment.Top,
@@ -199,32 +204,28 @@ fun ChefAITopAppBarWithWordmark(
 }
 
 /**
- * The header ground: full width, 16dp padding, a 2dp rule along the bottom, status-bar inset
- * applied above the padding.
+ * The header ground: full width, 16dp padding, status-bar inset applied above the padding.
  *
  * Exposed so that the headers which stack content under the title row — the wizard's three-segment
  * progress bar, the shopping list's completion bar — build the same shell instead of re-deriving
- * the padding and the rule. [content] is the header's interior, above the rule.
+ * the padding. [content] is the header's interior.
+ *
+ * @param containerColor the header's ground; see [ChefAITopAppBarWithSubtitle].
  */
 @Composable
 fun ChefAITopAppBarSurface(
     modifier: Modifier = Modifier,
+    containerColor: Color = MaterialTheme.colorScheme.background,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(HeaderMetrics.Padding),
-            content = content,
-        )
-        SectionRule()
-    }
+            .background(containerColor)
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .padding(HeaderMetrics.Padding),
+        content = content,
+    )
 }
 
 /**
