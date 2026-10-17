@@ -577,6 +577,11 @@ fun ChefAINavGraph(
                         ChefAITopAppBar(
                             title = stringResource(titleRes),
                             navigation = navigation,
+                            containerColor = if (currentRoute in paneledRoutes) {
+                                MaterialTheme.chefColors.panelGround
+                            } else {
+                                MaterialTheme.colorScheme.background
+                            },
                             actions = trailingActions,
                         )
                     }
@@ -649,6 +654,15 @@ fun ChefAINavGraph(
 
 // Preview not available - ChefAINavGraph requires SessionManager injection from Hilt
 // which can't be easily mocked in Composable previews
+
+/**
+ * Screens converted to panels (docs/design/modernist.md § 3.1) whose header is the plain
+ * [ChefAITopAppBar]: it takes `chefColors.panelGround` so it continues the page behind the panels.
+ * Home sets the same color on its own header. Grows as screens convert.
+ */
+private val paneledRoutes = setOf(
+    AppDestinations.SEARCH.route,
+)
 
 /** Every route that shows a recipe's details screen (it draws its own back arrow over the hero). */
 private val recipeDetailRoutes = setOf(
