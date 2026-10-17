@@ -234,10 +234,9 @@ private fun FlatButtonVariant.borderModifier(): Modifier = when (this) {
 /**
  * The pressed fill — "one step along the accent ramp", per the handoff.
  *
- * Two of the three deliberately read a Material role rather than the `chefColors` ramp step the
- * light design names, because **the accent ramp is `DarkUnset` (magenta) in dark mode** and a
- * button that flashes magenta on every tap is noise, not the honest signal that an un-designed
- * *resting* color is. The roles chosen resolve to the specified light value anyway:
+ * Two of the three read a Material role rather than the `chefColors` ramp step the light design
+ * names — written while the dark accent ramp was still unset, and kept because the roles resolve
+ * to the specified light value anyway and move the right way in dark:
  *
  * - [Primary] → `secondary`, which **is** accent-700 in the light scheme (`.btn-primary:active`).
  *   Dark resolves it to accent-300, a step *lighter*, which is the right direction on a dark ground.

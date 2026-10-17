@@ -36,11 +36,8 @@ private val CardMinHeight = 76.dp
  * bottom-aligned, with `chefColors.mediaRadius` corners — it stands in for card artwork, so it
  * rounds like an image does (docs/design/modernist.md § 1.4). No gradient.
  *
- * TODO(dark): one of the three cases the handoff says will not invert mechanically — light tints
- *  cycle the *shallow* end of the ramp (accent-100/200/300) with accent-900 text; on a dark ground
- *  the fill has to come from the *deep* end with light text, so the ramp direction flips rather
- *  than darkening. [MaterialTheme.chefColors]'s accent ramp is `DarkUnset` (magenta) in dark for
- *  exactly this reason — see docs/design/modernist.md § 5.
+ * Fills cycle accent-100/200/300 with accent-900 text. The dark ramp is flipped, so the same steps
+ * give deep fills with light text there — see `DarkChefColors`.
  */
 @Composable
 fun CategoryCard(

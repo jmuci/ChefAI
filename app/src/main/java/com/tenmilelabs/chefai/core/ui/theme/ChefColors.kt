@@ -150,44 +150,44 @@ internal val LightChefColors = ChefColors(
 )
 
 /**
- * Deliberately unfinished. Magenta is not a Modernist color and never will be — anywhere it shows
- * up on screen, it is an un-designed dark token, not a styling bug.
- *
- * The handoff's instruction for dark is to leave what has not been designed *obviously* missing:
- * "a placeholder that looks plausible is harder to find and replace later than one that is
- * obviously unfinished". Grep `DarkUnset` to find every one of them.
+ * The placeholder for a dark token nobody has decided yet. Magenta is not a Modernist color and
+ * never will be — anywhere it shows up on screen, it is an un-designed dark token, not a styling
+ * bug. A plausible-looking guess is harder to find and replace later than an obviously unfinished
+ * one. No token uses it today; a new `ChefColors` field without a dark answer should
+ * (docs/design/modernist.md § Adding a token).
  */
+@Suppress("unused")
 private val DarkUnset = Color(0xFFFF00FF)
 
 /**
- * The dark tokens — **not designed**. See docs/design/modernist.md § Dark mode.
+ * The dark tokens — **derived, not designed**. See docs/design/modernist.md § Dark mode.
  *
- * TODO(dark): the accent ramp is the thing the handoff says will not invert mechanically, so it
- *  is left as [DarkUnset] rather than guessed:
- *
- *  - **The accent ramp.** In light, tinted fills come from the shallow end (accent-100/200/300)
- *    with accent-900 text. On a dark ground the fill has to come from the *deep* end with light
- *    text — the ramp direction flips, it does not just darken. Darkening each step one-for-one
- *    produces fills that vanish into the ground and text that fails contrast.
- *
- *  The panel and nav surfaces *are* filled in — derived, not designed: a deep page with raised
- *  panels on it, so they separate by tone, and no nav shade. Provisional like the rest of dark.
- *
- *  The neutral ramp *is* filled in, mechanically inverted (100 ↔ 900), because a mono ramp does
- *  invert cleanly. It is still provisional: it has not been checked against the dark ground for
- *  contrast at the steps that carry text.
+ * - **The accent ramp is flipped**, 100 ↔ 900, not darkened. In light, tinted fills come from the
+ *   shallow end (accent-100/200/300) with accent-900 text; on a dark ground the fill has to come
+ *   from the *deep* end with light text. Flipping the steps keeps every call site's pairing right
+ *   in both themes — `accent.s100` stays "the subtle tinted fill" and `accent.s900` "the text on
+ *   it" — and keeps the accent ramp step-matched to the neutral ramp, which flips the same way.
+ *   Measured: the light-text-on-fill pairs clear 6:1 (s300) to 11.9:1 (s100), and the fills sit
+ *   1.1–2.2:1 off a dark panel, the same separation light's tiles have off a light one.
+ * - **[ChefColors.accentText]** follows the flip to accent-300 (8.6:1 on a dark panel, 9.7:1 on
+ *   the ground) — the same color as the active nav tab.
+ * - The panel and nav surfaces are derived as well: a deep page with raised panels on it, so they
+ *   separate by tone, and no nav shade.
+ * - The neutral ramp is mechanically inverted (100 ↔ 900) — a mono ramp inverts cleanly. It has
+ *   not been contrast-checked at the steps that carry text.
  */
 internal val DarkChefColors = ChefColors(
+    // Flipped, like the neutral ramp below: a deep fill with light text on it. See the KDoc.
     accent = ChefRamp(
-        s100 = DarkUnset,
-        s200 = DarkUnset,
-        s300 = DarkUnset,
-        s400 = DarkUnset,
-        s500 = DarkUnset,
-        s600 = DarkUnset,
-        s700 = DarkUnset,
-        s800 = DarkUnset,
-        s900 = DarkUnset,
+        s100 = ModernistPalette.Accent900,
+        s200 = ModernistPalette.Accent800,
+        s300 = ModernistPalette.Accent700,
+        s400 = ModernistPalette.Accent600,
+        s500 = ModernistPalette.Accent500,
+        s600 = ModernistPalette.Accent400,
+        s700 = ModernistPalette.Accent300,
+        s800 = ModernistPalette.Accent200,
+        s900 = ModernistPalette.Accent100,
     ),
     // TODO(dark): provisional — mechanically inverted, contrast unverified.
     neutral = ChefRamp(
@@ -201,9 +201,8 @@ internal val DarkChefColors = ChefColors(
         s800 = ModernistPalette.Neutral200,
         s900 = ModernistPalette.Neutral100,
     ),
-    // TODO(dark): the ramp flips on a dark ground, so the legible accent step is not accent-700
-    //  there. Blocked on the same decision as the ramp above.
-    accentText = DarkUnset,
+    // accent.s700 in both themes; the flip lands it on accent-300 here.
+    accentText = ModernistPalette.Accent300,
     // TODO(dark): derived, not designed — the panels lift off a deeper page by tone alone.
     panelGround = ModernistPalette.DarkGroundDeep,
     panelSurface = ModernistPalette.DarkGroundRaised,

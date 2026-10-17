@@ -346,18 +346,19 @@ So, three rules:
    (`#6A6868` light — ink at 65% over the ground, 4.85:1; the CSS's literal 55% measures 3.66:1
    and fails AA on the 11–13px captions it is used for). `NoLiteralColorsTest` enforces this too.
 3. **Leave what is undesigned obviously undesigned.** Dark tokens with no answer are
-   `Color(0xFFFF00FF)` — magenta is not a Modernist color and never will be. Magenta on screen in
-   dark mode is an unset token, not a styling bug. Grep `DarkUnset` and `TODO(dark)`.
+   `Color(0xFFFF00FF)` (`DarkUnset`) — magenta is not a Modernist color and never will be. Magenta
+   on screen in dark mode is an unset token, not a styling bug. None are unset today (Oct 2026);
+   grep `TODO(dark)` for what is still provisional.
 
 ### What is unfinished, and why it will not invert mechanically
 
 | Token | State | Why a mechanical inversion is wrong |
 | --- | --- | --- |
-| `chefColors.accent.*` (dark) | **magenta** | Light tinted fills come from the *shallow* end (accent-100/200/300) with accent-900 text. On a dark ground the fill must come from the *deep* end with light text. The ramp direction **flips**; it does not just darken. Darkening each step one-for-one gives fills that vanish into the ground and text that fails contrast. Affects the Search category cards and the Import error banner. |
+| `chefColors.accent.*` (dark) | **flipped** 100 ↔ 900 (Oct 2026) | Light tinted fills come from the *shallow* end (accent-100/200/300) with accent-900 text. On a dark ground the fill must come from the *deep* end with light text. The ramp direction **flips**; it does not just darken (darkening one-for-one gives fills that vanish and text that fails). Flipping keeps every call site's pairing right in both themes and keeps the ramp step-matched to the neutral ramp, which flips the same way. Light text on the s100–s300 fills measures 11.9 / 8.6 / 6.0:1; the fills sit 1.1–2.2:1 off a dark panel, matching light's tiles. |
 | `chefColors.panelGround` / `panelSurface` / `navSurface` (dark) | provisional, derived | `#121110` page under `#242322` panels and nav — they lift by tone alone, since dark casts no shadows (`navShade` is transparent). Derived, not designed; tune by eye. |
 | `chefColors.navIndicator` / `navActiveContent` (dark) | provisional accent-800 / accent-300 | The ramp flips on a dark ground: a deep pill with a shallow accent on it. |
 | `colorScheme.outline` (dark) | provisional `#716F6F` | The 2dp rules carry the entire layout. In dark they must read *as assertive as they do in light*, which is not the same relative contrast. Tune this by eye; do not derive it. |
-| `chefColors.accentText` (dark) | **magenta** | Same blocker as the ramp: the legible accent step on a dark ground is not accent-700, and which step it *is* depends on where the ramp lands. |
+| `chefColors.accentText` (dark) | accent-300 (Oct 2026) | `accent.s700` in both themes; the flip lands it on accent-300 — 9.7:1 on the ground, 8.6:1 on a panel, and the same color as the active nav tab. |
 | `chefColors.neutral.*` (dark) | provisional, inverted 100↔900 | A mono ramp does invert cleanly, so this one is filled in — but it has not been contrast-checked at the steps that carry text. |
 | `colorScheme.primary` (dark) | provisional accent-400 | The full-strength accent is too dark to sit on a dark ground, so dark uses accent-400 and flips `onPrimary` from light to dark. That inverts the accent/ink relationship, which is a design call. |
 | Shadows | — | `--shadow-sm/md/lg` are tuned to the light ground and read as noise on a dark one. The profile-menu panel uses a shadow *plus* a 2dp border; in dark, the border should do the work alone. |
@@ -607,7 +608,7 @@ rule is about boxes.)
 
 **Step 4 — previews, light and dark, both.** Dark will look wrong in places. That is information,
 not a bug to fix in your PR — if something in dark is *magenta*, it is an unset token from § 5,
-and it stays magenta until dark mode is designed.
+and it stays magenta until someone decides its dark value.
 
 ```kotlin
 @Preview(name = "Settings — light")
@@ -658,9 +659,8 @@ the dark previews exist to prove the components render and to keep the un-design
 ### Where the components deviate from a literal reading of the handoff
 
 Three pressed/tinted fills read a Material role instead of the `chefColors` ramp step the light
-design names, because the accent ramp is `DarkUnset` (magenta) in dark and a control that flashes
-magenta on every tap is noise rather than the honest signal an un-designed *resting* color is.
-Each resolves to the specified light value or within one ramp step of it:
+design names — chosen while the dark accent ramp was still unset, so a tap would not flash
+magenta, and kept since. Each resolves to the specified light value or within one ramp step of it:
 
 | Where | Design says | Code reads | Light resolves to |
 | --- | --- | --- | --- |
