@@ -3,8 +3,6 @@ package com.tenmilelabs.chefai.home.ui.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Surface
@@ -44,7 +42,6 @@ fun SduiCarousel(
                 )
             }
         }
-        Spacer(Modifier.height(4.dp))
     }
 }
 

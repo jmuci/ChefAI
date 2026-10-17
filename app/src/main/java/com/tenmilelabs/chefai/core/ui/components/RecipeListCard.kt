@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -23,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -57,6 +59,8 @@ private val ThumbnailHeight = 60.dp
  * @param onSaveToCollection When non-null, shows a bookmark button that invokes this with the
  * recipe UUID. Left null (the default) at this card's three existing call sites, which don't want
  * inline save — introduced for search results, where saving without opening the recipe matters.
+ * @param showDivider Whether to draw the 1dp row rule under the row. On by default for the ruled
+ * lists; off inside a panel (Home), where rows separate by spacing instead.
  */
 @Composable
 fun RecipeListCard(
@@ -64,6 +68,7 @@ fun RecipeListCard(
     modifier: Modifier = Modifier,
     isInCollection: Boolean = false,
     onSaveToCollection: ((UUID) -> Unit)? = null,
+    showDivider: Boolean = true,
     navigateToDetail: (UUID) -> Unit = {}
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -95,6 +100,7 @@ fun RecipeListCard(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(width = ThumbnailWidth, height = ThumbnailHeight)
+                    .clip(RoundedCornerShape(MaterialTheme.chefColors.mediaRadius))
                     .background(MaterialTheme.colorScheme.surfaceVariant),
             )
 
@@ -139,10 +145,12 @@ fun RecipeListCard(
             }
         }
 
-        HorizontalDivider(
-            thickness = MaterialTheme.chefColors.rowRuleWidth,
-            color = MaterialTheme.colorScheme.outlineVariant,
-        )
+        if (showDivider) {
+            HorizontalDivider(
+                thickness = MaterialTheme.chefColors.rowRuleWidth,
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
+        }
     }
 }
 

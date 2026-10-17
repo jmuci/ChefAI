@@ -4,7 +4,6 @@ import android.content.res.Configuration
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -13,37 +12,33 @@ import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
-import com.tenmilelabs.chefai.core.ui.theme.chefColors
 
 /**
- * A section-opening label, matching the design's rule rhythm: the heavy 2dp rule that opens every
- * section in the design, then an uppercase kicker and a muted subtitle beneath.
+ * A section's opening title — a title-case heading over a muted subtitle, no rule. It opens a
+ * panel (Home), where the panel's own edge already marks where the section starts.
  */
 @Composable
 fun SectionHeaderWithSubtitle(title: String, subtitle: String) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        HorizontalDivider(
-            thickness = MaterialTheme.chefColors.sectionRuleWidth,
-            color = MaterialTheme.colorScheme.outline,
-        )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = dimensionResource(id = R.dimen.padding_medium)),
+    ) {
         Text(
-            text = title.uppercase(),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(
-                horizontal = dimensionResource(id = R.dimen.padding_medium),
-                vertical = dimensionResource(id = R.dimen.padding_small),
-            ),
+            text = title,
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onBackground,
         )
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(
-                horizontal = dimensionResource(id = R.dimen.padding_medium),
-                vertical = dimensionResource(id = R.dimen.padding_extra_extra_small),
-            ),
-        )
+        if (subtitle.isNotEmpty()) {
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(
+                    top = dimensionResource(id = R.dimen.padding_extra_extra_small),
+                ),
+            )
+        }
     }
 }
 

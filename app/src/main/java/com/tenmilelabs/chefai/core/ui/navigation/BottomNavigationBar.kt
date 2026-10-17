@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.core.ui.navigation
 import android.content.res.Configuration.UI_MODE_NIGHT_YES
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,11 +18,15 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -32,7 +37,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
-import com.tenmilelabs.chefai.core.ui.components.flat.SectionRule
 import com.tenmilelabs.chefai.core.ui.components.flat.flatSelectable
 import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
@@ -87,9 +91,16 @@ private object NavBarMetrics {
     /** Lucide stroke icons at the design's 20px. */
     val IconSize = 20.dp
 
-    /** `padding: 10px 0 8px` on each item. */
-    val ItemTopPadding = 10.dp
+    /** Vertical padding on each item. The indicator pill adds its own 4dp above and below. */
+    val ItemTopPadding = 6.dp
     val ItemBottomPadding = 8.dp
+
+    /** The active-tab pill behind the icon: 4dp above/below the 20dp icon, 20dp either side. */
+    val IndicatorVerticalPadding = 4.dp
+    val IndicatorHorizontalPadding = 20.dp
+
+    /** How far above the bar its shade reaches into the content. */
+    val ShadeHeight = 16.dp
 
     /** `gap: 4px` between icon and label. */
     val IconLabelGap = 4.dp
@@ -107,18 +118,19 @@ private object NavBarMetrics {
 }
 
 /**
- * The Modernist bottom nav: a flat sage bar under a 2dp rule.
+ * The bottom nav: a panel-toned bar that casts a soft shade upward onto the content instead of
+ * sitting under a rule, with a tinted pill behind the active tab.
  *
- * Deliberately **not** `NavigationBar`/`NavigationBarItem`. Material's item draws a rounded pill
- * indicator behind the active icon and resolves its own container tone; both are wrong here. This
- * system marks the active tab with color alone — accent icon and label against ink — and separates
- * the bar from the content with a rule, not a shadow or an elevation tint. There is no way to turn
- * the pill off, only to make it transparent, which leaves the item's shape and insets behind. So
- * the row is built out of primitives.
+ * Deliberately **not** `NavigationBar`/`NavigationBarItem`. Material's bar resolves its own
+ * container tone through tonal elevation and its item brings a ripple and its own indicator
+ * metrics; this one takes every color from [chefColors] (navSurface, navIndicator,
+ * navActiveContent, navShade) so dark can retheme it in one place. So the row is built out of
+ * primitives.
  *
- * The sage ([chefColors].navSurface) is the one color in the system with no counterpart anywhere
- * else, and it has no dark value yet — it renders magenta in dark on purpose. See
- * docs/design/modernist.md § Dark mode.
+ * The shade is drawn *outside* the bar's bounds, over the bottom of the content — a `shadow()`
+ * modifier would not do: Android casts elevation shadows downward, so a bottom bar's is all but
+ * invisible. In dark [chefColors].navShade is transparent and the bar separates by tone alone.
+ * See docs/design/modernist.md § 9.2.
  */
 @Composable
 fun BottomNavigationBar(
@@ -128,12 +140,25 @@ fun BottomNavigationBar(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
+    val shade = MaterialTheme.chefColors.navShade
+
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .drawBehind {
+                val shadeHeight = NavBarMetrics.ShadeHeight.toPx()
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(shade.copy(alpha = 0f), shade),
+                        startY = -shadeHeight,
+                        endY = 0f,
+                    ),
+                    topLeft = Offset(0f, -shadeHeight),
+                    size = Size(size.width, shadeHeight),
+                )
+            }
             .background(MaterialTheme.chefColors.navSurface),
     ) {
-        SectionRule()
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -152,8 +177,9 @@ fun BottomNavigationBar(
 }
 
 /**
- * The same bar turned on its side for expanded widths. Same surface, same rule (vertical, on the
- * trailing edge), same items — a rail is a layout change, not a different component.
+ * The same bar turned on its side for expanded widths. Same surface, same items, no rule — a rail
+ * is a layout change, not a different component. It casts no shade: beside the content rather
+ * than over it, the tone change alone separates them.
  */
 @Composable
 fun NavigationRailBar(
@@ -163,38 +189,30 @@ fun NavigationRailBar(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    Row(
+    Column(
         modifier = modifier
+            .width(NavBarMetrics.RailWidth)
             .fillMaxHeight()
-            .background(MaterialTheme.chefColors.navSurface),
+            .background(MaterialTheme.chefColors.navSurface)
+            .windowInsetsPadding(WindowInsets.navigationBars)
+            .padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .width(NavBarMetrics.RailWidth)
-                .fillMaxHeight()
-                .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            TopLevelDestination.entries.forEach { destination ->
-                NavItem(
-                    destination = destination,
-                    selected = isRouteInSection(currentRoute, destination),
-                    onClick = { navController.navigateToTab(destination) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
+        TopLevelDestination.entries.forEach { destination ->
+            NavItem(
+                destination = destination,
+                selected = isRouteInSection(currentRoute, destination),
+                onClick = { navController.navigateToTab(destination) },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
-        VerticalDivider(
-            thickness = MaterialTheme.chefColors.sectionRuleWidth,
-            color = MaterialTheme.colorScheme.outline,
-        )
     }
 }
 
 /**
- * One tab. Icon over label, both taking their color from [selected] — that color *is* the selected
- * state, there is no indicator behind it.
+ * One tab. Icon over label; the active one takes [chefColors].navActiveContent and sits its icon
+ * on a [chefColors].navIndicator pill. The pill is always laid out — transparent when inactive —
+ * so switching tabs never shifts the icon.
  */
 @Composable
 private fun NavItem(
@@ -205,10 +223,11 @@ private fun NavItem(
 ) {
     val label = stringResource(destination.appDestination.title)
     val contentColor = if (selected) {
-        MaterialTheme.colorScheme.primary
+        MaterialTheme.chefColors.navActiveContent
     } else {
-        MaterialTheme.colorScheme.onBackground
+        MaterialTheme.colorScheme.onSurfaceVariant
     }
+    val indicatorColor = if (selected) MaterialTheme.chefColors.navIndicator else Color.Unspecified
 
     Column(
         modifier = modifier
@@ -228,7 +247,13 @@ private fun NavItem(
             // The label beside it already names the tab; announcing it twice is noise.
             contentDescription = null,
             tint = contentColor,
-            modifier = Modifier.size(NavBarMetrics.IconSize),
+            modifier = Modifier
+                .background(indicatorColor, CircleShape)
+                .padding(
+                    horizontal = NavBarMetrics.IndicatorHorizontalPadding,
+                    vertical = NavBarMetrics.IndicatorVerticalPadding,
+                )
+                .size(NavBarMetrics.IconSize),
         )
         Text(
             text = label,
