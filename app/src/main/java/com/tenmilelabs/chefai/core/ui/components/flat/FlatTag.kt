@@ -60,8 +60,8 @@ fun FlatTag(
  * The accent tag reads `primaryContainer` / `onPrimaryContainer` rather than
  * `chefColors.accent.s100` / `.s800`. In light those resolve to the same accent-100 fill the design
  * names (with accent-900 text, one step deeper than `.tag-accent`, which is the contrast-safer
- * read). In dark the ramp is `DarkUnset`, but the container roles have provisional values — so the
- * tag renders as a dark tinted block instead of magenta. See `docs/design/modernist.md` § Dark mode.
+ * read). In dark the container roles resolve to accent-800 with accent-100 text — a deep tinted
+ * block, the same direction the flipped accent ramp takes. See `docs/design/modernist.md` § Dark mode.
  */
 @Composable
 private fun FlatTagTone.containerColor(): Color = when (this) {

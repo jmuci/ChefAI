@@ -14,8 +14,9 @@ import androidx.compose.runtime.CompositionLocalProvider
  *   widths). Read via `MaterialTheme.chefColors`.
  * - [ChefShapes] — 0dp on every size, so no call site needs to say so.
  *
- * Dark mode is **not designed**. It compiles and renders, and everything un-designed in it is
- * flagged `TODO(dark)` or rendered in magenta. See docs/design/modernist.md § Dark mode.
+ * Dark mode is **derived, not designed**: every dark value is a reasoned derivation from the light
+ * palette, and anything still provisional is flagged `TODO(dark)`. See docs/design/modernist.md
+ * § Dark mode.
  */
 @Composable
 fun ChefAITheme(

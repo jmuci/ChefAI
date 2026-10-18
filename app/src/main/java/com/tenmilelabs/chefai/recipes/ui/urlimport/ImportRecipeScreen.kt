@@ -156,12 +156,9 @@ fun ImportRecipeScreen(
  * import failure is important enough to earn the accent, where every other invalid-field message in
  * the app is plain `colorScheme.error` text.
  *
- * DARK MODE FLAG: this is one of the three cases the handoff's Dark mode section says will not
- * invert mechanically — the fill has to come from the *deep* end of the accent ramp with light
- * text, not a darkened `accent-100`. `primaryContainer`/`onPrimaryContainer` are provisional in dark
- * (see `ChefColors`), so this renders as a dark tinted block rather than magenta, but nobody has
- * decided whether that provisional value is *right* for this banner specifically.
- * TODO(dark): revisit once the accent ramp itself is designed — see docs/design/modernist.md § 5.
+ * In dark the fill comes from the *deep* end of the accent ramp with light text, not a darkened
+ * `accent-100`: `primaryContainer`/`onPrimaryContainer` resolve to accent-800/accent-100 there
+ * (8.6:1), the same direction the flipped `chefColors.accent` ramp takes.
  */
 @Composable
 private fun ImportErrorBanner(text: String) {
