@@ -103,7 +103,7 @@ class HouseholdApiServiceTest {
     fun `createInvite on success returns the raw token and url`() = runTest {
         val subject = service(
             jsonEngine(
-                """{"token":"raw-token","url":"https://chefai.app/invite?token=raw-token","expiresAt":1000,"singleUse":true,"maxUses":null}""",
+                """{"token":"raw-token","url":"https://pocket-chef.app/invite?token=raw-token","expiresAt":1000,"singleUse":true,"maxUses":null}""",
                 HttpStatusCode.Created,
             )
         )

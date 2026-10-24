@@ -76,7 +76,7 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Handles an App Link (`https://chefai.app/invite?token=...`) landing on this activity.
+     * Handles an App Link (`https://pocket-chef.app/invite?token=...`) landing on this activity.
      *
      * Mirrors [consumeShareIntent]: the token is read once and the data URI is cleared from the
      * intent as it's read, for the same reason — `getIntent()` keeps returning this same launching
