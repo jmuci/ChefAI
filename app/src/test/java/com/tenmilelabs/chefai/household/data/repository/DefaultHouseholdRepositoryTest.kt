@@ -196,7 +196,7 @@ class DefaultHouseholdRepositoryTest {
     @Test
     fun `createInviteLink returns the link on success`() = runTest {
         dao.upsertHousehold(HouseholdEntity(householdId, "The Test Kitchen", ownerId, 0L, 0L))
-        network.createInviteResult = CreateInviteResult.Success("raw-token", "https://chefai.app?token=raw-token", 999L)
+        network.createInviteResult = CreateInviteResult.Success("raw-token", "https://pocket-chef.app?token=raw-token", 999L)
 
         val result = repository.createInviteLink()
 

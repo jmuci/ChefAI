@@ -33,7 +33,7 @@
             </intent-filter>
             <!--
                 Household invite links. android:autoVerify requires
-                https://chefai.app/.well-known/assetlinks.json to be served with this app's
+                https://pocket-chef.app/.well-known/assetlinks.json to be served with this app's
                 signing cert fingerprint, or Android falls back to a disambiguation dialog instead
                 of opening the app directly — see ADR-014 §6, a deploy-pipeline dependency outside
                 this repo.
@@ -45,7 +45,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:scheme="https"
-                    android:host="chefai.app"
+                    android:host="pocket-chef.app"
                     android:pathPrefix="/invite" />
             </intent-filter>
         </activity>

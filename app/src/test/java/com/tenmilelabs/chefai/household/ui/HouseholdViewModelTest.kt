@@ -180,7 +180,7 @@ class HouseholdViewModelTest {
     fun `onInviteByLink success emits ShareInviteLink`() = runTest {
         householdRepository.seedHousehold(householdWithMe(HouseholdRole.OWNER))
         householdRepository.createInviteLinkResult =
-            Result.success(HouseholdInviteLink("https://chefai.app?token=abc", "abc", null))
+            Result.success(HouseholdInviteLink("https://pocket-chef.app?token=abc", "abc", null))
         val viewModel = createViewModel()
 
         viewModel.events.test {

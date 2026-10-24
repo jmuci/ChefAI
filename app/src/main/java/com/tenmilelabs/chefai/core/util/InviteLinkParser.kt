@@ -3,12 +3,12 @@ package com.tenmilelabs.chefai.core.util
 import java.net.URI
 import java.net.URISyntaxException
 
-private const val INVITE_HOST = "chefai.app"
+private const val INVITE_HOST = "pocket-chef.app"
 private const val INVITE_PATH_PREFIX = "/invite"
 
 /**
  * Extracts a household invite token from an App Link URL, e.g.
- * `https://chefai.app/invite?token=abc123` -> `"abc123"` — matches the backend's default
+ * `https://pocket-chef.app/invite?token=abc123` -> `"abc123"` — matches the backend's default
  * `household.inviteBaseUrl` (`ktor-chefai`'s `Application.kt`).
  *
  * Takes a plain `String` rather than `android.net.Uri` (unlike the `Intent` it's ultimately read
