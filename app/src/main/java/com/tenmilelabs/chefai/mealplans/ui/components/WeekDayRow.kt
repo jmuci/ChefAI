@@ -38,7 +38,8 @@ import java.util.UUID
  *
  * A day can hold both a lunch and a dinner ([com.tenmilelabs.chefai.mealplans.domain.model.MealType.DINNER_AND_LUNCH]),
  * so the meals **stack** beside a single date column rather than the row being one meal wide.
- * Dropping the second to keep a literal one-line-per-day reading would hide planned data.
+ * Dropping the second to keep a literal one-line-per-day reading would hide planned data. The same
+ * goes for overlapping plans: a slot two plans fill shows both, each tagged with its plan's name.
  */
 @Composable
 fun WeekDayRow(
@@ -60,11 +61,13 @@ fun WeekDayRow(
         if (day.meals.isEmpty()) {
             AddMealLink(onClick = { onAddMeal(day.date) })
         } else {
+            val sharedSlots = day.sharedSlots
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 day.meals.forEach { meal ->
                     MealLine(
                         meal = meal,
                         showSlotLabel = day.meals.size > 1,
+                        showPlanName = meal.slot in sharedSlots,
                         onClick = { onMealClick(meal) },
                     )
                 }
@@ -120,6 +123,7 @@ private fun AddMealLink(onClick: () -> Unit) {
 private fun MealLine(
     meal: PlannedWeekMeal,
     showSlotLabel: Boolean,
+    showPlanName: Boolean,
     onClick: () -> Unit,
 ) {
     val recipe = meal.recipe
@@ -140,7 +144,12 @@ private fun MealLine(
                 MaterialTheme.colorScheme.onBackground
             },
         )
-        val meta = buildMeta(meal = meal, recipe = recipe, showSlotLabel = showSlotLabel)
+        val meta = buildMeta(
+            meal = meal,
+            recipe = recipe,
+            showSlotLabel = showSlotLabel,
+            showPlanName = showPlanName,
+        )
         if (meta.isNotEmpty()) {
             Text(
                 text = meta,
@@ -151,15 +160,20 @@ private fun MealLine(
     }
 }
 
-/** "30m · pasta", with the slot prefixed only when a day holds both meals. */
+/**
+ * "30m · pasta", with the slot prefixed only when a day holds more than one meal, and the plan's
+ * name only when another plan fills the same slot — the one case where "which plan?" is ambiguous.
+ */
 @Composable
 private fun buildMeta(
     meal: PlannedWeekMeal,
     recipe: RecipePreview?,
     showSlotLabel: Boolean,
+    showPlanName: Boolean,
 ): String {
     val parts = buildList {
         if (showSlotLabel) add(meal.slot.label)
+        if (showPlanName) add(meal.planName)
         if (recipe != null) {
             val minutes = recipe.prepTimeMinutes + recipe.cookTimeMinutes
             if (minutes > 0) add("${minutes}m")
@@ -218,6 +232,19 @@ private fun WeekDayRowPreview() {
                 onMealClick = {},
                 onAddMeal = {},
             )
+            // Two overlapping plans both fill this dinner: both show, each tagged with its plan.
+            WeekDayRow(
+                day = WeekDay(
+                    date = LocalDate.of(2026, 8, 15),
+                    meals = listOf(
+                        previewMeal("Tortilla", "spanish", 40, cooked = true, planName = "3-day meal plan"),
+                        previewMeal("Corn on the cob", "sides", 15, planName = "5-day meal plan"),
+                    ),
+                ),
+                isToday = false,
+                onMealClick = {},
+                onAddMeal = {},
+            )
         }
     }
 }
@@ -228,10 +255,12 @@ private fun previewMeal(
     minutes: Int,
     slot: MealSlot = MealSlot.DINNER,
     cooked: Boolean = false,
+    planName: String = "5-day meal plan",
 ): PlannedWeekMeal {
     val recipeId = UUID.randomUUID()
     return PlannedWeekMeal(
         planId = UUID.randomUUID(),
+        planName = planName,
         dayId = UUID.randomUUID(),
         slot = slot,
         recipeId = recipeId,

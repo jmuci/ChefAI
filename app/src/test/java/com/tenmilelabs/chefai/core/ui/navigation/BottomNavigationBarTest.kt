@@ -1,89 +1,156 @@
 package com.tenmilelabs.chefai.core.ui.navigation
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import android.app.Application
+import android.os.Build
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.ComposeNavigator
+import androidx.navigation.compose.composable
+import androidx.navigation.createGraph
+import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
+import java.util.UUID
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
+/**
+ * Tab highlighting ([owningTab]) and tab taps ([selectTab]) against a graph that mirrors the flat
+ * tab wiring in `ChefAINavGraph` (same routes, no composable content).
+ */
+@Config(application = Application::class, sdk = [Build.VERSION_CODES.VANILLA_ICE_CREAM])
+@RunWith(RobolectricTestRunner::class)
 class BottomNavigationBarTest {
 
+    private val navController = NavHostController(RuntimeEnvironment.getApplication()).apply {
+        navigatorProvider.addNavigator(ComposeNavigator())
+        graph = createGraph(startDestination = AppDestinations.HOME.route) {
+            TopLevelDestination.entries.forEach { tab -> composable(tab.appDestination.route) {} }
+            composable(AppDestinations.RECIPE_DETAILS.route) {}
+            composable(AppDestinations.HOME_RECIPE_DETAIL.route) {}
+            composable(AppDestinations.SEARCH_RECIPE_DETAIL.route) {}
+            composable(AppDestinations.MEAL_PLAN_DETAIL.route) {}
+            composable(AppDestinations.MEAL_PLAN_RECIPE_DETAIL.route) {}
+            composable(AppDestinations.SETTINGS.route) {}
+        }
+    }
+    private val navActions = NavigationActions(navController)
+
+    private val currentRoute: String?
+        get() = navController.currentBackStackEntry?.destination?.route
+
     @Test
-    fun `null route selects no tab`() {
+    fun `no graph selects no tab`() {
+        val bare = NavHostController(RuntimeEnvironment.getApplication())
+
+        assertThat(bare.owningTab()).isNull()
+    }
+
+    @Test
+    fun `the start destination selects Home`() {
+        assertThat(navController.owningTab()).isEqualTo(TopLevelDestination.HOME)
+    }
+
+    @Test
+    fun `each tab root selects only that tab`() {
         TopLevelDestination.entries.forEach { tab ->
-            assertFalse(isRouteInSection(null, tab))
+            navController.selectTab(tab)
+
+            assertThat(currentRoute).isEqualTo(tab.appDestination.route)
+            assertThat(navController.owningTab()).isEqualTo(tab)
         }
     }
 
     @Test
-    fun `unmapped route selects no tab`() {
-        val unmappedRoute = ScreenBaseRoutes.RECIPE_EDITOR
+    fun `a plan created from a recipe highlights Recipes, the stack it lives in`() {
+        // Given Recipes tab -> recipe -> (wizard, popped) -> plan detail
+        navController.selectTab(TopLevelDestination.RECIPES)
+        navActions.navigateToRecipeDetail(UUID.randomUUID())
+        navActions.navigateToMealPlanDetail(UUID.randomUUID())
 
-        TopLevelDestination.entries.forEach { tab ->
-            assertFalse(isRouteInSection(unmappedRoute, tab))
-        }
+        // Then the plan detail belongs to the Recipes tab, not Meal Plans
+        assertThat(currentRoute).isEqualTo(AppDestinations.MEAL_PLAN_DETAIL.route)
+        assertThat(navController.owningTab()).isEqualTo(TopLevelDestination.RECIPES)
     }
 
     @Test
-    fun `each tab's own route selects only that tab`() {
-        TopLevelDestination.entries.forEach { tab ->
-            val selected = TopLevelDestination.entries.filter {
-                isRouteInSection(tab.appDestination.route, it)
-            }
-            assertEquals("route ${tab.appDestination.route}", listOf(tab), selected)
-        }
+    fun `re-tapping the selected tab pops to its root`() {
+        // Given the Recipes stack ends in a plan detail
+        navController.selectTab(TopLevelDestination.RECIPES)
+        navActions.navigateToRecipeDetail(UUID.randomUUID())
+        navActions.navigateToMealPlanDetail(UUID.randomUUID())
+
+        // When Recipes is tapped again
+        navController.selectTab(TopLevelDestination.RECIPES)
+
+        // Then the Recipes list shows, and Back leaves the tab rather than revisiting the plan
+        assertThat(currentRoute).isEqualTo(AppDestinations.RECIPES.route)
+        navController.popBackStack()
+        assertThat(currentRoute).isEqualTo(AppDestinations.HOME.route)
     }
 
     @Test
-    fun `home recipe detail keeps Home selected`() {
-        assertSelectsOnly(TopLevelDestination.HOME, "${ScreenBaseRoutes.HOME_RECIPE_DETAIL}/abc-123")
+    fun `switching away and back restores the deep stack, and a second tap pops it`() {
+        // Given the Recipes stack ends in a plan detail
+        navController.selectTab(TopLevelDestination.RECIPES)
+        navActions.navigateToRecipeDetail(UUID.randomUUID())
+        navActions.navigateToMealPlanDetail(UUID.randomUUID())
+
+        // When the user visits Meal Plans, the Meal Plans list shows — not the Recipes stack's plan
+        navController.selectTab(TopLevelDestination.MEAL_PLANS)
+        assertThat(currentRoute).isEqualTo(AppDestinations.MEAL_PLANS.route)
+        assertThat(navController.owningTab()).isEqualTo(TopLevelDestination.MEAL_PLANS)
+
+        // When they come back to Recipes, its stack is restored where they left it
+        navController.selectTab(TopLevelDestination.RECIPES)
+        assertThat(currentRoute).isEqualTo(AppDestinations.MEAL_PLAN_DETAIL.route)
+        assertThat(navController.owningTab()).isEqualTo(TopLevelDestination.RECIPES)
+
+        // And tapping Recipes again pops to its root
+        navController.selectTab(TopLevelDestination.RECIPES)
+        assertThat(currentRoute).isEqualTo(AppDestinations.RECIPES.route)
     }
 
     @Test
-    fun `search recipe detail keeps Search selected`() {
-        assertSelectsOnly(TopLevelDestination.SEARCH, "${ScreenBaseRoutes.SEARCH_RECIPE_DETAIL}/abc-123")
+    fun `a recipe opened from a meal plan keeps Meal Plans selected, and re-tap pops to the list`() {
+        navController.selectTab(TopLevelDestination.MEAL_PLANS)
+        navActions.navigateToMealPlanDetail(UUID.randomUUID())
+        navActions.navigateToMealPlanRecipeDetail(UUID.randomUUID(), UUID.randomUUID(), MealSlot.DINNER)
+
+        assertThat(navController.owningTab()).isEqualTo(TopLevelDestination.MEAL_PLANS)
+
+        navController.selectTab(TopLevelDestination.MEAL_PLANS)
+        assertThat(currentRoute).isEqualTo(AppDestinations.MEAL_PLANS.route)
     }
 
     @Test
-    fun `recipe details from Recipes tab keeps Recipes selected`() {
-        assertSelectsOnly(TopLevelDestination.RECIPES, "${ScreenBaseRoutes.RECIPE_DETAILS}/abc-123")
+    fun `re-tapping Home pops a recipe opened from Home`() {
+        navActions.navigateToHomeRecipeDetail(UUID.randomUUID())
+        assertThat(navController.owningTab()).isEqualTo(TopLevelDestination.HOME)
+
+        navController.selectTab(TopLevelDestination.HOME)
+
+        assertThat(currentRoute).isEqualTo(AppDestinations.HOME.route)
     }
 
     @Test
-    fun `meal plan detail keeps Meal Plans selected`() {
-        assertSelectsOnly(TopLevelDestination.MEAL_PLANS, "${ScreenBaseRoutes.MEAL_PLAN_DETAIL}/plan-1")
+    fun `a non-tab screen opened inside a tab keeps that tab selected`() {
+        navController.selectTab(TopLevelDestination.SEARCH)
+        navActions.navigateToSearchRecipeDetail(UUID.randomUUID())
+        navActions.navigateToSettings()
+
+        assertThat(navController.owningTab()).isEqualTo(TopLevelDestination.SEARCH)
     }
 
     @Test
-    fun `meal plan shopping list keeps Meal Plans selected`() {
-        assertSelectsOnly(TopLevelDestination.MEAL_PLANS, "${ScreenBaseRoutes.MEAL_PLAN_SHOPPING_LIST}/plan-1")
-    }
+    fun `re-tapping a tab already at its root changes nothing`() {
+        navController.selectTab(TopLevelDestination.SEARCH)
 
-    @Test
-    fun `recipe opened from a meal plan keeps Meal Plans selected`() {
-        assertSelectsOnly(
-            TopLevelDestination.MEAL_PLANS,
-            "${ScreenBaseRoutes.MEAL_PLAN_RECIPE_DETAIL}/abc-123/day-1/BREAKFAST",
-        )
-    }
+        navController.selectTab(TopLevelDestination.SEARCH)
 
-    /** Asserts [route] selects [expected] and no other tab — a route can never highlight two tabs. */
-    private fun assertSelectsOnly(expected: TopLevelDestination, route: String) {
-        val selected = TopLevelDestination.entries.filter { isRouteInSection(route, it) }
-        assertEquals("route $route", listOf(expected), selected)
-    }
-
-    @Test
-    fun `every known recipe-detail route selects exactly one tab`() {
-        val routesByExpectedTab = mapOf(
-            "${ScreenBaseRoutes.HOME_RECIPE_DETAIL}/abc-123" to TopLevelDestination.HOME,
-            "${ScreenBaseRoutes.SEARCH_RECIPE_DETAIL}/abc-123" to TopLevelDestination.SEARCH,
-            "${ScreenBaseRoutes.RECIPE_DETAILS}/abc-123" to TopLevelDestination.RECIPES,
-            "${ScreenBaseRoutes.MEAL_PLAN_RECIPE_DETAIL}/abc-123/day-1/DINNER" to TopLevelDestination.MEAL_PLANS,
-        )
-
-        routesByExpectedTab.forEach { (route, expectedTab) ->
-            val matches = TopLevelDestination.entries.count { isRouteInSection(route, it) }
-            assertTrue("route $route should select exactly one tab, matched $matches", matches == 1)
-        }
+        assertThat(currentRoute).isEqualTo(AppDestinations.SEARCH.route)
+        navController.popBackStack()
+        assertThat(currentRoute).isEqualTo(AppDestinations.HOME.route)
     }
 }

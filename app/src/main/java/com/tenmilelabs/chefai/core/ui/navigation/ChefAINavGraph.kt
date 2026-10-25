@@ -19,6 +19,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.tenmilelabs.chefai.auth.ui.UserProfileMenu
@@ -252,6 +253,15 @@ fun ChefAINavGraph(
                     navController.getBackStackEntry(ScreenBaseRoutes.MEAL_PLAN_WIZARD_GRAPH)
                 }
                 val wizardViewModel: CreateMealPlanViewModel = hiltViewModel(parentEntry)
+                val context = LocalContext.current
+
+                // Non-blocking: the plan is created either way and the week view shows both. On
+                // navScope because this destination is popped by the navigation just before it.
+                fun noteOverlap(planName: String?) {
+                    planName ?: return
+                    val message = context.getString(R.string.meal_plan_overlap_notice, planName)
+                    navScope.launch { snackbarHostState.showSnackbar(message) }
+                }
 
                 LaunchedEffect(Unit) {
                     wizardViewModel.uiEvents.collect { event ->
@@ -259,10 +269,12 @@ fun ChefAINavGraph(
                             is CreateMealPlanEvent.MealPlanReady -> {
                                 // Generation succeeded — go straight to the detail screen
                                 navActions.navigateToCreatedMealPlan(event.mealPlanId)
+                                noteOverlap(event.overlappingPlanName)
                             }
                             is CreateMealPlanEvent.MealPlanSavedAsDraft -> {
                                 // Offline / BE error — show detail as DRAFT with Generate button
                                 navActions.navigateToCreatedMealPlan(event.mealPlanId)
+                                noteOverlap(event.overlappingPlanName)
                             }
                             is CreateMealPlanEvent.ShowError -> {
                                 snackbarHostState.showSnackbar("Failed to create meal plan")

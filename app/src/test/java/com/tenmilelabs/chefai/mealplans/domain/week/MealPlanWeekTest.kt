@@ -166,17 +166,85 @@ class MealPlanWeekTest {
     // --- Overlap resolution ---
 
     @Test
-    fun `when two plans claim the same slot the most recently updated wins`() {
-        val stale = UUID.randomUUID()
-        val fresh = UUID.randomUUID()
-        val older = plan(createdAt = monday, updatedAtMillis = 1_000L, days = listOf(day(0, dinner = stale)))
-        val newer = plan(createdAt = monday, updatedAtMillis = 2_000L, days = listOf(day(0, dinner = fresh)))
+    fun `when two plans fill the same slot both meals show, older plan first`() {
+        val tortilla = UUID.randomUUID()
+        val corn = UUID.randomUUID()
+        // The newer plan is also the more recently updated one — the one that used to win alone.
+        val older = plan(createdAt = monday, days = listOf(day(0, dinner = tortilla)))
+        val newer = plan(
+            createdAt = monday,
+            createdAtOffsetMillis = 60_000L,
+            updatedAtMillis = Long.MAX_VALUE,
+            days = listOf(day(0, dinner = corn)),
+        )
 
         // Order of the input list must not matter.
         listOf(listOf(older, newer), listOf(newer, older)).forEach { plans ->
             val meals = project(plans = plans).days.first().meals
-            assertThat(meals.single().recipeId).isEqualTo(fresh)
+            assertThat(meals.map { it.recipeId }).containsExactly(tortilla, corn).inOrder()
+            assertThat(meals.map { it.planId }).containsExactly(older.uuid, newer.uuid).inOrder()
         }
+    }
+
+    @Test
+    fun `a shared slot keeps each plan's own cooked mark and day`() {
+        val cookedDay = MealPlanDay(
+            uuid = UUID.randomUUID(),
+            dayIndex = 0,
+            dinnerRecipeId = UUID.randomUUID(),
+            lunchRecipeId = null,
+            dinnerCookedAt = 1_000L,
+        )
+        val first = plan(createdAt = monday, days = listOf(cookedDay))
+        val second = plan(
+            createdAt = monday,
+            createdAtOffsetMillis = 60_000L,
+            updatedAtMillis = Long.MAX_VALUE,
+            days = listOf(day(0, dinner = UUID.randomUUID())),
+        )
+
+        val meals = project(plans = listOf(first, second)).days.first().meals
+
+        val firstMeal = meals.single { it.planId == first.uuid }
+        assertThat(firstMeal.isCooked).isTrue()
+        assertThat(firstMeal.dayId).isEqualTo(cookedDay.uuid)
+        assertThat(meals.single { it.planId == second.uuid }.isCooked).isFalse()
+    }
+
+    @Test
+    fun `a shared slot is reported so the UI can label each plan`() {
+        val first = plan(createdAt = monday, name = "3-day meal plan", days = listOf(day(0, dinner = UUID.randomUUID())))
+        val second = plan(
+            createdAt = monday,
+            name = "5-day meal plan",
+            days = listOf(day(0, lunch = UUID.randomUUID(), dinner = UUID.randomUUID())),
+        )
+
+        val day = project(plans = listOf(first, second)).days.first()
+
+        assertThat(day.sharedSlots).containsExactly(MealSlot.DINNER)
+        assertThat(day.meals.filter { it.slot == MealSlot.DINNER }.map { it.planName })
+            .containsExactly("3-day meal plan", "5-day meal plan")
+    }
+
+    @Test
+    fun `overlapping 3-day and 5-day plans count every meal and both plans`() {
+        // The reported case: a 3-day and a 5-day plan, both starting the same day.
+        val sunday = monday.plusDays(6)
+        val short = plan(createdAt = sunday.minusDays(2), days = (0..2).map { day(it, dinner = UUID.randomUUID()) })
+        val long = plan(
+            createdAt = sunday.minusDays(2),
+            createdAtOffsetMillis = 60_000L,
+            days = (0..4).map { day(it, dinner = UUID.randomUUID()) },
+        )
+
+        val week = project(plans = listOf(short, long))
+
+        // Fri, Sat, Sun of this week: three shared dinners, so six meals rather than three.
+        assertThat(week.mealCount).isEqualTo(6)
+        assertThat(week.planIds).containsExactly(short.uuid, long.uuid)
+        assertThat(week.slotCountByRecipe.values.sum()).isEqualTo(6)
+        assertThat(week.days.takeLast(3).all { it.meals.size == 2 }).isTrue()
     }
 
     @Test
@@ -287,12 +355,15 @@ class MealPlanWeekTest {
         status: MealPlanStatus = MealPlanStatus.READY,
         updatedAtMillis: Long = 0L,
         householdId: UUID? = null,
+        name: String = "Week plan",
+        /** Later in the same day, to order two plans created on one date. */
+        createdAtOffsetMillis: Long = 0L,
     ): MealPlan {
-        val createdAtMillis = createdAt.atStartOfDay(zone).toInstant().toEpochMilli()
+        val createdAtMillis = createdAt.atStartOfDay(zone).toInstant().toEpochMilli() + createdAtOffsetMillis
         return MealPlan(
             uuid = UUID.randomUUID(),
             userId = UUID.randomUUID(),
-            name = "Week plan",
+            name = name,
             preferences = MealPlanPreferences(
                 planLengthDays = days.size,
                 mealType = MealType.DINNER,

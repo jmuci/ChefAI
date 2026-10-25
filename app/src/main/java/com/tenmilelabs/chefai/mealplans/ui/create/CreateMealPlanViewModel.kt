@@ -15,6 +15,7 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.usecase.GenerateMealPlanUseCase
+import com.tenmilelabs.chefai.mealplans.domain.week.MealPlanOverlap
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
@@ -23,9 +24,12 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.time.Clock
+import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.CancellationException
 import javax.inject.Inject
@@ -37,6 +41,7 @@ class CreateMealPlanViewModel @Inject constructor(
     private val recipesRepository: RecipesRepository,
     private val generateMealPlanUseCase: GenerateMealPlanUseCase,
     savedStateHandle: SavedStateHandle,
+    private val clock: Clock,
 ) : ViewModel() {
 
     /** Recipe the wizard was opened from ("Add to Meal Plan" → create), slotted into the new plan. */
@@ -125,9 +130,11 @@ class CreateMealPlanViewModel @Inject constructor(
         )
 
         viewModelScope.launch {
+            val now = clock.millis()
+            // Read before the new plan exists, so it cannot overlap itself.
+            val overlappingPlanName = findOverlappingPlanName(userId, now, state.planLengthDays)
             val mealPlanId: UUID
             try {
-                val now = System.currentTimeMillis()
                 mealPlanId = UuidV7Generator.newId()
                 val mealPlan = MealPlan(
                     uuid = mealPlanId,
@@ -174,13 +181,33 @@ class CreateMealPlanViewModel @Inject constructor(
             _uiState.update { it.copy(isSaving = false) }
             _uiEvent.send(
                 if (filled || includedRecipeAssigned) {
-                    CreateMealPlanEvent.MealPlanReady(mealPlanId)
+                    CreateMealPlanEvent.MealPlanReady(mealPlanId, overlappingPlanName)
                 } else {
-                    CreateMealPlanEvent.MealPlanSavedAsDraft(mealPlanId)
+                    CreateMealPlanEvent.MealPlanSavedAsDraft(mealPlanId, overlappingPlanName)
                 }
             )
         }
     }
+
+    /**
+     * The name of an existing plan whose dates a new [lengthDays]-day plan starting at [nowMillis]
+     * would share, or `null`. Only feeds a notice — overlap is allowed — so a failed read is logged
+     * and treated as "no overlap" rather than blocking the save.
+     */
+    private suspend fun findOverlappingPlanName(userId: UUID, nowMillis: Long, lengthDays: Int): String? =
+        try {
+            val existing = mealPlanRepository.observeMealPlansForUser(userId).first()
+            MealPlanOverlap.overlapping(
+                plans = existing,
+                start = Instant.ofEpochMilli(nowMillis).atZone(clock.zone).toLocalDate(),
+                lengthDays = lengthDays,
+                zone = clock.zone,
+            ).minByOrNull { it.createdAt }?.name
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Timber.w(e, "Could not check for overlapping meal plans")
+            null
+        }
 
     companion object {
         internal const val MIN_COLLECTION_RECIPES = 20
