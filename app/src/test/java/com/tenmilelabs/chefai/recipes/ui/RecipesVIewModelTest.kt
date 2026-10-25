@@ -367,9 +367,10 @@ class RecipesViewModelTest {
 
     @Test
     fun `selecting QUICK_EASY narrows items to recipes at or under the time threshold`() = runTest {
-        // Given: totals of 25, 15 and 10 minutes
+        // Given: totals of 35, 15 and 10 minutes
+        val slow = recipePreview1.copy(prepTimeMinutes = 20, cookTimeMinutes = 15)
         seedBookmarkedRecipes(
-            TEST_DOMAIN_RECIPE_PREVIEWS_LIST,
+            listOf(slow, recipePreview2, recipePreview3),
             setOf(recipeId1, recipeId2, recipeId3)
         )
 

@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.search.ui.model
 
 import androidx.annotation.StringRes
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.core.domain.model.QUICK_EASY_MAX_TOTAL_MINUTES
 
 /** The two browse sections on the Search tab, in render order. */
 enum class SearchCategoryGroup(@param:StringRes val titleRes: Int) {
@@ -35,7 +36,7 @@ enum class SearchCategory(
 
     LOW_CARB(SearchCategoryGroup.POPULAR, R.string.search_category_low_carb, "low carb"),
     SANDWICHES_WRAPS(SearchCategoryGroup.POPULAR, R.string.search_category_sandwiches_wraps, "sandwich"),
-    QUICK_EASY(SearchCategoryGroup.POPULAR, R.string.search_category_quick_easy, "quick", maxTotalMinutes = 30),
+    QUICK_EASY(SearchCategoryGroup.POPULAR, R.string.search_category_quick_easy, "quick", maxTotalMinutes = QUICK_EASY_MAX_TOTAL_MINUTES),
     BUDGET_FRIENDLY(SearchCategoryGroup.POPULAR, R.string.search_category_budget_friendly, "budget"),
     AIR_FRYER(SearchCategoryGroup.POPULAR, R.string.search_category_air_fryer, "air fryer"),
     VEGETARIAN(SearchCategoryGroup.POPULAR, R.string.search_category_vegetarian, "vegetarian"),

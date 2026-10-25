@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.recipes.ui
 
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.core.domain.model.Label
+import com.tenmilelabs.chefai.core.domain.model.QUICK_EASY_MAX_TOTAL_MINUTES
 import com.tenmilelabs.chefai.core.domain.model.Tag
 import com.tenmilelabs.chefai.core.testutil.recipePreview1
 import org.junit.Test
@@ -25,6 +26,18 @@ class RecipeFilterTest {
         // Then
         assertThat(RecipeFilter.QUICK_EASY.matches(atLimit)).isTrue()
         assertThat(RecipeFilter.QUICK_EASY.matches(overLimit)).isFalse()
+    }
+
+    @Test
+    fun `QUICK_EASY threshold is 30 minutes inclusive`() {
+        // Given: totals of exactly 30, and 31, split across prep and cook
+        val thirty = plain.copy(prepTimeMinutes = 10, cookTimeMinutes = 20)
+        val thirtyOne = plain.copy(prepTimeMinutes = 10, cookTimeMinutes = 21)
+
+        // Then: literal numbers, so a drift in the shared constant fails here
+        assertThat(QUICK_EASY_MAX_TOTAL_MINUTES).isEqualTo(30)
+        assertThat(RecipeFilter.QUICK_EASY.matches(thirty)).isTrue()
+        assertThat(RecipeFilter.QUICK_EASY.matches(thirtyOne)).isFalse()
     }
 
     @Test
