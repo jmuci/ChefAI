@@ -52,6 +52,11 @@ data class RecipeEntity(
     val caloriesPerServing: Int? = null,
     /** Protein grams per serving. Same provenance and null-means-unknown convention as [caloriesPerServing]. */
     val proteinGramsPerServing: Int? = null,
+    /**
+     * ISO 639-1 code of the language the recipe is written in (`"en"`, `"es"`), or `null` when
+     * unknown. See [com.tenmilelabs.chefai.core.domain.model.Recipe.languageCode].
+     */
+    val language: String? = null,
     val creatorId: UUID,
     val recipeExternalUrl: String?,
     val privacy: RecipePrivacy = RecipePrivacy.PUBLIC,

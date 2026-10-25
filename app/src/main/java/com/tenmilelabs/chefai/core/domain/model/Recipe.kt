@@ -38,6 +38,15 @@ data class Recipe(
     val caloriesPerServing: Int? = null,
     /** Protein grams per serving. Same provenance and null-means-unknown convention as [caloriesPerServing]. */
     val proteinGramsPerServing: Int? = null,
+    /**
+     * ISO 639-1 code of the language the recipe is written in (`"en"`, `"es"`), or `null` when
+     * unknown — every recipe saved before languages were tracked.
+     *
+     * Kept as the raw code rather than an enum on purpose: [com.tenmilelabs.chefai.recipes.data.mapper.toRoomEntity]
+     * writes the full row, so mapping a code this build doesn't know (synced from a newer client)
+     * to `null` would erase it on the next edit.
+     */
+    val languageCode: String? = null,
     val creator: User,
     val recipeExternalUrl: String?,
     val privacy: RecipePrivacy = RecipePrivacy.PUBLIC,

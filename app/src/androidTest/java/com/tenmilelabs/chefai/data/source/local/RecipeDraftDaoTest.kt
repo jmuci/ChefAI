@@ -44,6 +44,8 @@ class RecipeDraftDaoTest {
             servings = "4",
             caloriesPerServing = "",
             proteinGramsPerServing = "",
+            language = "es",
+            languageNeedsConfirmation = true,
             externalUrl = "https://example.com/recipe",
             privacy = RecipePrivacy.PRIVATE,
             ingredientsJson = "[]",

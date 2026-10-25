@@ -369,4 +369,31 @@ class DraftMapperTest {
         val creator = User(UUID.randomUUID(), "Chef", "chef@example.com", "")
         draft.toRecipe(creator) // should throw
     }
+
+    // --- Language ---
+
+    @Test
+    fun `language and its confirmation flag round-trip through the entity`() {
+        val original = RecipeDraft(
+            recipeId = UUID.randomUUID(),
+            isNewRecipe = true,
+            languageCode = "es",
+            languageNeedsConfirmation = true,
+            updatedAt = 1000L,
+        )
+
+        assertEquals(original, original.toRecipeDraftEntity().toRecipeDraft())
+    }
+
+    @Test
+    fun `language survives Recipe to draft to Recipe`() {
+        val recipe = recipe1.copy(languageCode = "es")
+
+        val draft = recipe.toRecipeDraft()
+
+        assertEquals("es", draft.languageCode)
+        // An already-saved recipe never asks again.
+        assertEquals(false, draft.languageNeedsConfirmation)
+        assertEquals("es", draft.toRecipe(recipe.creator).languageCode)
+    }
 }

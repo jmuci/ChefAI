@@ -150,6 +150,19 @@ class RecipeEditorViewModelTest {
     }
 
     @Test
+    fun `a seeded draft's language survives into the saved recipe`() = runTest {
+        val draftId = UuidV7Generator.newId()
+        recipeDraftDao.saveDraft(completeImportedDraft(draftId).copy(languageCode = "es").toRecipeDraftEntity())
+
+        val vm = createViewModel(draftId = draftId.toString())
+        assertEquals("es", vm.state.value.recipeFields.languageCode)
+        vm.dispatch(EditorAction.Save)
+
+        assertEquals("es", recipesRepository.lastCreatedRecipe?.languageCode)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
     fun `saving a seeded draft takes the create path not update`() = runTest {
         val draftId = UuidV7Generator.newId()
         recipeDraftDao.saveDraft(completeImportedDraft(draftId).toRecipeDraftEntity())

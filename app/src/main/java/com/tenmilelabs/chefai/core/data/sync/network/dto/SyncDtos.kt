@@ -36,6 +36,12 @@ data class SyncRecipeDto(
     val prepTimeMinutes: Int,
     val cookTimeMinutes: Int,
     val servings: Int,
+    /**
+     * ISO 639-1 code of the recipe's language, or `null` when unknown. Defaulted so a server that
+     * predates language tracking still deserialises — see [com.tenmilelabs.chefai.core.data.sync.mapper.toRecipeEntity]
+     * for why a `null` here never erases a value this device already has.
+     */
+    val language: String? = null,
     val creatorId: String,
     val recipeExternalUrl: String?,
     val privacy: String,

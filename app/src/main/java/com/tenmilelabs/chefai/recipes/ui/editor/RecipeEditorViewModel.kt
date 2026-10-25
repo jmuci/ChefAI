@@ -200,6 +200,8 @@ class RecipeEditorViewModel @Inject constructor(
                         servings = draft.servings,
                         caloriesPerServing = draft.caloriesPerServing,
                         proteinGramsPerServing = draft.proteinGramsPerServing,
+                        languageCode = draft.languageCode,
+                        languageNeedsConfirmation = draft.languageNeedsConfirmation,
                         externalUrl = draft.externalUrl,
                         privacy = draft.privacy,
                     ),

@@ -52,7 +52,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         TagEntity::class,
         UserEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = true
 )
 @TypeConverters(UuidConverters::class)
@@ -331,5 +331,23 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
 val MIGRATION_9_10 = object : Migration(9, 10) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE shopping_list_checks ADD COLUMN checkedBy BLOB")
+    }
+}
+
+/**
+ * Adds the recipe's language (an ISO 639-1 code) to
+ * [com.tenmilelabs.chefai.core.data.local.room.RecipeEntity] and
+ * [com.tenmilelabs.chefai.core.data.local.room.RecipeDraftEntity], plus the draft-only
+ * `languageNeedsConfirmation` flag an import sets when the page's language was only a guess.
+ *
+ * No backfill: `null` ("unknown") is the honest state for every recipe saved before languages were
+ * tracked — most are probably English, but guessing would hide the ones that aren't. Existing
+ * drafts default to "no confirmation needed", since none of them came from a language-aware import.
+ */
+val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE recipes ADD COLUMN language TEXT")
+        db.execSQL("ALTER TABLE recipe_drafts ADD COLUMN language TEXT")
+        db.execSQL("ALTER TABLE recipe_drafts ADD COLUMN languageNeedsConfirmation INTEGER NOT NULL DEFAULT 0")
     }
 }

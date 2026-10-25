@@ -27,6 +27,8 @@ class FakeRecipeDraftDaoTest {
         servings = "4",
         caloriesPerServing = "",
         proteinGramsPerServing = "",
+        language = null,
+        languageNeedsConfirmation = false,
         externalUrl = "",
         privacy = RecipePrivacy.PRIVATE,
         ingredientsJson = "[]",

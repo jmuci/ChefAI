@@ -19,6 +19,10 @@ data class RecipeFields(
     val caloriesPerServing: String = "",
     /** Optional — blank means not entered, never validated as required. */
     val proteinGramsPerServing: String = "",
+    /** See [com.tenmilelabs.chefai.recipes.domain.model.RecipeDraft.languageCode]. */
+    val languageCode: String? = null,
+    /** See [com.tenmilelabs.chefai.recipes.domain.model.RecipeDraft.languageNeedsConfirmation]. */
+    val languageNeedsConfirmation: Boolean = false,
     val externalUrl: String = "",
     val privacy: RecipePrivacy = RecipePrivacy.PRIVATE,
 )

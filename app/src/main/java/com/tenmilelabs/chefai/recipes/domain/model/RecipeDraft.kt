@@ -30,6 +30,14 @@ data class RecipeDraft(
     val caloriesPerServing: String = "",
     /** Form-input string for [com.tenmilelabs.chefai.core.domain.model.Recipe.proteinGramsPerServing]; blank means not entered. */
     val proteinGramsPerServing: String = "",
+    /** See [com.tenmilelabs.chefai.core.domain.model.Recipe.languageCode]. */
+    val languageCode: String? = null,
+    /**
+     * `true` when [languageCode] is a guess the user hasn't confirmed yet — an import whose page
+     * gave no confident language signal. The editor asks before saving. Never set for a recipe
+     * written by hand or one already saved.
+     */
+    val languageNeedsConfirmation: Boolean = false,
     val externalUrl: String = "",
     /**
      * Defaults to [RecipePrivacy.PRIVATE]: a recipe the user writes stays theirs until they say

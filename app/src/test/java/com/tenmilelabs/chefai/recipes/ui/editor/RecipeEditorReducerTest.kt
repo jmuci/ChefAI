@@ -244,6 +244,17 @@ class RecipeEditorReducerTest {
         assertEquals(RecipePrivacy.PUBLIC, state.toRecipeDraft().privacy)
     }
 
+    @Test
+    fun `toRecipeDraft carries the language and its confirmation flag`() {
+        // Autosave goes through toRecipeDraft — dropping these would lose the import's language.
+        val state = emptyState.copy(
+            recipeFields = RecipeFields(languageCode = "es", languageNeedsConfirmation = true)
+        )
+        val draft = state.toRecipeDraft()
+        assertEquals("es", draft.languageCode)
+        assertTrue(draft.languageNeedsConfirmation)
+    }
+
     // --- Ingredients ---
 
     @Test
