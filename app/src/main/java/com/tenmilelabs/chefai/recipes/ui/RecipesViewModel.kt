@@ -34,7 +34,9 @@ import javax.inject.Inject
  * UiState for the recipes screen.
  */
 data class RecipesUiState(
+    /** The collection, already narrowed by [selectedFilter]. */
     val items: List<RecipePreview> = emptyList(),
+    val selectedFilter: RecipeFilter = RecipeFilter.ALL,
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
 )
@@ -57,6 +59,9 @@ class RecipesViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _isLoading = MutableStateFlow(false)
+    // Lives here rather than in Compose state so it survives leaving and returning to the tab.
+    // Not persisted: process death resets it to ALL.
+    private val _selectedFilter = MutableStateFlow(RecipeFilter.ALL)
     // A Channel, not a replaying SharedFlow: replay = 1 re-delivered the last snackbar every time
     // the screen re-subscribed (back navigation, rotation, tab switch).
     private val _uiEvent = Channel<RecipesUiEvent>(Channel.BUFFERED)
@@ -83,19 +88,28 @@ class RecipesViewModel @Inject constructor(
         }
 
     val uiState: StateFlow<RecipesUiState> = combine(
-        _isLoading, _recipesAsync, syncStatusHolder.syncStatus
-    ) { isLoading, recipesAsync, syncStatus ->
+        _isLoading, _recipesAsync, _selectedFilter, syncStatusHolder.syncStatus
+    ) { isLoading, recipesAsync, selectedFilter, syncStatus ->
         val isRefreshing = syncStatus is SyncStatus.Syncing
         when (recipesAsync) {
             Async.Loading -> {
-                RecipesUiState(isLoading = true, isRefreshing = isRefreshing)
+                RecipesUiState(
+                    isLoading = true,
+                    isRefreshing = isRefreshing,
+                    selectedFilter = selectedFilter,
+                )
             }
             is Async.Error -> {
-                RecipesUiState(isLoading = false, isRefreshing = isRefreshing)
+                RecipesUiState(
+                    isLoading = false,
+                    isRefreshing = isRefreshing,
+                    selectedFilter = selectedFilter,
+                )
             }
             is Async.Success -> {
                 RecipesUiState(
-                    items = recipesAsync.data,
+                    items = recipesAsync.data.filter(selectedFilter::matches),
+                    selectedFilter = selectedFilter,
                     isLoading = isLoading,
                     isRefreshing = isRefreshing,
                 )
@@ -111,6 +125,10 @@ class RecipesViewModel @Inject constructor(
     fun onRefresh() {
         syncStatusHolder.emitStatus(SyncStatus.Syncing)
         syncScheduler.requestManualSync()
+    }
+
+    fun onFilterSelected(filter: RecipeFilter) {
+        _selectedFilter.value = filter
     }
 
 }

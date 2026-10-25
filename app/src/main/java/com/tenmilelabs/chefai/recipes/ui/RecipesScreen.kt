@@ -1,7 +1,6 @@
 package com.tenmilelabs.chefai.recipes.ui
 
 import android.content.res.Configuration
-import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -22,10 +21,6 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -47,19 +42,6 @@ import com.tenmilelabs.chefai.core.util.LoadingContent
 import com.tenmilelabs.chefai.recipes.ui.components.RecipeGridCard
 import java.util.UUID
 
-/**
- * The filter chips above the recipe grid (04). Only [ALL] is wired to anything today — the others
- * render selectable but inert. See the GitHub issue filed alongside this screen's redesign for what
- * real filtering needs: where the state lives, how it maps to tags/labels, and how it interacts
- * with the search pipeline.
- */
-private enum class RecipeFilter(@StringRes val labelRes: Int) {
-    ALL(R.string.recipe_filter_all),
-    QUICK_EASY(R.string.search_category_quick_easy),
-    VEGETARIAN(R.string.search_category_vegetarian),
-    SEAFOOD(R.string.recipe_filter_seafood),
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecipesScreen(
@@ -78,6 +60,8 @@ fun RecipesScreen(
         RecipesContent(
             loading = uiState.isLoading,
             recipes = uiState.items,
+            selectedFilter = uiState.selectedFilter,
+            onFilterSelect = viewModel::onFilterSelected,
             recipeCardOnClick = onRecipeCardClick,
         )
     }
@@ -101,20 +85,27 @@ fun RecipesScreen(
 fun RecipesContent(
     loading: Boolean,
     recipes: List<RecipePreview>,
+    selectedFilter: RecipeFilter = RecipeFilter.ALL,
+    onFilterSelect: (RecipeFilter) -> Unit = {},
     recipeCardOnClick: (UUID) -> Unit = {},
 ) {
-    var selectedFilter by rememberSaveable { mutableStateOf(RecipeFilter.ALL) }
-
     if (loading) {
         LoadingContent()
     } else {
         Column(modifier = Modifier.fillMaxSize()) {
             FilterChipsRow(
                 selected = selectedFilter,
-                onSelect = { selectedFilter = it },
+                onSelect = onFilterSelect,
             )
 
-            if (recipes.isEmpty()) {
+            if (recipes.isEmpty() && selectedFilter != RecipeFilter.ALL) {
+                // The collection may well be non-empty; it's the filter that matched nothing.
+                EmptyContent(
+                    R.string.no_filtered_recipes_title,
+                    R.string.no_filtered_recipes_subtitle,
+                    R.drawable.ic_chef_hat_black_24dp
+                )
+            } else if (recipes.isEmpty()) {
                 EmptyContent(
                     R.string.no_recipes_title,
                     R.string.no_recipes_subtitle,
@@ -194,6 +185,17 @@ fun RecipesListScreenEmptyPreview() {
     ChefAITheme {
         Surface {
             RecipesContent(false, recipes)
+        }
+    }
+}
+
+@Preview
+@Preview(uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+fun RecipesListScreenFilteredEmptyPreview() {
+    ChefAITheme {
+        Surface {
+            RecipesContent(false, emptyList(), selectedFilter = RecipeFilter.DESSERT)
         }
     }
 }
