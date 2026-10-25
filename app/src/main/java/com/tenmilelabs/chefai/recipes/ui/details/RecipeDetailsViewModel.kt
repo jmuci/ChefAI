@@ -49,6 +49,8 @@ data class RecipesDetailsUiState(
      * any other entry point) never offers it, regardless of where it was opened from.
      */
     val canDelete: Boolean = false,
+    /** True when the current user created or imported this recipe; others' recipes are read-only. */
+    val canEdit: Boolean = false,
     /** True when this recipe was opened from a meal plan slot, so a cooked toggle applies. */
     val showCookedToggle: Boolean = false,
     val isCooked: Boolean = false,
@@ -283,6 +285,7 @@ class RecipeDetailsViewModel @Inject constructor(
                     showDeleteConfirmation = combined.deleteUi.showConfirmation,
                     isDeleting = combined.deleteUi.isDeleting,
                     canDelete = currentUserId != null && recipe.creator.uuid == currentUserId,
+                    canEdit = currentUserId != null && recipe.creator.uuid == currentUserId,
                     showCookedToggle = mealPlanSlotRef != null,
                     isCooked = isCooked,
                     servings = servings,

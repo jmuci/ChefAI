@@ -227,7 +227,10 @@ class RecipeDetailsViewModelTest {
             // recipe1's creator is a fixture user distinct from this session's own id.
             recipesRepository.emitRecipe(recipeId1, recipe1)
 
-            assertThat(awaitItem().canDelete).isFalse()
+            awaitItem().let {
+                assertThat(it.canDelete).isFalse()
+                assertThat(it.canEdit).isFalse()
+            }
 
             cancelAndConsumeRemainingEvents()
         }
@@ -243,7 +246,10 @@ class RecipeDetailsViewModelTest {
             assertThat(awaitItem().isLoading).isTrue()
             recipesRepository.emitRecipe(recipeId1, ownRecipe)
 
-            assertThat(awaitItem().canDelete).isTrue()
+            awaitItem().let {
+                assertThat(it.canDelete).isTrue()
+                assertThat(it.canEdit).isTrue()
+            }
 
             cancelAndConsumeRemainingEvents()
         }

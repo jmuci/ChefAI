@@ -143,7 +143,7 @@ fun RecipeDetailsScreen(
                 },
                 servings = uiState.servings,
                 isBookmarked = uiState.isBookmarked,
-                canEdit = onEditClick != null,
+                canEdit = onEditClick != null && uiState.canEdit,
                 // Deleting navigates away, so the button is only offered when there is somewhere to
                 // go — and even then, only for a recipe the user owns (uiState.canDelete).
                 canDelete = onNavigateBack != null && uiState.canDelete,
