@@ -24,6 +24,9 @@ sealed interface EditorAction {
     data class ProteinChanged(val protein: String) : EditorAction
     data class ExternalUrlChanged(val url: String) : EditorAction
     data class PrivacyChanged(val privacy: RecipePrivacy) : EditorAction
+
+    /** Picked from the editor's language row. An explicit choice, so it also counts as confirming. */
+    data class LanguageSelected(val code: String) : EditorAction
     data class ImageUrlChanged(val url: String) : EditorAction
     data class ImageSelected(val uri: String?) : EditorAction
 
@@ -66,7 +69,28 @@ sealed interface EditorAction {
 
     /** The user chose "Discard" on the unsaved-changes dialog: drop the auto-saved draft too. */
     data object DiscardDraft : EditorAction
+
+    // Language confirmation prompt
+    data class LanguagePromptSelectionChanged(val code: String) : EditorAction
+    data object LanguagePromptConfirmed : EditorAction
+
+    /** "Not now": closes the prompt, keeping the guess — and the need to confirm it. */
+    data object LanguagePromptDismissed : EditorAction
 }
+
+/**
+ * The open "what language is this recipe in?" prompt, shown for an import whose language was only
+ * a guess (see [RecipeFields.languageNeedsConfirmation]).
+ *
+ * @property selectedCode the language currently ticked — the guess, or the fallback-language
+ *   setting when there was no guess, until the user picks another.
+ * @property saveOnConfirm `true` when Save opened the prompt, so confirming carries on saving
+ *   rather than leaving the user to tap Save a second time.
+ */
+data class LanguagePrompt(
+    val selectedCode: String,
+    val saveOnConfirm: Boolean,
+)
 
 /**
  * One-shot side effects emitted by the ViewModel, consumed by the UI.
@@ -97,6 +121,7 @@ data class RecipeEditorState(
     val isSaving: Boolean = false,
     val isDeleting: Boolean = false,
     val showDeleteConfirmation: Boolean = false,
+    val languagePrompt: LanguagePrompt? = null,
     val saveError: String? = null,
     val isFormValid: Boolean = false,
     val isDirty: Boolean = false,

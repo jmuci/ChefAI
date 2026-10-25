@@ -51,10 +51,12 @@ import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.Label
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
+import com.tenmilelabs.chefai.core.domain.model.RecipeLanguage
 import com.tenmilelabs.chefai.core.ui.components.flat.DragReorderColumn
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatBlockButton
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatButtonVariant
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatChip
+import com.tenmilelabs.chefai.core.ui.language.labelRes
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatField
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatTag
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatTagTone
@@ -70,6 +72,7 @@ import com.tenmilelabs.chefai.core.util.QuantityFormat
 import com.tenmilelabs.chefai.recipes.domain.model.EditorMode
 import com.tenmilelabs.chefai.recipes.ui.components.DeleteConfirmationDialog
 import com.tenmilelabs.chefai.recipes.ui.editor.components.AutocompleteInput
+import com.tenmilelabs.chefai.recipes.ui.editor.components.LanguagePromptDialog
 import com.tenmilelabs.chefai.recipes.ui.editor.components.IngredientAddForm
 import com.tenmilelabs.chefai.recipes.ui.editor.components.IngredientRow
 import com.tenmilelabs.chefai.recipes.ui.editor.components.ImageUploadContent
@@ -114,6 +117,15 @@ fun RecipeEditorScreen(
         UnsavedChangesDialog(
             onDiscard = { viewModel.dispatch(EditorAction.DiscardDraft) },
             onKeepEditing = { showUnsavedDialog = false },
+        )
+    }
+
+    state.languagePrompt?.let { prompt ->
+        LanguagePromptDialog(
+            selectedCode = prompt.selectedCode,
+            onSelect = { viewModel.dispatch(EditorAction.LanguagePromptSelectionChanged(it)) },
+            onConfirm = { viewModel.dispatch(EditorAction.LanguagePromptConfirmed) },
+            onDismiss = { viewModel.dispatch(EditorAction.LanguagePromptDismissed) },
         )
     }
 
@@ -201,6 +213,12 @@ fun RecipeEditorScreen(
             VisibilitySection(
                 privacy = state.recipeFields.privacy,
                 onPrivacyChange = { viewModel.dispatch(EditorAction.PrivacyChanged(it)) },
+            )
+
+            LanguageSection(
+                languageCode = state.recipeFields.languageCode,
+                needsConfirmation = state.recipeFields.languageNeedsConfirmation,
+                onLanguageSelected = { viewModel.dispatch(EditorAction.LanguageSelected(it)) },
             )
 
             IngredientsSection(
@@ -474,6 +492,56 @@ private fun VisibilitySection(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+/**
+ * The recipe's language as a single-select chip row. A code the app doesn't offer (synced from a
+ * newer client) selects no chip and is named in the caption instead, so it is never silently
+ * replaced; picking a chip replaces it deliberately.
+ */
+@Composable
+private fun LanguageSection(
+    languageCode: String?,
+    needsConfirmation: Boolean,
+    onLanguageSelected: (String) -> Unit,
+) {
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.section_language).uppercase(),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.chefColors.accentText,
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            RecipeLanguage.entries.forEach { language ->
+                FlatChip(
+                    label = stringResource(language.labelRes),
+                    selected = languageCode == language.code,
+                    onClick = { onLanguageSelected(language.code) },
+                    singleSelect = true,
+                    modifier = Modifier.testTag("LanguageOption_${language.code}"),
+                )
+            }
+        }
+        val caption = when {
+            languageCode == null -> stringResource(R.string.recipe_language_not_set)
+            RecipeLanguage.fromCode(languageCode) == null -> stringResource(R.string.recipe_language_other, languageCode)
+            needsConfirmation -> stringResource(R.string.recipe_language_unconfirmed)
+            else -> null
+        }
+        if (caption != null) {
+            Text(
+                text = caption,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

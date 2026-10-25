@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.core.domain.repository
 
+import com.tenmilelabs.chefai.core.domain.model.RecipeLanguage
 import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
 import kotlinx.coroutines.flow.Flow
 
@@ -17,4 +18,13 @@ interface UserPreferencesRepository {
     val measurementSystem: Flow<MeasurementSystem>
 
     suspend fun setMeasurementSystem(system: MeasurementSystem)
+
+    /**
+     * The language to assume for a recipe when nothing better is known: pre-selected when an
+     * import's language has to be confirmed, and given to recipes written by hand. Until the user
+     * picks one, the device's language if the app offers it, else English. Emits on every change.
+     */
+    val fallbackRecipeLanguage: Flow<RecipeLanguage>
+
+    suspend fun setFallbackRecipeLanguage(language: RecipeLanguage)
 }

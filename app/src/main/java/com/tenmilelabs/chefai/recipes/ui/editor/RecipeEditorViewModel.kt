@@ -10,9 +10,11 @@ import com.tenmilelabs.chefai.core.di.IoDispatcher
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.domain.model.Label
+import com.tenmilelabs.chefai.core.domain.model.RecipeLanguage
 import com.tenmilelabs.chefai.core.domain.model.Tag
 import com.tenmilelabs.chefai.core.domain.model.User
 import com.tenmilelabs.chefai.core.domain.repository.MetadataRepository
+import com.tenmilelabs.chefai.core.domain.repository.UserPreferencesRepository
 import com.tenmilelabs.chefai.recipes.data.mapper.toRecipe
 import com.tenmilelabs.chefai.recipes.data.mapper.toRecipeDraft
 import com.tenmilelabs.chefai.recipes.data.mapper.toRecipeDraftEntity
@@ -30,6 +32,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -48,6 +51,7 @@ class RecipeEditorViewModel @Inject constructor(
     private val sessionManager: SessionManager,
     private val recipeDraftDao: RecipeDraftDao,
     private val cachePickedImage: CachePickedImage,
+    private val userPreferencesRepository: UserPreferencesRepository,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
@@ -111,10 +115,12 @@ class RecipeEditorViewModel @Inject constructor(
      * then dispatches side effects as needed.
      */
     fun dispatch(action: EditorAction) {
+        val promptBefore = _state.value.languagePrompt
         _state.update { RecipeEditorReducer.reduce(it, action) }
 
         when (action) {
             is EditorAction.Save -> save()
+            is EditorAction.LanguagePromptConfirmed -> if (promptBefore?.saveOnConfirm == true) save()
             is EditorAction.ConfirmDelete -> delete()
             is EditorAction.DiscardDraft -> discardDraft()
             is EditorAction.ImageSelected -> storePickedImage(action.uri)
@@ -182,6 +188,34 @@ class RecipeEditorViewModel @Inject constructor(
             if (existingDraft != null) {
                 val draft = existingDraft.toRecipeDraft()
                 populateFromDraft(draft)
+                if (draft.languageNeedsConfirmation) openLanguagePrompt(saveOnConfirm = false)
+            } else {
+                // A recipe the user is writing themselves: assume their fallback language rather
+                // than asking — they can change it from the language row.
+                val fallback = userPreferencesRepository.fallbackRecipeLanguage.first()
+                _state.update { state ->
+                    if (state.recipeFields.languageCode != null) state
+                    else state.copy(recipeFields = state.recipeFields.copy(languageCode = fallback.code))
+                }
+            }
+        }
+    }
+
+    /**
+     * Opens the language prompt, pre-ticking the recipe's guessed language when the app offers it,
+     * else the user's fallback-language setting.
+     */
+    private fun openLanguagePrompt(saveOnConfirm: Boolean) {
+        viewModelScope.launch {
+            val fallback = userPreferencesRepository.fallbackRecipeLanguage.first()
+            _state.update { state ->
+                val guess = state.recipeFields.languageCode?.takeIf { RecipeLanguage.fromCode(it) != null }
+                state.copy(
+                    languagePrompt = LanguagePrompt(
+                        selectedCode = guess ?: fallback.code,
+                        saveOnConfirm = saveOnConfirm,
+                    )
+                )
             }
         }
     }
@@ -342,6 +376,10 @@ class RecipeEditorViewModel @Inject constructor(
 
     private fun save() {
         if (!_state.value.isFormValid || _state.value.isSaving) return
+        if (_state.value.recipeFields.languageNeedsConfirmation) {
+            openLanguagePrompt(saveOnConfirm = true)
+            return
+        }
 
         viewModelScope.launch {
             _state.update { it.copy(isSaving = true, saveError = null) }

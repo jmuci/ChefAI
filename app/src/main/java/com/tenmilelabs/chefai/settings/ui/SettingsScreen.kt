@@ -4,8 +4,10 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -25,7 +27,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.core.domain.model.RecipeLanguage
 import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
+import com.tenmilelabs.chefai.core.ui.language.labelRes
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatRadio
 import com.tenmilelabs.chefai.core.ui.components.flat.MinHitTarget
 import com.tenmilelabs.chefai.core.ui.components.flat.RuledGroup
@@ -58,21 +62,9 @@ fun SettingsContent(
             .verticalScroll(rememberScrollState())
             .padding(vertical = SettingsMetrics.ScreenVerticalPadding),
     ) {
-        Text(
-            // labelMedium carries the uppercase tracking but not the transform — see Type.kt.
-            text = stringResource(R.string.settings_measurement_units_title).uppercase(),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = SettingsMetrics.HorizontalPadding),
-        )
-        Text(
-            text = stringResource(R.string.settings_measurement_units_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(
-                horizontal = SettingsMetrics.HorizontalPadding,
-                vertical = SettingsMetrics.TitleToSubtitleGap,
-            ),
+        SettingsSectionHeader(
+            title = stringResource(R.string.settings_measurement_units_title),
+            subtitle = stringResource(R.string.settings_measurement_units_subtitle),
         )
 
         RuledGroup(
@@ -81,26 +73,79 @@ fun SettingsContent(
                 .padding(top = SettingsMetrics.SubtitleToGroupGap)
                 .selectableGroup(),
         ) { option ->
-            MeasurementSystemRow(
-                option = option,
+            SettingsRadioRow(
+                label = stringResource(option.labelRes),
+                example = stringResource(option.exampleRes),
                 isSelected = uiState.measurementSystem == option.system,
                 onSelect = { onAction(SettingsAction.MeasurementSystemChanged(option.system)) },
             )
         }
 
-        Text(
-            text = stringResource(R.string.settings_measurement_units_footnote),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = SettingsMetrics.HorizontalPadding),
+        SettingsFootnote(stringResource(R.string.settings_measurement_units_footnote))
+
+        Spacer(Modifier.height(SettingsMetrics.SectionGap))
+
+        SettingsSectionHeader(
+            title = stringResource(R.string.settings_recipe_language_title),
+            subtitle = stringResource(R.string.settings_recipe_language_subtitle),
         )
+
+        RuledGroup(
+            items = RecipeLanguage.entries,
+            modifier = Modifier
+                .padding(top = SettingsMetrics.SubtitleToGroupGap)
+                .selectableGroup(),
+        ) { language ->
+            SettingsRadioRow(
+                label = stringResource(language.labelRes),
+                example = null,
+                isSelected = uiState.fallbackRecipeLanguage == language,
+                onSelect = { onAction(SettingsAction.FallbackRecipeLanguageChanged(language)) },
+            )
+        }
+
+        SettingsFootnote(stringResource(R.string.settings_recipe_language_footnote))
     }
 }
 
-/** One radio row — 44dp minimum, the selected label going 800. See [FlatRadio]'s own preview. */
 @Composable
-private fun MeasurementSystemRow(
-    option: MeasurementSystemOption,
+private fun SettingsSectionHeader(title: String, subtitle: String) {
+    Text(
+        // labelMedium carries the uppercase tracking but not the transform — see Type.kt.
+        text = title.uppercase(),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(horizontal = SettingsMetrics.HorizontalPadding),
+    )
+    Text(
+        text = subtitle,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(
+            horizontal = SettingsMetrics.HorizontalPadding,
+            vertical = SettingsMetrics.TitleToSubtitleGap,
+        ),
+    )
+}
+
+@Composable
+private fun SettingsFootnote(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = SettingsMetrics.HorizontalPadding),
+    )
+}
+
+/**
+ * One radio row — 44dp minimum, the selected label going 800. See [FlatRadio]'s own preview.
+ * [example] is a second line under the label, omitted when the label says it all.
+ */
+@Composable
+private fun SettingsRadioRow(
+    label: String,
+    example: String?,
     isSelected: Boolean,
     onSelect: () -> Unit,
 ) {
@@ -119,15 +164,17 @@ private fun MeasurementSystemRow(
         FlatRadio(selected = isSelected, onClick = null)
         Column {
             Text(
-                text = stringResource(option.labelRes),
+                text = label,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Normal,
             )
-            Text(
-                text = stringResource(option.exampleRes),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (example != null) {
+                Text(
+                    text = example,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
@@ -146,6 +193,9 @@ private object SettingsMetrics {
     /** `padding: var(--space-3) 0` inside each row. */
     val RowVerticalPadding = 12.dp
     val RadioGap = 12.dp
+
+    /** Between one section's footnote and the next section's label. */
+    val SectionGap = 32.dp
 }
 
 /**
@@ -181,7 +231,10 @@ private fun SettingsContentPreview() {
     ChefAITheme {
         Surface {
             SettingsContent(
-                uiState = SettingsUiState(measurementSystem = MeasurementSystem.METRIC),
+                uiState = SettingsUiState(
+                    measurementSystem = MeasurementSystem.METRIC,
+                    fallbackRecipeLanguage = RecipeLanguage.SPANISH,
+                ),
                 onAction = {},
             )
         }

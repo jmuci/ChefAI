@@ -7,9 +7,11 @@ import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDraftDao
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
+import com.tenmilelabs.chefai.core.domain.model.RecipeLanguage
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.core.data.repository.FakeMetadataRepository
+import com.tenmilelabs.chefai.core.data.repository.FakeUserPreferencesRepository
 import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
 import com.tenmilelabs.chefai.core.testutil.recipe1
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
@@ -45,6 +47,7 @@ class RecipeEditorViewModelTest {
     private lateinit var metadataRepository: FakeMetadataRepository
     private lateinit var recipeDraftDao: FakeRecipeDraftDao
     private lateinit var cachePickedImage: CachePickedImage
+    private lateinit var userPreferencesRepository: FakeUserPreferencesRepository
 
     @Before
     fun setup() {
@@ -52,6 +55,7 @@ class RecipeEditorViewModelTest {
         collectionsRepository = FakeCollectionsRepository()
         metadataRepository = FakeMetadataRepository()
         recipeDraftDao = FakeRecipeDraftDao()
+        userPreferencesRepository = FakeUserPreferencesRepository(initialFallbackLanguage = RecipeLanguage.FRENCH)
         cachePickedImage = CachePickedImage(
             recipeImageStore = mockk(relaxed = true),
             ioDispatcher = mainCoroutineRule.testDispatcher,
@@ -75,6 +79,7 @@ class RecipeEditorViewModelTest {
             ),
             recipeDraftDao = recipeDraftDao,
             cachePickedImage = cachePickedImage,
+            userPreferencesRepository = userPreferencesRepository,
             ioDispatcher = mainCoroutineRule.testDispatcher,
             savedStateHandle = savedStateHandle,
         )
@@ -159,6 +164,113 @@ class RecipeEditorViewModelTest {
         vm.dispatch(EditorAction.Save)
 
         assertEquals("es", recipesRepository.lastCreatedRecipe?.languageCode)
+        vm.viewModelScope.cancel()
+    }
+
+    // --- Language ---
+
+    @Test
+    fun `a recipe written from scratch starts in the fallback language without asking`() = runTest {
+        val vm = createViewModel()
+
+        assertEquals("fr", vm.state.value.recipeFields.languageCode)
+        assertNull(vm.state.value.languagePrompt)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `an import whose language is a guess opens the prompt on that guess`() = runTest {
+        val draftId = UuidV7Generator.newId()
+        recipeDraftDao.saveDraft(
+            completeImportedDraft(draftId).copy(languageCode = "es", languageNeedsConfirmation = true)
+                .toRecipeDraftEntity()
+        )
+
+        val vm = createViewModel(draftId = draftId.toString())
+
+        assertEquals(LanguagePrompt(selectedCode = "es", saveOnConfirm = false), vm.state.value.languagePrompt)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `an import with no language guess opens the prompt on the fallback language`() = runTest {
+        val draftId = UuidV7Generator.newId()
+        recipeDraftDao.saveDraft(
+            completeImportedDraft(draftId).copy(languageCode = null, languageNeedsConfirmation = true)
+                .toRecipeDraftEntity()
+        )
+
+        val vm = createViewModel(draftId = draftId.toString())
+
+        assertEquals("fr", vm.state.value.languagePrompt?.selectedCode)
+        // Never written onto the recipe until the user confirms.
+        assertNull(vm.state.value.recipeFields.languageCode)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `a confidently detected import opens no prompt`() = runTest {
+        val draftId = UuidV7Generator.newId()
+        recipeDraftDao.saveDraft(
+            completeImportedDraft(draftId).copy(languageCode = "es", languageNeedsConfirmation = false)
+                .toRecipeDraftEntity()
+        )
+
+        val vm = createViewModel(draftId = draftId.toString())
+
+        assertNull(vm.state.value.languagePrompt)
+        assertEquals("es", vm.state.value.recipeFields.languageCode)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `saving with an unconfirmed language asks first and does not save`() = runTest {
+        val draftId = UuidV7Generator.newId()
+        recipeDraftDao.saveDraft(
+            completeImportedDraft(draftId).copy(languageCode = "es", languageNeedsConfirmation = true)
+                .toRecipeDraftEntity()
+        )
+        val vm = createViewModel(draftId = draftId.toString())
+        vm.dispatch(EditorAction.LanguagePromptDismissed)
+
+        vm.dispatch(EditorAction.Save)
+
+        assertEquals(LanguagePrompt(selectedCode = "es", saveOnConfirm = true), vm.state.value.languagePrompt)
+        assertNull(recipesRepository.lastCreatedRecipe)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `confirming a prompt that Save opened carries on saving in the chosen language`() = runTest {
+        val draftId = UuidV7Generator.newId()
+        recipeDraftDao.saveDraft(
+            completeImportedDraft(draftId).copy(languageCode = "es", languageNeedsConfirmation = true)
+                .toRecipeDraftEntity()
+        )
+        val vm = createViewModel(draftId = draftId.toString())
+        vm.dispatch(EditorAction.LanguagePromptDismissed)
+        vm.dispatch(EditorAction.Save)
+
+        vm.dispatch(EditorAction.LanguagePromptSelectionChanged("pt"))
+        vm.dispatch(EditorAction.LanguagePromptConfirmed)
+
+        assertEquals("pt", recipesRepository.lastCreatedRecipe?.languageCode)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `confirming the prompt opened on load does not save`() = runTest {
+        val draftId = UuidV7Generator.newId()
+        recipeDraftDao.saveDraft(
+            completeImportedDraft(draftId).copy(languageCode = "es", languageNeedsConfirmation = true)
+                .toRecipeDraftEntity()
+        )
+        val vm = createViewModel(draftId = draftId.toString())
+
+        vm.dispatch(EditorAction.LanguagePromptConfirmed)
+
+        assertNull(recipesRepository.lastCreatedRecipe)
+        assertFalse(vm.state.value.recipeFields.languageNeedsConfirmation)
         vm.viewModelScope.cancel()
     }
 
