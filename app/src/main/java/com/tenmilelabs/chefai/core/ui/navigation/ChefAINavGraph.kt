@@ -60,7 +60,7 @@ import com.tenmilelabs.chefai.household.ui.HouseholdScreen
 import com.tenmilelabs.chefai.mealplans.ui.MealPlansScreen
 import com.tenmilelabs.chefai.mealplans.ui.MealPlansUiState
 import com.tenmilelabs.chefai.mealplans.ui.MealPlansViewModel
-import com.tenmilelabs.chefai.mealplans.ui.components.ServingBasisToggle
+import com.tenmilelabs.chefai.mealplans.ui.components.MealPlansViewToggle
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailScreen
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailUiState
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailViewModel
@@ -180,6 +180,7 @@ fun ChefAINavGraph(
                 onShoppingListClick = { planId ->
                     navActions.navigateToMealPlanShoppingList(planId)
                 },
+                onPlanClick = { planId -> navActions.navigateToMealPlanDetail(planId) },
             )
         }
         composable(route = AppDestinations.MEAL_PLAN_DETAIL.route) { backStackEntry ->
@@ -502,23 +503,19 @@ fun ChefAINavGraph(
                         )
                     }
                     AppDestinations.MEAL_PLANS.route -> {
-                        // The "Just me" / "Family" toggle lives in the header (screen 06), so the
-                        // week's view model is hoisted here the same way the plan detail's is.
+                        // The Week / Plans toggle lives in the header, so the tab's view model is
+                        // hoisted here the same way the plan detail's is.
                         navController.currentBackStackEntry?.let { entry ->
                             val weekViewModel: MealPlansViewModel = hiltViewModel(entry)
-                            val weekState by weekViewModel.uiState.collectAsStateWithLifecycle()
-                            val week = weekState as? MealPlansUiState.Success
+                            val viewMode by weekViewModel.viewMode.collectAsStateWithLifecycle()
                             ChefAITopAppBar(
                                 title = stringResource(titleRes),
                                 navigation = navigation,
                                 actions = {
-                                    if (week != null) {
-                                        ServingBasisToggle(
-                                            basis = week.servingBasis,
-                                            onBasisChange = weekViewModel::onServingBasisChange,
-                                            canSelectFamily = week.canSelectFamily,
-                                        )
-                                    }
+                                    MealPlansViewToggle(
+                                        mode = viewMode,
+                                        onModeChange = weekViewModel::onViewModeChange,
+                                    )
                                     trailingActions()
                                 },
                             )

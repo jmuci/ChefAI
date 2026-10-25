@@ -2,12 +2,16 @@ package com.tenmilelabs.chefai.mealplans.ui
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -29,17 +33,18 @@ import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.core.ui.theme.chefColors
 import com.tenmilelabs.chefai.core.util.LoadingContent
 import com.tenmilelabs.chefai.core.util.EmptyContent
-import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanServingBasis
 import com.tenmilelabs.chefai.mealplans.domain.week.MealPlanWeek
 import com.tenmilelabs.chefai.mealplans.domain.week.PlannedWeekMeal
 import com.tenmilelabs.chefai.mealplans.domain.week.WeekDay
+import com.tenmilelabs.chefai.mealplans.domain.summary.MealPlanSummary
+import com.tenmilelabs.chefai.mealplans.ui.components.MealPlanHeroCard
 import com.tenmilelabs.chefai.mealplans.ui.components.WeekDayRow
 import com.tenmilelabs.chefai.mealplans.ui.components.WeekNavigator
 import java.time.LocalDate
 import java.util.UUID
 
 /**
- * Screen 06 — the week view.
+ * Screen 06 — the week view, or (via the header toggle) the list of every plan.
  *
  * Date-first, not plan-first: seven rows, Mon–Sun (or whatever the locale calls the first day),
  * each holding the meals that land on that date. See ADR-015 for how plans are projected onto it
@@ -50,13 +55,19 @@ fun MealPlansScreen(
     onCreateMealPlan: () -> Unit = {},
     onMealClick: (PlannedWeekMeal) -> Unit = {},
     onShoppingListClick: (UUID) -> Unit = {},
+    onPlanClick: (UUID) -> Unit = {},
     viewModel: MealPlansViewModel = hiltViewModel(),
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val listState by viewModel.listState.collectAsStateWithLifecycle()
+    val viewMode by viewModel.viewMode.collectAsStateWithLifecycle()
 
     MealPlansContent(
         uiState = uiState,
+        listState = listState,
+        viewMode = viewMode,
+        onPlanClick = onPlanClick,
         onPreviousWeek = viewModel::onPreviousWeek,
         onNextWeek = viewModel::onNextWeek,
         onMealClick = onMealClick,
@@ -71,6 +82,9 @@ fun MealPlansScreen(
 @Composable
 private fun MealPlansContent(
     uiState: MealPlansUiState,
+    listState: MealPlanListUiState,
+    viewMode: MealPlansViewMode,
+    onPlanClick: (UUID) -> Unit,
     onPreviousWeek: () -> Unit,
     onNextWeek: () -> Unit,
     onMealClick: (PlannedWeekMeal) -> Unit,
@@ -78,6 +92,15 @@ private fun MealPlansContent(
     onGenerateGroceryList: (UUID) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    if (viewMode == MealPlansViewMode.PLANS) {
+        PlanListContent(
+            listState = listState,
+            onPlanClick = onPlanClick,
+            modifier = modifier,
+        )
+        return
+    }
+
     when (uiState) {
         is MealPlansUiState.Loading -> LoadingContent(modifier = modifier)
 
@@ -97,6 +120,67 @@ private fun MealPlansContent(
             onGenerateGroceryList = onGenerateGroceryList,
             modifier = modifier,
         )
+    }
+}
+
+@Composable
+private fun PlanListContent(
+    listState: MealPlanListUiState,
+    onPlanClick: (UUID) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    when (listState) {
+        is MealPlanListUiState.Loading -> LoadingContent(modifier = modifier)
+
+        is MealPlanListUiState.Error -> EmptyContent(
+            title = R.string.meal_plan_error,
+            subtitle = R.string.no_meal_plans_subtitle,
+            noRecipesIconRes = R.drawable.ic_skillet_cooktop_24dp,
+            modifier = modifier,
+        )
+
+        is MealPlanListUiState.Success -> if (listState.plans.isEmpty()) {
+            EmptyContent(
+                title = R.string.no_meal_plans_title,
+                subtitle = R.string.no_meal_plans_subtitle,
+                noRecipesIconRes = R.drawable.ic_skillet_cooktop_24dp,
+                modifier = modifier,
+            )
+        } else {
+            PlanList(
+                plans = listState.plans,
+                today = listState.today,
+                onPlanClick = onPlanClick,
+                modifier = modifier,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlanList(
+    plans: List<MealPlanSummary>,
+    today: LocalDate,
+    onPlanClick: (UUID) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.chefColors.panelGround),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        items(plans, key = { it.planId }) { summary ->
+            MealPlanHeroCard(
+                summary = summary,
+                today = today,
+                onClick = { onPlanClick(summary.planId) },
+                // Picking a date for a plan is a follow-up; the button is here so the card's
+                // shape is final.
+                onScheduleClick = {},
+            )
+        }
     }
 }
 
@@ -214,6 +298,9 @@ private fun MealPlansPreview() {
             onMealClick = {},
             onAddMeal = {},
             onGenerateGroceryList = {},
+            listState = MealPlanListUiState.Loading,
+            viewMode = MealPlansViewMode.WEEK,
+            onPlanClick = {},
         )
     }
 }
@@ -232,8 +319,6 @@ private fun MealPlansEmptyWeekPreview() {
                     planIds = emptySet(),
                 ),
                 today = start.plusDays(1),
-                servingBasis = MealPlanServingBasis.JUST_ME,
-                household = null,
                 ingredientCount = 0,
             ),
             onPreviousWeek = {},
@@ -241,6 +326,9 @@ private fun MealPlansEmptyWeekPreview() {
             onMealClick = {},
             onAddMeal = {},
             onGenerateGroceryList = {},
+            listState = MealPlanListUiState.Loading,
+            viewMode = MealPlansViewMode.WEEK,
+            onPlanClick = {},
         )
     }
 }
@@ -254,8 +342,6 @@ private fun previewState(): MealPlansUiState.Success {
     return MealPlansUiState.Success(
         week = MealPlanWeek(weekStart = start, days = days, planIds = setOf(planId)),
         today = start.plusDays(1),
-        servingBasis = MealPlanServingBasis.JUST_ME,
-        household = null,
         ingredientCount = 24,
     )
 }

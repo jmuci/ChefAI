@@ -237,3 +237,16 @@ concurrent edit.
   no plan name, no "Plan →" link — so rather than invent one, this is recorded as a gap for the next
   revision of the design. The nearest on-system fix is Home's pattern: a section label with a
   trailing accent link, which screen 06 already has the label half of ("GROCERY LIST").
+
+## Amendment — Decision 5 superseded (Just me / Family removed)
+
+The header's "Just me" / "Family" toggle (`MealPlanServingBasis`, `MealPlanPreferencesRepository`) is
+gone. A plan shared with a household is simply the user's plan, so the week now projects every live
+plan and nothing filters by `householdId`. Grocery servings are no longer a user choice: a week that
+contains a shared plan shops for the household's member count, otherwise for one.
+
+The header toggle is now **Week | Plans** (`MealPlansViewMode`, in-memory, opens on Week). *Plans*
+is a vertical list of hero cards (`MealPlanHeroCard`) built by the pure `MealPlanSummaryBuilder`
+from every non-archived plan, newest first. A plan without a user-given title gets one generated
+from its most common recipe tag ("Italian week"). The card's calendar button is a deliberate no-op
+until plan scheduling lands.

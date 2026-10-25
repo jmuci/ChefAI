@@ -267,9 +267,23 @@
     <string name="meal_plan_shared_by">Shared by %1$s</string>
 
     <!-- Meal Plans week view (screen 06) -->
-    <string name="meal_plans_basis_just_me">Just me</string>
-    <string name="meal_plans_basis_family">Family</string>
-    <string name="meal_plans_basis_label">Whose meals to show</string>
+    <string name="meal_plans_view_label">Meal plans view</string>
+    <string name="meal_plans_view_week">Week</string>
+    <string name="meal_plans_view_plans">Plans</string>
+    <string name="meal_plans_generated_title">%1$s week</string>
+    <string name="meal_plans_untitled">Meal plan</string>
+    <string name="meal_plans_card_meta">%1$s · %2$s</string>
+    <string name="meal_plans_card_scheduled">Scheduled %1$s</string>
+    <string name="meal_plans_card_last_cooked">Last cooked %1$s</string>
+    <string name="meal_plans_card_schedule">Schedule this plan</string>
+    <plurals name="meal_plans_card_days">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+    <plurals name="meal_plans_card_recipes">
+        <item quantity="one">%d recipe</item>
+        <item quantity="other">%d recipes</item>
+    </plurals>
     <string name="meal_plans_previous_week">Previous week</string>
     <string name="meal_plans_next_week">Next week</string>
     <string name="meal_plans_add_meal">+ Add meal</string>
