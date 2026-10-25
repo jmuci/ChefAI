@@ -105,6 +105,71 @@ class ShoppingListBuilderTest {
     }
 
     @Test
+    fun `garlic written three ways adds up to one line`() {
+        // Issue #280: "1 clove + 0.5 clove peeled crushed + 3 cloves". The singular, the plural and
+        // the unit that carries a preparation note are all the same garlic.
+        val recipeA = UUID.randomUUID()
+        val recipeB = UUID.randomUUID()
+        val recipeC = UUID.randomUUID()
+        val ingredients = listOf(
+            ingredient(recipeA, 0, "Garlic", 1.0, "clove"),
+            ingredient(recipeB, 0, "garlic", 0.5, "clove peeled crushed"),
+            ingredient(recipeC, 0, "garlic", 3.0, "cloves"),
+        )
+
+        val list = ShoppingListBuilder.build(
+            ingredients, mapOf(recipeA to 1, recipeB to 1, recipeC to 1), 0, emptySet(),
+        )
+
+        assertThat(list.allItems().single().quantityLabel).isEqualTo("4.5 cloves")
+    }
+
+    @Test
+    fun `a counting unit is singular when the total is one or less`() {
+        val recipeId = UUID.randomUUID()
+        val ingredients = listOf(ingredient(recipeId, 0, "garlic", 1.0, "cloves"))
+
+        val list = ShoppingListBuilder.build(ingredients, mapOf(recipeId to 1), 0, emptySet())
+
+        assertThat(list.allItems().single().quantityLabel).isEqualTo("1 clove")
+    }
+
+    @Test
+    fun `spanish counting units merge and stay spanish`() {
+        val recipeA = UUID.randomUUID()
+        val recipeB = UUID.randomUUID()
+        val ingredients = listOf(
+            ingredient(recipeA, 0, "ajo", 1.0, "diente"),
+            ingredient(recipeB, 0, "ajo", 2.0, "dientes"),
+        )
+
+        val list = ShoppingListBuilder.build(
+            ingredients, mapOf(recipeA to 1, recipeB to 1), 0, emptySet(),
+        )
+
+        assertThat(list.allItems().single().quantityLabel).isEqualTo("3 dientes")
+    }
+
+    @Test
+    fun `a trailing preparation note on the name does not split the item`() {
+        val recipeA = UUID.randomUUID()
+        val recipeB = UUID.randomUUID()
+        val ingredients = listOf(
+            ingredient(recipeA, 0, "garlic", 2.0, "cloves"),
+            ingredient(recipeB, 0, "garlic, peeled and crushed", 1.0, "clove"),
+        )
+
+        val list = ShoppingListBuilder.build(
+            ingredients, mapOf(recipeA to 1, recipeB to 1), 0, emptySet(),
+        )
+
+        val item = list.allItems().single()
+        assertThat(item.displayName).isEqualTo("garlic")
+        assertThat(item.key).isEqualTo("garlic")
+        assertThat(item.quantityLabel).isEqualTo("3 cloves")
+    }
+
+    @Test
     fun `a total resting on an assumed density is flagged as approximate`() {
         val recipeId = UUID.randomUUID()
         val flour = listOf(ingredient(recipeId, 0, "all-purpose flour", 1.0, "cup"))
