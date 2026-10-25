@@ -235,12 +235,13 @@ class RecipeSearchViewModelTest {
     }
 
     @Test
-    fun `Quick and easy drops recipes over 30 minutes and scans on when a page filters to nothing`() = testScope.runTest {
+    fun `Quick and easy keeps exactly 30 minutes, drops 31 and over, and scans on when a page filters to nothing`() = testScope.runTest {
         val slow = preview().copy(prepTimeMinutes = 30, cookTimeMinutes = 90)
         val unknownTime = preview().copy(prepTimeMinutes = 0, cookTimeMinutes = 0)
-        val quick = preview().copy(prepTimeMinutes = 10, cookTimeMinutes = 20)
+        val quick = preview().copy(prepTimeMinutes = 10, cookTimeMinutes = 20) // exactly 30
+        val justOver = preview().copy(prepTimeMinutes = 10, cookTimeMinutes = 21) // 31
         searchRepository.outcomesByOffset[0] = RecipeSearchOutcome(listOf(slow, unknownTime), true, RecipeSearchSource.REMOTE)
-        searchRepository.outcomesByOffset[2] = RecipeSearchOutcome(listOf(quick, slow), false, RecipeSearchSource.REMOTE)
+        searchRepository.outcomesByOffset[2] = RecipeSearchOutcome(listOf(quick, justOver, slow), false, RecipeSearchSource.REMOTE)
 
         viewModel.uiState.test {
             assertThat(awaitItem()).isEqualTo(SearchUiState.Idle)

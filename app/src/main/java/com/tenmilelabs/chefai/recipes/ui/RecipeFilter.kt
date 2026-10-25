@@ -2,11 +2,9 @@ package com.tenmilelabs.chefai.recipes.ui
 
 import androidx.annotation.StringRes
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.core.domain.model.QUICK_EASY_MAX_TOTAL_MINUTES
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import java.util.UUID
-
-/** Total (prep + cook) time, in minutes, at or under which a recipe counts as [RecipeFilter.QUICK_EASY]. */
-const val QUICK_EASY_MAX_TOTAL_MINUTES = 20
 
 /**
  * The single-select filter chips above the Recipes tab's grid (04).

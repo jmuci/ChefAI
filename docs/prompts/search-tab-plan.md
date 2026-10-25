@@ -318,7 +318,8 @@ enum class SearchCategory(
 
     LOW_CARB(SearchCategoryGroup.POPULAR, R.string.search_category_low_carb, "low carb"),
     SANDWICHES_WRAPS(SearchCategoryGroup.POPULAR, R.string.search_category_sandwiches_wraps, "sandwich"),
-    QUICK_EASY(SearchCategoryGroup.POPULAR, R.string.search_category_quick_easy, "quick"),
+    QUICK_EASY(SearchCategoryGroup.POPULAR, R.string.search_category_quick_easy, "quick",
+        maxTotalMinutes = QUICK_EASY_MAX_TOTAL_MINUTES), // 30 min, shared with the Recipes-tab chip
     BUDGET_FRIENDLY(SearchCategoryGroup.POPULAR, R.string.search_category_budget_friendly, "budget"),
     AIR_FRYER(SearchCategoryGroup.POPULAR, R.string.search_category_air_fryer, "air fryer"),
     VEGETARIAN(SearchCategoryGroup.POPULAR, R.string.search_category_vegetarian, "vegetarian"),

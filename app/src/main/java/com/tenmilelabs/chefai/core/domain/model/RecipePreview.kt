@@ -4,6 +4,14 @@ import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import java.util.UUID
 
 /**
+ * Total (prep + cook) time, in minutes, at or under which a recipe counts as "Quick & Easy" — the one
+ * definition shared by the Recipes tab's `RecipeFilter.QUICK_EASY` chip and the Search tab's
+ * `SearchCategory.QUICK_EASY`. Inclusive: a 30-minute recipe qualifies. A recipe with no time recorded
+ * (total `0`) never qualifies; callers check `total in 1..QUICK_EASY_MAX_TOTAL_MINUTES`.
+ */
+const val QUICK_EASY_MAX_TOTAL_MINUTES = 30
+
+/**
  * A simplified, business-oriented representation of a recipe, to be used in recipe lists.
  * Details like ingredients or steps have been stripped for efficiency.
  */
