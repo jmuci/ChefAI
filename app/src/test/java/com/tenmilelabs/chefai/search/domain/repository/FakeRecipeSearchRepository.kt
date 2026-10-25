@@ -13,6 +13,12 @@ class FakeRecipeSearchRepository : RecipeSearchRepository {
     var outcomeToReturn = RecipeSearchOutcome(emptyList(), hasMore = false, source = RecipeSearchSource.REMOTE)
     var delayMillis: Long = 0
 
+    /** Outcomes keyed by request offset; an offset with no entry falls back to [outcomeToReturn]. */
+    val outcomesByOffset = mutableMapOf<Int, RecipeSearchOutcome>()
+
+    private val _offsetsReceived = mutableListOf<Int>()
+    val offsetsReceived: List<Int> get() = _offsetsReceived
+
     private val _queriesReceived = mutableListOf<String>()
     val queriesReceived: List<String> get() = _queriesReceived
 
@@ -21,12 +27,13 @@ class FakeRecipeSearchRepository : RecipeSearchRepository {
 
     override suspend fun search(query: String, limit: Int, offset: Int): RecipeSearchOutcome {
         _queriesReceived.add(query)
+        _offsetsReceived.add(offset)
         try {
             if (delayMillis > 0) delay(delayMillis)
         } catch (e: CancellationException) {
             cancelledCount++
             throw e
         }
-        return outcomeToReturn
+        return outcomesByOffset[offset] ?: outcomeToReturn
     }
 }

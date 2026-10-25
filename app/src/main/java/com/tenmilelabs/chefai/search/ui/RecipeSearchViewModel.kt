@@ -26,6 +26,9 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -56,6 +59,9 @@ sealed interface SearchUiState {
         val bookmarkedRecipeIds: Set<UUID> = emptySet(),
         /** True when [items] came from the on-device fallback, not the server — see [RecipeSearchSource]. */
         val isOffline: Boolean,
+        /** The server has more pages for this query; scrolling to the end should request one. */
+        val hasMore: Boolean = false,
+        val isLoadingMore: Boolean = false,
     ) : SearchUiState
     data object Empty : SearchUiState
     data class Error(val messageRes: Int) : SearchUiState
@@ -93,6 +99,12 @@ class RecipeSearchViewModel @Inject constructor(
     private val _navigateToRecipe = Channel<UUID>(Channel.BUFFERED)
     val navigateToRecipe: Flow<UUID> = _navigateToRecipe.receiveAsFlow()
 
+    // Conflated: a burst of scroll callbacks near the end of the list asks for one page, not many.
+    private val _loadMoreRequests = MutableSharedFlow<Unit>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+
     private val _bookmarkedIds: Flow<Set<UUID>> = sessionManager.userSession
         .flatMapLatest { session ->
             when (session) {
@@ -112,7 +124,9 @@ class RecipeSearchViewModel @Inject constructor(
             } else {
                 flow {
                     emit(SearchUiState.Searching)
-                    emit(runSearch(trimmed))
+                    val first = runSearch(trimmed)
+                    emit(first)
+                    if (first is SearchUiState.Results) emitLoadedPages(trimmed, first)
                 }.catch { e ->
                     // Caught per query, inside flatMapLatest: a catch on the outer flow would
                     // complete it, and search would stop reacting to typing until the ViewModel
@@ -141,8 +155,46 @@ class RecipeSearchViewModel @Inject constructor(
             SearchUiState.Results(
                 items = outcome.results,
                 isOffline = outcome.source == RecipeSearchSource.LOCAL_FALLBACK,
+                hasMore = outcome.hasMore,
             )
         }
+    }
+
+    /**
+     * Serves [onLoadMore] for one query: each request appends the next page to [initial]. Runs
+     * inside the per-query flow, so typing a new query cancels it along with any in-flight page.
+     */
+    private suspend fun FlowCollector<SearchUiState>.emitLoadedPages(
+        query: String,
+        initial: SearchUiState.Results,
+    ) {
+        var current = initial
+        _loadMoreRequests.collect {
+            if (!current.hasMore) return@collect
+            emit(current.copy(isLoadingMore = true))
+            current = try {
+                val outcome = recipeSearchRepository.search(query, offset = current.items.size)
+                prefetchImages(outcome.results)
+                val known = current.items.mapTo(HashSet()) { it.uuid }
+                current.copy(
+                    items = current.items + outcome.results.filter { it.uuid !in known },
+                    hasMore = outcome.hasMore && outcome.source == RecipeSearchSource.REMOTE,
+                    isLoadingMore = false,
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Loading more search results failed")
+                _uiEvent.send(SearchUiEvent.ShowSnackbar(R.string.search_error))
+                current.copy(isLoadingMore = false)
+            }
+            emit(current)
+        }
+    }
+
+    /** Requests the next page of the current query's results; a no-op when there is none. */
+    fun onLoadMore() {
+        _loadMoreRequests.tryEmit(Unit)
     }
 
     fun onQueryChanged(newQuery: String) {
