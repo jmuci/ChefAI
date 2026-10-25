@@ -1,9 +1,11 @@
 package com.tenmilelabs.chefai.core.data.repository
 
 import android.content.Context
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.tenmilelabs.chefai.core.data.local.prefs.userPreferencesDataStore
+import com.tenmilelabs.chefai.core.domain.model.WeekStart
 import com.tenmilelabs.chefai.core.domain.repository.UserPreferencesRepository
 import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -20,7 +22,7 @@ class DataStoreUserPreferencesRepository @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) : UserPreferencesRepository {
 
-    override val measurementSystem: Flow<MeasurementSystem> =
+    private val preferences: Flow<Preferences> =
         context.userPreferencesDataStore.data
             .catch { throwable ->
                 // A corrupt or unreadable preferences file must not take a recipe screen down with
@@ -29,7 +31,16 @@ class DataStoreUserPreferencesRepository @Inject constructor(
                 Timber.w(throwable, "Could not read user preferences; falling back to defaults")
                 emit(androidx.datastore.preferences.core.emptyPreferences())
             }
-            .map { MeasurementSystem.fromName(it[KEY_MEASUREMENT_SYSTEM]) }
+
+    override val measurementSystem: Flow<MeasurementSystem> =
+        preferences.map { MeasurementSystem.fromName(it[KEY_MEASUREMENT_SYSTEM]) }
+
+    override val weekStart: Flow<WeekStart> =
+        preferences.map { WeekStart.fromName(it[KEY_WEEK_START]) }
+
+    override suspend fun setWeekStart(weekStart: WeekStart) {
+        context.userPreferencesDataStore.edit { it[KEY_WEEK_START] = weekStart.name }
+    }
 
     override suspend fun setMeasurementSystem(system: MeasurementSystem) {
         context.userPreferencesDataStore.edit { it[KEY_MEASUREMENT_SYSTEM] = system.name }
@@ -38,5 +49,6 @@ class DataStoreUserPreferencesRepository @Inject constructor(
     private companion object {
         /** Stored by [MeasurementSystem.name], so reordering the enum can never re-map a choice. */
         val KEY_MEASUREMENT_SYSTEM = stringPreferencesKey("measurement_system")
+        val KEY_WEEK_START = stringPreferencesKey("week_start")
     }
 }
