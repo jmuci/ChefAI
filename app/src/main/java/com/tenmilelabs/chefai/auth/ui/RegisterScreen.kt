@@ -23,6 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -160,7 +161,7 @@ fun RegisterScreenContent(
                     username = uiState.username,
                     onUsernameChange = onUsernameChange,
                     error = uiState.usernameError,
-                    onNext = { focusManager.clearFocus() },
+                    onNext = { focusManager.moveFocus(FocusDirection.Down) },
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -171,7 +172,7 @@ fun RegisterScreenContent(
                     email = uiState.email,
                     onEmailChange = onEmailChange,
                     error = uiState.emailError,
-                    onNext = { focusManager.clearFocus() },
+                    onNext = { focusManager.moveFocus(FocusDirection.Down) },
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -184,7 +185,7 @@ fun RegisterScreenContent(
                     isVisible = uiState.isPasswordVisible,
                     onVisibilityToggle = onPasswordVisibilityToggle,
                     error = uiState.passwordError,
-                    onNext = { focusManager.clearFocus() },
+                    onNext = { focusManager.moveFocus(FocusDirection.Down) },
                     modifier = Modifier.fillMaxWidth()
                 )
 
