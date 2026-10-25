@@ -346,6 +346,7 @@
     <string name="wizard_dietary_title">Any dietary preferences?</string>
     <string name="wizard_recipe_source_title">Where should recipes come from?</string>
     <string name="wizard_recipe_source_collection_too_small">Add at least 20 recipes to your collection to use only recipes in your collection.</string>
+    <string name="wizard_options_title">Cooking style</string>
     <string name="wizard_prep_time_title">Max prep time per meal?</string>
     <string name="wizard_batch_cooking_title">Batch cook &amp; freeze</string>
     <string name="wizard_batch_cooking_subtitle">Cook larger portions and freeze for later</string>

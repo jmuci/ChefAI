@@ -104,6 +104,8 @@ private object HeaderMetrics {
  * list's completion bar) build on [ChefAITopAppBarSurface] rather than growing a parameter here.
  *
  * @param containerColor the header's ground; see [ChefAITopAppBarWithSubtitle].
+ * @param applyStatusBarInsets false when another header already sits above this one and has
+ *   consumed the status bar, so the inset isn't padded in a second time.
  */
 @Composable
 fun ChefAITopAppBar(
@@ -219,13 +221,14 @@ fun ChefAITopAppBarWithWordmark(
 fun ChefAITopAppBarSurface(
     modifier: Modifier = Modifier,
     containerColor: Color = MaterialTheme.colorScheme.background,
+    applyStatusBarInsets: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
         modifier = modifier
             .fillMaxWidth()
             .background(containerColor)
-            .windowInsetsPadding(WindowInsets.statusBars)
+            .then(if (applyStatusBarInsets) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier)
             .padding(HeaderMetrics.Padding),
         content = content,
     )
