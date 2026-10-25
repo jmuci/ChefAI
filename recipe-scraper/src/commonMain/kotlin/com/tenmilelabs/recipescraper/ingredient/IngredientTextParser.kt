@@ -253,11 +253,14 @@ private val UNITS: Map<String, String> = buildMap {
     unit("piece", "pieces")
     unit("sheet", "sheets")
 
-    // Spanish, mapped onto the same canonical forms. Recognised whatever the page's language: none
-    // of these is an English word, and a unit is only looked for right after an amount, so a
-    // coincidence elsewhere is unlikely. Not none at all — "sobre" is also Portuguese for "on",
-    // "bote" a Portuguese boat — but "2 sobre …" on a Portuguese page is rare enough that the
-    // worst case, one line with a spurious "package" unit, is cheaper than per-language tables.
+    // Spanish. Recognised whatever the page's language: none of these is an English word, and a
+    // unit is only looked for right after an amount, so a coincidence elsewhere is unlikely. Not
+    // none at all — "sobre" is also Portuguese for "on", "bote" a Portuguese boat — but "2 sobre …"
+    // on a Portuguese page is rare enough that the worst case, one line with a spurious "sobre"
+    // unit, is cheaper than per-language tables.
+    //
+    // Measuring units map onto the same canonical forms as English, because the app converts
+    // them and only knows those spellings.
     unit("cup", "taza", "tazas")
     unit("tbsp", "cucharada", "cucharadas", "cda", "cdas")
     unit("tsp", "cucharadita", "cucharaditas", "cdta", "cdtas", "cdita", "cditas")
@@ -265,15 +268,20 @@ private val UNITS: Map<String, String> = buildMap {
     unit("kg", "kilogramo", "kilogramos")
     unit("ml", "mililitro", "mililitros")
     unit("l", "litro", "litros")
-    unit("pinch", "pizca", "pizcas")
-    unit("clove", "diente", "dientes")
-    unit("slice", "rebanada", "rebanadas", "loncha", "lonchas")
-    unit("can", "lata", "latas")
-    unit("jar", "bote", "botes", "frasco", "frascos")
-    unit("package", "paquete", "paquetes", "sobre", "sobres")
-    unit("sprig", "ramita", "ramitas")
-    unit("bunch", "manojo", "manojos")
-    unit("head", "cabeza", "cabezas")
-    unit("handful", "puñado", "puñados")
-    unit("piece", "pieza", "piezas")
+    // Counting units are never converted, so they keep their own (singular) Spanish word: the
+    // unit is shown verbatim, and "1 clove ajo" is English text inside a Spanish recipe.
+    unit("pizca", "pizcas")
+    unit("diente", "dientes")
+    unit("rebanada", "rebanadas")
+    unit("loncha", "lonchas")
+    unit("lata", "latas")
+    unit("bote", "botes")
+    unit("frasco", "frascos")
+    unit("paquete", "paquetes")
+    unit("sobre", "sobres")
+    unit("ramita", "ramitas")
+    unit("manojo", "manojos")
+    unit("cabeza", "cabezas")
+    unit("puñado", "puñados")
+    unit("pieza", "piezas")
 }

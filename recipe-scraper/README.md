@@ -85,6 +85,8 @@ corroboration, so a three-line English recipe on an English site doesn't make th
 Ingredient lines are then re-parsed with the detected language. Unit words are recognised in
 English and Spanish regardless of language (they never collide); only connector words are gated —
 Spanish ranges (`"2 a 3"`), the `de` in `"200 g de harina"`, and whether a bare `c` means cup.
+Measuring units come back in canonical English short form (`taza` → `cup`); counting units keep
+their singular Spanish word (`dientes` → `diente`), since nothing converts them.
 
 ## Using it
 

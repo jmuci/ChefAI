@@ -99,6 +99,19 @@ class IngredientAmountFormatterTest {
     }
 
     @Test
+    fun `a Spanish counting unit as the importer now stores it reads in Spanish`() {
+        // Given "6 huevos M" (placeholder unit) and "2 dientes de ajo" (stored as "diente")
+        val eggs = IngredientAmountFormatter.format(6.0, "unit", "huevos M", MeasurementSystem.AS_WRITTEN)
+        val garlic = IngredientAmountFormatter.format(2.0, "diente", "ajo", MeasurementSystem.METRIC)
+        val oneClove = IngredientAmountFormatter.format(1.0, "diente", "ajo", MeasurementSystem.AS_WRITTEN)
+
+        // Then no literal "unit", and no English "clove"
+        assertThat(eggs.text).isEqualTo("6")
+        assertThat(garlic.text).isEqualTo("2 dientes")
+        assertThat(oneClove.text).isEqualTo("1 diente")
+    }
+
+    @Test
     fun `an ingredient with no amount shows no number and no unit`() {
         // Given a line imported with no amount, scaled for a different serving count
         val label = IngredientAmountFormatter.format(
