@@ -26,12 +26,23 @@ enum class ApiEnvironment {
  *
  * @property local the base URL every ChefAI endpoint is built from (`BuildConfig.API_BASE_URL`).
  * @property remote the deployed host the [ApiEnvironment.REMOTE] choice points requests at.
+ * @property remoteConfigured `false` when the build had no `chefaiApiBaseUrl` and [remote] is only
+ *   the `https://api.invalid` placeholder.
  */
 data class ApiBaseUrls(
     val local: String,
     val remote: String,
+    val remoteConfigured: Boolean = true,
 ) {
-    fun urlFor(environment: ApiEnvironment): String = when (environment) {
+    /**
+     * The environment requests actually go to: a stored [ApiEnvironment.REMOTE] choice falls back
+     * to [ApiEnvironment.LOCAL] when the build has no remote to offer, rather than sending every
+     * request to the placeholder.
+     */
+    fun effective(environment: ApiEnvironment): ApiEnvironment =
+        if (environment == ApiEnvironment.REMOTE && !remoteConfigured) ApiEnvironment.LOCAL else environment
+
+    fun urlFor(environment: ApiEnvironment): String = when (effective(environment)) {
         ApiEnvironment.LOCAL -> local
         ApiEnvironment.REMOTE -> remote
     }

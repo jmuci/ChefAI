@@ -19,6 +19,8 @@ data class DeveloperOptionsUiState(
     val environment: ApiEnvironment = ApiEnvironment.DEFAULT,
     val localBaseUrl: String = "",
     val remoteBaseUrl: String = "",
+    /** `false` when the build has no remote host — the switch is disabled and says why. */
+    val isRemoteConfigured: Boolean = true,
 ) {
     val isRemote: Boolean get() = environment == ApiEnvironment.REMOTE
     val activeBaseUrl: String get() = if (isRemote) remoteBaseUrl else localBaseUrl
@@ -55,8 +57,9 @@ class DeveloperOptionsViewModel @Inject constructor(
     }
 
     private fun stateFor(environment: ApiEnvironment) = DeveloperOptionsUiState(
-        environment = environment,
+        environment = apiBaseUrls.effective(environment),
         localBaseUrl = apiBaseUrls.local,
         remoteBaseUrl = apiBaseUrls.remote,
+        isRemoteConfigured = apiBaseUrls.remoteConfigured,
     )
 }

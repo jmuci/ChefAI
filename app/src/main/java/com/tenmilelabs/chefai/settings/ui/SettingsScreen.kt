@@ -56,35 +56,12 @@ fun SettingsContent(
     uiState: SettingsUiState,
     onAction: (SettingsAction) -> Unit,
     modifier: Modifier = Modifier,
+    /** `null` hides the Developer options section — the caller passes one on debug builds only. */
     onDeveloperOptionsClick: (() -> Unit)? = null,
-) {
-    Column(modifier = modifier.fillMaxSize()) {
-        SettingsSections(
-            uiState = uiState,
-            onAction = onAction,
-            modifier = Modifier.weight(1f),
-        )
-        if (onDeveloperOptionsClick != null) {
-            DeveloperOptionsLink(
-                onClick = onDeveloperOptionsClick,
-                modifier = Modifier.padding(
-                    horizontal = SettingsMetrics.HorizontalPadding,
-                    vertical = SettingsMetrics.ScreenVerticalPadding,
-                ),
-            )
-        }
-    }
-}
-
-@Composable
-private fun SettingsSections(
-    uiState: SettingsUiState,
-    onAction: (SettingsAction) -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
-            .fillMaxWidth()
+            .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(vertical = SettingsMetrics.ScreenVerticalPadding),
     ) {
@@ -158,6 +135,10 @@ private fun SettingsSections(
                 onSelect = { onAction(SettingsAction.WeekStartChanged(option.weekStart)) },
             )
         }
+
+        if (onDeveloperOptionsClick != null) {
+            DeveloperOptionsSection(onClick = onDeveloperOptionsClick)
+        }
     }
 }
 
@@ -167,6 +148,35 @@ private enum class WeekStartOption(
 ) {
     MONDAY(WeekStart.MONDAY, R.string.settings_week_start_monday),
     SUNDAY(WeekStart.SUNDAY, R.string.settings_week_start_sunday),
+}
+
+/** Debug builds only — its own section, after the user-facing settings. */
+@Composable
+private fun DeveloperOptionsSection(onClick: () -> Unit) {
+    Text(
+        text = stringResource(R.string.app_dest_title_developer_options).uppercase(),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(
+            start = SettingsMetrics.HorizontalPadding,
+            end = SettingsMetrics.HorizontalPadding,
+            top = SettingsMetrics.ScreenVerticalPadding,
+        ),
+    )
+    Text(
+        text = stringResource(R.string.settings_developer_options_subtitle),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(
+            horizontal = SettingsMetrics.HorizontalPadding,
+            vertical = SettingsMetrics.TitleToSubtitleGap,
+        ),
+    )
+    DeveloperOptionsLink(
+        onClick = onClick,
+        text = stringResource(R.string.settings_developer_options_open),
+        modifier = Modifier.padding(horizontal = SettingsMetrics.HorizontalPadding),
+    )
 }
 
 /** One radio row — 44dp minimum, the selected label going 800. See [FlatRadio]'s own preview. */

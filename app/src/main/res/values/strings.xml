@@ -375,6 +375,9 @@
     <string name="developer_options_link">Developer options</string>
     <string name="developer_options_environment_title">Environment</string>
     <string name="developer_options_use_remote">Use remote environment</string>
+    <string name="developer_options_remote_not_configured">Remote isn\'t configured in this build. Add chefaiApiBaseUrl=https://… to ~/.gradle/gradle.properties and rebuild.</string>
+    <string name="settings_developer_options_subtitle">Debug builds only. Backend environment and other tools for testing.</string>
+    <string name="settings_developer_options_open">Open developer options</string>
     <string name="developer_options_environment_footnote">Applies to the next request. Switching signs you out, since an account belongs to one environment; recipes on this device are kept.</string>
 
     <!-- Settings: measurement units -->

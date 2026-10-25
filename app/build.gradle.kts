@@ -18,8 +18,8 @@ plugins {
  * The placeholder default is intentional: a release build that silently pointed at a stale or
  * someone else's host would be worse than one that fails its first request loudly.
  */
-val releaseApiBaseUrl: String =
-    (project.findProperty("chefaiApiBaseUrl") as String?) ?: "https://api.invalid"
+val configuredApiBaseUrl: String? = project.findProperty("chefaiApiBaseUrl") as String?
+val releaseApiBaseUrl: String = configuredApiBaseUrl ?: "https://api.invalid"
 
 android {
     namespace = "com.tenmilelabs.chefai"
@@ -36,6 +36,8 @@ android {
         // The deployed host, in every build type: release talks to it directly (API_BASE_URL
         // below), and a debug build can be switched onto it from Developer options.
         buildConfigField("String", "REMOTE_API_BASE_URL", "\"${releaseApiBaseUrl}\"")
+        // False when chefaiApiBaseUrl is unset, so Developer options can refuse the placeholder.
+        buildConfigField("boolean", "REMOTE_API_CONFIGURED", "${configuredApiBaseUrl != null}")
     }
 
     buildTypes {
