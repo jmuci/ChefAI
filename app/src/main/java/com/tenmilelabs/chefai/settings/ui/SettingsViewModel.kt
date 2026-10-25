@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.settings.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.core.domain.model.RecipeLanguage
+import com.tenmilelabs.chefai.core.domain.model.WeekStart
 import com.tenmilelabs.chefai.core.domain.repository.UserPreferencesRepository
 import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
 import com.tenmilelabs.chefai.core.util.WhileUiSubscribed
@@ -17,12 +18,14 @@ import javax.inject.Inject
 data class SettingsUiState(
     val measurementSystem: MeasurementSystem = MeasurementSystem.DEFAULT,
     val fallbackRecipeLanguage: RecipeLanguage = RecipeLanguage.DEFAULT,
+    val weekStart: WeekStart = WeekStart.MONDAY,
 )
 
 /** Everything the user can do on the settings screen. */
 sealed interface SettingsAction {
     data class MeasurementSystemChanged(val system: MeasurementSystem) : SettingsAction
     data class FallbackRecipeLanguageChanged(val language: RecipeLanguage) : SettingsAction
+    data class WeekStartChanged(val weekStart: WeekStart) : SettingsAction
 }
 
 @HiltViewModel
@@ -33,8 +36,13 @@ class SettingsViewModel @Inject constructor(
     val uiState: StateFlow<SettingsUiState> = combine(
         userPreferencesRepository.measurementSystem,
         userPreferencesRepository.fallbackRecipeLanguage,
-    ) { measurementSystem, fallbackRecipeLanguage ->
-        SettingsUiState(measurementSystem = measurementSystem, fallbackRecipeLanguage = fallbackRecipeLanguage)
+        userPreferencesRepository.weekStart,
+    ) { measurementSystem, fallbackRecipeLanguage, weekStart ->
+        SettingsUiState(
+            measurementSystem = measurementSystem,
+            fallbackRecipeLanguage = fallbackRecipeLanguage,
+            weekStart = weekStart,
+        )
     }
         .stateIn(
             scope = viewModelScope,
@@ -49,6 +57,10 @@ class SettingsViewModel @Inject constructor(
             }
             is SettingsAction.FallbackRecipeLanguageChanged -> viewModelScope.launch {
                 userPreferencesRepository.setFallbackRecipeLanguage(action.language)
+            }
+
+            is SettingsAction.WeekStartChanged -> viewModelScope.launch {
+                userPreferencesRepository.setWeekStart(action.weekStart)
             }
         }
     }

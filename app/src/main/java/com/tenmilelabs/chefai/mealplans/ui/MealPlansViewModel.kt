@@ -10,11 +10,11 @@ import com.tenmilelabs.chefai.core.util.WhileUiSubscribed
 import com.tenmilelabs.chefai.household.domain.model.Household
 import com.tenmilelabs.chefai.household.domain.repository.HouseholdRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
-import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanServingBasis
-import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanPreferencesRepository
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.repository.ShoppingListRepository
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.ShoppingListBuilder
+import com.tenmilelabs.chefai.mealplans.domain.summary.MealPlanSummary
+import com.tenmilelabs.chefai.mealplans.domain.summary.MealPlanSummaryBuilder
 import com.tenmilelabs.chefai.mealplans.domain.week.DAYS_IN_WEEK
 import com.tenmilelabs.chefai.mealplans.domain.week.MealPlanWeek
 import com.tenmilelabs.chefai.mealplans.domain.week.MealPlanWeekProjector
@@ -29,16 +29,27 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.LocalDate
-import java.time.temporal.WeekFields
-import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.CancellationException
 import javax.inject.Inject
+
+/** Which of the tab's two views is showing. Not persisted — the tab opens on the calendar. */
+enum class MealPlansViewMode { WEEK, PLANS }
+
+/** What the plans list shows; separate from the week's state because it spans every plan. */
+sealed interface MealPlanListUiState {
+    data object Loading : MealPlanListUiState
+    data object Error : MealPlanListUiState
+    data class Success(
+        val plans: List<MealPlanSummary>,
+        val today: LocalDate,
+    ) : MealPlanListUiState
+}
 
 sealed interface MealPlansUiState {
     data object Loading : MealPlansUiState
@@ -55,12 +66,9 @@ sealed interface MealPlansUiState {
     data class Success(
         val week: MealPlanWeek,
         val today: LocalDate,
-        val servingBasis: MealPlanServingBasis,
-        val household: Household?,
         val ingredientCount: Int,
     ) : MealPlansUiState {
         val mealCount: Int get() = week.mealCount
-        val canSelectFamily: Boolean get() = household != null
         val canGenerateGroceryList: Boolean get() = week.singlePlanId != null
     }
 }
@@ -72,20 +80,19 @@ class MealPlansViewModel @Inject constructor(
     recipesRepository: RecipesRepository,
     shoppingListRepository: ShoppingListRepository,
     householdRepository: HouseholdRepository,
-    private val mealPlanPreferencesRepository: MealPlanPreferencesRepository,
     userPreferencesRepository: UserPreferencesRepository,
     sessionManager: SessionManager,
     private val clock: Clock,
 ) : ViewModel() {
 
     /**
-     * The week being read, as its first day.
+     * A date inside the week being read; the week's first day follows the user's week-start setting.
      *
      * Deliberately not in `SavedStateHandle`: surviving rotation is what a ViewModel is for, and a
      * user returning to a cold app wants this week rather than whichever week they were browsing
      * yesterday. ADR-015 Decision 4.
      */
-    private val weekStart = MutableStateFlow(weekStartFor(today(), firstDayOfWeek))
+    private val browsedDate = MutableStateFlow(today())
 
     private val plans: Flow<List<MealPlan>> = sessionManager.userSession
         .flatMapLatest { session ->
@@ -99,19 +106,49 @@ class MealPlansViewModel @Inject constructor(
             }
         }
 
+    private val _viewMode = MutableStateFlow(MealPlansViewMode.WEEK)
+    val viewMode: StateFlow<MealPlansViewMode> = _viewMode
+
+    /**
+     * Every live plan, personal and shared alike: a plan the user invited others to is simply
+     * theirs, so there is no "whose plans" switch to filter by.
+     */
+    val listState: StateFlow<MealPlanListUiState> = plans
+        .flatMapLatest { plans ->
+            val recipeIds = plans.flatMap { plan ->
+                plan.days.flatMap { listOfNotNull(it.lunchRecipeId, it.dinnerRecipeId) }
+            }.distinct()
+            recipesRepository.getRecipePreviewsByIds(recipeIds).map { previews ->
+                val state: MealPlanListUiState = MealPlanListUiState.Success(
+                    plans = MealPlanSummaryBuilder.build(
+                        plans = plans,
+                        recipes = previews.associateBy { it.uuid },
+                        zone = clock.zone,
+                    ),
+                    today = today(),
+                )
+                state
+            }
+        }
+        .catch { e ->
+            if (e is CancellationException) throw e
+            emit(MealPlanListUiState.Error)
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = WhileUiSubscribed,
+            initialValue = MealPlanListUiState.Loading,
+        )
+
     val uiState: StateFlow<MealPlansUiState> = combine(
         plans,
-        weekStart,
-        mealPlanPreferencesRepository.servingBasis,
+        browsedDate,
+        userPreferencesRepository.weekStart,
         householdRepository.observeMyHousehold(),
-    ) { plans, weekStart, basis, household ->
-        // "Family" with no household has nothing to filter for and nothing to scale to, so the
-        // basis falls back rather than emptying the screen while the toggle claims otherwise.
-        val effectiveBasis = if (household == null) MealPlanServingBasis.DEFAULT else basis
+    ) { plans, date, firstDay, household ->
         WeekInputs(
-            plans = plans.filter { it.matches(effectiveBasis) },
-            weekStart = weekStart,
-            basis = effectiveBasis,
+            plans = plans,
+            weekStart = weekStartFor(date, firstDay.dayOfWeek),
             household = household,
         )
     }
@@ -131,16 +168,13 @@ class MealPlansViewModel @Inject constructor(
                 val state: MealPlansUiState = MealPlansUiState.Success(
                     week = week,
                     today = today(),
-                    servingBasis = inputs.basis,
-                    household = inputs.household,
                     ingredientCount = ShoppingListBuilder.build(
                         ingredients = ingredients,
                         slotCountByRecipe = week.slotCountByRecipe,
-                        // The basis, not the plan's own servingsPerMeal — a week can span several
-                        // plans, and this is what makes their quantities commensurable.
-                        plannedServings = inputs.basis.servingsPerMeal(
-                            householdSize = inputs.household?.members?.size ?: 0,
-                        ),
+                        // Not each plan's own servingsPerMeal — a week can span several plans, and
+                        // one figure is what makes their quantities commensurable. A week that
+                        // includes a shared plan shops for the household; otherwise for one.
+                        plannedServings = inputs.plannedServings(week),
                         checkedKeys = emptySet(),
                         measurementSystem = measurementSystem,
                     ).totalCount,
@@ -159,33 +193,30 @@ class MealPlansViewModel @Inject constructor(
         )
 
     fun onPreviousWeek() {
-        weekStart.update { it.minusDays(DAYS_IN_WEEK.toLong()) }
+        browsedDate.update { it.minusDays(DAYS_IN_WEEK.toLong()) }
     }
 
     fun onNextWeek() {
-        weekStart.update { it.plusDays(DAYS_IN_WEEK.toLong()) }
+        browsedDate.update { it.plusDays(DAYS_IN_WEEK.toLong()) }
     }
 
-    fun onServingBasisChange(basis: MealPlanServingBasis) {
-        viewModelScope.launch { mealPlanPreferencesRepository.setServingBasis(basis) }
+    fun onViewModeChange(mode: MealPlansViewMode) {
+        _viewMode.value = mode
     }
 
     private fun today(): LocalDate = LocalDate.now(clock)
-
-    private val firstDayOfWeek get() = WeekFields.of(Locale.getDefault()).firstDayOfWeek
-
-    private fun MealPlan.matches(basis: MealPlanServingBasis): Boolean = when (basis) {
-        MealPlanServingBasis.JUST_ME -> householdId == null
-        MealPlanServingBasis.FAMILY -> householdId != null
-    }
 
     /** Everything the projection needs, gathered before the recipe queries it implies. */
     private inner class WeekInputs(
         val plans: List<MealPlan>,
         val weekStart: LocalDate,
-        val basis: MealPlanServingBasis,
         val household: Household?,
     ) {
+        fun plannedServings(week: MealPlanWeek): Int {
+            val sharedInWeek = plans.any { it.uuid in week.planIds && it.householdId != null }
+            return if (sharedInWeek) (household?.members?.size ?: 1).coerceAtLeast(1) else 1
+        }
+
         fun project(recipes: Map<UUID, RecipePreview>) =
             MealPlanWeekProjector.project(
                 plans = plans,

@@ -185,6 +185,52 @@ class MealPlanSchedulerTest {
         assertThat(days.all { it.dinnerRecipeId != null }).isTrue()
     }
 
+    // --- Desserts ---
+
+    @Test
+    fun `desserts are never scheduled`() {
+        val cake = recipe("Cheesecake", tags = listOf("Dessert"))
+        val cookies = recipe("Cookies", labels = listOf("cookies"))
+        val candidates = listOf(cake, cookies, recipe("Caesar Salad"), recipe("Lasagna"))
+
+        val days = schedule(
+            preferences(planLengthDays = 7, mealType = MealType.DINNER_AND_LUNCH),
+            candidates,
+        )
+
+        val used = days.flatMap { listOfNotNull(it.lunchRecipeId, it.dinnerRecipeId) }
+        assertThat(used).containsNoneOf(cake.uuid, cookies.uuid)
+    }
+
+    @Test
+    fun `a collection of only desserts produces no days`() {
+        val days = schedule(preferences(), listOf(recipe("Brownies", tags = listOf("Desserts"))))
+
+        assertThat(days).isEmpty()
+    }
+
+    @Test
+    fun `dessert matching is by whole tag, not substring`() {
+        val stew = recipe("Sweet Potato Stew", tags = listOf("Sweet Potato"))
+
+        val days = schedule(preferences(planLengthDays = 2), listOf(stew))
+
+        assertThat(days.mapNotNull { it.dinnerRecipeId }).containsExactly(stew.uuid, stew.uuid)
+    }
+
+    @Test
+    fun `desserts are excluded even when a dietary fallback widens the pool`() {
+        val cake = recipe("Cake", tags = listOf("Dessert"))
+        val pasta = recipe("Pasta", tags = listOf("Italian"))
+
+        val days = schedule(
+            preferences(planLengthDays = 3, dietaryRestrictions = setOf(DietaryRestriction.KETO)),
+            listOf(cake, pasta),
+        )
+
+        assertThat(days.mapNotNull { it.dinnerRecipeId }.toSet()).containsExactly(pasta.uuid)
+    }
+
     // --- Variety ---
 
     @Test

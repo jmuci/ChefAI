@@ -13,6 +13,7 @@ import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.core.util.Async
 import com.tenmilelabs.chefai.core.util.WhileUiSubscribed
+import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
@@ -115,20 +116,32 @@ sealed interface RecipeDetailsAction {
     data class ServingsChanged(val servings: Int) : RecipeDetailsAction
     data object NavigateBack : RecipeDetailsAction
 
-    /**
-     * Neither flow exists yet — there is no meal-plan picker to add a recipe into, and no
-     * per-recipe grocery list separate from a meal plan's own (see [ShoppingListBuilder]). Both
-     * buttons render per the redesign (05) and currently no-op; see the GitHub issue filed
-     * alongside that screen's redesign for what each needs.
-     */
+    /** Opens the plan/day/slot picker; a confirmed pick slots this recipe into that plan. */
     data object AddToMealPlanClicked : RecipeDetailsAction
+
+    /**
+     * A plan's shopping list is derived from the recipes slotted into it (see `ShoppingListBuilder`),
+     * so "add to grocery list" is the same pick with different wording: the recipe's ingredients
+     * join the chosen plan's list by joining the plan.
+     */
     data object AddToGroceryListClicked : RecipeDetailsAction
+    data object SlotPickerDismissed : RecipeDetailsAction
+    data class SlotPicked(val planId: UUID, val dayIndex: Int, val slot: MealSlot) : RecipeDetailsAction
 }
 
 /** One-shot side effects emitted by [RecipeDetailsViewModel], consumed by the UI. */
 sealed interface RecipeDetailsEffect {
     data object RecipeDeleted : RecipeDetailsEffect
 }
+
+/** Why the slot picker is open — only changes its wording and the confirmation message. */
+enum class SlotPickerPurpose { MEAL_PLAN, GROCERY_LIST }
+
+/** What the plan/day/slot picker sheet renders; absent from the screen while it is closed. */
+data class SlotPickerUiState(
+    val purpose: SlotPickerPurpose,
+    val plans: List<MealPlan>,
+)
 
 private data class DeleteUiState(
     val showConfirmation: Boolean = false,
@@ -245,6 +258,17 @@ class RecipeDetailsViewModel @Inject constructor(
     private val _measurementSystem: Flow<MeasurementSystem> =
         userPreferencesRepository.measurementSystem
 
+    private val _pickerPurpose = MutableStateFlow<SlotPickerPurpose?>(null)
+
+    private val _userPlans: Flow<List<MealPlan>> = _currentUserId.flatMapLatest { userId ->
+        if (userId == null) flowOf(emptyList()) else mealPlanRepository.observeMealPlansForUser(userId)
+    }.catch { emit(emptyList()) }
+
+    /** Non-null while the plan/day/slot picker is open. */
+    val slotPicker: StateFlow<SlotPickerUiState?> = combine(_pickerPurpose, _userPlans) { purpose, plans ->
+        purpose?.let { SlotPickerUiState(it, plans) }
+    }.stateIn(viewModelScope, WhileUiSubscribed, null)
+
     private val _combinedState = combine(
         _isLoading, _recipeAsync, _userMessage, _isBookmarked, _deleteUi
     ) { isLoading, recipeAsync, userMessage, isBookmarked, deleteUi ->
@@ -338,6 +362,36 @@ class RecipeDetailsViewModel @Inject constructor(
                 if (e is CancellationException) throw e
                 Timber.e(e, "onToggleCooked: failed for day ${ref.dayId} slot ${ref.slot}")
                 _userMessage.value = R.string.meal_plan_toggle_cooked_error
+            }
+        }
+    }
+
+    fun onOpenSlotPicker(purpose: SlotPickerPurpose) {
+        _pickerPurpose.value = purpose
+    }
+
+    fun onDismissSlotPicker() {
+        _pickerPurpose.value = null
+    }
+
+    /** Slots this recipe into the picked plan/day/slot and closes the picker. */
+    fun onSlotPicked(planId: UUID, dayIndex: Int, slot: MealSlot) {
+        val purpose = _pickerPurpose.value ?: return
+        _pickerPurpose.value = null
+        viewModelScope.launch {
+            _userMessage.value = try {
+                if (mealPlanRepository.assignRecipeToSlot(planId, dayIndex, slot, recipeUuid)) {
+                    when (purpose) {
+                        SlotPickerPurpose.MEAL_PLAN -> R.string.recipe_added_to_meal_plan
+                        SlotPickerPurpose.GROCERY_LIST -> R.string.recipe_added_to_grocery_list
+                    }
+                } else {
+                    R.string.recipe_add_to_plan_error
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "onSlotPicked: failed for plan $planId day $dayIndex slot $slot")
+                R.string.recipe_add_to_plan_error
             }
         }
     }

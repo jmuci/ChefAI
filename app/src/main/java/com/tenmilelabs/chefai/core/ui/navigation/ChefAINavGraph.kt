@@ -45,6 +45,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.createGraph
 import androidx.window.core.layout.WindowSizeClass
 import androidx.navigation.navArgument
+import com.tenmilelabs.chefai.BuildConfig
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.ui.LoginScreen
 import com.tenmilelabs.chefai.auth.ui.RegisterScreen
@@ -60,7 +61,7 @@ import com.tenmilelabs.chefai.household.ui.HouseholdScreen
 import com.tenmilelabs.chefai.mealplans.ui.MealPlansScreen
 import com.tenmilelabs.chefai.mealplans.ui.MealPlansUiState
 import com.tenmilelabs.chefai.mealplans.ui.MealPlansViewModel
-import com.tenmilelabs.chefai.mealplans.ui.components.ServingBasisToggle
+import com.tenmilelabs.chefai.mealplans.ui.components.MealPlansViewToggle
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailScreen
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailUiState
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailViewModel
@@ -80,6 +81,7 @@ import com.tenmilelabs.chefai.recipes.ui.urlimport.ImportRecipeRoute
 import com.tenmilelabs.chefai.recipes.ui.urlimport.browser.BrowserImportRoute
 import com.tenmilelabs.chefai.search.ui.SearchScreen
 import com.tenmilelabs.chefai.settings.ui.SettingsScreen
+import com.tenmilelabs.chefai.developeroptions.ui.DeveloperOptionsScreen
 import timber.log.Timber
 import java.util.UUID
 import kotlinx.coroutines.launch
@@ -180,6 +182,7 @@ fun ChefAINavGraph(
                 onShoppingListClick = { planId ->
                     navActions.navigateToMealPlanShoppingList(planId)
                 },
+                onPlanClick = { planId -> navActions.navigateToMealPlanDetail(planId) },
             )
         }
         composable(route = AppDestinations.MEAL_PLAN_DETAIL.route) { backStackEntry ->
@@ -332,7 +335,18 @@ fun ChefAINavGraph(
             )
         }
         composable(route = AppDestinations.SETTINGS.route) {
-            SettingsScreen()
+            SettingsScreen(
+                onNavigateToDeveloperOptions = if (BuildConfig.DEBUG) {
+                    { navActions.navigateToDeveloperOptions() }
+                } else {
+                    null
+                },
+            )
+        }
+        if (BuildConfig.DEBUG) {
+            composable(route = AppDestinations.DEVELOPER_OPTIONS.route) {
+                DeveloperOptionsScreen()
+            }
         }
         composable(route = AppDestinations.HOUSEHOLD.route) {
             HouseholdScreen(
@@ -376,6 +390,11 @@ fun ChefAINavGraph(
                 onNavigateToHome = { navActions.navigateToHome() },
                 onNavigateToRegister = { navActions.navigateToRegister() },
                 onNavigateToAcceptInvite = { token -> navActions.navigateToAcceptInvite(token) },
+                onNavigateToDeveloperOptions = if (BuildConfig.DEBUG) {
+                    { navActions.navigateToDeveloperOptions() }
+                } else {
+                    null
+                },
             )
         }
         composable(route = AppDestinations.REGISTER.route) {
@@ -502,23 +521,19 @@ fun ChefAINavGraph(
                         )
                     }
                     AppDestinations.MEAL_PLANS.route -> {
-                        // The "Just me" / "Family" toggle lives in the header (screen 06), so the
-                        // week's view model is hoisted here the same way the plan detail's is.
+                        // The Week / Plans toggle lives in the header, so the tab's view model is
+                        // hoisted here the same way the plan detail's is.
                         navController.currentBackStackEntry?.let { entry ->
                             val weekViewModel: MealPlansViewModel = hiltViewModel(entry)
-                            val weekState by weekViewModel.uiState.collectAsStateWithLifecycle()
-                            val week = weekState as? MealPlansUiState.Success
+                            val viewMode by weekViewModel.viewMode.collectAsStateWithLifecycle()
                             ChefAITopAppBar(
                                 title = stringResource(titleRes),
                                 navigation = navigation,
                                 actions = {
-                                    if (week != null) {
-                                        ServingBasisToggle(
-                                            basis = week.servingBasis,
-                                            onBasisChange = weekViewModel::onServingBasisChange,
-                                            canSelectFamily = week.canSelectFamily,
-                                        )
-                                    }
+                                    MealPlansViewToggle(
+                                        mode = viewMode,
+                                        onModeChange = weekViewModel::onViewModeChange,
+                                    )
                                     trailingActions()
                                 },
                             )

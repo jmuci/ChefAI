@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.core.domain.repository
 
 import com.tenmilelabs.chefai.core.domain.model.RecipeLanguage
+import com.tenmilelabs.chefai.core.domain.model.WeekStart
 import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
 import kotlinx.coroutines.flow.Flow
 
@@ -27,4 +28,9 @@ interface UserPreferencesRepository {
     val fallbackRecipeLanguage: Flow<RecipeLanguage>
 
     suspend fun setFallbackRecipeLanguage(language: RecipeLanguage)
+
+    /** The first day of the meal-plan calendar's week. Defaults to the device locale's. */
+    val weekStart: Flow<WeekStart>
+
+    suspend fun setWeekStart(weekStart: WeekStart)
 }

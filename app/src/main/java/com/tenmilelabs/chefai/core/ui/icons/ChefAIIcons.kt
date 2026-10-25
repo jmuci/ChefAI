@@ -16,6 +16,7 @@ object ChefAIIcons {
     @DrawableRes val BookOpen: Int = R.drawable.ic_lucide_book_open
     @DrawableRes val Bookmark: Int = R.drawable.ic_lucide_bookmark
     @DrawableRes val BookmarkFilled: Int = R.drawable.ic_lucide_bookmark_filled
+    @DrawableRes val Calendar: Int = R.drawable.ic_lucide_calendar
     @DrawableRes val Check: Int = R.drawable.ic_lucide_check
     @DrawableRes val ChefHat: Int = R.drawable.ic_lucide_chef_hat
     @DrawableRes val ChevronDown: Int = R.drawable.ic_lucide_chevron_down

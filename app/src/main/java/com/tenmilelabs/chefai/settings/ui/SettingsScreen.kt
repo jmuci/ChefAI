@@ -28,6 +28,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.domain.model.RecipeLanguage
+import com.tenmilelabs.chefai.core.domain.model.WeekStart
 import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
 import com.tenmilelabs.chefai.core.ui.language.labelRes
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatRadio
@@ -35,17 +36,21 @@ import com.tenmilelabs.chefai.core.ui.components.flat.MinHitTarget
 import com.tenmilelabs.chefai.core.ui.components.flat.RuledGroup
 import com.tenmilelabs.chefai.core.ui.components.flat.flatSelectable
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
+import com.tenmilelabs.chefai.developeroptions.ui.DeveloperOptionsLink
 
 @Composable
 fun SettingsScreen(
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
+    /** `null` hides the Developer options link — the caller passes one on debug builds only. */
+    onNavigateToDeveloperOptions: (() -> Unit)? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     SettingsContent(
         uiState = uiState,
         onAction = viewModel::onAction,
+        onDeveloperOptionsClick = onNavigateToDeveloperOptions,
         modifier = modifier,
     )
 }
@@ -55,10 +60,35 @@ fun SettingsContent(
     uiState: SettingsUiState,
     onAction: (SettingsAction) -> Unit,
     modifier: Modifier = Modifier,
+    onDeveloperOptionsClick: (() -> Unit)? = null,
+) {
+    Column(modifier = modifier.fillMaxSize()) {
+        SettingsSections(
+            uiState = uiState,
+            onAction = onAction,
+            modifier = Modifier.weight(1f),
+        )
+        if (onDeveloperOptionsClick != null) {
+            DeveloperOptionsLink(
+                onClick = onDeveloperOptionsClick,
+                modifier = Modifier.padding(
+                    horizontal = SettingsMetrics.HorizontalPadding,
+                    vertical = SettingsMetrics.ScreenVerticalPadding,
+                ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsSections(
+    uiState: SettingsUiState,
+    onAction: (SettingsAction) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .verticalScroll(rememberScrollState())
             .padding(vertical = SettingsMetrics.ScreenVerticalPadding),
     ) {
@@ -105,7 +135,35 @@ fun SettingsContent(
         }
 
         SettingsFootnote(stringResource(R.string.settings_recipe_language_footnote))
+
+        Spacer(Modifier.height(SettingsMetrics.SectionGap))
+
+        SettingsSectionHeader(
+            title = stringResource(R.string.settings_week_start_title),
+            subtitle = stringResource(R.string.settings_week_start_subtitle),
+        )
+        RuledGroup(
+            items = WeekStartOption.entries,
+            modifier = Modifier
+                .padding(top = SettingsMetrics.SubtitleToGroupGap)
+                .selectableGroup(),
+        ) { option ->
+            SettingsRadioRow(
+                label = stringResource(option.labelRes),
+                example = null,
+                isSelected = uiState.weekStart == option.weekStart,
+                onSelect = { onAction(SettingsAction.WeekStartChanged(option.weekStart)) },
+            )
+        }
     }
+}
+
+private enum class WeekStartOption(
+    val weekStart: WeekStart,
+    @param:StringRes val labelRes: Int,
+) {
+    MONDAY(WeekStart.MONDAY, R.string.settings_week_start_monday),
+    SUNDAY(WeekStart.SUNDAY, R.string.settings_week_start_sunday),
 }
 
 @Composable
@@ -236,6 +294,7 @@ private fun SettingsContentPreview() {
                     fallbackRecipeLanguage = RecipeLanguage.SPANISH,
                 ),
                 onAction = {},
+                onDeveloperOptionsClick = {},
             )
         }
     }
@@ -249,6 +308,7 @@ private fun SettingsContentDarkPreview() {
             SettingsContent(
                 uiState = SettingsUiState(measurementSystem = MeasurementSystem.AS_WRITTEN),
                 onAction = {},
+                onDeveloperOptionsClick = {},
             )
         }
     }

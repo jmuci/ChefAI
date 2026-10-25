@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.mealplans.data.repository
 
 import com.tenmilelabs.chefai.core.data.local.room.carryForwardCookedMarks
+import com.tenmilelabs.chefai.core.data.local.room.MealPlanDayEntity
 import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.MealPlanDao
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
@@ -160,5 +161,34 @@ class DefaultMealPlanRepository @Inject constructor(
             return
         }
         Timber.d("saveLocallyGeneratedDays: filled plan $planId with $written day(s) on device")
+    }
+
+    override suspend fun assignRecipeToSlot(
+        planId: UUID,
+        dayIndex: Int,
+        slot: MealSlot,
+        recipeId: UUID,
+    ): Boolean {
+        val existing = mealPlanDao.getMealPlanById(planId) ?: return false
+        transactionRunner {
+            val day = mealPlanDao.getDaysForMealPlan(planId).firstOrNull { it.dayIndex == dayIndex }
+                ?: MealPlanDayEntity(
+                    uuid = UUID.randomUUID(),
+                    mealPlanId = planId,
+                    dayIndex = dayIndex,
+                    dinnerRecipeId = null,
+                    lunchRecipeId = null,
+                )
+            val updated = when (slot) {
+                MealSlot.LUNCH -> day.copy(lunchRecipeId = recipeId, lunchCookedAt = null)
+                MealSlot.DINNER -> day.copy(dinnerRecipeId = recipeId, dinnerCookedAt = null)
+            }
+            mealPlanDao.upsertDays(listOf(updated))
+            mealPlanDao.upsertMealPlan(
+                existing.copy(syncState = SyncState.PENDING, updatedAt = System.currentTimeMillis())
+            )
+        }
+        syncScheduler.requestMutationSync()
+        return true
     }
 }

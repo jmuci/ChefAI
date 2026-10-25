@@ -16,9 +16,9 @@ import kotlin.random.Random
  * rules can be unit-tested directly. [LocalMealPlanGenerator] supplies the candidates and persists
  * the result.
  *
- * This is a deliberately simple stand-in for the backend generator: it filters candidates against
- * the preferences that are checkable on-device, then deals them out round-robin so a short
- * collection repeats as late as possible.
+ * This is a deliberately simple stand-in for the backend generator: it drops desserts, filters the
+ * rest against the preferences that are checkable on-device, then deals them out round-robin so a
+ * short collection repeats as late as possible.
  */
 object MealPlanScheduler {
 
@@ -40,12 +40,25 @@ object MealPlanScheduler {
     )
 
     /**
+     * Tag/label names that mark a recipe as a dessert, which an auto-generated plan never schedules
+     * — only mains and salads belong in a generated lunch/dinner slot. A user can still put a
+     * dessert in a plan by hand.
+     *
+     * Matched against whole, case-insensitive tag/label names rather than substrings, so a tag
+     * like "Sweet Potato" doesn't knock out a main course. Recipes carry no course field, so this
+     * is the best signal available on-device.
+     */
+    private val DESSERT_KEYWORDS: Set<String> = setOf(
+        "dessert", "desserts", "sweets", "cake", "cakes", "cookie", "cookies", "pastry", "pastries",
+    )
+
+    /**
      * Deals [candidates] into one [MealPlanDay] per planned day.
      *
      * @param newDayId supplies the id for each generated day — a UUIDv7 factory in production.
      * @param random seeds the shuffle; inject a fixed seed to make a schedule reproducible.
-     * @return one day per [MealPlanPreferences.planLengthDays], or an empty list if [candidates] is
-     *   empty — a plan with no recipes to draw from cannot be scheduled.
+     * @return one day per [MealPlanPreferences.planLengthDays], or an empty list if [candidates]
+     *   holds no non-dessert recipe — a plan with no recipes to draw from cannot be scheduled.
      */
     fun schedule(
         preferences: MealPlanPreferences,
@@ -53,9 +66,12 @@ object MealPlanScheduler {
         newDayId: () -> UUID,
         random: Random = Random.Default,
     ): List<MealPlanDay> {
-        if (candidates.isEmpty()) return emptyList()
+        // Unlike the preference filters in [eligible], there is no fallback here: a plan of desserts
+        // is worse than no plan.
+        val meals = candidates.filterNot { it.isDessert() }
+        if (meals.isEmpty()) return emptyList()
 
-        val pool = orderPool(eligible(preferences, candidates), preferences.varietyPreference, random)
+        val pool = orderPool(eligible(preferences, meals), preferences.varietyPreference, random)
         val includeLunch = preferences.mealType == MealType.DINNER_AND_LUNCH
 
         // One cursor across the whole week so lunches and dinners draw from the same rotation and a
@@ -94,6 +110,10 @@ object MealPlanScheduler {
         val maxPrep = preferences.maxPrepTimeMinutes ?: return byDiet
         return byDiet.filter { it.prepTimeMinutes <= maxPrep }.ifEmpty { byDiet }
     }
+
+    private fun RecipePreview.isDessert(): Boolean =
+        (tags.map { it.displayName } + labels.map { it.displayName })
+            .any { it.trim().lowercase() in DESSERT_KEYWORDS }
 
     private fun RecipePreview.satisfies(restriction: DietaryRestriction): Boolean {
         val keywords = RESTRICTION_KEYWORDS[restriction] ?: return true

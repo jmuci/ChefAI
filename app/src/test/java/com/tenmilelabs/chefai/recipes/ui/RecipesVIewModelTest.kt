@@ -11,6 +11,7 @@ import com.tenmilelabs.chefai.core.data.sync.SyncStatusHolder
 import com.tenmilelabs.chefai.core.testutil.TEST_DOMAIN_RECIPE_PREVIEWS_LIST
 import com.tenmilelabs.chefai.core.testutil.createRealSessionManagerWithFakes
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
+import com.tenmilelabs.chefai.core.domain.model.Tag
 import com.tenmilelabs.chefai.core.testutil.recipeId1
 import com.tenmilelabs.chefai.core.testutil.recipeId2
 import com.tenmilelabs.chefai.core.testutil.recipeId3
@@ -356,6 +357,73 @@ class RecipesViewModelTest {
 
             collectionsRepository.setBookmarkedIds(setOf(recipeId1, recipeId2, recipeId3))
             assertThat(awaitItem().items).hasSize(3)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `selecting QUICK_EASY narrows items to recipes at or under the time threshold`() = runTest {
+        // Given: totals of 25, 15 and 10 minutes
+        seedBookmarkedRecipes(
+            TEST_DOMAIN_RECIPE_PREVIEWS_LIST,
+            setOf(recipeId1, recipeId2, recipeId3)
+        )
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().items).hasSize(3)
+
+            // When
+            viewModel.onFilterSelected(RecipeFilter.QUICK_EASY)
+
+            // Then
+            val filtered = awaitItem()
+            assertThat(filtered.selectedFilter).isEqualTo(RecipeFilter.QUICK_EASY)
+            assertThat(filtered.items.map { it.uuid }).containsExactly(recipeId2, recipeId3)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `selecting DESSERT then ALL restores the full collection`() = runTest {
+        val dessert = recipePreview1.copy(
+            tags = listOf(Tag(UUID.randomUUID(), "Dessert"))
+        )
+        seedBookmarkedRecipes(
+            listOf(dessert, recipePreview2, recipePreview3),
+            setOf(recipeId1, recipeId2, recipeId3)
+        )
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().items).hasSize(3)
+
+            viewModel.onFilterSelected(RecipeFilter.DESSERT)
+            assertThat(awaitItem().items.map { it.uuid }).containsExactly(recipeId1)
+
+            viewModel.onFilterSelected(RecipeFilter.ALL)
+            assertThat(awaitItem().items).hasSize(3)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `a filter that matches nothing yields empty items with the filter still selected`() = runTest {
+        // Given: only recipe 1 carries a Dessert label, and it isn't bookmarked
+        seedBookmarkedRecipes(
+            TEST_DOMAIN_RECIPE_PREVIEWS_LIST,
+            setOf(recipeId2, recipeId3)
+        )
+
+        viewModel.uiState.test {
+            awaitItem()
+
+            viewModel.onFilterSelected(RecipeFilter.DESSERT)
+
+            val state = awaitItem()
+            assertThat(state.items).isEmpty()
+            assertThat(state.selectedFilter).isEqualTo(RecipeFilter.DESSERT)
 
             cancelAndIgnoreRemainingEvents()
         }

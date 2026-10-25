@@ -11,6 +11,7 @@
     <string name="app_dest_title_import_recipe">Import Recipe</string>
     <string name="app_dest_title_import_recipe_browser">Import Recipe</string>
     <string name="app_dest_title_settings">Settings</string>
+    <string name="app_dest_title_developer_options">Developer options</string>
     <string name="app_dest_title_household">Household</string>
     <string name="app_dest_title_accept_invite">Accept Invite</string>
     <string name="app_name">ChefAI</string>
@@ -63,6 +64,8 @@
     <string name="no_items_added">No items added yet</string>
     <string name="no_recipes_subtitle">Start browsing recipes and bookmark the ones you like to populate your collection.</string>
     <string name="no_recipes_title">No recipes in your collection</string>
+    <string name="no_filtered_recipes_title">No matching recipes</string>
+    <string name="no_filtered_recipes_subtitle">None of the recipes in your collection match this filter. Try another one, or tap All.</string>
     <string name="no_steps_listed">No steps listed for this recipe.</string>
     <string name="nutrition_calories_format">%1$d kcal</string>
     <string name="nutrition_protein_format">%1$dg protein</string>
@@ -113,7 +116,6 @@
     <string name="recipes_subtitle">Browse recipes and pick your next meal.</string>
     <string name="recipes_title">Ready to cook?</string>
     <string name="recipe_filter_all">All</string>
-    <string name="recipe_filter_seafood">Seafood</string>
     <string name="recipe_add_to_meal_plan">Add to Meal Plan</string>
     <string name="recipe_add_to_grocery_list_content_description">Add to grocery list</string>
     <string name="save_button">Save</string>
@@ -251,6 +253,16 @@
     <string name="meal_plan_mark_cooked">Mark as cooked</string>
     <string name="meal_plan_mark_not_cooked">Mark as not cooked</string>
     <string name="meal_plan_toggle_cooked_error">Couldn\'t update this meal</string>
+    <string name="recipe_added_to_meal_plan">Added to your meal plan</string>
+    <string name="recipe_added_to_grocery_list">Ingredients added to the plan\'s shopping list</string>
+    <string name="recipe_add_to_plan_error">Couldn\'t add this recipe to the plan</string>
+    <string name="slot_picker_meal_plan_title">Add to meal plan</string>
+    <string name="slot_picker_grocery_list_title">Add to grocery list</string>
+    <string name="slot_picker_choose_plan">Choose a plan</string>
+    <string name="slot_picker_choose_slot">Choose a day and meal</string>
+    <string name="slot_picker_no_plans">Create a meal plan first, then add recipes to it.</string>
+    <string name="slot_picker_day">Day %1$d</string>
+    <string name="slot_picker_back">Back</string>
     <string name="meal_plan_recipe_unavailable">Recipe not available</string>
     <string name="meal_plan_cooked_section_title">Cooked this week</string>
     <string name="meal_plan_progress">%1$d of %2$d meals cooked</string>
@@ -267,9 +279,23 @@
     <string name="meal_plan_shared_by">Shared by %1$s</string>
 
     <!-- Meal Plans week view (screen 06) -->
-    <string name="meal_plans_basis_just_me">Just me</string>
-    <string name="meal_plans_basis_family">Family</string>
-    <string name="meal_plans_basis_label">Whose meals to show</string>
+    <string name="meal_plans_view_label">Meal plans view</string>
+    <string name="meal_plans_view_week">Week</string>
+    <string name="meal_plans_view_plans">Plans</string>
+    <string name="meal_plans_generated_title">%1$s week</string>
+    <string name="meal_plans_untitled">Meal plan</string>
+    <string name="meal_plans_card_meta">%1$s · %2$s</string>
+    <string name="meal_plans_card_scheduled">Scheduled %1$s</string>
+    <string name="meal_plans_card_last_cooked">Last cooked %1$s</string>
+    <string name="meal_plans_card_schedule">Schedule this plan</string>
+    <plurals name="meal_plans_card_days">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+    <plurals name="meal_plans_card_recipes">
+        <item quantity="one">%d recipe</item>
+        <item quantity="other">%d recipes</item>
+    </plurals>
     <string name="meal_plans_previous_week">Previous week</string>
     <string name="meal_plans_next_week">Next week</string>
     <string name="meal_plans_add_meal">+ Add meal</string>
@@ -345,6 +371,12 @@
     <string name="import_recipe_browser_gave_up">We still couldn\'t read a recipe from that page</string>
     <string name="import_recipe_browser_cancel">Cancel</string>
 
+    <!-- Developer options (debug builds only) -->
+    <string name="developer_options_link">Developer options</string>
+    <string name="developer_options_environment_title">Environment</string>
+    <string name="developer_options_use_remote">Use remote environment</string>
+    <string name="developer_options_environment_footnote">Applies to the next request. Switching signs you out, since an account belongs to one environment; recipes on this device are kept.</string>
+
     <!-- Settings: measurement units -->
     <string name="settings_measurement_units_title">Measurement units</string>
     <string name="settings_measurement_units_subtitle">How ingredient amounts are shown to you. Recipes themselves are never changed.</string>
@@ -355,6 +387,10 @@
     <string name="settings_units_imperial">Imperial</string>
     <string name="settings_units_imperial_example">Ounces, pounds, cups, spoons</string>
     <string name="settings_measurement_units_footnote">Weights marked \u2248 are estimated from a typical density, so they\'re a good guide rather than an exact figure. Amounts counted rather than measured \u2014 cloves, cans, slices \u2014 are never converted.</string>
+    <string name="settings_week_start_title">Week starts on</string>
+    <string name="settings_week_start_subtitle">The first day shown in the meal plan calendar.</string>
+    <string name="settings_week_start_monday">Monday</string>
+    <string name="settings_week_start_sunday">Sunday</string>
     <string name="settings_menu_item">Settings</string>
     <string name="settings_recipe_language_title">Recipe language</string>
     <string name="settings_recipe_language_subtitle">Assumed for recipes you write yourself, and suggested first when an imported recipe\'s language can\'t be told from the page.</string>
