@@ -27,8 +27,9 @@ private const val DEFAULT_UNIT = "unit"
  * (case-insensitively) against the app's existing catalogs before minting a new id, mirroring
  * [com.tenmilelabs.chefai.recipes.ui.editor.RecipeEditorViewModel.selectIngredient] and
  * `addTagByName` — otherwise every import would duplicate catalog rows. Privacy defaults to
- * `PUBLIC`: a scraped recipe is someone else's already-published page, unlike a recipe the user
- * writes from scratch, which starts `PRIVATE` (see [RecipeDraft.privacy]).
+ * `PRIVATE`, like a recipe the user writes from scratch (see [RecipeDraft.privacy]): a scraped
+ * recipe is third-party content the user did not author, so publishing it is an explicit choice
+ * made in the editor's Visibility control, never a default.
  *
  * Calories/protein are the one pair of fields that stay blank rather than falling back to `"0"`
  * when the page didn't publish them: unlike prep/cook time and servings, they're optional and
@@ -56,7 +57,7 @@ fun ScrapedRecipe.toRecipeDraft(
     languageCode = language?.code,
     languageNeedsConfirmation = language?.confidence != LanguageConfidence.HIGH,
     externalUrl = sourceUrl,
-    privacy = RecipePrivacy.PUBLIC,
+    privacy = RecipePrivacy.PRIVATE,
     ingredients = ingredients.toRecipeIngredients(knownIngredients),
     steps = instructions.toRecipeSteps(),
     tags = keywords.toTags(knownTags),

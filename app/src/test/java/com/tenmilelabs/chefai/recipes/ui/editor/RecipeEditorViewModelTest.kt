@@ -146,7 +146,9 @@ class RecipeEditorViewModelTest {
         // Regression guard: populateFromDraft must copy draft.privacy into RecipeFields, or every
         // imported draft would silently reset to the RecipeFields default of PRIVATE on open.
         val draftId = UuidV7Generator.newId()
-        recipeDraftDao.saveDraft(completeImportedDraft(draftId).toRecipeDraftEntity())
+        recipeDraftDao.saveDraft(
+            completeImportedDraft(draftId).copy(privacy = RecipePrivacy.PUBLIC).toRecipeDraftEntity()
+        )
 
         val vm = createViewModel(draftId = draftId.toString())
 
@@ -313,7 +315,7 @@ class RecipeEditorViewModelTest {
 
     /**
      * Mirrors what the recipe URL importer persists before handing off to the editor — including
-     * `privacy = PUBLIC`, which is what [com.tenmilelabs.chefai.recipes.data.mapper.toRecipeDraft]
+     * `privacy = PRIVATE`, which is what [com.tenmilelabs.chefai.recipes.data.mapper.toRecipeDraft]
      * (the scraper mapper) always sets.
      */
     private fun completeImportedDraft(draftId: java.util.UUID) = RecipeDraft(
@@ -325,7 +327,7 @@ class RecipeEditorViewModelTest {
         cookTimeMinutes = "15",
         servings = "4",
         externalUrl = "https://example.com/pancakes",
-        privacy = RecipePrivacy.PUBLIC,
+        privacy = RecipePrivacy.PRIVATE,
         ingredients = listOf(
             RecipeIngredient(
                 ingredientId = UuidV7Generator.newId(),

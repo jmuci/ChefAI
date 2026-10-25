@@ -41,8 +41,8 @@ data class RecipeDraft(
     val externalUrl: String = "",
     /**
      * Defaults to [RecipePrivacy.PRIVATE]: a recipe the user writes stays theirs until they say
-     * otherwise. The import path overrides this to `PUBLIC` — see
-     * [com.tenmilelabs.chefai.recipes.data.mapper.toRecipeDraft].
+     * otherwise. A URL import uses the same default — it is third-party content the user did not
+     * write — see [com.tenmilelabs.chefai.recipes.data.mapper.toRecipeDraft].
      */
     val privacy: RecipePrivacy = RecipePrivacy.PRIVATE,
     val ingredients: List<RecipeIngredient> = emptyList(),
