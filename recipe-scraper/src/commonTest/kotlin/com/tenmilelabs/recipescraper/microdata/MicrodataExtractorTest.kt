@@ -1,6 +1,9 @@
 package com.tenmilelabs.recipescraper.microdata
 
 import com.fleeksoft.ksoup.Ksoup
+import com.tenmilelabs.recipescraper.model.DetectedLanguage
+import com.tenmilelabs.recipescraper.model.LanguageConfidence
+import com.tenmilelabs.recipescraper.model.LanguageSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -67,5 +70,12 @@ class MicrodataExtractorTest {
         assertEquals("Just A Name", recipe?.title)
         assertEquals(emptyList(), recipe?.ingredients)
         assertEquals(emptyList(), recipe?.instructions)
+    }
+
+    @Test
+    fun `leaves the scope's declared inLanguage as a provisional language`() {
+        val recipe = extract(MicrodataFixtures.SPANISH_RECIPE)
+
+        assertEquals(DetectedLanguage("es", LanguageConfidence.HIGH, LanguageSource.MICRODATA), recipe?.language)
     }
 }

@@ -196,4 +196,64 @@ class IngredientTextParserTest {
         assertNull(blank.quantity)
         assertEquals("", blank.name)
     }
+
+    // --- Spanish ---
+
+    private fun assertParsedSpanish(raw: String, quantity: Double?, unit: String?, name: String) {
+        val result = parseIngredient(raw, language = "es")
+        assertEquals(quantity, result.quantity, "quantity for \"$raw\"")
+        assertEquals(unit, result.unit, "unit for \"$raw\"")
+        assertEquals(name, result.name, "name for \"$raw\"")
+    }
+
+    @Test
+    fun `strips the de between a Spanish unit and its ingredient`() {
+        assertParsedSpanish("200 g de harina", 200.0, "g", "harina")
+        assertParsedSpanish("1 diente de ajo", 1.0, "clove", "ajo")
+        assertParsedSpanish("1 taza de leche", 1.0, "cup", "leche")
+        assertParsedSpanish("2 cucharadas de la salsa", 2.0, "tbsp", "salsa")
+        assertParsedSpanish("300g de garbanzos", 300.0, "g", "garbanzos")
+    }
+
+    @Test
+    fun `normalizes Spanish units and abbreviations`() {
+        assertParsedSpanish("1/2 cdta. de sal", 0.5, "tsp", "sal")
+        assertParsedSpanish("2 cdas aceite", 2.0, "tbsp", "aceite")
+        assertParsedSpanish("1 lata de tomate triturado", 1.0, "can", "tomate triturado")
+        assertParsedSpanish("1 litro de caldo", 1.0, "l", "caldo")
+        assertParsedSpanish("1 sobre de levadura", 1.0, "package", "levadura")
+    }
+
+    @Test
+    fun `reads Spanish spelled-out ranges`() {
+        assertParsedSpanish("2 a 3 cucharadas de aceite", 2.0, "tbsp", "aceite")
+        assertParsedSpanish("1 o 2 dientes de ajo", 1.0, "clove", "ajo")
+    }
+
+    @Test
+    fun `leaves an amountless Spanish line whole`() {
+        assertParsedSpanish("sal al gusto", null, null, "sal al gusto")
+    }
+
+    @Test
+    fun `recognises Spanish units even without a detected language`() {
+        // Units are a union across languages; only connector words are gated.
+        assertParsed("2 cucharadas aceite", 2.0, "tbsp", "aceite")
+        assertParsed("200 g de harina", 200.0, "g", "de harina")
+    }
+
+    @Test
+    fun `reads a bare c as cup only on English or undetected pages`() {
+        assertEquals("cup", parseIngredient("1 c flour").unit)
+        assertEquals("cup", parseIngredient("1 c flour", language = "en").unit)
+
+        val french = parseIngredient("2 c. sucre", language = "fr")
+        assertNull(french.unit)
+        assertEquals("c. sucre", french.name)
+    }
+
+    @Test
+    fun `does not treat a as a range word in English`() {
+        assertParsed("2 a 3 cups flour", 2.0, null, "a 3 cups flour")
+    }
 }

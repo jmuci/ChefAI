@@ -62,4 +62,19 @@ internal object MicrodataFixtures {
         </div>
         </body></html>
     """.trimIndent()
+
+    val SPANISH_RECIPE = """
+        <html><body>
+        <div itemscope itemtype="https://schema.org/Recipe">
+          <meta itemprop="inLanguage" content="es" />
+          <h1 itemprop="name">Gazpacho andaluz</h1>
+          <li itemprop="recipeIngredient">1 kg de tomates</li>
+          <li itemprop="recipeIngredient">1 pimiento verde</li>
+          <li itemprop="recipeIngredient">1 diente de ajo</li>
+          <li itemprop="recipeIngredient">50 ml de aceite de oliva</li>
+          <li itemprop="recipeInstructions">Triturar todos los ingredientes con el aceite y la sal.</li>
+          <li itemprop="recipeInstructions">Enfriar en la nevera durante dos horas.</li>
+        </div>
+        </body></html>
+    """.trimIndent()
 }

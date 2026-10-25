@@ -249,4 +249,98 @@ internal object JsonLdFixtures {
         </script>
         </head><body></body></html>
     """.trimIndent()
+
+    // --- Language detection ---
+
+    /** Spanish text, an explicit `inLanguage` and a matching `<html lang>` — every signal agrees. */
+    val SPANISH_RECIPE = """
+        <html lang="es"><head>
+        <script type="application/ld+json">
+        {
+          "@type": "Recipe",
+          "name": "Tortilla de patatas",
+          "inLanguage": "es-ES",
+          "description": "La tortilla de patatas clásica, jugosa y con cebolla.",
+          "recipeIngredient": [
+            "6 huevos",
+            "500 g de patatas",
+            "1 cebolla",
+            "200 ml de aceite de oliva",
+            "1 pizca de sal",
+            "2 a 3 cucharadas de leche"
+          ],
+          "recipeInstructions": [
+            "Pelar y cortar las patatas en láminas finas.",
+            "Freír las patatas con la cebolla en el aceite a fuego medio durante 20 minutos.",
+            "Batir los huevos con la sal y mezclar con las patatas.",
+            "Cuajar la tortilla en la sartén por los dos lados."
+          ]
+        }
+        </script>
+        </head><body></body></html>
+    """.trimIndent()
+
+    /** Spanish text on a page whose theme left `<html lang="en-US">` at its template default. */
+    val MISMATCHED_LANG = """
+        <html lang="en-US"><head>
+        <script type="application/ld+json">
+        {
+          "@type": "Recipe",
+          "name": "Lentejas con chorizo",
+          "recipeIngredient": [
+            "300 g de lentejas",
+            "1 chorizo",
+            "1 cebolla",
+            "2 dientes de ajo",
+            "1 cucharada de pimentón",
+            "Sal al gusto"
+          ],
+          "recipeInstructions": [
+            "Picar la cebolla y el ajo y sofreír en una olla con aceite.",
+            "Añadir el chorizo en rodajas y el pimentón.",
+            "Agregar las lentejas y cubrir con agua.",
+            "Cocinar a fuego lento durante 40 minutos hasta que estén tiernas."
+          ]
+        }
+        </script>
+        </head><body></body></html>
+    """.trimIndent()
+
+    /** Spanish text with no language markup anywhere. */
+    val NO_LANG_METADATA = """
+        <html><head>
+        <script type="application/ld+json">
+        {
+          "@type": "Recipe",
+          "name": "Arroz con leche",
+          "recipeIngredient": [
+            "1 litro de leche",
+            "100 g de arroz",
+            "150 g de azúcar",
+            "1 rama de canela",
+            "La piel de un limón"
+          ],
+          "recipeInstructions": [
+            "Calentar la leche con la canela y la piel del limón.",
+            "Añadir el arroz y cocinar a fuego lento durante 40 minutos.",
+            "Agregar el azúcar y mezclar hasta que se disuelva."
+          ]
+        }
+        </script>
+        </head><body></body></html>
+    """.trimIndent()
+
+    /** `inLanguage` as a schema.org `Language` object rather than a bare tag. */
+    val LANGUAGE_OBJECT = """
+        <html><head>
+        <script type="application/ld+json">
+        {
+          "@type": "Recipe",
+          "name": "Language Object Recipe",
+          "inLanguage": {"@type": "Language", "name": "Spanish", "alternateName": "es"},
+          "recipeIngredient": ["1 taza de arroz"]
+        }
+        </script>
+        </head><body></body></html>
+    """.trimIndent()
 }

@@ -2,11 +2,15 @@ package com.tenmilelabs.recipescraper
 
 import com.tenmilelabs.recipescraper.jsonld.JsonLdFixtures
 import com.tenmilelabs.recipescraper.microdata.MicrodataFixtures
+import com.tenmilelabs.recipescraper.model.DetectedLanguage
 import com.tenmilelabs.recipescraper.model.ExtractionSource
+import com.tenmilelabs.recipescraper.model.LanguageConfidence
+import com.tenmilelabs.recipescraper.model.LanguageSource
 import com.tenmilelabs.recipescraper.model.ScrapeResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 
 class RecipeHtmlParserTest {
 
@@ -91,5 +95,92 @@ class RecipeHtmlParserTest {
 
         val success = assertIs<ScrapeResult.Success>(result)
         assertEquals("https://mysite.example/recipe/42", success.recipe.sourceUrl)
+    }
+
+    // --- Language ---
+
+    private fun parseRecipe(html: String, contentLanguage: String? = null) =
+        assertIs<ScrapeResult.Success>(parser.parse(html, "https://example.com/r", contentLanguage)).recipe
+
+    @Test
+    fun `detects Spanish at HIGH confidence when markup and text agree`() {
+        val recipe = parseRecipe(JsonLdFixtures.SPANISH_RECIPE)
+
+        assertEquals(DetectedLanguage("es", LanguageConfidence.HIGH, LanguageSource.JSON_LD), recipe.language)
+    }
+
+    @Test
+    fun `re-parses ingredients with the detected language`() {
+        val ingredients = parseRecipe(JsonLdFixtures.SPANISH_RECIPE).ingredients.associateBy { it.raw }
+
+        val potatoes = ingredients.getValue("500 g de patatas")
+        assertEquals(500.0, potatoes.quantity)
+        assertEquals("g", potatoes.unit)
+        assertEquals("patatas", potatoes.name)
+
+        val milk = ingredients.getValue("2 a 3 cucharadas de leche")
+        assertEquals(2.0, milk.quantity)
+        assertEquals("tbsp", milk.unit)
+        assertEquals("leche", milk.name)
+    }
+
+    @Test
+    fun `asks for confirmation when the page's lang attribute contradicts its text`() {
+        val recipe = parseRecipe(JsonLdFixtures.MISMATCHED_LANG)
+
+        assertEquals(DetectedLanguage("es", LanguageConfidence.LOW, LanguageSource.TEXT), recipe.language)
+    }
+
+    @Test
+    fun `detects the language from the text alone when there is no markup`() {
+        assertEquals(
+            DetectedLanguage("es", LanguageConfidence.HIGH, LanguageSource.TEXT),
+            parseRecipe(JsonLdFixtures.NO_LANG_METADATA).language,
+        )
+        assertEquals(
+            DetectedLanguage("en", LanguageConfidence.HIGH, LanguageSource.TEXT),
+            parseRecipe(JsonLdFixtures.PLAIN_OBJECT).language,
+        )
+    }
+
+    @Test
+    fun `detects the language of a microdata recipe`() {
+        assertEquals(
+            DetectedLanguage("es", LanguageConfidence.HIGH, LanguageSource.MICRODATA),
+            parseRecipe(MicrodataFixtures.SPANISH_RECIPE).language,
+        )
+    }
+
+    @Test
+    fun `falls back to the Content-Language header at LOW confidence`() {
+        val html = """
+            <html><head><script type="application/ld+json">
+            {"@type": "Recipe", "name": "Gazpacho", "recipeIngredient": ["1 kg tomates"]}
+            </script></head><body></body></html>
+        """.trimIndent()
+
+        assertEquals(
+            DetectedLanguage("es", LanguageConfidence.LOW, LanguageSource.HTTP_HEADER),
+            parseRecipe(html, contentLanguage = "es-ES").language,
+        )
+        assertNull(parseRecipe(html).language)
+    }
+
+    @Test
+    fun `reads og-locale and the content-language meta tag`() {
+        val body = """
+            <script type="application/ld+json">
+            {"@type": "Recipe", "name": "Gazpacho", "recipeIngredient": ["1 kg tomates"]}
+            </script></head><body></body></html>
+        """.trimIndent()
+
+        assertEquals(
+            DetectedLanguage("es", LanguageConfidence.LOW, LanguageSource.OG_LOCALE),
+            parseRecipe("""<html><head><meta property="og:locale" content="es_ES" />""" + body).language,
+        )
+        assertEquals(
+            DetectedLanguage("es", LanguageConfidence.LOW, LanguageSource.META_CONTENT_LANGUAGE),
+            parseRecipe("""<html><head><meta http-equiv="Content-Language" content="es" />""" + body).language,
+        )
     }
 }

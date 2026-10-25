@@ -3,6 +3,10 @@ package com.tenmilelabs.recipescraper.microdata
 import com.fleeksoft.ksoup.nodes.Document
 import com.fleeksoft.ksoup.nodes.Element
 import com.tenmilelabs.recipescraper.ingredient.parseIngredient
+import com.tenmilelabs.recipescraper.language.normalizeLanguageTag
+import com.tenmilelabs.recipescraper.model.DetectedLanguage
+import com.tenmilelabs.recipescraper.model.LanguageConfidence
+import com.tenmilelabs.recipescraper.model.LanguageSource
 import com.tenmilelabs.recipescraper.model.ScrapedRecipe
 import com.tenmilelabs.recipescraper.util.cleanHtmlText
 import com.tenmilelabs.recipescraper.util.firstIntOrNull
@@ -45,6 +49,9 @@ internal fun extractMicrodataRecipe(document: Document, sourceUrl: String): Scra
         keywords = scope.keywords(),
         author = cleanHtmlText(scope.propertyValue("author")),
         sourceUrl = sourceUrl,
+        // Provisional: RecipeHtmlParser weighs this against the page's other signals.
+        language = normalizeLanguageTag(scope.propertyValue("inLanguage"))
+            ?.let { DetectedLanguage(it, LanguageConfidence.HIGH, LanguageSource.MICRODATA) },
     )
 }
 
