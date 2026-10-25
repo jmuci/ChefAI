@@ -257,6 +257,21 @@ class NavigationActions(private val navController: NavHostController) {
         navController.navigate("${ScreenBaseRoutes.MEAL_PLAN_DETAIL}/$mealPlanId")
     }
 
+    /**
+     * Opens a just-created meal plan and removes the wizard from the back stack, so Back from the
+     * detail screen returns to wherever the wizard was launched from (the Meal Plans list, or a
+     * recipe's details screen).
+     *
+     * Pops the wizard graph itself rather than a launch-point route: popping to
+     * [AppDestinations.MEAL_PLANS] is a silent no-op when the wizard was opened from a recipe
+     * (that route isn't on the stack), which left all three wizard steps behind.
+     */
+    fun navigateToCreatedMealPlan(mealPlanId: UUID) {
+        navController.navigate("${ScreenBaseRoutes.MEAL_PLAN_DETAIL}/$mealPlanId") {
+            popUpTo(ScreenBaseRoutes.MEAL_PLAN_WIZARD_GRAPH) { inclusive = true }
+        }
+    }
+
     /** Opens the shopping list derived from an open meal plan. */
     fun navigateToMealPlanShoppingList(mealPlanId: UUID) {
         navController.navigate("${ScreenBaseRoutes.MEAL_PLAN_SHOPPING_LIST}/$mealPlanId")

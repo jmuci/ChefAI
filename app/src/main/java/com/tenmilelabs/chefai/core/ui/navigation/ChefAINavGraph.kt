@@ -258,19 +258,11 @@ fun ChefAINavGraph(
                         when (event) {
                             is CreateMealPlanEvent.MealPlanReady -> {
                                 // Generation succeeded — go straight to the detail screen
-                                navController.popBackStack(
-                                    route = AppDestinations.MEAL_PLANS.route,
-                                    inclusive = false,
-                                )
-                                navActions.navigateToMealPlanDetail(event.mealPlanId)
+                                navActions.navigateToCreatedMealPlan(event.mealPlanId)
                             }
                             is CreateMealPlanEvent.MealPlanSavedAsDraft -> {
                                 // Offline / BE error — show detail as DRAFT with Generate button
-                                navController.popBackStack(
-                                    route = AppDestinations.MEAL_PLANS.route,
-                                    inclusive = false,
-                                )
-                                navActions.navigateToMealPlanDetail(event.mealPlanId)
+                                navActions.navigateToCreatedMealPlan(event.mealPlanId)
                             }
                             is CreateMealPlanEvent.ShowError -> {
                                 snackbarHostState.showSnackbar("Failed to create meal plan")
