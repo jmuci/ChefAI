@@ -1,6 +1,8 @@
 package com.tenmilelabs.chefai.mealplans.domain.shoppinglist
 
+import com.tenmilelabs.chefai.core.domain.units.CountingUnits
 import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
+import com.tenmilelabs.chefai.core.domain.units.PreparationNotes
 import com.tenmilelabs.chefai.core.domain.units.UnitConversion
 import com.tenmilelabs.chefai.core.domain.units.UnitNormalizer
 import com.tenmilelabs.chefai.core.util.QuantityFormat
@@ -78,6 +80,9 @@ object ShoppingListBuilder {
         checkedByNames: Map<String, String> = emptyMap(),
     ): ShoppingList {
         data class ScaledRow(
+            // Without any trailing preparation note: "garlic, peeled and crushed" is still the
+            // garlic on the line above it. The raw name still feeds conversion, where "chopped"
+            // is a reason not to guess a density.
             val displayName: String,
             val unit: String,
             val amount: Double,
@@ -105,7 +110,7 @@ object ShoppingListBuilder {
                     target = measurementSystem,
                 )
                 ScaledRow(
-                    displayName = row.displayName,
+                    displayName = PreparationNotes.stripFrom(row.displayName),
                     unit = UnitNormalizer.withoutPlaceholder(converted.unit),
                     amount = converted.quantity,
                     isApproximate = converted.isApproximate,
@@ -122,12 +127,15 @@ object ShoppingListBuilder {
                 val quantityLabel = rows
                     // Bucket by the unit a spelling *means*, not the spelling itself: two recipes
                     // can say "300 g" and "200 gram" for the same thing, and "300 g + 200 gram" is
-                    // not something anyone can shop from. Unrecognised units (cloves, cans) have no
-                    // canonical form and keep their own wording.
-                    .groupBy { UnitNormalizer.normalize(it.unit)?.canonical ?: it.unit.trim().lowercase() }
+                    // not something anyone can shop from. Counting units (clove/cloves, diente/
+                    // dientes) merge on their singular and are re-pluralised for the total below;
+                    // anything else unrecognised keeps its own wording.
+                    .groupBy { bucketKey(it.unit) }
                     .mapValues { (_, unitRows) ->
                         val spelling = unitRows.first().unit.trim()
-                        val display = UnitNormalizer.normalize(spelling)?.canonical ?: spelling
+                        val display = UnitNormalizer.normalize(spelling)?.canonical
+                            ?: CountingUnits.resolve(spelling)?.singular
+                            ?: spelling
                         display to unitRows.sumOf { it.amount }
                     }
                     .mergeSameDimension()
@@ -136,7 +144,9 @@ object ShoppingListBuilder {
                     .mapNotNull { (_, unitAndSum) ->
                         val (originalUnit, sum) = unitAndSum
                         if (sum <= 0.0) return@mapNotNull null
-                        if (originalUnit.isBlank()) formatQuantity(sum) else "${formatQuantity(sum)} $originalUnit"
+                        val unit = CountingUnits.resolveExact(originalUnit)?.let { CountingUnits.label(it, sum) }
+                            ?: originalUnit
+                        if (unit.isBlank()) formatQuantity(sum) else "${formatQuantity(sum)} $unit"
                     }
                     .joinToString(" + ")
                     .ifEmpty { null }
@@ -171,6 +181,11 @@ object ShoppingListBuilder {
     /** Lowercased, trimmed, internal whitespace collapsed. The tick key and the grouping key. */
     fun nameKey(displayName: String): String =
         displayName.trim().lowercase().replace(WHITESPACE, " ")
+
+    private fun bucketKey(unit: String): String =
+        UnitNormalizer.normalize(unit)?.canonical
+            ?: CountingUnits.resolve(unit)?.singular
+            ?: unit.trim().lowercase()
 
     private val WHITESPACE = Regex("\\s+")
 }

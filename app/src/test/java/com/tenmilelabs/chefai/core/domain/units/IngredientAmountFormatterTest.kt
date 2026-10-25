@@ -6,6 +6,18 @@ import org.junit.Test
 class IngredientAmountFormatterTest {
 
     @Test
+    fun `a counting unit is pluralised past one and keeps a trailing note as written`() {
+        fun text(quantity: Double, unit: String) = IngredientAmountFormatter.format(
+            quantity, unit, "garlic", MeasurementSystem.AS_WRITTEN,
+        ).text
+
+        assertThat(text(1.0, "clove")).isEqualTo("1 clove")
+        assertThat(text(2.0, "clove")).isEqualTo("2 cloves")
+        assertThat(text(2.0, "diente")).isEqualTo("2 dientes")
+        assertThat(text(2.0, "clove peeled crushed")).isEqualTo("2 clove peeled crushed")
+    }
+
+    @Test
     fun `as written - renders the recipe's own amount with cooking fractions`() {
         val label = IngredientAmountFormatter.format(
             quantity = 0.5,

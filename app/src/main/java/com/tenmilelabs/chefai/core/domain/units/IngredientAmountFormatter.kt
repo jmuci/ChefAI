@@ -33,7 +33,10 @@ object IngredientAmountFormatter {
             QuantityFormat.decimal(converted.quantity)
         }
         // A unitless ingredient reads "2", not "2 ".
-        val unitLabel = UnitNormalizer.withoutPlaceholder(converted.unit)
+        // "clove" reads "cloves" past one. Exact match only: a unit carrying a trailing note keeps
+        // it here, where the recipe is read as written.
+        val unitLabel = CountingUnits.resolveExact(converted.unit)?.let { CountingUnits.label(it, converted.quantity) }
+            ?: UnitNormalizer.withoutPlaceholder(converted.unit)
         val text = if (unitLabel.isBlank()) amount else "$amount $unitLabel"
         return IngredientAmountLabel(text = text, isApproximate = converted.isApproximate)
     }
