@@ -8,7 +8,7 @@ enum class ApiEnvironment {
     /** The developer's own backend, as the emulator sees it (`10.0.2.2:8080`). */
     LOCAL,
 
-    /** The deployed backend (`chefaiApiBaseUrl`). */
+    /** The deployed backend — `https://api.pocket-chef.app` unless `chefaiApiBaseUrl` overrides it. */
     REMOTE;
 
     companion object {
@@ -26,8 +26,8 @@ enum class ApiEnvironment {
  *
  * @property local the base URL every ChefAI endpoint is built from (`BuildConfig.API_BASE_URL`).
  * @property remote the deployed host the [ApiEnvironment.REMOTE] choice points requests at.
- * @property remoteConfigured `false` when the build had no `chefaiApiBaseUrl` and [remote] is only
- *   the `https://api.invalid` placeholder.
+ * @property remoteConfigured `false` when the build was given a blank `chefaiApiBaseUrl`, so there
+ *   is no remote to switch to.
  */
 data class ApiBaseUrls(
     val local: String,

@@ -147,7 +147,7 @@ private fun DeveloperOptionsContentDarkPreview() {
     ChefAITheme(darkTheme = true) {
         Surface {
             DeveloperOptionsContent(
-                uiState = PreviewState.copy(remoteBaseUrl = "https://api.invalid", isRemoteConfigured = false),
+                uiState = PreviewState.copy(remoteBaseUrl = "", isRemoteConfigured = false),
                 onAction = {},
             )
         }

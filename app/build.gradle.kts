@@ -12,14 +12,12 @@ plugins {
 }
 
 /**
- * Base URL the release build talks to. Supply the deployed host via `-PchefaiApiBaseUrl=https://…`
- * or a `chefaiApiBaseUrl` entry in `~/.gradle/gradle.properties`.
- *
- * The placeholder default is intentional: a release build that silently pointed at a stale or
- * someone else's host would be worse than one that fails its first request loudly.
+ * Base URL the release build talks to: the deployed backend by default, overridable via
+ * `-PchefaiApiBaseUrl=https://…` or a `chefaiApiBaseUrl` entry in `~/.gradle/gradle.properties`
+ * (e.g. to point a build at a staging host). Pass it blank to build with no remote at all.
  */
-val configuredApiBaseUrl: String? = project.findProperty("chefaiApiBaseUrl") as String?
-val releaseApiBaseUrl: String = configuredApiBaseUrl ?: "https://api.invalid"
+val releaseApiBaseUrl: String =
+    (project.findProperty("chefaiApiBaseUrl") as String?) ?: "https://api.pocket-chef.app"
 
 android {
     namespace = "com.tenmilelabs.chefai"
@@ -36,8 +34,8 @@ android {
         // The deployed host, in every build type: release talks to it directly (API_BASE_URL
         // below), and a debug build can be switched onto it from Developer options.
         buildConfigField("String", "REMOTE_API_BASE_URL", "\"${releaseApiBaseUrl}\"")
-        // False when chefaiApiBaseUrl is unset, so Developer options can refuse the placeholder.
-        buildConfigField("boolean", "REMOTE_API_CONFIGURED", "${configuredApiBaseUrl != null}")
+        // False only when chefaiApiBaseUrl is passed blank, so Developer options can refuse it.
+        buildConfigField("boolean", "REMOTE_API_CONFIGURED", "${releaseApiBaseUrl.isNotBlank()}")
     }
 
     buildTypes {
@@ -47,8 +45,8 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Overridable from ~/.gradle/gradle.properties or -PchefaiApiBaseUrl=... so the deployed
-            // host never has to be committed. Must be https: the release build permits no cleartext.
+            // Overridable from ~/.gradle/gradle.properties or -PchefaiApiBaseUrl=...
+            // Must be https: the release build permits no cleartext.
             buildConfigField("String", "API_BASE_URL", "\"${releaseApiBaseUrl}\"")
         }
         debug {
