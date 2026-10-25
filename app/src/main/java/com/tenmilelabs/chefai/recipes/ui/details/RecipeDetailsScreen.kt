@@ -143,7 +143,7 @@ fun RecipeDetailsScreen(
                 },
                 servings = uiState.servings,
                 isBookmarked = uiState.isBookmarked,
-                canEdit = onEditClick != null,
+                canEdit = onEditClick != null && uiState.canEdit,
                 // Deleting navigates away, so the button is only offered when there is somewhere to
                 // go — and even then, only for a recipe the user owns (uiState.canDelete).
                 canDelete = onNavigateBack != null && uiState.canDelete,
@@ -184,7 +184,8 @@ fun RecipeDetailsScreen(
  *   disagree about what they are showing.
  * @param measurementSystem the units the ingredient list is read in. Applied here, after scaling,
  *   for the same reason scaling itself is: it is a way of reading the recipe, never an edit to it.
- * @param canEdit whether the caller has somewhere for the edit FAB to go.
+ * @param canEdit whether the caller has somewhere for the edit FAB to go, and the current user
+ *   owns [recipe].
  * @param canDelete whether the caller has somewhere to navigate after a delete, and the current
  *   user owns [recipe] (created or imported it themselves).
  */
