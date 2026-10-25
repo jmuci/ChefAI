@@ -350,7 +350,7 @@
     <string name="developer_options_link">Developer options</string>
     <string name="developer_options_environment_title">Environment</string>
     <string name="developer_options_use_remote">Use remote environment</string>
-    <string name="developer_options_environment_footnote">Applies to the next request. Tokens and synced data from one environment mean nothing to the other, so sign out before switching if you are signed in.</string>
+    <string name="developer_options_environment_footnote">Applies to the next request. Switching signs you out, since an account belongs to one environment; recipes on this device are kept.</string>
 
     <!-- Settings: measurement units -->
     <string name="settings_measurement_units_title">Measurement units</string>

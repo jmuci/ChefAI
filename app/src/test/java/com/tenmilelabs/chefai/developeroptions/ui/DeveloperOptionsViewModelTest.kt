@@ -2,10 +2,13 @@ package com.tenmilelabs.chefai.developeroptions.ui
 
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import com.tenmilelabs.chefai.developeroptions.data.repository.FakeApiEnvironmentRepository
 import com.tenmilelabs.chefai.developeroptions.domain.model.ApiBaseUrls
 import com.tenmilelabs.chefai.developeroptions.domain.model.ApiEnvironment
+import com.tenmilelabs.chefai.developeroptions.domain.usecase.SwitchApiEnvironment
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
@@ -19,9 +22,18 @@ class DeveloperOptionsViewModelTest {
 
     private val baseUrls = ApiBaseUrls(local = "http://10.0.2.2:8080", remote = "https://api.example.com")
 
+    private fun viewModel(repository: FakeApiEnvironmentRepository) = DeveloperOptionsViewModel(
+        apiEnvironmentRepository = repository,
+        switchApiEnvironment = SwitchApiEnvironment(
+            repository,
+            createTestSessionManager(CoroutineScope(mainCoroutineRule.testDispatcher)),
+        ),
+        apiBaseUrls = baseUrls,
+    )
+
     @Test
     fun `starts on the local environment and shows its URL`() = runTest {
-        val viewModel = DeveloperOptionsViewModel(FakeApiEnvironmentRepository(), baseUrls)
+        val viewModel = viewModel(FakeApiEnvironmentRepository())
 
         viewModel.uiState.test {
             val state = awaitItem()
@@ -34,7 +46,7 @@ class DeveloperOptionsViewModelTest {
     @Test
     fun `turning remote on stores it and shows the remote URL`() = runTest {
         val repository = FakeApiEnvironmentRepository()
-        val viewModel = DeveloperOptionsViewModel(repository, baseUrls)
+        val viewModel = viewModel(repository)
 
         viewModel.uiState.test {
             assertThat(awaitItem().isRemote).isFalse()
@@ -52,7 +64,7 @@ class DeveloperOptionsViewModelTest {
     @Test
     fun `turning remote off goes back to local`() = runTest {
         val repository = FakeApiEnvironmentRepository(ApiEnvironment.REMOTE)
-        val viewModel = DeveloperOptionsViewModel(repository, baseUrls)
+        val viewModel = viewModel(repository)
 
         viewModel.uiState.test {
             // Seeded with the default before the repository flow is collected.
