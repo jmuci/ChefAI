@@ -10,8 +10,13 @@ import com.tenmilelabs.recipescraper.util.collapseWhitespace
  * necessarily heuristic. It is built to degrade rather than guess: anything it cannot confidently
  * split comes back with a null quantity and unit and the whole line as the name, which a UI can
  * still display correctly. It never throws.
+ *
+ * [language] (ISO 639-1, as detected for the page) only switches on connector words: Spanish
+ * ranges (`"2 a 3"`), the `de` between a unit and its ingredient (`"200 g de harina"`), and whether a
+ * bare `c` means cup. Unit words themselves are recognised in English and Spanish whatever the
+ * language, since they never collide — so a wrong or missing language costs little.
  */
-internal fun parseIngredient(raw: String): ScrapedIngredient {
+internal fun parseIngredient(raw: String, language: String? = null): ScrapedIngredient {
     val text = raw.trim().collapseWhitespace()
     if (text.isEmpty()) return ScrapedIngredient(raw = raw, quantity = null, unit = null, name = "")
 
@@ -35,7 +40,7 @@ internal fun parseIngredient(raw: String): ScrapedIngredient {
 
         // A spelled-out range ("2 to 3 tablespoons") — keep the lower bound, drop the rest.
         if (index + 1 < tokens.size &&
-            tokens[index].lowercase() in RANGE_WORDS &&
+            tokens[index].lowercase() in rangeWords(language) &&
             parseNumber(tokens[index + 1]) != null
         ) {
             index += 2
@@ -46,7 +51,7 @@ internal fun parseIngredient(raw: String): ScrapedIngredient {
     } else {
         // Metric sites — Spanish and French ones especially — routinely fuse the amount and the
         // unit into a single token: "300g Garbanzos".
-        splitFusedAmountAndUnit(tokens[0])?.let { (amount, fusedUnit) ->
+        splitFusedAmountAndUnit(tokens[0], language)?.let { (amount, fusedUnit) ->
             quantity = amount
             unit = fusedUnit
             index = skipParenthetical(tokens, 1)
@@ -57,7 +62,7 @@ internal fun parseIngredient(raw: String): ScrapedIngredient {
     // part of the name ("Salt to taste") than a unit. A fused token already supplied one, and
     // re-running this would swallow the first word of the name as a second unit.
     if (quantity != null && unit == null && index < tokens.size) {
-        normalizeUnit(tokens[index])?.let { matched ->
+        normalizeUnit(tokens[index], language)?.let { matched ->
             unit = matched
             index = skipParenthetical(tokens, index + 1)
         }
@@ -67,6 +72,7 @@ internal fun parseIngredient(raw: String): ScrapedIngredient {
         .joinToString(" ")
         .removePrefix("of ")
         .removePrefix("Of ")
+        .let { if (language == "es" && quantity != null) it.removeSpanishConnector() else it }
         .trim()
         // A line that was nothing but an amount still needs a usable label.
         .ifEmpty { text }
@@ -81,11 +87,11 @@ internal fun parseIngredient(raw: String): ScrapedIngredient {
  * Deliberately conservative: the trailing part must normalise to a *known* unit, so pan sizes
  * (`"9x13"`), multipliers (`"1x"`) and product codes (`"1A"`) fall through untouched.
  */
-private fun splitFusedAmountAndUnit(token: String): Pair<Double, String>? {
+private fun splitFusedAmountAndUnit(token: String, language: String?): Pair<Double, String>? {
     val splitAt = token.indexOfFirst { it.isLetter() }
     if (splitAt <= 0) return null
     val amount = parseNumber(token.substring(0, splitAt)) ?: return null
-    val unit = normalizeUnit(token.substring(splitAt)) ?: return null
+    val unit = normalizeUnit(token.substring(splitAt), language) ?: return null
     return amount to unit
 }
 
@@ -153,18 +159,38 @@ private fun parseSingleNumber(text: String): Double? {
  *
  * Single-letter forms are matched case-sensitively first, because `T` (tablespoon) and `t`
  * (teaspoon) are distinguished only by case in recipe shorthand.
+ *
+ * A bare `c` is English shorthand for cup, and only read that way on English (or undetected)
+ * pages — French writes `c.` for cuillère, and on a Spanish page it is never a unit.
  */
-private fun normalizeUnit(token: String): String? {
+private fun normalizeUnit(token: String, language: String?): String? {
     val bare = token.trim().trimEnd('.', ',')
     if (bare.isEmpty()) return null
     CASE_SENSITIVE_UNITS[bare]?.let { return it }
-    return UNITS[bare.lowercase()]
+    val key = bare.lowercase()
+    if (key == "c") return if (language == null || language == "en") "cup" else null
+    return UNITS[key]
 }
+
+/** Drops the `de` that joins a Spanish unit to its ingredient: `"de harina"` → `"harina"`. */
+private fun String.removeSpanishConnector(): String {
+    val prefix = SPANISH_CONNECTORS.firstOrNull { startsWith(it, ignoreCase = true) } ?: return this
+    return substring(prefix.length)
+}
+
+private fun rangeWords(language: String?): Set<String> =
+    if (language == "es") RANGE_WORDS + SPANISH_RANGE_WORDS else RANGE_WORDS
 
 private val DASHES = listOf('-', '–', '—')
 
 // Dashes too, for ranges written with spaces around them ("1 - 2 tablespoons").
 private val RANGE_WORDS = setOf("to", "or", "-", "–", "—")
+
+// "2 a 3 cucharadas", "1 o 2 dientes". Gated on language: in English, "a" starts the name.
+private val SPANISH_RANGE_WORDS = setOf("a", "o")
+
+// Longest first, so "de la salsa" loses "de la " rather than just "de ".
+private val SPANISH_CONNECTORS = listOf("de la ", "del ", "de ")
 
 private val VULGAR_FRACTIONS: Map<Char, Double> = mapOf(
     '½' to 0.5,          // ½
@@ -197,7 +223,8 @@ private val UNITS: Map<String, String> = buildMap {
         put(canonical, canonical)
         synonyms.forEach { put(it, canonical) }
     }
-    unit("cup", "cups", "c")
+    // English and metric. A bare "c" (cup) is handled in normalizeUnit, gated on language.
+    unit("cup", "cups")
     unit("tbsp", "tbsps", "tablespoon", "tablespoons", "tbs", "tbl", "tblsp")
     unit("tsp", "tsps", "teaspoon", "teaspoons")
     unit("oz", "ounce", "ounces")
@@ -224,4 +251,24 @@ private val UNITS: Map<String, String> = buildMap {
     unit("handful", "handfuls")
     unit("piece", "pieces")
     unit("sheet", "sheets")
+
+    // Spanish, mapped onto the same canonical forms.
+    unit("cup", "taza", "tazas")
+    unit("tbsp", "cucharada", "cucharadas", "cda", "cdas")
+    unit("tsp", "cucharadita", "cucharaditas", "cdta", "cdtas", "cdita", "cditas")
+    unit("g", "gramo", "gramos", "grs")
+    unit("kg", "kilogramo", "kilogramos")
+    unit("ml", "mililitro", "mililitros")
+    unit("l", "litro", "litros")
+    unit("pinch", "pizca", "pizcas")
+    unit("clove", "diente", "dientes")
+    unit("slice", "rebanada", "rebanadas", "loncha", "lonchas")
+    unit("can", "lata", "latas")
+    unit("jar", "bote", "botes", "frasco", "frascos")
+    unit("package", "paquete", "paquetes", "sobre", "sobres")
+    unit("sprig", "ramita", "ramitas")
+    unit("bunch", "manojo", "manojos")
+    unit("head", "cabeza", "cabezas")
+    unit("handful", "puñado", "puñados")
+    unit("piece", "pieza", "piezas")
 }

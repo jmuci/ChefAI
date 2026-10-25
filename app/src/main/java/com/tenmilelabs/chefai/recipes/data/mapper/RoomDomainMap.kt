@@ -41,6 +41,7 @@ fun RecipeWithDetails.toDomain(ingredients: List<RecipeIngredient> = emptyList()
         servings = recipe.servings,
         caloriesPerServing = recipe.caloriesPerServing,
         proteinGramsPerServing = recipe.proteinGramsPerServing,
+        languageCode = recipe.language,
         creator = creator.toDomain(),
         recipeExternalUrl = recipe.recipeExternalUrl,
         privacy = recipe.privacy,
@@ -156,6 +157,7 @@ fun Recipe.toRoomEntity(): RecipeEntity = RecipeEntity(
     // applies to every field here.
     caloriesPerServing = caloriesPerServing,
     proteinGramsPerServing = proteinGramsPerServing,
+    language = languageCode,
     creatorId = creator.uuid,
     recipeExternalUrl = recipeExternalUrl,
     privacy = privacy,

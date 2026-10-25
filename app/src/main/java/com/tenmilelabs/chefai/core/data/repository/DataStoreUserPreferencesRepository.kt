@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.tenmilelabs.chefai.core.data.local.prefs.userPreferencesDataStore
+import com.tenmilelabs.chefai.core.domain.model.RecipeLanguage
 import com.tenmilelabs.chefai.core.domain.model.WeekStart
 import com.tenmilelabs.chefai.core.domain.repository.UserPreferencesRepository
 import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import timber.log.Timber
 import java.io.IOException
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -46,9 +48,21 @@ class DataStoreUserPreferencesRepository @Inject constructor(
         context.userPreferencesDataStore.edit { it[KEY_MEASUREMENT_SYSTEM] = system.name }
     }
 
+    override val fallbackRecipeLanguage: Flow<RecipeLanguage> = preferences.map { prefs ->
+        RecipeLanguage.fromCode(prefs[KEY_FALLBACK_RECIPE_LANGUAGE])
+            ?: RecipeLanguage.forDeviceLanguage(Locale.getDefault().language)
+    }
+
+    override suspend fun setFallbackRecipeLanguage(language: RecipeLanguage) {
+        context.userPreferencesDataStore.edit { it[KEY_FALLBACK_RECIPE_LANGUAGE] = language.code }
+    }
+
     private companion object {
         /** Stored by [MeasurementSystem.name], so reordering the enum can never re-map a choice. */
         val KEY_MEASUREMENT_SYSTEM = stringPreferencesKey("measurement_system")
+
+        /** Stored by [RecipeLanguage.code] — the same ISO 639-1 code recipes themselves store. */
+        val KEY_FALLBACK_RECIPE_LANGUAGE = stringPreferencesKey("fallback_recipe_language")
         val KEY_WEEK_START = stringPreferencesKey("week_start")
     }
 }

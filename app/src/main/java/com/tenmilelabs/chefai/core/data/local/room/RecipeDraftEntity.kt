@@ -27,6 +27,10 @@ data class RecipeDraftEntity(
     val caloriesPerServing: String,
     /** Form-input string for [com.tenmilelabs.chefai.core.domain.model.Recipe.proteinGramsPerServing]; blank means not entered. */
     val proteinGramsPerServing: String,
+    /** See [com.tenmilelabs.chefai.recipes.domain.model.RecipeDraft.languageCode]. */
+    val language: String?,
+    /** See [com.tenmilelabs.chefai.recipes.domain.model.RecipeDraft.languageNeedsConfirmation]. */
+    val languageNeedsConfirmation: Boolean,
     val externalUrl: String,
     val privacy: RecipePrivacy,
     val ingredientsJson: String,

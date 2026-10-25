@@ -13,6 +13,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_6_7
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_7_8
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_8_9
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_9_10
+import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_10_11
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -457,13 +458,59 @@ class ChefAIDatabaseMigrationTest {
     }
 
     @Test
-    fun migrateAll1To10_succeeds() {
+    fun migrate10To11_addsLanguageUnknownOnRecipesAndUnflaggedOnDrafts() {
+        val recipeId = UUID.randomUUID()
+        val draftId = UUID.randomUUID()
+
+        helper.createDatabase(TEST_DB, 10).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO recipes (
+                    uuid, title, description, imageUrl, imageUrlThumbnail, localImagePath,
+                    prepTimeMinutes, cookTimeMinutes, servings, creatorId, recipeExternalUrl,
+                    privacy, version, updatedAt, deletedAt, syncState
+                ) VALUES (?, 'Carbonara', 'Classic', 'https://example.com/x.jpg',
+                    'https://example.com/x.jpg', NULL, 10, 20, 2, ?, NULL,
+                    'PUBLIC', 1, 555, NULL, 'SYNCED')
+                """.trimIndent(),
+                arrayOf(recipeId.toBlob(), UUID.randomUUID().toBlob())
+            )
+            db.execSQL(
+                """
+                INSERT INTO recipe_drafts (
+                    recipeId, isNewRecipe, title, description, imageUrl, localImagePath,
+                    prepTimeMinutes, cookTimeMinutes, servings, caloriesPerServing,
+                    proteinGramsPerServing, externalUrl, privacy, ingredientsJson, stepsJson,
+                    tagsJson, labelsJson, version, updatedAt
+                ) VALUES (?, 1, 'Carbonara', 'Classic', 'https://example.com/x.jpg', NULL,
+                    '10', '20', '2', '', '', '', 'PUBLIC', '[]', '[]', '[]', '[]', 1, 555)
+                """.trimIndent(),
+                arrayOf(draftId.toBlob())
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 11, true, MIGRATION_10_11)
+
+        db.query("SELECT title, language FROM recipes").use { cursor ->
+            assertTrue("the pre-existing recipe should survive the migration", cursor.moveToFirst())
+            assertEquals("Carbonara", cursor.getString(0))
+            assertTrue("a recipe saved before languages were tracked has an unknown language", cursor.isNull(1))
+        }
+        db.query("SELECT language, languageNeedsConfirmation FROM recipe_drafts").use { cursor ->
+            assertTrue("the pre-existing draft should survive the migration", cursor.moveToFirst())
+            assertTrue(cursor.isNull(0))
+            assertEquals("an old draft never came from a language-aware import", 0, cursor.getInt(1))
+        }
+    }
+
+    @Test
+    fun migrateAll1To11_succeeds() {
         helper.createDatabase(TEST_DB, 1).close()
 
         helper.runMigrationsAndValidate(
-            TEST_DB, 10, true,
+            TEST_DB, 11, true,
             MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
         )
     }
 }

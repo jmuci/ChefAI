@@ -75,6 +75,8 @@ object RecipeEditorReducer {
             recipeFields = state.recipeFields.copy(privacy = action.privacy)
         ).markDirty()
 
+        is EditorAction.LanguageSelected -> state.withConfirmedLanguage(action.code)
+
         // localImagePath is cleared alongside the field it was cached for — otherwise the user
         // keeps seeing the stale on-device copy from before their edit.
         is EditorAction.ImageUrlChanged -> state.copy(
@@ -280,6 +282,19 @@ object RecipeEditorReducer {
         is EditorAction.DismissDeleteDialog -> state.copy(showDeleteConfirmation = false)
         is EditorAction.ClearError -> state.copy(saveError = null)
 
+        // --- Language prompt (opened by the ViewModel, which knows the fallback language) ---
+
+        is EditorAction.LanguagePromptSelectionChanged -> state.copy(
+            languagePrompt = state.languagePrompt?.copy(selectedCode = action.code)
+        )
+
+        // The ViewModel carries on with a save the prompt interrupted (LanguagePrompt.saveOnConfirm).
+        is EditorAction.LanguagePromptConfirmed -> state.languagePrompt
+            ?.let { prompt -> state.withConfirmedLanguage(prompt.selectedCode).copy(languagePrompt = null) }
+            ?: state
+
+        is EditorAction.LanguagePromptDismissed -> state.copy(languagePrompt = null)
+
         // Save, ConfirmDelete, DiscardDraft: handled by ViewModel, no state change here
         is EditorAction.Save,
         is EditorAction.ConfirmDelete,
@@ -309,6 +324,10 @@ object RecipeEditorReducer {
      * - Create mode: dirty if any required field is non-empty.
      * - Edit mode: dirty if current fields differ from [originalDraft].
      */
+    private fun RecipeEditorState.withConfirmedLanguage(code: String): RecipeEditorState = copy(
+        recipeFields = recipeFields.copy(languageCode = code, languageNeedsConfirmation = false)
+    ).markDirty()
+
     private fun RecipeEditorState.markDirty(): RecipeEditorState {
         if (originalDraft == null) {
             // Create mode
@@ -340,6 +359,8 @@ fun RecipeEditorState.toRecipeDraft(): RecipeDraft = RecipeDraft(
     servings = recipeFields.servings,
     caloriesPerServing = recipeFields.caloriesPerServing,
     proteinGramsPerServing = recipeFields.proteinGramsPerServing,
+    languageCode = recipeFields.languageCode,
+    languageNeedsConfirmation = recipeFields.languageNeedsConfirmation,
     externalUrl = recipeFields.externalUrl,
     privacy = recipeFields.privacy,
     ingredients = ingredients.selectedIngredients,

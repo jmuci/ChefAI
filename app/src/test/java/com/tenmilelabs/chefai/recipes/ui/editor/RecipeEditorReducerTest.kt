@@ -244,6 +244,87 @@ class RecipeEditorReducerTest {
         assertEquals(RecipePrivacy.PUBLIC, state.toRecipeDraft().privacy)
     }
 
+    // --- Language ---
+
+    @Test
+    fun `LanguageSelected sets the language and counts as confirming it`() {
+        val state = emptyState.copy(
+            recipeFields = RecipeFields(languageCode = "en", languageNeedsConfirmation = true)
+        )
+
+        val result = RecipeEditorReducer.reduce(state, EditorAction.LanguageSelected("es"))
+
+        assertEquals("es", result.recipeFields.languageCode)
+        assertFalse(result.recipeFields.languageNeedsConfirmation)
+    }
+
+    @Test
+    fun `LanguageSelected marks dirty in edit mode`() {
+        val recipeId = UUID.randomUUID()
+        val originalDraft = RecipeDraft(recipeId = recipeId, isNewRecipe = false, title = "Pasta", languageCode = "en")
+        val state = emptyState.copy(
+            mode = EditorMode.Edit(recipeId),
+            recipeId = recipeId,
+            recipeFields = RecipeFields(title = "Pasta", languageCode = "en"),
+            originalDraft = originalDraft,
+        )
+
+        assertTrue(RecipeEditorReducer.reduce(state, EditorAction.LanguageSelected("es")).isDirty)
+    }
+
+    @Test
+    fun `prompt selection changes only the ticked language, not the recipe`() {
+        val state = emptyState.copy(
+            recipeFields = RecipeFields(languageCode = "en", languageNeedsConfirmation = true),
+            languagePrompt = LanguagePrompt(selectedCode = "en", saveOnConfirm = false),
+        )
+
+        val result = RecipeEditorReducer.reduce(state, EditorAction.LanguagePromptSelectionChanged("es"))
+
+        assertEquals("es", result.languagePrompt?.selectedCode)
+        assertEquals("en", result.recipeFields.languageCode)
+        assertTrue(result.recipeFields.languageNeedsConfirmation)
+    }
+
+    @Test
+    fun `confirming the prompt applies the ticked language and closes it`() {
+        val state = emptyState.copy(
+            recipeFields = RecipeFields(languageCode = "en", languageNeedsConfirmation = true),
+            languagePrompt = LanguagePrompt(selectedCode = "es", saveOnConfirm = false),
+        )
+
+        val result = RecipeEditorReducer.reduce(state, EditorAction.LanguagePromptConfirmed)
+
+        assertEquals("es", result.recipeFields.languageCode)
+        assertFalse(result.recipeFields.languageNeedsConfirmation)
+        assertEquals(null, result.languagePrompt)
+    }
+
+    @Test
+    fun `dismissing the prompt keeps the guess unconfirmed`() {
+        val state = emptyState.copy(
+            recipeFields = RecipeFields(languageCode = "es", languageNeedsConfirmation = true),
+            languagePrompt = LanguagePrompt(selectedCode = "en", saveOnConfirm = false),
+        )
+
+        val result = RecipeEditorReducer.reduce(state, EditorAction.LanguagePromptDismissed)
+
+        assertEquals(null, result.languagePrompt)
+        assertEquals("es", result.recipeFields.languageCode)
+        assertTrue(result.recipeFields.languageNeedsConfirmation)
+    }
+
+    @Test
+    fun `toRecipeDraft carries the language and its confirmation flag`() {
+        // Autosave goes through toRecipeDraft — dropping these would lose the import's language.
+        val state = emptyState.copy(
+            recipeFields = RecipeFields(languageCode = "es", languageNeedsConfirmation = true)
+        )
+        val draft = state.toRecipeDraft()
+        assertEquals("es", draft.languageCode)
+        assertTrue(draft.languageNeedsConfirmation)
+    }
+
     // --- Ingredients ---
 
     @Test

@@ -397,6 +397,24 @@
     <string name="settings_week_start_monday">Monday</string>
     <string name="settings_week_start_sunday">Sunday</string>
     <string name="settings_menu_item">Settings</string>
+    <string name="settings_recipe_language_title">Recipe language</string>
+    <string name="settings_recipe_language_subtitle">Assumed for recipes you write yourself, and suggested first when an imported recipe\'s language can\'t be told from the page.</string>
+    <string name="settings_recipe_language_footnote">Imports in other languages still work. You\'ll be asked to confirm whenever a recipe\'s language is only a guess.</string>
+    <!-- Each language's name in its own language, so these are deliberately not translated. -->
+    <string name="recipe_language_en" translatable="false">English</string>
+    <string name="recipe_language_es" translatable="false">Español</string>
+    <string name="recipe_language_fr" translatable="false">Français</string>
+    <string name="recipe_language_it" translatable="false">Italiano</string>
+    <string name="recipe_language_pt" translatable="false">Português</string>
+    <string name="recipe_language_de" translatable="false">Deutsch</string>
+    <string name="section_language">Language</string>
+    <string name="recipe_language_not_set">Not set. Pick the language this recipe is written in.</string>
+    <string name="recipe_language_unconfirmed">A guess from the page. Pick a language to confirm it.</string>
+    <string name="recipe_language_other">Other (%1$s)</string>
+    <string name="language_prompt_title">What language is this recipe in?</string>
+    <string name="language_prompt_message">The page didn\'t make it clear. Knowing helps read the ingredients correctly.</string>
+    <string name="language_prompt_confirm">Confirm</string>
+    <string name="language_prompt_not_now">Not now</string>
 
     <!-- Header / shell -->
     <string name="header_navigate_back">Back</string>

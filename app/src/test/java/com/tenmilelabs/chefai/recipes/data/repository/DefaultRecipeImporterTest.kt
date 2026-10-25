@@ -30,6 +30,15 @@ private const val JSON_LD_RECIPE_HTML = """
     </head><body></body></html>
 """
 
+// Too little text for the parser to tell the language on its own, so only a header can supply it.
+private const val TERSE_RECIPE_HTML = """
+    <html><head>
+    <script type="application/ld+json">
+    {"@type": "Recipe", "name": "Gazpacho", "recipeIngredient": ["1 kg tomates"]}
+    </script>
+    </head><body></body></html>
+"""
+
 private const val NO_RECIPE_HTML = "<html><body><h1>Just a blog post</h1></body></html>"
 
 class DefaultRecipeImporterTest {
@@ -65,6 +74,35 @@ class DefaultRecipeImporterTest {
         val flourIngredient = success.draft.ingredients.find { it.ingredientDisplayName.equals("flour", ignoreCase = true) }
         assertThat(flourIngredient).isNotNull()
         assertThat(flourIngredient!!.ingredientId).isEqualTo(testIngredients.first { it.displayName == "Flour" }.uuid)
+    }
+
+    @Test
+    fun `passes the Content-Language header to the parser as a language signal`() = runTest {
+        val engine = MockEngine { _ ->
+            respond(
+                content = ByteReadChannel(TERSE_RECIPE_HTML),
+                status = HttpStatusCode.OK,
+                headers = headersOf(
+                    HttpHeaders.ContentType to listOf("text/html"),
+                    HttpHeaders.ContentLanguage to listOf("es-ES"),
+                ),
+            )
+        }
+
+        val draft = (importer(engine).import("https://example.com/gazpacho") as? RecipeImportResult.Success)?.draft
+
+        assertThat(draft?.languageCode).isEqualTo("es")
+        // A header alone is page-level: kept as the guess, but the user is asked.
+        assertThat(draft?.languageNeedsConfirmation).isTrue()
+    }
+
+    @Test
+    fun `leaves the language unknown when no signal names one`() = runTest {
+        val draft = (importer(htmlEngine(TERSE_RECIPE_HTML)).import("https://example.com/gazpacho")
+            as? RecipeImportResult.Success)?.draft
+
+        assertThat(draft?.languageCode).isNull()
+        assertThat(draft?.languageNeedsConfirmation).isTrue()
     }
 
     @Test

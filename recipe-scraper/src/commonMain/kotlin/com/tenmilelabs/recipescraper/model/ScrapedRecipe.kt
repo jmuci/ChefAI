@@ -27,6 +27,10 @@ package com.tenmilelabs.recipescraper.model
  * @property keywords tags, cuisines and categories the page declared, deduplicated.
  * @property author the recipe author's name.
  * @property sourceUrl the URL this recipe was extracted from, as supplied by the caller.
+ * @property language the language the recipe is written in, or `null` when no signal was strong
+ *   enough to name one. On a recipe returned by [com.tenmilelabs.recipescraper.RecipeHtmlParser]
+ *   this is the final verdict over the page's markup and text; check its
+ *   [DetectedLanguage.confidence] before trusting it without asking the user.
  */
 data class ScrapedRecipe(
     val title: String,
@@ -43,4 +47,5 @@ data class ScrapedRecipe(
     val keywords: List<String>,
     val author: String?,
     val sourceUrl: String,
+    val language: DetectedLanguage? = null,
 )

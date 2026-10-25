@@ -1,5 +1,10 @@
 package com.tenmilelabs.chefai.recipes.data.mapper
 
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
+import com.tenmilelabs.recipescraper.model.LanguageSource
+import com.tenmilelabs.recipescraper.model.LanguageConfidence
+import com.tenmilelabs.recipescraper.model.DetectedLanguage
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.Ingredient
 import com.tenmilelabs.chefai.core.domain.model.Tag
@@ -33,6 +38,7 @@ class ScrapedRecipeMapperTest {
         keywords: List<String> = emptyList(),
         author: String? = "A Cook",
         sourceUrl: String = "https://example.com/recipe",
+        language: DetectedLanguage? = null,
     ) = ScrapedRecipe(
         title = title,
         description = description,
@@ -48,6 +54,7 @@ class ScrapedRecipeMapperTest {
         keywords = keywords,
         author = author,
         sourceUrl = sourceUrl,
+        language = language,
     )
 
     @Test
@@ -300,5 +307,35 @@ class ScrapedRecipeMapperTest {
         // calories/protein must stay blank-safe here too, since RecipeDraft.toRecipe() parses them
         // with toIntOrNull(), not toInt().
         draft.toRecipe(testUser)
+    }
+
+    // --- Language ---
+
+    @Test
+    fun `a confidently detected language needs no confirmation`() {
+        val draft = minimalScrapedRecipe(
+            language = DetectedLanguage("es", LanguageConfidence.HIGH, LanguageSource.JSON_LD),
+        ).toRecipeDraft(UUID.randomUUID(), emptyList(), emptyList())
+
+        assertEquals("es", draft.languageCode)
+        assertFalse(draft.languageNeedsConfirmation)
+    }
+
+    @Test
+    fun `a low-confidence language is kept as the guess but flagged for confirmation`() {
+        val draft = minimalScrapedRecipe(
+            language = DetectedLanguage("es", LanguageConfidence.LOW, LanguageSource.TEXT),
+        ).toRecipeDraft(UUID.randomUUID(), emptyList(), emptyList())
+
+        assertEquals("es", draft.languageCode)
+        assertTrue(draft.languageNeedsConfirmation)
+    }
+
+    @Test
+    fun `an undetected language is flagged for confirmation`() {
+        val draft = minimalScrapedRecipe(language = null).toRecipeDraft(UUID.randomUUID(), emptyList(), emptyList())
+
+        assertNull(draft.languageCode)
+        assertTrue(draft.languageNeedsConfirmation)
     }
 }

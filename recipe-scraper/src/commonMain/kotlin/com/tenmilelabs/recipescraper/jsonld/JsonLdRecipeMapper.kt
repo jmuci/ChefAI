@@ -1,6 +1,10 @@
 package com.tenmilelabs.recipescraper.jsonld
 
 import com.tenmilelabs.recipescraper.ingredient.parseIngredient
+import com.tenmilelabs.recipescraper.language.normalizeLanguageTag
+import com.tenmilelabs.recipescraper.model.DetectedLanguage
+import com.tenmilelabs.recipescraper.model.LanguageConfidence
+import com.tenmilelabs.recipescraper.model.LanguageSource
 import com.tenmilelabs.recipescraper.model.ScrapedIngredient
 import com.tenmilelabs.recipescraper.model.ScrapedRecipe
 import com.tenmilelabs.recipescraper.util.cleanHtmlText
@@ -46,10 +50,23 @@ internal fun mapJsonLdRecipe(obj: JsonObject, sourceUrl: String): ScrapedRecipe?
         keywords = obj.keywords(),
         author = obj["author"]?.firstAuthorNameOrNull(),
         sourceUrl = sourceUrl,
+        // Provisional: RecipeHtmlParser weighs this against the page's other signals.
+        language = normalizeLanguageTag(obj["inLanguage"]?.languageTagOrNull())
+            ?.let { DetectedLanguage(it, LanguageConfidence.HIGH, LanguageSource.JSON_LD) },
     )
 }
 
 internal fun JsonObject.stringOrNull(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
+
+/**
+ * `inLanguage` as schema.org allows it: a bare tag (`"es-ES"`), or a `Language` object carrying
+ * the tag in `alternateName`. An array is read for its first entry.
+ */
+private fun JsonElement.languageTagOrNull(): String? = when (this) {
+    is JsonArray -> firstNotNullOfOrNull { it.languageTagOrNull() }
+    is JsonObject -> stringOrNull("alternateName")
+    is JsonPrimitive -> contentOrNull
+}
 
 private fun JsonElement.firstImageUrlOrNull(): String? = when (this) {
     is JsonArray -> firstNotNullOfOrNull { it.firstImageUrlOrNull() }

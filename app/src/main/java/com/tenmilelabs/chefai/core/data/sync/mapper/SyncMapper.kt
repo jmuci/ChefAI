@@ -47,6 +47,7 @@ fun RecipeEntity.toSyncDto(
     prepTimeMinutes = prepTimeMinutes,
     cookTimeMinutes = cookTimeMinutes,
     servings = servings,
+    language = language,
     creatorId = creatorId.toString(),
     recipeExternalUrl = recipeExternalUrl,
     privacy = privacy.name,
@@ -113,11 +114,16 @@ fun SyncIngredientDto.toIngredientEntity(): IngredientEntity = IngredientEntity(
  *
  * `imageBlobId` needs no such threading: it is server-owned, so the DTO's value is by definition
  * the authoritative one (ADR-011 / Stage 2 D1).
+ *
+ * [existingLanguage] is a fallback, not a passthrough: the DTO's `language` wins when present, but
+ * a `null` one — from a backend that doesn't store languages yet — keeps whatever this device had.
+ * The cost is that no device can clear a language back to unknown, which nothing needs to do.
  */
 fun SyncRecipeDto.toRecipeEntity(
     localImagePath: String?,
     caloriesPerServing: Int? = null,
     proteinGramsPerServing: Int? = null,
+    existingLanguage: String? = null,
 ): RecipeEntity = RecipeEntity(
     uuid = UUID.fromString(uuid),
     title = title,
@@ -131,6 +137,7 @@ fun SyncRecipeDto.toRecipeEntity(
     servings = servings,
     caloriesPerServing = caloriesPerServing,
     proteinGramsPerServing = proteinGramsPerServing,
+    language = language ?: existingLanguage,
     creatorId = UUID.fromString(creatorId),
     recipeExternalUrl = recipeExternalUrl,
     privacy = RecipePrivacy.valueOf(privacy.uppercase()),

@@ -65,7 +65,7 @@ class DefaultRecipeImporter @Inject constructor(
         val fetched = fetchHtml(normalizedUrl)
         val httpResult = when (fetched) {
             is FetchOutcome.Failure -> fetched.error
-            is FetchOutcome.Html -> importFromHtml(fetched.body, normalizedUrl)
+            is FetchOutcome.Html -> importParsed(fetched.body, normalizedUrl, fetched.contentLanguage)
         }
 
         // A plain GET is enough for the large majority of recipe sites. Exactly two shapes of
@@ -93,8 +93,16 @@ class DefaultRecipeImporter @Inject constructor(
     }
 
     override suspend fun importFromHtml(html: String, url: String): RecipeImportResult =
+        importParsed(html, url, contentLanguage = null)
+
+    /**
+     * [contentLanguage] is the HTTP `Content-Language` header, when this importer fetched the page
+     * itself — the weakest of the parser's language signals. The rendered and visible-browser paths
+     * have no response headers, and don't need them: `<html lang>` survives in the DOM snapshot.
+     */
+    private suspend fun importParsed(html: String, url: String, contentLanguage: String?): RecipeImportResult =
         withContext(ioDispatcher) {
-            when (val scrapeResult = recipeHtmlParser.parse(html, url)) {
+            when (val scrapeResult = recipeHtmlParser.parse(html, url, contentLanguage)) {
                 is ScrapeResult.Success -> {
                     val knownIngredients = metadataRepository.observeAllIngredients().first()
                     val knownTags = metadataRepository.observeAllTags().first()
@@ -112,7 +120,7 @@ class DefaultRecipeImporter @Inject constructor(
         }
 
     private sealed interface FetchOutcome {
-        data class Html(val body: String) : FetchOutcome
+        data class Html(val body: String, val contentLanguage: String? = null) : FetchOutcome
 
         /**
          * @property looksLikeBotWall the server answered, and answered with a refusal rather than
@@ -165,7 +173,10 @@ class DefaultRecipeImporter @Inject constructor(
             ) {
                 FetchOutcome.Failure(RecipeImportResult.NetworkError("Not an HTML page"))
             } else {
-                FetchOutcome.Html(response.readBodyCapped(contentType?.charset()))
+                FetchOutcome.Html(
+                    body = response.readBodyCapped(contentType?.charset()),
+                    contentLanguage = response.headers[HttpHeaders.ContentLanguage],
+                )
             }
             FetchStep.Terminal(outcome)
         }

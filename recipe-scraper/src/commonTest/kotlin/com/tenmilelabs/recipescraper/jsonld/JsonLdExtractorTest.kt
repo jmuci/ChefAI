@@ -1,6 +1,9 @@
 package com.tenmilelabs.recipescraper.jsonld
 
 import com.fleeksoft.ksoup.Ksoup
+import com.tenmilelabs.recipescraper.model.DetectedLanguage
+import com.tenmilelabs.recipescraper.model.LanguageConfidence
+import com.tenmilelabs.recipescraper.model.LanguageSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -143,5 +146,22 @@ class JsonLdExtractorTest {
             listOf("1 cup sugar", "2 eggs", "1 tsp vanilla"),
             recipe?.ingredients?.map { it.raw },
         )
+    }
+
+    @Test
+    fun `leaves the recipe's declared inLanguage as a provisional language`() {
+        val recipe = extract(JsonLdFixtures.SPANISH_RECIPE)
+
+        assertEquals(DetectedLanguage("es", LanguageConfidence.HIGH, LanguageSource.JSON_LD), recipe?.language)
+    }
+
+    @Test
+    fun `reads inLanguage published as a Language object`() {
+        assertEquals("es", extract(JsonLdFixtures.LANGUAGE_OBJECT)?.language?.code)
+    }
+
+    @Test
+    fun `leaves language null when the recipe declares none`() {
+        assertNull(extract(JsonLdFixtures.PLAIN_OBJECT)?.language)
     }
 }

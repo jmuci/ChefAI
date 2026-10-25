@@ -7,6 +7,7 @@ import com.tenmilelabs.chefai.core.domain.model.Ingredient
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
 import com.tenmilelabs.chefai.recipes.domain.model.RecipeDraft
+import com.tenmilelabs.recipescraper.model.LanguageConfidence
 import com.tenmilelabs.recipescraper.model.ScrapedIngredient
 import com.tenmilelabs.recipescraper.model.ScrapedRecipe
 import java.net.URI
@@ -33,6 +34,9 @@ private const val DEFAULT_UNIT = "unit"
  * when the page didn't publish them: unlike prep/cook time and servings, they're optional and
  * never block [RecipeDraft.toRecipe] — the same "blank means not entered" convention manual entry
  * already uses (see [com.tenmilelabs.chefai.core.domain.model.Recipe.caloriesPerServing]).
+ *
+ * The scraper's language verdict is carried over as-is, and anything short of a confident one —
+ * no language at all, or a `LOW`-confidence guess — flags the draft for the editor to confirm.
  */
 fun ScrapedRecipe.toRecipeDraft(
     recipeId: UUID,
@@ -49,6 +53,8 @@ fun ScrapedRecipe.toRecipeDraft(
     servings = servings?.toString() ?: "0",
     caloriesPerServing = caloriesPerServing?.toString().orEmpty(),
     proteinGramsPerServing = proteinGramsPerServing?.toString().orEmpty(),
+    languageCode = language?.code,
+    languageNeedsConfirmation = language?.confidence != LanguageConfidence.HIGH,
     externalUrl = sourceUrl,
     privacy = RecipePrivacy.PUBLIC,
     ingredients = ingredients.toRecipeIngredients(knownIngredients),

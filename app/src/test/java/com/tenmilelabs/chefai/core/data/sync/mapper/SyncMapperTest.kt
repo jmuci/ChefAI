@@ -14,6 +14,7 @@ import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncGroceryListItem
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeIngredientDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncRecipeStepDto
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Test
@@ -468,5 +469,39 @@ class SyncMapperTest {
         val entity = dto.toEntity()
 
         assertThat(entity.checkedBy).isNull()
+    }
+
+    // --- Language ---
+
+    @Test
+    fun `toSyncDto sends the recipe's language`() {
+        val dto = recipeEntity.copy(language = "es")
+            .toSyncDto(stepEntities, ingredientEntities, tagCrossRefs, labelCrossRefs)
+
+        assertThat(dto.language).isEqualTo("es")
+    }
+
+    @Test
+    fun `toRecipeEntity prefers the language on the wire`() {
+        val entity = syncRecipeDto.copy(language = "es")
+            .toRecipeEntity(localImagePath = null, existingLanguage = "en")
+
+        assertThat(entity.language).isEqualTo("es")
+    }
+
+    @Test
+    fun `toRecipeEntity keeps the local language when the server sends none`() {
+        // A backend that predates language tracking omits the field; that must not erase it.
+        val entity = syncRecipeDto.copy(language = null)
+            .toRecipeEntity(localImagePath = null, existingLanguage = "es")
+
+        assertThat(entity.language).isEqualTo("es")
+    }
+
+    @Test
+    fun `a SyncRecipeDto without a language field still deserialises`() {
+        val json = Json.encodeToString(syncRecipeDto.copy(language = "es")).replace(",\"language\":\"es\"", "")
+
+        assertThat(Json.decodeFromString<SyncRecipeDto>(json).language).isNull()
     }
 }

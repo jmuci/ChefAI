@@ -24,7 +24,7 @@ rendered DOM back into this same parser. See
 
 ```kotlin
 class RecipeHtmlParser {
-    fun parse(html: String, sourceUrl: String): ScrapeResult
+    fun parse(html: String, sourceUrl: String, contentLanguage: String? = null): ScrapeResult
 }
 
 sealed interface ScrapeResult {
@@ -50,9 +50,36 @@ Two generic tiers, tried in order — no per-site selectors:
    reliably structured one.
 2. **Microdata** (`itemscope`/`itemprop` attributes) — fallback for sites that don't publish JSON-LD.
 
-A tier counts as a hit only when it produces a non-blank title *and* at least one ingredient or
-instruction; otherwise the next tier is tried, and if both miss, the result is
+A tier counts as a hit only when it produces a non-blank title *and* at least one ingredient;
+otherwise the next tier is tried, and if both miss, the result is
 `ScrapeResult.NoRecipeFound`.
+
+## Language detection
+
+Every successful result carries `ScrapedRecipe.language`: a `DetectedLanguage` with an ISO 639-1
+`code` (`"en"`, `"es"`), a `confidence` (`HIGH` / `LOW`) and the `source` it came from — or `null`
+when nothing was strong enough to name one.
+
+Markup signals are read most specific first: the recipe's own `inLanguage` (JSON-LD or microdata),
+`<html lang>`, `og:locale`, `<meta http-equiv="content-language">`, then the optional
+`contentLanguage` argument (the HTTP header). The highest-priority one is cross-checked against the
+recipe's text, scored by counting common words from six language profiles (en, es, pt, fr, it, de):
+
+| Markup                | Text         | Result         |
+|-----------------------|--------------|----------------|
+| agrees                | confident    | markup, HIGH   |
+| absent                | confident    | text, HIGH     |
+| disagrees             | confident    | text, LOW      |
+| explicit `inLanguage` | inconclusive | markup, HIGH   |
+| page-level only       | inconclusive | markup, LOW    |
+| absent                | inconclusive | `null`         |
+
+Text wins a disagreement because page-level markup is often a theme's untouched template default —
+but only at `LOW`, which tells the caller to ask the user.
+
+Ingredient lines are then re-parsed with the detected language. Unit words are recognised in
+English and Spanish regardless of language (they never collide); only connector words are gated —
+Spanish ranges (`"2 a 3"`), the `de` in `"200 g de harina"`, and whether a bare `c` means cup.
 
 ## Using it
 
