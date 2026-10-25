@@ -263,6 +263,8 @@
     <string name="slot_picker_no_plans">Create a meal plan first, then add recipes to it.</string>
     <string name="slot_picker_day">Day %1$d</string>
     <string name="slot_picker_back">Back</string>
+    <string name="slot_picker_create_plan">+ Create new meal plan</string>
+    <string name="slot_picker_add_new_day">+ Add to new day</string>
     <string name="meal_plan_recipe_unavailable">Recipe not available</string>
     <string name="meal_plan_cooked_section_title">Cooked this week</string>
     <string name="meal_plan_progress">%1$d of %2$d meals cooked</string>

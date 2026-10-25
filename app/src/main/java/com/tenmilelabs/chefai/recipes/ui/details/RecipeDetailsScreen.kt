@@ -97,13 +97,15 @@ fun RecipeDetailsScreen(
      * null, the snackbar is shown here first — the screen shows a spinner meanwhile.
      */
     onRecipeDeleted: ((message: String) -> Unit)? = null,
+    onCreateMealPlan: ((recipeId: java.util.UUID) -> Unit)? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val recipeDeletedText = stringResource(R.string.recipe_deleted)
-    LaunchedEffect(viewModel, snackbarHostState, onNavigateBack, onRecipeDeleted, recipeDeletedText) {
+    LaunchedEffect(viewModel, snackbarHostState, onNavigateBack, onRecipeDeleted, onCreateMealPlan, recipeDeletedText) {
         viewModel.effects.collect { effect ->
             when (effect) {
+                is RecipeDetailsEffect.OpenMealPlanWizard -> onCreateMealPlan?.invoke(effect.recipeId)
                 RecipeDetailsEffect.RecipeDeleted -> if (onRecipeDeleted != null) {
                     onRecipeDeleted(recipeDeletedText)
                 } else {
@@ -139,6 +141,9 @@ fun RecipeDetailsScreen(
                         RecipeDetailsAction.AddToGroceryListClicked ->
                             viewModel.onOpenSlotPicker(SlotPickerPurpose.GROCERY_LIST)
                         RecipeDetailsAction.SlotPickerDismissed -> viewModel.onDismissSlotPicker()
+                        RecipeDetailsAction.CreatePlanWithRecipeClicked -> viewModel.onCreatePlanWithRecipe()
+                        is RecipeDetailsAction.NewDayPicked ->
+                            viewModel.onNewDayPicked(action.planId, action.slot)
                         is RecipeDetailsAction.SlotPicked ->
                             viewModel.onSlotPicked(action.planId, action.dayIndex, action.slot)
                         RecipeDetailsAction.NavigateBack -> onNavigateBack?.invoke()
@@ -174,6 +179,9 @@ fun RecipeDetailsScreen(
                 when (action) {
                     is RecipeDetailsAction.SlotPicked ->
                         viewModel.onSlotPicked(action.planId, action.dayIndex, action.slot)
+                    is RecipeDetailsAction.NewDayPicked ->
+                        viewModel.onNewDayPicked(action.planId, action.slot)
+                    RecipeDetailsAction.CreatePlanWithRecipeClicked -> viewModel.onCreatePlanWithRecipe()
                     else -> viewModel.onDismissSlotPicker()
                 }
             },

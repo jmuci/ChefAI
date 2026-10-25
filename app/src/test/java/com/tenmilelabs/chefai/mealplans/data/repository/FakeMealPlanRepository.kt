@@ -135,6 +135,25 @@ class FakeMealPlanRepository : MealPlanRepository {
         return true
     }
 
+    override suspend fun appendRecipeAsNewDay(planId: UUID, slot: MealSlot, recipeId: UUID): Boolean {
+        if (shouldThrowOnAssign) throw RuntimeException("Fake assign error")
+        val plan = plans.value.firstOrNull { it.uuid == planId } ?: return false
+        val newIndex = maxOf((plan.days.maxOfOrNull { it.dayIndex } ?: -1) + 1, plan.preferences.planLengthDays)
+        val day = MealPlanDay(
+            UUID.randomUUID(), newIndex,
+            dinnerRecipeId = recipeId.takeIf { slot == MealSlot.DINNER },
+            lunchRecipeId = recipeId.takeIf { slot == MealSlot.LUNCH },
+        )
+        plans.value = plans.value.map {
+            if (it.uuid != planId) it
+            else it.copy(
+                preferences = it.preferences.copy(planLengthDays = newIndex + 1),
+                days = it.days + day,
+            )
+        }
+        return true
+    }
+
     fun emitPlans(vararg mealPlans: MealPlan) {
         plans.value = mealPlans.toList()
     }

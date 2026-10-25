@@ -173,6 +173,46 @@ class DefaultMealPlanRepositoryTest {
             .isFalse()
     }
 
+    // --- appendRecipeAsNewDay ---
+
+    @Test
+    fun `appendRecipeAsNewDay adds a day after the last one and grows the plan length`() = runTest {
+        val plan = planWithOneDay()
+        repository.createMealPlan(plan)
+        val recipeId = UUID.randomUUID()
+        val lastIndex = plan.days.maxOf { it.dayIndex }
+
+        val ok = repository.appendRecipeAsNewDay(plan.uuid, MealSlot.LUNCH, recipeId)
+
+        assertThat(ok).isTrue()
+        val updated = repository.observeMealPlan(plan.uuid).first()!!
+        val newDay = updated.days.maxByOrNull { it.dayIndex }!!
+        assertThat(newDay.dayIndex).isEqualTo(lastIndex + 1)
+        assertThat(newDay.lunchRecipeId).isEqualTo(recipeId)
+        assertThat(newDay.dinnerRecipeId).isNull()
+        assertThat(updated.preferences.planLengthDays).isEqualTo(newDay.dayIndex + 1)
+    }
+
+    @Test
+    fun `appendRecipeAsNewDay on a plan with no days starts at the plan length and requests sync`() = runTest {
+        val plan = plan(days = emptyList()).let { it.copy(preferences = it.preferences.copy(planLengthDays = 3)) }
+        repository.createMealPlan(plan)
+        val syncCountBefore = syncScheduler.mutationSyncCount
+
+        repository.appendRecipeAsNewDay(plan.uuid, MealSlot.DINNER, UUID.randomUUID())
+
+        val updated = repository.observeMealPlan(plan.uuid).first()!!
+        assertThat(updated.days.single().dayIndex).isEqualTo(3)
+        assertThat(updated.preferences.planLengthDays).isEqualTo(4)
+        assertThat(syncScheduler.mutationSyncCount).isGreaterThan(syncCountBefore)
+    }
+
+    @Test
+    fun `appendRecipeAsNewDay returns false for an unknown plan`() = runTest {
+        assertThat(repository.appendRecipeAsNewDay(UUID.randomUUID(), MealSlot.DINNER, UUID.randomUUID()))
+            .isFalse()
+    }
+
     // --- setMealCooked ---
 
     @Test

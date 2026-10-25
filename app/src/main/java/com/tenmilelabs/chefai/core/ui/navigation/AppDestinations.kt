@@ -42,6 +42,9 @@ internal object ScreenBaseRoutes {
     const val SEARCH_RECIPE_DETAIL = "search_recipe_detail"
     const val HOME_RECIPE_DETAIL = "home_recipe_detail"
     const val MEAL_PLAN_WIZARD = "meal_plan_wizard"
+
+    /** Wizard graph route; the optional recipe arg pre-includes that recipe in the generated plan. */
+    const val MEAL_PLAN_WIZARD_GRAPH = "$MEAL_PLAN_WIZARD?${AppDestinationArgs.RECIPE_ID_ARG}={${AppDestinationArgs.RECIPE_ID_ARG}}"
     const val MEAL_PLAN_WIZARD_BASICS = "meal_plan_wizard_basics"
     const val MEAL_PLAN_WIZARD_PREFERENCES = "meal_plan_wizard_preferences"
     const val MEAL_PLAN_WIZARD_ADVANCED = "meal_plan_wizard_advanced"
@@ -285,8 +288,14 @@ class NavigationActions(private val navController: NavHostController) {
         navController.navigate("${ScreenBaseRoutes.HOME_RECIPE_DETAIL}/$recipeId")
     }
 
-    fun navigateToMealPlanWizard() {
-        navController.navigate(ScreenBaseRoutes.MEAL_PLAN_WIZARD)
+    fun navigateToMealPlanWizard(includeRecipeId: UUID? = null) {
+        navController.navigate(
+            if (includeRecipeId == null) {
+                ScreenBaseRoutes.MEAL_PLAN_WIZARD
+            } else {
+                "${ScreenBaseRoutes.MEAL_PLAN_WIZARD}?${AppDestinationArgs.RECIPE_ID_ARG}=$includeRecipeId"
+            }
+        )
     }
 
     fun navigateToHome() {

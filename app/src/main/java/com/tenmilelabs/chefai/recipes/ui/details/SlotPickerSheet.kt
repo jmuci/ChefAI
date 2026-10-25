@@ -55,19 +55,32 @@ fun SlotPickerSheet(
                 style = MaterialTheme.typography.titleLarge,
             )
             when {
-                state.plans.isEmpty() -> Text(
-                    text = stringResource(R.string.slot_picker_no_plans),
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(vertical = 16.dp),
+                state.plans.isEmpty() -> {
+                    Text(
+                        text = stringResource(R.string.slot_picker_no_plans),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(vertical = 16.dp),
+                    )
+                    CreatePlanRow { onAction(RecipeDetailsAction.CreatePlanWithRecipeClicked) }
+                }
+                selectedPlan == null -> PlanList(
+                    plans = state.plans,
+                    onPlanClick = { selectedPlanId = it.uuid.toString() },
+                    onCreatePlanClick = { onAction(RecipeDetailsAction.CreatePlanWithRecipeClicked) },
                 )
-                selectedPlan == null -> PlanList(state.plans) { selectedPlanId = it.uuid.toString() }
                 else -> {
                     TextButton(onClick = { selectedPlanId = null }) {
                         Text(stringResource(R.string.slot_picker_back))
                     }
-                    SlotList(selectedPlan) { dayIndex, slot ->
-                        onAction(RecipeDetailsAction.SlotPicked(selectedPlan.uuid, dayIndex, slot))
-                    }
+                    SlotList(
+                        plan = selectedPlan,
+                        onSlotClick = { dayIndex, slot ->
+                            onAction(RecipeDetailsAction.SlotPicked(selectedPlan.uuid, dayIndex, slot))
+                        },
+                        onNewDayClick = { slot ->
+                            onAction(RecipeDetailsAction.NewDayPicked(selectedPlan.uuid, slot))
+                        },
+                    )
                 }
             }
         }
@@ -75,7 +88,11 @@ fun SlotPickerSheet(
 }
 
 @Composable
-private fun PlanList(plans: List<MealPlan>, onPlanClick: (MealPlan) -> Unit) {
+private fun PlanList(
+    plans: List<MealPlan>,
+    onPlanClick: (MealPlan) -> Unit,
+    onCreatePlanClick: () -> Unit,
+) {
     Text(stringResource(R.string.slot_picker_choose_plan), style = MaterialTheme.typography.labelLarge)
     LazyColumn {
         items(plans, key = { it.uuid }) { plan ->
@@ -88,11 +105,29 @@ private fun PlanList(plans: List<MealPlan>, onPlanClick: (MealPlan) -> Unit) {
                     .padding(vertical = 14.dp),
             )
         }
+        item(key = "create_plan") { CreatePlanRow(onCreatePlanClick) }
     }
 }
 
 @Composable
-private fun SlotList(plan: MealPlan, onSlotClick: (dayIndex: Int, slot: MealSlot) -> Unit) {
+private fun CreatePlanRow(onClick: () -> Unit) {
+    Text(
+        text = stringResource(R.string.slot_picker_create_plan),
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 14.dp),
+    )
+}
+
+@Composable
+private fun SlotList(
+    plan: MealPlan,
+    onSlotClick: (dayIndex: Int, slot: MealSlot) -> Unit,
+    onNewDayClick: (slot: MealSlot) -> Unit,
+) {
     Text(stringResource(R.string.slot_picker_choose_slot), style = MaterialTheme.typography.labelLarge)
     LazyColumn {
         items((0 until plan.preferences.planLengthDays).toList(), key = { it }) { dayIndex ->
@@ -109,6 +144,24 @@ private fun SlotList(plan: MealPlan, onSlotClick: (dayIndex: Int, slot: MealSlot
                 )
                 MealSlot.entries.forEach { slot ->
                     TextButton(onClick = { onSlotClick(dayIndex, slot) }) { Text(slot.label) }
+                }
+            }
+        }
+        item(key = "new_day") {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.slot_picker_add_new_day),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(vertical = 14.dp),
+                )
+                MealSlot.entries.forEach { slot ->
+                    TextButton(onClick = { onNewDayClick(slot) }) { Text(slot.label) }
                 }
             }
         }
