@@ -73,4 +73,16 @@ class IngredientAmountFormatterTest {
 
         assertThat(label.text).isEqualTo("2.5 cups")
     }
+
+    @Test
+    fun `the placeholder unit reads as a bare count`() {
+        val label = IngredientAmountFormatter.format(
+            quantity = 2.0,
+            unit = "unit",
+            ingredientName = "chicken breasts",
+            system = MeasurementSystem.AS_WRITTEN,
+        )
+
+        assertThat(label.text).isEqualTo("2")
+    }
 }

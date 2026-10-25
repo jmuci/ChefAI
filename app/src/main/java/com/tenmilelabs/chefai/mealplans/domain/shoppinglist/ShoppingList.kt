@@ -106,7 +106,7 @@ object ShoppingListBuilder {
                 )
                 ScaledRow(
                     displayName = row.displayName,
-                    unit = converted.unit,
+                    unit = UnitNormalizer.withoutPlaceholder(converted.unit),
                     amount = converted.quantity,
                     isApproximate = converted.isApproximate,
                 )
