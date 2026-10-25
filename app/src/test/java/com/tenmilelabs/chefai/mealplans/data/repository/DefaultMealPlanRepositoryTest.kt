@@ -135,6 +135,44 @@ class DefaultMealPlanRepositoryTest {
         }
     }
 
+    // --- assignRecipeToSlot ---
+
+    @Test
+    fun `assignRecipeToSlot replaces the slot, clears its cooked mark and dirties the plan`() = runTest {
+        val plan = planWithOneDay()
+        repository.createMealPlan(plan)
+        val day = plan.days.single()
+        repository.setMealCooked(day.uuid, MealSlot.DINNER, cooked = true)
+        val recipeId = UUID.randomUUID()
+
+        val ok = repository.assignRecipeToSlot(plan.uuid, day.dayIndex, MealSlot.DINNER, recipeId)
+
+        assertThat(ok).isTrue()
+        val updated = repository.observeMealPlan(plan.uuid).first()!!
+        val updatedDay = updated.days.single()
+        assertThat(updatedDay.dinnerRecipeId).isEqualTo(recipeId)
+        assertThat(updatedDay.dinnerCookedAt).isNull()
+    }
+
+    @Test
+    fun `assignRecipeToSlot creates the day when the plan has none at that index`() = runTest {
+        val plan = planWithOneDay()
+        repository.createMealPlan(plan)
+        val recipeId = UUID.randomUUID()
+
+        repository.assignRecipeToSlot(plan.uuid, dayIndex = 5, MealSlot.LUNCH, recipeId)
+
+        val days = repository.observeMealPlan(plan.uuid).first()!!.days
+        assertThat(days).hasSize(2)
+        assertThat(days.single { it.dayIndex == 5 }.lunchRecipeId).isEqualTo(recipeId)
+    }
+
+    @Test
+    fun `assignRecipeToSlot returns false for an unknown plan`() = runTest {
+        assertThat(repository.assignRecipeToSlot(UUID.randomUUID(), 0, MealSlot.DINNER, UUID.randomUUID()))
+            .isFalse()
+    }
+
     // --- setMealCooked ---
 
     @Test

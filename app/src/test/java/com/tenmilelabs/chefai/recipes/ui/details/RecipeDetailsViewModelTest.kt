@@ -28,6 +28,7 @@ import com.tenmilelabs.chefai.recipes.domain.scaling.RecipeScaling
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
@@ -676,6 +677,90 @@ class RecipeDetailsViewModelTest {
             assertThat(state.servings.range)
                 .isEqualTo(RecipeScaling.MIN_SERVINGS..RecipeScaling.MAX_SERVINGS)
 
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    // --- Add to meal plan / grocery list --------------------------------------------------------
+
+    private fun ownPlan(): MealPlan =
+        planWithDay(UUID.randomUUID()).copy(userId = requireNotNull(sessionManager.getCurrentUserId()))
+
+    @Test
+    fun `slotPicker - closed by default, opens with the user's plans and closes on dismiss`() = runTest {
+        val plan = ownPlan()
+        mealPlanRepository.emitPlans(plan)
+        initializeViewModel()
+
+        viewModel.slotPicker.test {
+            assertThat(awaitItem()).isNull()
+
+            viewModel.onOpenSlotPicker(SlotPickerPurpose.GROCERY_LIST)
+            val open = awaitItem()
+            assertThat(open?.purpose).isEqualTo(SlotPickerPurpose.GROCERY_LIST)
+            assertThat(open?.plans).containsExactly(plan)
+
+            viewModel.onDismissSlotPicker()
+            assertThat(awaitItem()).isNull()
+        }
+    }
+
+    @Test
+    fun `onSlotPicked - slots this recipe into the plan and confirms`() = runTest {
+        val plan = ownPlan()
+        mealPlanRepository.emitPlans(plan)
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+            awaitItem()
+
+            viewModel.onOpenSlotPicker(SlotPickerPurpose.MEAL_PLAN)
+            viewModel.onSlotPicked(plan.uuid, dayIndex = 2, slot = MealSlot.LUNCH)
+
+            assertThat(awaitItem().userMessage).isEqualTo(R.string.recipe_added_to_meal_plan)
+            cancelAndConsumeRemainingEvents()
+        }
+        val day = mealPlanRepository.observeMealPlan(plan.uuid).first()?.days?.single { it.dayIndex == 2 }
+        assertThat(day?.lunchRecipeId).isEqualTo(recipeId1)
+    }
+
+    @Test
+    fun `onSlotPicked - grocery list purpose confirms with the grocery message`() = runTest {
+        val plan = ownPlan()
+        mealPlanRepository.emitPlans(plan)
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+            awaitItem()
+
+            viewModel.onOpenSlotPicker(SlotPickerPurpose.GROCERY_LIST)
+            viewModel.onSlotPicked(plan.uuid, dayIndex = 0, slot = MealSlot.DINNER)
+
+            assertThat(awaitItem().userMessage).isEqualTo(R.string.recipe_added_to_grocery_list)
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onSlotPicked - repository failure shows an error`() = runTest {
+        val plan = ownPlan()
+        mealPlanRepository.emitPlans(plan)
+        mealPlanRepository.shouldThrowOnAssign = true
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+            awaitItem()
+
+            viewModel.onOpenSlotPicker(SlotPickerPurpose.MEAL_PLAN)
+            viewModel.onSlotPicked(plan.uuid, dayIndex = 0, slot = MealSlot.DINNER)
+
+            assertThat(awaitItem().userMessage).isEqualTo(R.string.recipe_add_to_plan_error)
             cancelAndConsumeRemainingEvents()
         }
     }
