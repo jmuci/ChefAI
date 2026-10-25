@@ -49,6 +49,8 @@ data class RecipesDetailsUiState(
      * any other entry point) never offers it, regardless of where it was opened from.
      */
     val canDelete: Boolean = false,
+    /** Same ownership rule as [canDelete]: editing someone else's public recipe is never offered. */
+    val canEdit: Boolean = false,
     /** True when this recipe was opened from a meal plan slot, so a cooked toggle applies. */
     val showCookedToggle: Boolean = false,
     val isCooked: Boolean = false,
@@ -267,6 +269,7 @@ class RecipeDetailsViewModel @Inject constructor(
 
             is Async.Success -> {
                 val recipe = recipeAsync.data
+                val isOwner = currentUserId != null && recipe.creator.uuid == currentUserId
                 val base = ServingsUiState.forRecipeServings(recipe.servings)
                 // An out-of-range override (SERVINGS_UNSET, or a value saved for a recipe whose
                 // yield has since been edited) falls back to the recipe's own yield.
@@ -282,7 +285,8 @@ class RecipeDetailsViewModel @Inject constructor(
                     userMessage = combined.userMessage,
                     showDeleteConfirmation = combined.deleteUi.showConfirmation,
                     isDeleting = combined.deleteUi.isDeleting,
-                    canDelete = currentUserId != null && recipe.creator.uuid == currentUserId,
+                    canDelete = isOwner,
+                    canEdit = isOwner,
                     showCookedToggle = mealPlanSlotRef != null,
                     isCooked = isCooked,
                     servings = servings,

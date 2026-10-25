@@ -219,7 +219,7 @@ class RecipeDetailsViewModelTest {
     }
 
     @Test
-    fun `canDelete is false for a recipe the current user did not create or import`() = runTest {
+    fun `canDelete and canEdit are false for a recipe the current user did not create or import`() = runTest {
         initializeViewModel()
 
         viewModel.uiState.test {
@@ -227,14 +227,16 @@ class RecipeDetailsViewModelTest {
             // recipe1's creator is a fixture user distinct from this session's own id.
             recipesRepository.emitRecipe(recipeId1, recipe1)
 
-            assertThat(awaitItem().canDelete).isFalse()
+            val state = awaitItem()
+            assertThat(state.canDelete).isFalse()
+            assertThat(state.canEdit).isFalse()
 
             cancelAndConsumeRemainingEvents()
         }
     }
 
     @Test
-    fun `canDelete is true for a recipe the current user created or imported`() = runTest {
+    fun `canDelete and canEdit are true for a recipe the current user created or imported`() = runTest {
         initializeViewModel()
         val currentUserId = sessionManager.getCurrentUserId()!!
         val ownRecipe = recipe1.copy(creator = recipe1.creator.copy(uuid = currentUserId))
@@ -243,7 +245,9 @@ class RecipeDetailsViewModelTest {
             assertThat(awaitItem().isLoading).isTrue()
             recipesRepository.emitRecipe(recipeId1, ownRecipe)
 
-            assertThat(awaitItem().canDelete).isTrue()
+            val state = awaitItem()
+            assertThat(state.canDelete).isTrue()
+            assertThat(state.canEdit).isTrue()
 
             cancelAndConsumeRemainingEvents()
         }
