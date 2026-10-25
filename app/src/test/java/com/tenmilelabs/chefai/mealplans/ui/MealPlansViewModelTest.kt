@@ -4,21 +4,16 @@ import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.core.data.repository.FakeUserPreferencesRepository
-import com.tenmilelabs.chefai.core.domain.model.HouseholdRole
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
-import com.tenmilelabs.chefai.household.domain.model.Household
-import com.tenmilelabs.chefai.household.domain.model.HouseholdMember
 import com.tenmilelabs.chefai.household.domain.repository.FakeHouseholdRepository
-import com.tenmilelabs.chefai.mealplans.data.repository.FakeMealPlanPreferencesRepository
 import com.tenmilelabs.chefai.mealplans.data.repository.FakeMealPlanRepository
 import com.tenmilelabs.chefai.mealplans.data.repository.FakeShoppingListRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.DietaryRestriction
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
-import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanServingBasis
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
@@ -68,7 +63,6 @@ class MealPlansViewModelTest {
     private lateinit var recipesRepository: FakeRecipesRepository
     private lateinit var shoppingListRepository: FakeShoppingListRepository
     private lateinit var householdRepository: FakeHouseholdRepository
-    private lateinit var mealPlanPreferences: FakeMealPlanPreferencesRepository
     private lateinit var sessionManager: SessionManager
     private lateinit var viewModel: MealPlansViewModel
 
@@ -78,7 +72,6 @@ class MealPlansViewModelTest {
         recipesRepository = FakeRecipesRepository()
         shoppingListRepository = FakeShoppingListRepository()
         householdRepository = FakeHouseholdRepository()
-        mealPlanPreferences = FakeMealPlanPreferencesRepository()
         sessionManager = createTestSessionManager(CoroutineScope(mainCoroutineRule.testDispatcher))
         viewModel = buildViewModel()
     }
@@ -88,7 +81,6 @@ class MealPlansViewModelTest {
         recipesRepository = recipesRepository,
         shoppingListRepository = shoppingListRepository,
         householdRepository = householdRepository,
-        mealPlanPreferencesRepository = mealPlanPreferences,
         userPreferencesRepository = FakeUserPreferencesRepository(),
         sessionManager = sessionManager,
         clock = clock,
@@ -172,10 +164,10 @@ class MealPlansViewModelTest {
         }
     }
 
-    // --- The serving basis ---
+    // --- Shared plans ---
 
     @Test
-    fun `just me shows personal plans and hides household ones`() = runTest {
+    fun `personal and household plans both appear in the week`() = runTest {
         val userId = sessionManager.getCurrentUserId()!!
         val mine = preview("Mine")
         val ours = preview("Ours")
@@ -191,73 +183,41 @@ class MealPlansViewModelTest {
         )
 
         viewModel.uiState.test {
-            val state = awaitSuccess { it.mealCount > 0 }
-            assertThat(state.servingBasis).isEqualTo(MealPlanServingBasis.JUST_ME)
+            val state = awaitSuccess { it.mealCount == 2 }
             assertThat(state.week.days.flatMap { it.meals }.map { it.recipe?.title })
-                .containsExactly("Mine")
+                .containsExactly("Mine", "Ours")
             cancelAndIgnoreRemainingEvents()
         }
     }
 
+    // --- The view mode and the plans list ---
+
     @Test
-    fun `family shows household plans once a household is cached`() = runTest {
+    fun `opens on the week view and switches to the plans list`() = runTest {
+        assertThat(viewModel.viewMode.value).isEqualTo(MealPlansViewMode.WEEK)
+
+        viewModel.onViewModeChange(MealPlansViewMode.PLANS)
+
+        assertThat(viewModel.viewMode.value).isEqualTo(MealPlansViewMode.PLANS)
+    }
+
+    @Test
+    fun `the plans list covers every plan, newest first, not just this week's`() = runTest {
         val userId = sessionManager.getCurrentUserId()!!
-        val household = household(userId, size = 4)
-        householdRepository.seedHousehold(household)
-        mealPlanPreferences = FakeMealPlanPreferencesRepository(MealPlanServingBasis.FAMILY)
-        viewModel = buildViewModel()
+        val old = preview("Old")
+        val recent = preview("Recent")
+        recipesRepository.setRecipePreviewsToEmit(listOf(old, recent))
+        val oldPlan = makePlan(userId, createdAt = weekStart.minusDays(60), days = listOf(day(0, dinner = old.uuid)))
+        val recentPlan = makePlan(userId, createdAt = weekStart, days = listOf(day(0, dinner = recent.uuid)))
+        repository.emitPlans(oldPlan, recentPlan)
 
-        val mine = preview("Mine")
-        val ours = preview("Ours")
-        recipesRepository.setRecipePreviewsToEmit(listOf(mine, ours))
-        repository.emitPlans(
-            makePlan(userId, createdAt = weekStart, days = listOf(day(0, dinner = mine.uuid))),
-            makePlan(
-                userId,
-                createdAt = weekStart,
-                days = listOf(day(1, dinner = ours.uuid)),
-                householdId = household.uuid,
-            ),
-        )
-
-        viewModel.uiState.test {
-            val state = awaitSuccess { it.mealCount > 0 }
-            assertThat(state.week.days.flatMap { it.meals }.map { it.recipe?.title })
-                .containsExactly("Ours")
-            assertThat(state.canSelectFamily).isTrue()
+        viewModel.listState.test {
+            var state = awaitItem()
+            while (state !is MealPlanListUiState.Success || state.plans.size < 2) state = awaitItem()
+            assertThat(state.plans.map { it.planId }).containsExactly(recentPlan.uuid, oldPlan.uuid).inOrder()
+            assertThat(state.plans.first().recipeTitles).containsExactly("Recent")
             cancelAndIgnoreRemainingEvents()
         }
-    }
-
-    @Test
-    fun `family falls back to just me when there is no household`() = runTest {
-        val userId = sessionManager.getCurrentUserId()!!
-        mealPlanPreferences = FakeMealPlanPreferencesRepository(MealPlanServingBasis.FAMILY)
-        viewModel = buildViewModel()
-
-        val mine = preview("Mine")
-        recipesRepository.setRecipePreviewsToEmit(listOf(mine))
-        repository.emitPlans(
-            makePlan(userId, createdAt = weekStart, days = listOf(day(0, dinner = mine.uuid))),
-        )
-
-        viewModel.uiState.test {
-            val state = awaitSuccess { it.mealCount > 0 }
-            // Family with nothing to switch to would otherwise empty the screen while the toggle
-            // claimed a household existed.
-            assertThat(state.servingBasis).isEqualTo(MealPlanServingBasis.JUST_ME)
-            assertThat(state.canSelectFamily).isFalse()
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun `onServingBasisChange persists the choice`() = runTest {
-        repository.emitPlans()
-
-        viewModel.onServingBasisChange(MealPlanServingBasis.FAMILY)
-
-        assertThat(mealPlanPreferences.current).isEqualTo(MealPlanServingBasis.FAMILY)
     }
 
     // --- The grocery summary ---
@@ -404,20 +364,6 @@ class MealPlansViewModelTest {
             householdId = householdId,
         )
     }
-
-    private fun household(userId: UUID, size: Int) = Household(
-        uuid = UUID.randomUUID(),
-        name = "The Test Kitchen",
-        ownerId = userId,
-        members = (0 until size).map { index ->
-            HouseholdMember(
-                if (index == 0) userId else UUID.randomUUID(),
-                "Member $index",
-                "",
-                HouseholdRole.OWNER,
-            )
-        },
-    )
 
     private fun preview(title: String) = RecipePreview(
         uuid = UUID.randomUUID(),
