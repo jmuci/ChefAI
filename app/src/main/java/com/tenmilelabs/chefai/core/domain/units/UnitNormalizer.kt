@@ -65,7 +65,7 @@ object UnitNormalizer {
         unit(MeasurementUnit.LITRE, "lt", "ltr", "ltrs", "liter", "liters", "litre", "litres")
 
         unit(MeasurementUnit.TEASPOON, "tsps", "teaspoon", "teaspoons")
-        unit(MeasurementUnit.TABLESPOON, "tbsps", "tablespoon", "tablespoons", "tbs", "tbl", "tblsp")
+        unit(MeasurementUnit.TABLESPOON, "tbsps", "tablespoon", "tablespoons", "tbs", "tbl", "tblsp", "tbls")
         // "oz" on its own is mass — the overwhelmingly commoner reading in a recipe — so a fluid
         // ounce has to say so.
         unit(MeasurementUnit.FLUID_OUNCE, "floz", "fl. oz", "fluid oz", "fluid ounce", "fluid ounces")

@@ -26,6 +26,11 @@ object IngredientAmountFormatter {
         system: MeasurementSystem,
         cookingFractions: Boolean = true,
     ): IngredientAmountLabel {
+        // "To taste" has no number to scale or convert: show the phrase alone, or nothing at all
+        // for a line that never stated an amount — never the placeholder quantity behind it.
+        val reading = IngredientUnits.read(quantity, unit)
+        if (reading is UnitReading.Unmeasured) return IngredientAmountLabel(text = reading.phrase, isApproximate = false)
+
         val converted = UnitConversion.convert(quantity, unit, ingredientName, system)
         val amount = if (cookingFractions) {
             QuantityFormat.cooking(converted.quantity, converted.unit)

@@ -1,11 +1,12 @@
 package com.tenmilelabs.chefai.mealplans.domain.shoppinglist
 
 import com.tenmilelabs.chefai.core.domain.units.CountingUnits
+import com.tenmilelabs.chefai.core.domain.units.IngredientUnits
 import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
 import com.tenmilelabs.chefai.core.domain.units.PreparationNotes
 import com.tenmilelabs.chefai.core.domain.units.UnitConversion
 import com.tenmilelabs.chefai.core.domain.units.UnitNormalizer
-import com.tenmilelabs.chefai.core.util.QuantityFormat
+import com.tenmilelabs.chefai.core.domain.units.UnitReading
 import com.tenmilelabs.chefai.recipes.domain.scaling.RecipeScaling
 import java.util.UUID
 
@@ -14,7 +15,10 @@ data class ShoppingListItem(
     /** Normalised name; the stable key for the tick row and for `LazyColumn` item keys. */
     val key: String,
     val displayName: String,
-    /** e.g. "500 g", "2 tbsp + 100 ml", or `null` when no usable quantity was recorded. */
+    /**
+     * e.g. "500 g", "2 tbsp + 100 ml", "3 cloves", rounded to what a shop sells (see
+     * [ShoppingAmountFormat]); `null` when no usable quantity was recorded ("salt, to taste").
+     */
     val quantityLabel: String?,
     val section: GrocerySection,
     val isChecked: Boolean,
@@ -101,20 +105,30 @@ object ShoppingListBuilder {
                     1.0
                 }
                 val slots = slotCountByRecipe[row.recipeId] ?: 1
-                // Scale first, convert second — converting first would put the multiplication on
-                // top of a rounded value. Same order the recipe details screen applies them in.
-                val converted = UnitConversion.convert(
-                    quantity = row.quantity * servingsFactor * slots,
-                    unit = row.unit,
-                    ingredientName = row.displayName,
-                    target = measurementSystem,
-                )
-                ScaledRow(
-                    displayName = PreparationNotes.stripFrom(row.displayName),
-                    unit = UnitNormalizer.withoutPlaceholder(converted.unit),
-                    amount = converted.quantity,
-                    isApproximate = converted.isApproximate,
-                )
+                val displayName = PreparationNotes.stripFrom(row.displayName)
+                when (val reading = IngredientUnits.read(row.quantity, row.unit)) {
+                    // "To taste", "to serve", a line with no amount: the item still goes on the
+                    // list, but nothing is scaled or summed into a measured total beside it.
+                    is UnitReading.Unmeasured -> ScaledRow(displayName, unit = "", amount = 0.0, isApproximate = false)
+                    is UnitReading.Measured -> {
+                        // Scale first, convert second — converting first would put the
+                        // multiplication on top of a rounded value. Same order the recipe details
+                        // screen applies them in. A note lifted off the unit ("cup chopped") rides
+                        // along on the name, where it stops a density being guessed.
+                        val converted = UnitConversion.convert(
+                            quantity = row.quantity * servingsFactor * slots,
+                            unit = reading.unit,
+                            ingredientName = if (reading.note.isBlank()) row.displayName else "${row.displayName}, ${reading.note}",
+                            target = measurementSystem,
+                        )
+                        ScaledRow(
+                            displayName = displayName,
+                            unit = converted.unit,
+                            amount = converted.quantity,
+                            isApproximate = converted.isApproximate,
+                        )
+                    }
+                }
             }
 
         val items = scaledRows
@@ -142,11 +156,9 @@ object ShoppingListBuilder {
                     .entries
                     .sortedWith(compareBy({ it.key.isEmpty() }, { it.key }))
                     .mapNotNull { (_, unitAndSum) ->
-                        val (originalUnit, sum) = unitAndSum
+                        val (unit, sum) = unitAndSum
                         if (sum <= 0.0) return@mapNotNull null
-                        val unit = CountingUnits.resolveExact(originalUnit)?.let { CountingUnits.label(it, sum) }
-                            ?: originalUnit
-                        if (unit.isBlank()) formatQuantity(sum) else "${formatQuantity(sum)} $unit"
+                        ShoppingAmountFormat.format(sum, unit)
                     }
                     .joinToString(" + ")
                     .ifEmpty { null }
@@ -189,12 +201,6 @@ object ShoppingListBuilder {
 
     private val WHITESPACE = Regex("\\s+")
 }
-
-/**
- * Shopping-list amounts are aggregated totals — "how much do I buy" — so they read as decimals
- * rather than the cooking fractions a single recipe's quantities use. See [QuantityFormat].
- */
-internal fun formatQuantity(value: Double): String = QuantityFormat.decimal(value)
 
 /**
  * Collapses unit buckets that measure the same dimension in the same system into one — conversion

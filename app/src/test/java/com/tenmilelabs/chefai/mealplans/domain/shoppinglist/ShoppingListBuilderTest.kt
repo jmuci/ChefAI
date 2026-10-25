@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.mealplans.domain.shoppinglist
 
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.core.domain.units.IngredientUnits
 import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
 import com.tenmilelabs.chefai.recipes.domain.scaling.RecipeScaling
 import org.junit.Test
@@ -121,7 +122,8 @@ class ShoppingListBuilderTest {
             ingredients, mapOf(recipeA to 1, recipeB to 1, recipeC to 1), 0, emptySet(),
         )
 
-        assertThat(list.allItems().single().quantityLabel).isEqualTo("4.5 cloves")
+        // 4.5 cloves, rounded up: half a clove can't be bought on its own.
+        assertThat(list.allItems().single().quantityLabel).isEqualTo("5 cloves")
     }
 
     @Test
@@ -453,13 +455,149 @@ class ShoppingListBuilderTest {
         assertThat(list.allItems().single().checkedByName).isNull()
     }
 
-    // --- formatQuantity ---
+    // --- Amounts that aren't amounts (no stated quantity, "to taste", descriptors) ---
+
+    /** The production shape: recipes serving 6, planned for 2, each filling one slot. */
+    private fun buildForTwo(vararg rows: Pair<UUID, Triple<String, Double, String>>): ShoppingList =
+        ShoppingListBuilder.build(
+            ingredients = rows.map { (recipe, row) -> ingredient(recipe, 6, row.first, row.second, row.third) },
+            slotCountByRecipe = rows.associate { (recipe, _) -> recipe to 1 },
+            plannedServings = 2,
+            checkedKeys = emptySet(),
+        )
 
     @Test
-    fun `formatQuantity drops trailing zeros and never uses scientific notation`() {
-        assertThat(formatQuantity(2.0)).isEqualTo("2")
-        assertThat(formatQuantity(0.5)).isEqualTo("0.5")
-        assertThat(formatQuantity(1.005)).isEqualTo("1")
-        assertThat(formatQuantity(1.25)).isEqualTo("1.25")
+    fun `an ingredient imported with no amount is listed without one and never scaled`() {
+        // Given a line the importer found no amount in, from a recipe scaled 6 -> 2
+        val recipe = UUID.randomUUID()
+
+        // When
+        val list = buildForTwo(
+            recipe to Triple("Sal y pimienta negra recién molida (al gusto)", IngredientUnits.NO_AMOUNT, "unit"),
+        )
+
+        // Then it is on the list, with no "0.33" invented for it
+        val item = list.allItems().single()
+        assertThat(item.displayName).isEqualTo("Sal y pimienta negra recién molida (al gusto)")
+        assertThat(item.quantityLabel).isNull()
+    }
+
+    @Test
+    fun `a to-taste amount is not summed with a measured one`() {
+        // Given "0.5 To taste + 0.5 tsp": one recipe salts to taste, another measures it
+        val toTaste = UUID.randomUUID()
+        val measured = UUID.randomUUID()
+        val list = ShoppingListBuilder.build(
+            ingredients = listOf(
+                ingredient(toTaste, 4, "salt", 1.0, "To taste"),
+                ingredient(measured, 4, "salt", 1.0, "tsp"),
+            ),
+            slotCountByRecipe = mapOf(toTaste to 1, measured to 1),
+            plannedServings = 2,
+            checkedKeys = emptySet(),
+        )
+
+        assertThat(list.allItems().single().quantityLabel).isEqualTo("½ tsp")
+    }
+
+    @Test
+    fun `phrases standing in for an amount give no quantity at all`() {
+        val recipe = UUID.randomUUID()
+        val list = buildForTwo(
+            recipe to Triple("parsley", 1.0, "to serve"),
+            recipe to Triple("cheese", 1.0, "Sprinkling"),
+            recipe to Triple("gin", 1.0, "part"),
+        )
+
+        assertThat(list.allItems().map { it.quantityLabel }).containsExactly(null, null, null)
+    }
+
+    @Test
+    fun `a preparation note or size in the unit column is a count of the ingredient`() {
+        // Given "1 sliced", "1 finely chopped", "1 large" and "1 whole" — descriptors stored as units
+        val recipeA = UUID.randomUUID()
+        val recipeB = UUID.randomUUID()
+        val recipeC = UUID.randomUUID()
+
+        // When
+        val list = ShoppingListBuilder.build(
+            ingredients = listOf(
+                ingredient(recipeA, 0, "onion", 1.0, "sliced"),
+                ingredient(recipeB, 0, "onion", 1.0, "finely chopped"),
+                ingredient(recipeC, 0, "onion", 1.0, "large"),
+                ingredient(recipeC, 0, "lemon", 1.0, "whole"),
+            ),
+            slotCountByRecipe = mapOf(recipeA to 1, recipeB to 1, recipeC to 1),
+            plannedServings = 0,
+            checkedKeys = emptySet(),
+        )
+
+        // Then
+        val byName = list.allItems().associateBy { it.displayName }
+        assertThat(byName.getValue("onion").quantityLabel).isEqualTo("3")
+        assertThat(byName.getValue("lemon").quantityLabel).isEqualTo("1")
+    }
+
+    @Test
+    fun `a real unit carrying a note merges with the same unit written plainly`() {
+        val recipeA = UUID.randomUUID()
+        val recipeB = UUID.randomUUID()
+        val recipeC = UUID.randomUUID()
+        val list = ShoppingListBuilder.build(
+            ingredients = listOf(
+                ingredient(recipeA, 0, "parsley", 1.0, "tbs chopped"),
+                ingredient(recipeB, 0, "parsley", 1.0, "tablespoon"),
+                ingredient(recipeC, 0, "parsley", 1.0, "tbls"),
+            ),
+            slotCountByRecipe = mapOf(recipeA to 1, recipeB to 1, recipeC to 1),
+            plannedServings = 0,
+            checkedKeys = emptySet(),
+        )
+
+        assertThat(list.allItems().single().quantityLabel).isEqualTo("3 tbsp")
+    }
+
+    // --- Rounding to what a shop sells ---
+
+    @Test
+    fun `scaled totals are rounded for shopping rather than shown as raw decimals`() {
+        // Given recipes for 6 scaled to 2: every amount becomes a third
+        val recipe = UUID.randomUUID()
+
+        // When
+        val list = buildForTwo(
+            recipe to Triple("rice", 400.0, "g"),
+            recipe to Triple("garlic", 1.0, "clove"),
+            recipe to Triple("onion", 1.0, ""),
+            recipe to Triple("milk", 0.375, "cup"),
+            recipe to Triple("butter", 1.5, "tbsp"),
+        )
+
+        // Then
+        val byName = list.allItems().associate { it.displayName to it.quantityLabel }
+        assertThat(byName).containsExactly(
+            "rice", "135 g",
+            "garlic", "1 clove",
+            "onion", "1",
+            "milk", "⅛ cup",
+            "butter", "½ tbsp",
+        )
+    }
+
+    @Test
+    fun `rounding happens after conversion so metric and imperial both read cleanly`() {
+        val recipe = UUID.randomUUID()
+        val slots = mapOf(recipe to 1)
+
+        val metric = ShoppingListBuilder.build(
+            listOf(ingredient(recipe, 6, "chicken stock", 1.0, "cup")), slots, 2, emptySet(), MeasurementSystem.METRIC,
+        )
+        val imperial = ShoppingListBuilder.build(
+            listOf(ingredient(recipe, 6, "chicken stock", 250.0, "ml")), slots, 2, emptySet(), MeasurementSystem.IMPERIAL,
+        )
+
+        // ⅓ cup is 78.9 ml; 250 ml ÷ 3 is 83.3 ml, which is about ⅓ cup
+        assertThat(metric.allItems().single().quantityLabel).isEqualTo("80 ml")
+        assertThat(imperial.allItems().single().quantityLabel).isEqualTo("⅓ cup")
     }
 }
