@@ -505,7 +505,10 @@ fun ChefAINavGraph(
                     SyncStatusIndicator()
                     // User profile menu on the right side
                     UserProfileMenu(
-                        onLogout = {},
+                        // Detail screens (meal plan, shopping list, household) are keyed by id, not
+                        // by session, so they would keep rendering the departed account's data
+                        // for the new guest. Clear the whole back stack down to Home.
+                        onLogout = { navActions.navigateToHome() },
                         onLogin = { navActions.navigateToLogin() },
                         onSettings = { navActions.navigateToSettings() },
                         onHousehold = { navActions.navigateToHousehold() },
