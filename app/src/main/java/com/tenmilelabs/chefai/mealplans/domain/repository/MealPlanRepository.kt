@@ -55,4 +55,13 @@ interface MealPlanRepository {
      * schedule for the same plan overwrites these days.
      */
     suspend fun saveLocallyGeneratedDays(planId: UUID, days: List<MealPlanDay>)
+
+    /**
+     * Puts [recipeId] into [slot] of day [dayIndex] of [planId], replacing whatever was there and
+     * clearing that slot's cooked mark (a different meal has not been cooked). Creates the day row
+     * if the plan has none at [dayIndex]. Dirties the plan so the change syncs.
+     *
+     * @return `false` if [planId] has no local row.
+     */
+    suspend fun assignRecipeToSlot(planId: UUID, dayIndex: Int, slot: MealSlot, recipeId: UUID): Boolean
 }

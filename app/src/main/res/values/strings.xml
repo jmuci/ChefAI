@@ -253,6 +253,16 @@
     <string name="meal_plan_mark_cooked">Mark as cooked</string>
     <string name="meal_plan_mark_not_cooked">Mark as not cooked</string>
     <string name="meal_plan_toggle_cooked_error">Couldn\'t update this meal</string>
+    <string name="recipe_added_to_meal_plan">Added to your meal plan</string>
+    <string name="recipe_added_to_grocery_list">Ingredients added to the plan\'s shopping list</string>
+    <string name="recipe_add_to_plan_error">Couldn\'t add this recipe to the plan</string>
+    <string name="slot_picker_meal_plan_title">Add to meal plan</string>
+    <string name="slot_picker_grocery_list_title">Add to grocery list</string>
+    <string name="slot_picker_choose_plan">Choose a plan</string>
+    <string name="slot_picker_choose_slot">Choose a day and meal</string>
+    <string name="slot_picker_no_plans">Create a meal plan first, then add recipes to it.</string>
+    <string name="slot_picker_day">Day %1$d</string>
+    <string name="slot_picker_back">Back</string>
     <string name="meal_plan_recipe_unavailable">Recipe not available</string>
     <string name="meal_plan_cooked_section_title">Cooked this week</string>
     <string name="meal_plan_progress">%1$d of %2$d meals cooked</string>

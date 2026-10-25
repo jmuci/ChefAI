@@ -134,10 +134,13 @@ fun RecipeDetailsScreen(
                         RecipeDetailsAction.ToggleCooked -> viewModel.onToggleCooked()
                         is RecipeDetailsAction.ServingsChanged ->
                             viewModel.onServingsChange(action.servings)
-                        // Neither flow is designed yet (no meal-plan picker, no per-recipe grocery
-                        // list) — see the GitHub issue filed alongside this screen's redesign.
-                        RecipeDetailsAction.AddToMealPlanClicked,
-                        RecipeDetailsAction.AddToGroceryListClicked -> Unit
+                        RecipeDetailsAction.AddToMealPlanClicked ->
+                            viewModel.onOpenSlotPicker(SlotPickerPurpose.MEAL_PLAN)
+                        RecipeDetailsAction.AddToGroceryListClicked ->
+                            viewModel.onOpenSlotPicker(SlotPickerPurpose.GROCERY_LIST)
+                        RecipeDetailsAction.SlotPickerDismissed -> viewModel.onDismissSlotPicker()
+                        is RecipeDetailsAction.SlotPicked ->
+                            viewModel.onSlotPicked(action.planId, action.dayIndex, action.slot)
                         RecipeDetailsAction.NavigateBack -> onNavigateBack?.invoke()
                     }
                 },
@@ -161,6 +164,20 @@ fun RecipeDetailsScreen(
             )
             Timber.e("Recipe Not Found Loading error!")
         }
+    }
+
+    val slotPicker by viewModel.slotPicker.collectAsStateWithLifecycle()
+    slotPicker?.let { picker ->
+        SlotPickerSheet(
+            state = picker,
+            onAction = { action ->
+                when (action) {
+                    is RecipeDetailsAction.SlotPicked ->
+                        viewModel.onSlotPicked(action.planId, action.dayIndex, action.slot)
+                    else -> viewModel.onDismissSlotPicker()
+                }
+            },
+        )
     }
 
     // Check for user messages to display on the screen

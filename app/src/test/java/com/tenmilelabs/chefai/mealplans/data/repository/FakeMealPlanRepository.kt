@@ -18,6 +18,7 @@ class FakeMealPlanRepository : MealPlanRepository {
     var shouldThrowOnCreate: Boolean = false
     var shouldThrowOnDelete: Boolean = false
     var shouldThrowOnObserve: Boolean = false
+    var shouldThrowOnAssign: Boolean = false
     var shouldFailGeneration: Boolean = false
     var generationRequestedIds: MutableList<UUID> = mutableListOf()
     var locallyGeneratedIds: MutableList<UUID> = mutableListOf()
@@ -116,6 +117,22 @@ class FakeMealPlanRepository : MealPlanRepository {
                 plan
             }
         }
+    }
+
+    override suspend fun assignRecipeToSlot(planId: UUID, dayIndex: Int, slot: MealSlot, recipeId: UUID): Boolean {
+        if (shouldThrowOnAssign) throw RuntimeException("Fake assign error")
+        if (plans.value.none { it.uuid == planId }) return false
+        plans.value = plans.value.map { plan ->
+            if (plan.uuid != planId) return@map plan
+            val day = plan.days.firstOrNull { it.dayIndex == dayIndex }
+                ?: MealPlanDay(UUID.randomUUID(), dayIndex, dinnerRecipeId = null, lunchRecipeId = null)
+            val updated = when (slot) {
+                MealSlot.LUNCH -> day.copy(lunchRecipeId = recipeId, lunchCookedAt = null)
+                MealSlot.DINNER -> day.copy(dinnerRecipeId = recipeId, dinnerCookedAt = null)
+            }
+            plan.copy(days = (plan.days.filter { it.dayIndex != dayIndex } + updated).sortedBy { it.dayIndex })
+        }
+        return true
     }
 
     fun emitPlans(vararg mealPlans: MealPlan) {
