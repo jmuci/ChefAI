@@ -191,4 +191,30 @@ class DefaultMealPlanRepository @Inject constructor(
         syncScheduler.requestMutationSync()
         return true
     }
+
+    override suspend fun appendRecipeAsNewDay(planId: UUID, slot: MealSlot, recipeId: UUID): Boolean {
+        val existing = mealPlanDao.getMealPlanById(planId) ?: return false
+        transactionRunner {
+            val preferences = existing.toDomain(emptyList()).preferences
+            val lastIndex = mealPlanDao.getDaysForMealPlan(planId).maxOfOrNull { it.dayIndex } ?: -1
+            val newIndex = maxOf(lastIndex + 1, preferences.planLengthDays)
+            val day = MealPlanDayEntity(
+                uuid = UUID.randomUUID(),
+                mealPlanId = planId,
+                dayIndex = newIndex,
+                dinnerRecipeId = recipeId.takeIf { slot == MealSlot.DINNER },
+                lunchRecipeId = recipeId.takeIf { slot == MealSlot.LUNCH },
+            )
+            mealPlanDao.upsertDays(listOf(day))
+            mealPlanDao.upsertMealPlan(
+                existing.copy(
+                    preferencesJson = preferences.copy(planLengthDays = newIndex + 1).toJson(),
+                    syncState = SyncState.PENDING,
+                    updatedAt = System.currentTimeMillis(),
+                )
+            )
+        }
+        syncScheduler.requestMutationSync()
+        return true
+    }
 }

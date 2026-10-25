@@ -263,6 +263,8 @@
     <string name="slot_picker_no_plans">Create a meal plan first, then add recipes to it.</string>
     <string name="slot_picker_day">Day %1$d</string>
     <string name="slot_picker_back">Back</string>
+    <string name="slot_picker_create_plan">+ Create new meal plan</string>
+    <string name="slot_picker_add_new_day">+ Add to new day</string>
     <string name="meal_plan_recipe_unavailable">Recipe not available</string>
     <string name="meal_plan_cooked_section_title">Cooked this week</string>
     <string name="meal_plan_progress">%1$d of %2$d meals cooked</string>
@@ -375,6 +377,9 @@
     <string name="developer_options_link">Developer options</string>
     <string name="developer_options_environment_title">Environment</string>
     <string name="developer_options_use_remote">Use remote environment</string>
+    <string name="developer_options_remote_not_configured">Remote is disabled in this build (chefaiApiBaseUrl was blank). Set it to an https:// URL and rebuild.</string>
+    <string name="settings_developer_options_subtitle">Debug builds only. Backend environment and other tools for testing.</string>
+    <string name="settings_developer_options_open">Open developer options</string>
     <string name="developer_options_environment_footnote">Applies to the next request. Switching signs you out, since an account belongs to one environment; recipes on this device are kept.</string>
 
     <!-- Settings: measurement units -->

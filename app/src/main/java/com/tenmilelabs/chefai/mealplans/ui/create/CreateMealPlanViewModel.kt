@@ -1,14 +1,17 @@
 package com.tenmilelabs.chefai.mealplans.ui.create
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
+import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.mealplans.domain.model.DietaryRestriction
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
+import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.usecase.GenerateMealPlanUseCase
@@ -33,7 +36,12 @@ class CreateMealPlanViewModel @Inject constructor(
     private val sessionManager: SessionManager,
     private val recipesRepository: RecipesRepository,
     private val generateMealPlanUseCase: GenerateMealPlanUseCase,
+    savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
+
+    /** Recipe the wizard was opened from ("Add to Meal Plan" → create), slotted into the new plan. */
+    private val includedRecipeId: UUID? = savedStateHandle.get<String>(AppDestinationArgs.RECIPE_ID_ARG)
+        ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
 
     private val _uiState = MutableStateFlow(CreateMealPlanUiState())
     val uiState: StateFlow<CreateMealPlanUiState> = _uiState.asStateFlow()
@@ -152,9 +160,20 @@ class CreateMealPlanViewModel @Inject constructor(
                 false
             }
 
+            // Assigned after generation, which replaces the plan's days wholesale.
+            val includedRecipeAssigned = includedRecipeId?.let { recipeId ->
+                try {
+                    mealPlanRepository.assignRecipeToSlot(mealPlanId, 0, MealSlot.DINNER, recipeId)
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    Timber.e(e, "Failed to include recipe $recipeId in plan $mealPlanId")
+                    false
+                }
+            } ?: false
+
             _uiState.update { it.copy(isSaving = false) }
             _uiEvent.send(
-                if (filled) {
+                if (filled || includedRecipeAssigned) {
                     CreateMealPlanEvent.MealPlanReady(mealPlanId)
                 } else {
                     CreateMealPlanEvent.MealPlanSavedAsDraft(mealPlanId)

@@ -64,4 +64,12 @@ interface MealPlanRepository {
      * @return `false` if [planId] has no local row.
      */
     suspend fun assignRecipeToSlot(planId: UUID, dayIndex: Int, slot: MealSlot, recipeId: UUID): Boolean
+
+    /**
+     * Appends a new day after the plan's last one and puts [recipeId] in its [slot], growing
+     * [MealPlanPreferences.planLengthDays] to cover it. Dirties the plan so the change syncs.
+     *
+     * @return `false` if [planId] has no local row.
+     */
+    suspend fun appendRecipeAsNewDay(planId: UUID, slot: MealSlot, recipeId: UUID): Boolean
 }

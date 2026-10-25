@@ -86,11 +86,20 @@ fun DeveloperOptionsContent(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (!uiState.isRemoteConfigured) {
+                    Text(
+                        text = stringResource(R.string.developer_options_remote_not_configured),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.testTag("RemoteNotConfiguredMessage"),
+                    )
+                }
             }
             Spacer(modifier = Modifier.width(DeveloperOptionsMetrics.SwitchGap))
             FlatSwitch(
                 checked = uiState.isRemote,
                 onCheckedChange = { onAction(DeveloperOptionsAction.UseRemoteEnvironmentChanged(it)) },
+                enabled = uiState.isRemoteConfigured,
                 modifier = Modifier.testTag("UseRemoteEnvironmentSwitch"),
             )
         }
@@ -138,7 +147,7 @@ private fun DeveloperOptionsContentDarkPreview() {
     ChefAITheme(darkTheme = true) {
         Surface {
             DeveloperOptionsContent(
-                uiState = PreviewState.copy(environment = ApiEnvironment.REMOTE),
+                uiState = PreviewState.copy(remoteBaseUrl = "", isRemoteConfigured = false),
                 onAction = {},
             )
         }

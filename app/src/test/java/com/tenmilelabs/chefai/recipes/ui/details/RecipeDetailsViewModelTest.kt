@@ -768,4 +768,68 @@ class RecipeDetailsViewModelTest {
             cancelAndConsumeRemainingEvents()
         }
     }
+
+    @Test
+    fun `onNewDayPicked - appends a day with this recipe and confirms`() = runTest {
+        val plan = ownPlan()
+        mealPlanRepository.emitPlans(plan)
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+            awaitItem()
+
+            viewModel.onOpenSlotPicker(SlotPickerPurpose.MEAL_PLAN)
+            viewModel.onNewDayPicked(plan.uuid, MealSlot.DINNER)
+
+            assertThat(awaitItem().userMessage).isEqualTo(R.string.recipe_added_to_meal_plan)
+            cancelAndConsumeRemainingEvents()
+        }
+        val updated = mealPlanRepository.observeMealPlan(plan.uuid).first()!!
+        val newDay = updated.days.maxByOrNull { it.dayIndex }!!
+        assertThat(newDay.dayIndex).isEqualTo(plan.preferences.planLengthDays)
+        assertThat(newDay.dinnerRecipeId).isEqualTo(recipeId1)
+        assertThat(updated.preferences.planLengthDays).isEqualTo(plan.preferences.planLengthDays + 1)
+    }
+
+    @Test
+    fun `onNewDayPicked - repository failure shows an error`() = runTest {
+        val plan = ownPlan()
+        mealPlanRepository.emitPlans(plan)
+        mealPlanRepository.shouldThrowOnAssign = true
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+            awaitItem()
+
+            viewModel.onOpenSlotPicker(SlotPickerPurpose.MEAL_PLAN)
+            viewModel.onNewDayPicked(plan.uuid, MealSlot.LUNCH)
+
+            assertThat(awaitItem().userMessage).isEqualTo(R.string.recipe_add_to_plan_error)
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onCreatePlanWithRecipe - closes the picker and asks to open the wizard for this recipe`() = runTest {
+        mealPlanRepository.emitPlans(ownPlan())
+        initializeViewModel()
+
+        turbineScope {
+            val picker = viewModel.slotPicker.testIn(backgroundScope)
+            val effects = viewModel.effects.testIn(backgroundScope)
+            assertThat(picker.awaitItem()).isNull()
+
+            viewModel.onOpenSlotPicker(SlotPickerPurpose.MEAL_PLAN)
+            assertThat(picker.awaitItem()).isNotNull()
+
+            viewModel.onCreatePlanWithRecipe()
+
+            assertThat(picker.awaitItem()).isNull()
+            assertThat(effects.awaitItem()).isEqualTo(RecipeDetailsEffect.OpenMealPlanWizard(recipeId1))
+        }
+    }
 }
