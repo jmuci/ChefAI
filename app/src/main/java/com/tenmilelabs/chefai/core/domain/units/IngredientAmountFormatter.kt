@@ -33,7 +33,8 @@ object IngredientAmountFormatter {
             QuantityFormat.decimal(converted.quantity)
         }
         // A unitless ingredient reads "2", not "2 ".
-        val text = if (converted.unit.isBlank()) amount else "$amount ${converted.unit}"
+        val unitLabel = UnitNormalizer.withoutPlaceholder(converted.unit)
+        val text = if (unitLabel.isBlank()) amount else "$amount $unitLabel"
         return IngredientAmountLabel(text = text, isApproximate = converted.isApproximate)
     }
 }

@@ -43,6 +43,24 @@ class ShoppingListBuilderTest {
     }
 
     @Test
+    fun `the placeholder unit is shown as a bare count and merges with a unitless row`() {
+        // Catalog and scraped recipes write the literal "unit" for a line with no unit; it must
+        // not reach the screen ("2 unit") nor keep "2 unit + 1" apart from "3".
+        val recipeA = UUID.randomUUID()
+        val recipeB = UUID.randomUUID()
+        val ingredients = listOf(
+            ingredient(recipeA, 0, "eggs", 2.0, "unit"),
+            ingredient(recipeB, 0, "eggs", 1.0, ""),
+        )
+
+        val list = ShoppingListBuilder.build(
+            ingredients, mapOf(recipeA to 1, recipeB to 1), 0, emptySet(),
+        )
+
+        assertThat(list.allItems().single().quantityLabel).isEqualTo("3")
+    }
+
+    @Test
     fun `two spellings of the same unit add up instead of sitting side by side`() {
         // Scraped rows say whatever their page said. "300 g + 200 gram" is not a shopping
         // instruction, and it happens without any conversion being involved at all.

@@ -29,6 +29,16 @@ object UnitNormalizer {
         return SYNONYMS[bare.lowercase()]
     }
 
+    /**
+     * [raw] with the placeholder `"unit"` read as blank, for display. `ScrapedRecipeMapper`, the
+     * editor and the catalog seed all write that literal for an amount with no unit, so showing it
+     * verbatim reads "2 unit".
+     */
+    fun withoutPlaceholder(raw: String): String =
+        if (raw.trim().equals(PLACEHOLDER_UNIT, ignoreCase = true)) "" else raw
+
+    private const val PLACEHOLDER_UNIT = "unit"
+
     private val WHITESPACE = Regex("\\s+")
 
     private val CASE_SENSITIVE: Map<String, MeasurementUnit> = mapOf(
