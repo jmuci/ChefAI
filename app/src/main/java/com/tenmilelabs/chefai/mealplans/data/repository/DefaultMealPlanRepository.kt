@@ -2,8 +2,10 @@ package com.tenmilelabs.chefai.mealplans.data.repository
 
 import com.tenmilelabs.chefai.core.data.local.room.carryForwardCookedMarks
 import com.tenmilelabs.chefai.core.data.local.room.MealPlanDayEntity
+import com.tenmilelabs.chefai.core.data.local.room.RecipeCookEventEntity
 import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.MealPlanDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeCookEventDao
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.sync.SyncOrchestrator
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
@@ -29,6 +31,7 @@ import javax.inject.Singleton
 @Singleton
 class DefaultMealPlanRepository @Inject constructor(
     private val mealPlanDao: MealPlanDao,
+    private val recipeCookEventDao: RecipeCookEventDao,
     private val mealPlanNetworkDataSource: MealPlanNetworkDataSource,
     private val syncScheduler: SyncScheduler,
     private val syncOrchestrator: SyncOrchestrator,
@@ -148,11 +151,44 @@ class DefaultMealPlanRepository @Inject constructor(
     }
 
     override suspend fun setMealCooked(dayId: UUID, slot: MealSlot, cooked: Boolean) {
-        val cookedAt = if (cooked) System.currentTimeMillis() else null
-        when (slot) {
-            MealSlot.LUNCH -> mealPlanDao.setLunchCookedAt(dayId, cookedAt)
-            MealSlot.DINNER -> mealPlanDao.setDinnerCookedAt(dayId, cookedAt)
+        val day = mealPlanDao.getDayById(dayId) ?: return
+        val recipeId = when (slot) {
+            MealSlot.LUNCH -> day.lunchRecipeId
+            MealSlot.DINNER -> day.dinnerRecipeId
         }
+        val cookedAt = if (cooked) System.currentTimeMillis() else null
+        transactionRunner {
+            when (slot) {
+                MealSlot.LUNCH -> mealPlanDao.setLunchCookedAt(dayId, cookedAt)
+                MealSlot.DINNER -> mealPlanDao.setDinnerCookedAt(dayId, cookedAt)
+            }
+            if (recipeId != null) recordCookEvent(day, slot, recipeId, cookedAt)
+        }
+    }
+
+    /**
+     * Keeps the durable cook history in step with the slot's mark. Delete-then-insert makes
+     * re-marking an already-cooked slot idempotent (one event per slot and recipe), and un-marking
+     * removes the event, so an accidental tap that is undone leaves no history behind.
+     */
+    private suspend fun recordCookEvent(
+        day: MealPlanDayEntity,
+        slot: MealSlot,
+        recipeId: UUID,
+        cookedAt: Long?,
+    ) {
+        recipeCookEventDao.deleteForSlot(day.mealPlanId, day.dayIndex, slot.name, recipeId)
+        if (cookedAt == null) return
+        recipeCookEventDao.insert(
+            RecipeCookEventEntity(
+                uuid = UUID.randomUUID(),
+                recipeId = recipeId,
+                mealPlanId = day.mealPlanId,
+                dayIndex = day.dayIndex,
+                slot = slot.name,
+                cookedAt = cookedAt,
+            )
+        )
     }
 
     override suspend fun saveLocallyGeneratedDays(planId: UUID, days: List<MealPlanDay>) {

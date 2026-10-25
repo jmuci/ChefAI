@@ -104,8 +104,8 @@ fun RecipesContent(
             if (recipes.isEmpty() && selectedFilter != RecipeFilter.ALL) {
                 // The collection may well be non-empty; it's the filter that matched nothing.
                 EmptyContent(
-                    R.string.no_filtered_recipes_title,
-                    R.string.no_filtered_recipes_subtitle,
+                    selectedFilter.emptyTitleRes,
+                    selectedFilter.emptySubtitleRes,
                     R.drawable.ic_chef_hat_black_24dp
                 )
             } else if (recipes.isEmpty()) {

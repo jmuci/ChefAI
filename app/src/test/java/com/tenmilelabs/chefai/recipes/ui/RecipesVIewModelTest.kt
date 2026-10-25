@@ -19,6 +19,7 @@ import com.tenmilelabs.chefai.core.testutil.recipePreview1
 import com.tenmilelabs.chefai.core.testutil.recipePreview2
 import com.tenmilelabs.chefai.core.testutil.recipePreview3
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
+import com.tenmilelabs.chefai.recipes.data.repository.FakeCookHistoryRepository
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -40,6 +41,7 @@ class RecipesViewModelTest {
     private lateinit var viewModel: RecipesViewModel
     private lateinit var recipesRepository: FakeRecipesRepository
     private lateinit var collectionsRepository: FakeCollectionsRepository
+    private lateinit var cookHistoryRepository: FakeCookHistoryRepository
     private lateinit var sessionManager: SessionManager
     private lateinit var fakeSyncManager: FakeSyncManager
     private lateinit var syncStatusHolder: SyncStatusHolder
@@ -48,11 +50,12 @@ class RecipesViewModelTest {
     fun setup() {
         recipesRepository = FakeRecipesRepository()
         collectionsRepository = FakeCollectionsRepository()
+        cookHistoryRepository = FakeCookHistoryRepository()
         sessionManager = createRealSessionManagerWithFakes()
         fakeSyncManager = FakeSyncManager()
         syncStatusHolder = SyncStatusHolder()
 
-        viewModel = RecipesViewModel(recipesRepository, collectionsRepository, sessionManager, fakeSyncManager, syncStatusHolder)
+        viewModel = RecipesViewModel(recipesRepository, collectionsRepository, cookHistoryRepository, sessionManager, fakeSyncManager, syncStatusHolder)
     }
 
     /** Helper: seed the recipe "universe" and bookmark the given IDs. */
@@ -114,7 +117,7 @@ class RecipesViewModelTest {
         errorRepository.setShouldReturnErrorForGetRecipes(true)
         val errorCollections = FakeCollectionsRepository()
         errorCollections.setBookmarkedIds(setOf(recipeId1))
-        val testViewModel = RecipesViewModel(errorRepository, errorCollections, sessionManager, fakeSyncManager, syncStatusHolder)
+        val testViewModel = RecipesViewModel(errorRepository, errorCollections, cookHistoryRepository, sessionManager, fakeSyncManager, syncStatusHolder)
 
         testViewModel.uiState.test {
             val errorState = awaitItem()
@@ -138,7 +141,7 @@ class RecipesViewModelTest {
         errorRepository.setShouldReturnErrorForGetRecipes(true)
         val errorCollections = FakeCollectionsRepository()
         errorCollections.setBookmarkedIds(setOf(recipeId1))
-        val testViewModel = RecipesViewModel(errorRepository, errorCollections, sessionManager, fakeSyncManager, syncStatusHolder)
+        val testViewModel = RecipesViewModel(errorRepository, errorCollections, cookHistoryRepository, sessionManager, fakeSyncManager, syncStatusHolder)
 
         testViewModel.uiState.test {
             val errorState = awaitItem()
@@ -211,7 +214,7 @@ class RecipesViewModelTest {
         errorRepository.setShouldReturnErrorForGetRecipes(true)
         val errorCollections = FakeCollectionsRepository()
         errorCollections.setBookmarkedIds(setOf(recipeId1))
-        val testViewModel = RecipesViewModel(errorRepository, errorCollections, sessionManager, fakeSyncManager, syncStatusHolder)
+        val testViewModel = RecipesViewModel(errorRepository, errorCollections, cookHistoryRepository, sessionManager, fakeSyncManager, syncStatusHolder)
 
         testViewModel.uiState.test {
             val errorState = awaitItem()
@@ -247,7 +250,7 @@ class RecipesViewModelTest {
     fun `uiState handles transition from error to success`() = runTest {
         recipesRepository.setShouldReturnErrorForGetRecipes(true)
         collectionsRepository.setBookmarkedIds(setOf(recipeId1))
-        val errorViewModel = RecipesViewModel(recipesRepository, collectionsRepository, sessionManager, fakeSyncManager, syncStatusHolder)
+        val errorViewModel = RecipesViewModel(recipesRepository, collectionsRepository, cookHistoryRepository, sessionManager, fakeSyncManager, syncStatusHolder)
 
         errorViewModel.uiState.test {
             val errorState = awaitItem()
@@ -267,7 +270,7 @@ class RecipesViewModelTest {
         val successCollections = FakeCollectionsRepository()
         successRepository.setRecipePreviewsToEmit(TEST_DOMAIN_RECIPE_PREVIEWS_LIST)
         successCollections.setBookmarkedIds(setOf(recipeId1, recipeId2, recipeId3))
-        val successViewModel = RecipesViewModel(successRepository, successCollections, sessionManager, fakeSyncManager, syncStatusHolder)
+        val successViewModel = RecipesViewModel(successRepository, successCollections, cookHistoryRepository, sessionManager, fakeSyncManager, syncStatusHolder)
 
         successViewModel.uiState.test {
             val successState = awaitItem()
@@ -424,6 +427,65 @@ class RecipesViewModelTest {
             val state = awaitItem()
             assertThat(state.items).isEmpty()
             assertThat(state.selectedFilter).isEqualTo(RecipeFilter.DESSERT)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `selecting COOKED_BEFORE narrows items to recipes with cook history`() = runTest {
+        seedBookmarkedRecipes(
+            TEST_DOMAIN_RECIPE_PREVIEWS_LIST,
+            setOf(recipeId1, recipeId2, recipeId3)
+        )
+        cookHistoryRepository.setCookedRecipeIds(setOf(recipeId2))
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().items).hasSize(3)
+
+            viewModel.onFilterSelected(RecipeFilter.COOKED_BEFORE)
+
+            val filtered = awaitItem()
+            assertThat(filtered.selectedFilter).isEqualTo(RecipeFilter.COOKED_BEFORE)
+            assertThat(filtered.items.map { it.uuid }).containsExactly(recipeId2)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `COOKED_BEFORE list updates when a recipe is cooked`() = runTest {
+        seedBookmarkedRecipes(
+            TEST_DOMAIN_RECIPE_PREVIEWS_LIST,
+            setOf(recipeId1, recipeId2, recipeId3)
+        )
+
+        viewModel.uiState.test {
+            awaitItem()
+            viewModel.onFilterSelected(RecipeFilter.COOKED_BEFORE)
+            assertThat(awaitItem().items).isEmpty()
+
+            cookHistoryRepository.setCookedRecipeIds(setOf(recipeId1, recipeId3))
+
+            assertThat(awaitItem().items.map { it.uuid }).containsExactly(recipeId1, recipeId3)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `cook history for a recipe outside the collection does not leak into COOKED_BEFORE`() = runTest {
+        seedBookmarkedRecipes(
+            TEST_DOMAIN_RECIPE_PREVIEWS_LIST,
+            setOf(recipeId2)
+        )
+        cookHistoryRepository.setCookedRecipeIds(setOf(recipeId1))
+
+        viewModel.uiState.test {
+            awaitItem()
+            viewModel.onFilterSelected(RecipeFilter.COOKED_BEFORE)
+
+            assertThat(awaitItem().items).isEmpty()
 
             cancelAndIgnoreRemainingEvents()
         }

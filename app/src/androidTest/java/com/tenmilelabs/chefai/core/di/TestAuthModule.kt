@@ -24,9 +24,11 @@ import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.repository.ShoppingListRepository
 import com.tenmilelabs.chefai.recipes.data.network.SystemHostResolver
 import com.tenmilelabs.chefai.recipes.data.network.WebViewImageFetcher
+import com.tenmilelabs.chefai.recipes.data.repository.DefaultCookHistoryRepository
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeImporter
 import com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeRepository
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipeImporter
+import com.tenmilelabs.chefai.recipes.domain.repository.CookHistoryRepository
 import com.tenmilelabs.chefai.recipes.domain.repository.HostResolver
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipeImporter
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
@@ -138,6 +140,13 @@ abstract class TestRepositoryModule {
     @Binds
     @Singleton
     abstract fun bindCollectionsRepository(repository: DefaultCollectionsRepository): CollectionsRepository
+
+    /**
+     * Binds the cook-history repository (same as production).
+     */
+    @Binds
+    @Singleton
+    abstract fun bindCookHistoryRepository(repository: DefaultCookHistoryRepository): CookHistoryRepository
 
     /**
      * Binds the meal plan repository (same as production).

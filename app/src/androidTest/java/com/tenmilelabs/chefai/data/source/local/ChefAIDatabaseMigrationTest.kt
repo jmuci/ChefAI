@@ -14,6 +14,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_7_8
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_8_9
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_9_10
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_10_11
+import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_11_12
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -504,13 +505,73 @@ class ChefAIDatabaseMigrationTest {
     }
 
     @Test
-    fun migrateAll1To11_succeeds() {
+    fun migrate11To12_backfillsCookEventsFromExistingCookedMarks() {
+        val planId = UUID.randomUUID()
+        val userId = UUID.randomUUID()
+        val dinnerId = UUID.randomUUID()
+        val lunchId = UUID.randomUUID()
+        val uncookedId = UUID.randomUUID()
+
+        helper.createDatabase(TEST_DB, 11).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO users (uuid, displayName, email, avatarUrl, updatedAt, deletedAt, syncState)
+                VALUES (?, 'Tester', 'tester@example.com', '', 1, NULL, 'SYNCED')
+                """.trimIndent(),
+                arrayOf(userId.toBlob())
+            )
+            db.execSQL(
+                """
+                INSERT INTO meal_plans (
+                    uuid, userId, name, status, preferencesJson, createdAt, updatedAt,
+                    deletedAt, syncState
+                ) VALUES (?, ?, 'Plan', 'READY', '{}', 1, 1, NULL, 'SYNCED')
+                """.trimIndent(),
+                arrayOf(planId.toBlob(), userId.toBlob())
+            )
+            // Day 0: dinner and lunch both cooked. Day 1: nothing cooked.
+            db.execSQL(
+                """
+                INSERT INTO meal_plan_days (
+                    uuid, mealPlanId, dayIndex, dinnerRecipeId, lunchRecipeId, dinnerCookedAt, lunchCookedAt
+                ) VALUES (?, ?, 0, ?, ?, 111, 222)
+                """.trimIndent(),
+                arrayOf(UUID.randomUUID().toBlob(), planId.toBlob(), dinnerId.toBlob(), lunchId.toBlob())
+            )
+            db.execSQL(
+                """
+                INSERT INTO meal_plan_days (
+                    uuid, mealPlanId, dayIndex, dinnerRecipeId, lunchRecipeId, dinnerCookedAt, lunchCookedAt
+                ) VALUES (?, ?, 1, ?, NULL, NULL, NULL)
+                """.trimIndent(),
+                arrayOf(UUID.randomUUID().toBlob(), planId.toBlob(), uncookedId.toBlob())
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 12, true, MIGRATION_11_12)
+
+        db.query("SELECT recipeId, dayIndex, slot, cookedAt FROM recipe_cook_events ORDER BY cookedAt").use { cursor ->
+            assertEquals("only the two cooked slots become events", 2, cursor.count)
+            assertTrue(cursor.moveToFirst())
+            assertTrue(dinnerId.toBlob().contentEquals(cursor.getBlob(0)))
+            assertEquals(0, cursor.getInt(1))
+            assertEquals("DINNER", cursor.getString(2))
+            assertEquals(111L, cursor.getLong(3))
+            assertTrue(cursor.moveToNext())
+            assertTrue(lunchId.toBlob().contentEquals(cursor.getBlob(0)))
+            assertEquals("LUNCH", cursor.getString(2))
+            assertEquals(222L, cursor.getLong(3))
+        }
+    }
+
+    @Test
+    fun migrateAll1To12_succeeds() {
         helper.createDatabase(TEST_DB, 1).close()
 
         helper.runMigrationsAndValidate(
-            TEST_DB, 11, true,
+            TEST_DB, 12, true,
             MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
         )
     }
 }
