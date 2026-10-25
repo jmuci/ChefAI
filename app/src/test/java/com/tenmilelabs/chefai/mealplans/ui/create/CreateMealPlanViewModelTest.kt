@@ -80,6 +80,7 @@ class CreateMealPlanViewModelTest {
 
     private fun createViewModel(
         recipeCount: Int = recipesRepository.fakeRecipeCount,
+        savedStateHandle: androidx.lifecycle.SavedStateHandle = androidx.lifecycle.SavedStateHandle(),
     ): CreateMealPlanViewModel {
         recipesRepository.fakeRecipeCount = recipeCount
         val generateMealPlanUseCase = GenerateMealPlanUseCase(
@@ -93,7 +94,7 @@ class CreateMealPlanViewModelTest {
             sessionManager = sessionManager,
             recipesRepository = recipesRepository,
             generateMealPlanUseCase = generateMealPlanUseCase,
-            savedStateHandle = androidx.lifecycle.SavedStateHandle(),
+            savedStateHandle = savedStateHandle,
         )
     }
 
@@ -220,6 +221,59 @@ class CreateMealPlanViewModelTest {
     fun `SetVarietyPreference updates varietyPreference`() = runTest {
         viewModel.onAction(WizardAction.SetVarietyPreference(VarietyPreference.HIGH))
         assertThat(viewModel.uiState.value.varietyPreference).isEqualTo(VarietyPreference.HIGH)
+    }
+
+    // --- Included recipe ---
+
+    private fun wizardFor(recipeId: UUID) = createViewModel(
+        savedStateHandle = androidx.lifecycle.SavedStateHandle(
+            mapOf(com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.RECIPE_ID_ARG to recipeId.toString())
+        )
+    )
+
+    private suspend fun savedPlanDays(event: CreateMealPlanEvent): List<MealPlanDay> {
+        val id = when (event) {
+            is CreateMealPlanEvent.MealPlanReady -> event.mealPlanId
+            is CreateMealPlanEvent.MealPlanSavedAsDraft -> event.mealPlanId
+            else -> error("unexpected event $event")
+        }
+        return repository.observeMealPlan(id).first()?.days.orEmpty()
+    }
+
+    @Test
+    fun `SaveMealPlan puts the included recipe in day 1 dinner after generation`() = runTest {
+        val recipeId = UUID.randomUUID()
+        repository.daysFromServer = listOf(serverDay())
+        val wizard = wizardFor(recipeId)
+
+        wizard.uiEvents.test {
+            wizard.onAction(WizardAction.SaveMealPlan)
+            val days = savedPlanDays(awaitItem())
+            assertThat(days.single { it.dayIndex == 0 }.dinnerRecipeId).isEqualTo(recipeId)
+        }
+    }
+
+    @Test
+    fun `SaveMealPlan with an included recipe reports ready even when generation found nothing`() = runTest {
+        val recipeId = UUID.randomUUID()
+        val wizard = wizardFor(recipeId)
+
+        wizard.uiEvents.test {
+            wizard.onAction(WizardAction.SaveMealPlan)
+            val event = awaitItem()
+            assertThat(event).isInstanceOf(CreateMealPlanEvent.MealPlanReady::class.java)
+            assertThat(savedPlanDays(event).single().dinnerRecipeId).isEqualTo(recipeId)
+        }
+    }
+
+    @Test
+    fun `SaveMealPlan without an included recipe is unchanged`() = runTest {
+        viewModel.uiEvents.test {
+            viewModel.onAction(WizardAction.SaveMealPlan)
+            val event = awaitItem()
+            assertThat(event).isInstanceOf(CreateMealPlanEvent.MealPlanSavedAsDraft::class.java)
+            assertThat(savedPlanDays(event)).isEmpty()
+        }
     }
 
     // --- Save ---
