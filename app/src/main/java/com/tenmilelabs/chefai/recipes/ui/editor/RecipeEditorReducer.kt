@@ -319,15 +319,16 @@ object RecipeEditorReducer {
         return copy(isFormValid = isValid)
     }
 
+    /** Sets the recipe's language as an explicit user choice, which also settles any pending confirmation. */
+    private fun RecipeEditorState.withConfirmedLanguage(code: String): RecipeEditorState = copy(
+        recipeFields = recipeFields.copy(languageCode = code, languageNeedsConfirmation = false)
+    ).markDirty()
+
     /**
      * Computes [RecipeEditorState.isDirty] by comparing current form state to the original snapshot.
      * - Create mode: dirty if any required field is non-empty.
      * - Edit mode: dirty if current fields differ from [originalDraft].
      */
-    private fun RecipeEditorState.withConfirmedLanguage(code: String): RecipeEditorState = copy(
-        recipeFields = recipeFields.copy(languageCode = code, languageNeedsConfirmation = false)
-    ).markDirty()
-
     private fun RecipeEditorState.markDirty(): RecipeEditorState {
         if (originalDraft == null) {
             // Create mode
