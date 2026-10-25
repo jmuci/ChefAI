@@ -46,6 +46,13 @@ class DefaultHomeRecipeSidecarRepository @Inject constructor(
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : HomeRecipeSidecarRepository {
 
+    override suspend fun hasAllRecipes(recipeIds: Collection<UUID>): Boolean = withContext(ioDispatcher) {
+        val wanted = recipeIds.toSet()
+        // Chunked to stay under SQLite's bound-variable limit.
+        val found = wanted.chunked(500).flatMapTo(mutableSetOf()) { recipeDao.getExistingIds(it) }
+        found.containsAll(wanted)
+    }
+
     override suspend fun upsertSidecar(sidecar: HomeSidecarDto): Int = withContext(ioDispatcher) {
         transactionRunner {
             // 1. Upsert reference data first (FK order: creators → tags → labels), unconditionally —

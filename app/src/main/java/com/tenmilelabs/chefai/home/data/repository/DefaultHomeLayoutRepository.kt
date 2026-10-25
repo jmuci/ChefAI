@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.serialization.json.Json
 import timber.log.Timber
+import java.util.UUID
 import javax.inject.Inject
 
 class DefaultHomeLayoutRepository @Inject constructor(
@@ -28,7 +29,14 @@ class DefaultHomeLayoutRepository @Inject constructor(
 
     override fun getHomeLayout(): Flow<HomeLayoutModel> = flow {
         // 1. Try disk cache first (stale-while-revalidate)
-        val cached = cacheDataSource.readCachedLayout()
+        // The cache file and Room are separate stores and can diverge (DB reset, failed sidecar write).
+        // Cards with no backing recipe render nothing, and a 304 would never re-seed them, so a cache
+        // whose recipes are missing is discarded and refetched without If-None-Match.
+        val cached = cacheDataSource.readCachedLayout()?.takeIf { layout ->
+            sidecarRepository.hasAllRecipes(layout.recipeIds()).also { backed ->
+                if (!backed) Timber.w("SDUI: Cached layout references recipes missing from Room — ignoring cache")
+            }
+        }
         var emittedFreshLayout = false
         if (cached != null) {
             Timber.d("SDUI: Found cached layout. Checksum: ${cached.layoutChecksum} and ${cached.components.size} components.")
@@ -128,4 +136,18 @@ private fun HomeLayoutModel.knownComponentCount(): Int = components.sumOf { comp
         is ComponentModel.Carousel -> component.items.count { it !is ComponentModel.Unknown }
         else -> 1
     }
+}
+
+private fun HomeLayoutModel.recipeIds(): Set<UUID> = buildSet {
+    fun visit(component: ComponentModel) {
+        val id = when (component) {
+            is ComponentModel.LargeCard -> component.recipeId
+            is ComponentModel.SquaredCard -> component.recipeId
+            is ComponentModel.ListCard -> component.recipeId
+            is ComponentModel.Carousel -> { component.items.forEach(::visit); null }
+            else -> null
+        }
+        id?.let { runCatching { UUID.fromString(it) }.getOrNull() }?.let(::add)
+    }
+    components.forEach(::visit)
 }

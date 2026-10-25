@@ -150,6 +150,8 @@ class FakeRecipeDao : RecipeDao {
 
     override suspend fun getRecipeById(uuid: UUID): RecipeEntity? = recipes[uuid]
 
+    override suspend fun getExistingIds(uuids: List<UUID>): List<UUID> = uuids.filter { it in recipes }
+
     override fun observeRecipeById(uuid: UUID): Flow<RecipeEntity?> = trigger.map { recipes[uuid] }
 
     override suspend fun getRecipeWithDetails(uuid: UUID): RecipeWithDetails? {
