@@ -20,7 +20,6 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.ktor.client.HttpClient
-import io.ktor.client.engine.cio.CIO
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.HttpTimeout
@@ -80,6 +79,13 @@ object NetworkModule {
         remoteConfigured = BuildConfig.REMOTE_API_CONFIGURED,
     )
 
+    /**
+     * Engine is OkHttp, not CIO: CIO's TLS handshake on Android calls the legacy 2-arg
+     * `checkServerTrusted`, which Android's `RootTrustManager` rejects with a `CertificateException`
+     * as soon as the app's network security config declares any `<domain-config>` (the debug
+     * config does, for cleartext to a local backend) — so every HTTPS call to the deployed API
+     * failed in debug builds. See https://github.com/ktorio/ktor/issues/1029.
+     */
     @Provides
     @Singleton
     fun provideHttpClient(
@@ -87,7 +93,7 @@ object NetworkModule {
         json: Json,
         apiEnvironmentRepository: ApiEnvironmentRepository,
         apiBaseUrls: ApiBaseUrls,
-    ) = HttpClient(CIO) {
+    ) = HttpClient(OkHttp) {
         expectSuccess = true
 
         // Debug only: Developer options can point the build at the deployed backend.

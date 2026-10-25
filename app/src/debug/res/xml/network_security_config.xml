@@ -6,10 +6,9 @@
   This lives in src/debug precisely so it cannot reach a release build: release keeps the platform
   default for API 28+, which denies cleartext outright.
 
-  Without this the app happens to work anyway, because Ktor's CIO engine opens raw sockets and never
-  consults NetworkSecurityPolicy. Anything built on OkHttp — Coil, notably — does consult it and
-  would fail. Stating the permission explicitly means switching HTTP engines, or pointing Coil at a
-  local backend, doesn't break in a way that looks like a server fault.
+  Every HTTP client in the app is OkHttp-based, so this config applies to all of them (Ktor and
+  Coil alike). Note that declaring any <domain-config> makes Android reject Ktor CIO's TLS
+  handshake for every host, which is why the main client does not use CIO.
 -->
 <network-security-config>
     <domain-config cleartextTrafficPermitted="true">
