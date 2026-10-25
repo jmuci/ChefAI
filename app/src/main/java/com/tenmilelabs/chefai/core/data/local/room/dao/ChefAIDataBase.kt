@@ -14,6 +14,7 @@ import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.LabelEntity
 import com.tenmilelabs.chefai.core.data.local.room.MealPlanDayEntity
 import com.tenmilelabs.chefai.core.data.local.room.MealPlanEntity
+import com.tenmilelabs.chefai.core.data.local.room.RecipeCookEventEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeDraftEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeImageStateEntity
@@ -39,6 +40,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         LabelEntity::class,
         MealPlanEntity::class,
         MealPlanDayEntity::class,
+        RecipeCookEventEntity::class,
         RecipeDraftEntity::class,
         RecipeEntity::class,
         RecipeImageStateEntity::class,
@@ -52,7 +54,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         TagEntity::class,
         UserEntity::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = true
 )
 @TypeConverters(UuidConverters::class)
@@ -62,6 +64,7 @@ abstract class ChefAIDataBase : RoomDatabase() {
     abstract fun ingredientDao(): IngredientDao
     abstract fun labelDao(): LabelDao
     abstract fun recipeDao(): RecipeDao
+    abstract fun recipeCookEventDao(): RecipeCookEventDao
     abstract fun recipeImageStateDao(): RecipeImageStateDao
     abstract fun recipeIngredientDao(): RecipeIngredientDao
     abstract fun recipeStepDao(): RecipeStepDao
@@ -349,5 +352,48 @@ val MIGRATION_10_11 = object : Migration(10, 11) {
         db.execSQL("ALTER TABLE recipes ADD COLUMN language TEXT")
         db.execSQL("ALTER TABLE recipe_drafts ADD COLUMN language TEXT")
         db.execSQL("ALTER TABLE recipe_drafts ADD COLUMN languageNeedsConfirmation INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
+/**
+ * Adds `recipe_cook_events`, the durable "cooked before" history (#273), and backfills it from the
+ * cooked marks already sitting on `meal_plan_days` so nobody's existing history is lost.
+ *
+ * Each non-null `dinnerCookedAt` / `lunchCookedAt` whose slot still holds a recipe becomes one
+ * event. The ids are `randomblob(16)` rather than UUIDv7s: this table is local-only and never
+ * ordered by id, so time-sortability buys nothing here.
+ */
+val MIGRATION_11_12 = object : Migration(11, 12) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `recipe_cook_events` (
+                `uuid` BLOB NOT NULL, `recipeId` BLOB NOT NULL, `mealPlanId` BLOB NOT NULL,
+                `dayIndex` INTEGER NOT NULL, `slot` TEXT NOT NULL, `cookedAt` INTEGER NOT NULL,
+                PRIMARY KEY(`uuid`)
+            )
+            """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_recipe_cook_events_recipeId` ON `recipe_cook_events` (`recipeId`)")
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_recipe_cook_events_mealPlanId_dayIndex_slot` " +
+                "ON `recipe_cook_events` (`mealPlanId`, `dayIndex`, `slot`)"
+        )
+        db.execSQL(
+            """
+            INSERT INTO recipe_cook_events (uuid, recipeId, mealPlanId, dayIndex, slot, cookedAt)
+            SELECT randomblob(16), dinnerRecipeId, mealPlanId, dayIndex, 'DINNER', dinnerCookedAt
+            FROM meal_plan_days
+            WHERE dinnerCookedAt IS NOT NULL AND dinnerRecipeId IS NOT NULL
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            INSERT INTO recipe_cook_events (uuid, recipeId, mealPlanId, dayIndex, slot, cookedAt)
+            SELECT randomblob(16), lunchRecipeId, mealPlanId, dayIndex, 'LUNCH', lunchCookedAt
+            FROM meal_plan_days
+            WHERE lunchCookedAt IS NOT NULL AND lunchRecipeId IS NOT NULL
+            """.trimIndent()
+        )
     }
 }

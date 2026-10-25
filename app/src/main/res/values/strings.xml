@@ -65,6 +65,8 @@
     <string name="no_recipes_subtitle">Start browsing recipes and bookmark the ones you like to populate your collection.</string>
     <string name="no_recipes_title">No recipes in your collection</string>
     <string name="no_filtered_recipes_title">No matching recipes</string>
+    <string name="no_cooked_recipes_title">Nothing cooked yet</string>
+    <string name="no_cooked_recipes_subtitle">You haven\'t cooked anything yet. Mark a meal as cooked in your meal plan and it will show up here.</string>
     <string name="no_filtered_recipes_subtitle">None of the recipes in your collection match this filter. Try another one, or tap All.</string>
     <string name="no_steps_listed">No steps listed for this recipe.</string>
     <string name="nutrition_calories_format">%1$d kcal</string>
@@ -116,6 +118,7 @@
     <string name="recipes_subtitle">Browse recipes and pick your next meal.</string>
     <string name="recipes_title">Ready to cook?</string>
     <string name="recipe_filter_all">All</string>
+    <string name="recipe_filter_cooked_before">Cooked before</string>
     <string name="recipe_add_to_meal_plan">Add to Meal Plan</string>
     <string name="recipe_add_to_grocery_list_content_description">Add to grocery list</string>
     <string name="save_button">Save</string>

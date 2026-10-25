@@ -89,6 +89,10 @@ interface MealPlanDao {
     @Query("SELECT * FROM meal_plan_days WHERE uuid = :dayId")
     fun observeDayById(dayId: UUID): Flow<MealPlanDayEntity?>
 
+    /** One-shot read of a single day by its own id. */
+    @Query("SELECT * FROM meal_plan_days WHERE uuid = :dayId")
+    suspend fun getDayById(dayId: UUID): MealPlanDayEntity?
+
     @Upsert
     suspend fun upsertDays(days: List<MealPlanDayEntity>)
 

@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeMealPlanDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeCookEventDao
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import com.tenmilelabs.chefai.core.data.sync.SyncOrchestrator
@@ -35,6 +36,7 @@ import java.util.UUID
 class DefaultMealPlanRepositoryTest {
 
     private lateinit var mealPlanDao: FakeMealPlanDao
+    private lateinit var cookEventDao: FakeRecipeCookEventDao
     private lateinit var networkDataSource: FakeMealPlanNetworkDataSource
     private lateinit var syncScheduler: FakeSyncManager
     private lateinit var syncOrchestrator: SyncOrchestrator
@@ -43,11 +45,13 @@ class DefaultMealPlanRepositoryTest {
     @Before
     fun setup() {
         mealPlanDao = FakeMealPlanDao()
+        cookEventDao = FakeRecipeCookEventDao()
         networkDataSource = FakeMealPlanNetworkDataSource()
         syncScheduler = FakeSyncManager()
         syncOrchestrator = mockk(relaxed = true)
         repository = DefaultMealPlanRepository(
-            mealPlanDao, networkDataSource, syncScheduler, syncOrchestrator, FakeTransactionRunner(),
+            mealPlanDao, cookEventDao, networkDataSource, syncScheduler, syncOrchestrator,
+            FakeTransactionRunner(),
         )
     }
 
@@ -239,6 +243,70 @@ class DefaultMealPlanRepositoryTest {
 
         val day = repository.observeMealPlan(plan.uuid).first()!!.days.single()
         assertThat(day.dinnerCookedAt).isNull()
+    }
+
+    @Test
+    fun `setMealCooked records a cook event for the slot's recipe`() = runTest {
+        val plan = planWithOneDay()
+        repository.createMealPlan(plan)
+        val day = plan.days.single()
+
+        repository.setMealCooked(day.uuid, MealSlot.DINNER, cooked = true)
+
+        val event = cookEventDao.all.single()
+        assertThat(event.recipeId).isEqualTo(day.dinnerRecipeId)
+        assertThat(event.mealPlanId).isEqualTo(plan.uuid)
+        assertThat(event.dayIndex).isEqualTo(0)
+        assertThat(event.slot).isEqualTo("DINNER")
+    }
+
+    @Test
+    fun `setMealCooked is idempotent for an already cooked slot`() = runTest {
+        val plan = planWithOneDay()
+        repository.createMealPlan(plan)
+        val dayId = plan.days.single().uuid
+
+        repository.setMealCooked(dayId, MealSlot.DINNER, cooked = true)
+        repository.setMealCooked(dayId, MealSlot.DINNER, cooked = true)
+
+        assertThat(cookEventDao.all).hasSize(1)
+    }
+
+    @Test
+    fun `setMealCooked with cooked=false removes the slot's cook event`() = runTest {
+        val plan = planWithOneDay()
+        repository.createMealPlan(plan)
+        val dayId = plan.days.single().uuid
+        repository.setMealCooked(dayId, MealSlot.DINNER, cooked = true)
+        repository.setMealCooked(dayId, MealSlot.LUNCH, cooked = true)
+
+        repository.setMealCooked(dayId, MealSlot.DINNER, cooked = false)
+
+        assertThat(cookEventDao.all.map { it.slot }).containsExactly("LUNCH")
+    }
+
+    @Test
+    fun `cook history survives the slot being given a different recipe`() = runTest {
+        val plan = planWithOneDay()
+        repository.createMealPlan(plan)
+        val day = plan.days.single()
+        repository.setMealCooked(day.uuid, MealSlot.DINNER, cooked = true)
+
+        // When: the slot is swapped (clears the mark) and the new recipe is marked, then unmarked
+        val replacement = UUID.randomUUID()
+        repository.assignRecipeToSlot(plan.uuid, dayIndex = 0, slot = MealSlot.DINNER, recipeId = replacement)
+        repository.setMealCooked(day.uuid, MealSlot.DINNER, cooked = true)
+        repository.setMealCooked(day.uuid, MealSlot.DINNER, cooked = false)
+
+        // Then: only the original recipe's event remains
+        assertThat(cookEventDao.all.map { it.recipeId }).containsExactly(day.dinnerRecipeId)
+    }
+
+    @Test
+    fun `setMealCooked for an unknown day records nothing`() = runTest {
+        repository.setMealCooked(UUID.randomUUID(), MealSlot.DINNER, cooked = true)
+
+        assertThat(cookEventDao.all).isEmpty()
     }
 
     // --- saveLocallyGeneratedDays ---

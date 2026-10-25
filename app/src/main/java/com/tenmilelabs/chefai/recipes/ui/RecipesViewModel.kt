@@ -12,6 +12,7 @@ import com.tenmilelabs.chefai.core.data.sync.SyncStatusHolder
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.util.Async
 import com.tenmilelabs.chefai.core.util.WhileUiSubscribed
+import com.tenmilelabs.chefai.recipes.domain.repository.CookHistoryRepository
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -53,6 +54,7 @@ sealed interface RecipesUiEvent {
 class RecipesViewModel @Inject constructor(
     recipesRepository: RecipesRepository,
     collectionsRepository: CollectionsRepository,
+    cookHistoryRepository: CookHistoryRepository,
     sessionManager: SessionManager,
     private val syncScheduler: SyncScheduler,
     private val syncStatusHolder: SyncStatusHolder,
@@ -88,8 +90,9 @@ class RecipesViewModel @Inject constructor(
         }
 
     val uiState: StateFlow<RecipesUiState> = combine(
-        _isLoading, _recipesAsync, _selectedFilter, syncStatusHolder.syncStatus
-    ) { isLoading, recipesAsync, selectedFilter, syncStatus ->
+        _isLoading, _recipesAsync, _selectedFilter, cookHistoryRepository.observeCookedRecipeIds(),
+        syncStatusHolder.syncStatus
+    ) { isLoading, recipesAsync, selectedFilter, cookedRecipeIds, syncStatus ->
         val isRefreshing = syncStatus is SyncStatus.Syncing
         when (recipesAsync) {
             Async.Loading -> {
@@ -108,7 +111,7 @@ class RecipesViewModel @Inject constructor(
             }
             is Async.Success -> {
                 RecipesUiState(
-                    items = recipesAsync.data.filter(selectedFilter::matches),
+                    items = recipesAsync.data.filter { selectedFilter.matches(it, cookedRecipeIds) },
                     selectedFilter = selectedFilter,
                     isLoading = isLoading,
                     isRefreshing = isRefreshing,

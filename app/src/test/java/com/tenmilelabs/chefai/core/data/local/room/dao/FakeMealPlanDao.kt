@@ -104,6 +104,8 @@ class FakeMealPlanDao : MealPlanDao {
     override fun observeDayById(dayId: UUID): Flow<MealPlanDayEntity?> =
         daysFlow.map { it[dayId] }
 
+    override suspend fun getDayById(dayId: UUID): MealPlanDayEntity? = days[dayId]
+
     override suspend fun upsertDays(days: List<MealPlanDayEntity>) {
         days.forEach { this.days[it.uuid] = it }
         notifyDaysChange()

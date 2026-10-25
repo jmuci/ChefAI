@@ -57,4 +57,22 @@ class RecipeFilterTest {
 
         assertThat(RecipeFilter.DESSERT.matches(recipe)).isFalse()
     }
+
+    @Test
+    fun `COOKED_BEFORE matches only recipes in the cooked set`() {
+        val cooked = setOf(plain.uuid)
+
+        assertThat(RecipeFilter.COOKED_BEFORE.matches(plain, cooked)).isTrue()
+        assertThat(RecipeFilter.COOKED_BEFORE.matches(plain.copy(uuid = UUID.randomUUID()), cooked)).isFalse()
+    }
+
+    @Test
+    fun `COOKED_BEFORE matches nothing when no history is supplied`() {
+        assertThat(RecipeFilter.COOKED_BEFORE.matches(plain)).isFalse()
+    }
+
+    @Test
+    fun `other filters ignore the cooked set`() {
+        assertThat(RecipeFilter.ALL.matches(plain, emptySet())).isTrue()
+    }
 }
