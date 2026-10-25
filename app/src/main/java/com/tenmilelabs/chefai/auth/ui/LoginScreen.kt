@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.core.ui.components.AppVersionText
 import com.tenmilelabs.chefai.core.ui.components.ChefAIWordmark
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatBlockButton
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatCheckbox
@@ -58,6 +59,7 @@ import com.tenmilelabs.chefai.core.ui.components.flat.flatToggleable
 import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.core.ui.theme.chefColors
+import com.tenmilelabs.chefai.core.util.appVersionLabel
 import com.tenmilelabs.chefai.developeroptions.ui.DeveloperOptionsLink
 
 @Composable
@@ -109,6 +111,7 @@ fun LoginScreen(
         onLoginClick = viewModel::onLoginClick,
         onCreateAccountClick = viewModel::onCreateAccountClick,
         onDeveloperOptionsClick = onNavigateToDeveloperOptions,
+        appVersion = appVersionLabel,
     )
 }
 
@@ -125,6 +128,7 @@ fun LoginScreenContent(
     onLoginClick: () -> Unit = {},
     onCreateAccountClick: () -> Unit = {},
     onDeveloperOptionsClick: (() -> Unit)? = null,
+    appVersion: String,
 ) {
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -231,13 +235,16 @@ fun LoginScreenContent(
                 }
             }
 
-            if (onDeveloperOptionsClick != null) {
-                DeveloperOptionsLink(
-                    onClick = onDeveloperOptionsClick,
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(horizontal = dimensionResource(id = R.dimen.padding_medium)),
-                )
+            // The version sits right under the Developer options link, or alone on release builds.
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(horizontal = dimensionResource(id = R.dimen.padding_medium)),
+            ) {
+                if (onDeveloperOptionsClick != null) {
+                    DeveloperOptionsLink(onClick = onDeveloperOptionsClick)
+                }
+                AppVersionText(version = appVersion)
             }
         }
     }
@@ -418,6 +425,7 @@ private fun LoginScreenPreview() {
             ),
             focusManager = LocalFocusManager.current,
             onDeveloperOptionsClick = {},
+            appVersion = "1.0-a1b2c3d-debug",
         )
     }
 }
@@ -433,6 +441,7 @@ private fun LoginScreenDarkPreview() {
             ),
             focusManager = LocalFocusManager.current,
             onDeveloperOptionsClick = {},
+            appVersion = "1.0-a1b2c3d-debug",
         )
     }
 }

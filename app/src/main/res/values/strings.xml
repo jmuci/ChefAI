@@ -375,6 +375,7 @@
 
     <!-- Developer options (debug builds only) -->
     <string name="developer_options_link">Developer options</string>
+    <string name="app_version_label">Version %1$s</string>
     <string name="developer_options_environment_title">Environment</string>
     <string name="developer_options_use_remote">Use remote environment</string>
     <string name="developer_options_remote_not_configured">Remote is disabled in this build (chefaiApiBaseUrl was blank). Set it to an https:// URL and rebuild.</string>

@@ -31,11 +31,13 @@ import com.tenmilelabs.chefai.core.domain.model.RecipeLanguage
 import com.tenmilelabs.chefai.core.domain.model.WeekStart
 import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
 import com.tenmilelabs.chefai.core.ui.language.labelRes
+import com.tenmilelabs.chefai.core.ui.components.AppVersionText
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatRadio
 import com.tenmilelabs.chefai.core.ui.components.flat.MinHitTarget
 import com.tenmilelabs.chefai.core.ui.components.flat.RuledGroup
 import com.tenmilelabs.chefai.core.ui.components.flat.flatSelectable
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
+import com.tenmilelabs.chefai.core.util.appVersionLabel
 import com.tenmilelabs.chefai.developeroptions.ui.DeveloperOptionsLink
 
 @Composable
@@ -51,6 +53,7 @@ fun SettingsScreen(
         uiState = uiState,
         onAction = viewModel::onAction,
         onDeveloperOptionsClick = onNavigateToDeveloperOptions,
+        appVersion = appVersionLabel,
         modifier = modifier,
     )
 }
@@ -62,6 +65,7 @@ fun SettingsContent(
     modifier: Modifier = Modifier,
     /** `null` hides the Developer options section — the caller passes one on debug builds only. */
     onDeveloperOptionsClick: (() -> Unit)? = null,
+    appVersion: String,
 ) {
     Column(
         modifier = modifier
@@ -136,6 +140,16 @@ fun SettingsContent(
         if (onDeveloperOptionsClick != null) {
             DeveloperOptionsSection(onClick = onDeveloperOptionsClick)
         }
+
+        // Last thing on the screen, under Developer options on debug builds.
+        AppVersionText(
+            version = appVersion,
+            modifier = Modifier.padding(
+                start = SettingsMetrics.HorizontalPadding,
+                end = SettingsMetrics.HorizontalPadding,
+                top = SettingsMetrics.SectionGap,
+            ),
+        )
     }
 }
 
@@ -291,6 +305,7 @@ private fun SettingsContentPreview() {
                 ),
                 onAction = {},
                 onDeveloperOptionsClick = {},
+                appVersion = "1.0-a1b2c3d-debug",
             )
         }
     }
@@ -305,6 +320,7 @@ private fun SettingsContentDarkPreview() {
                 uiState = SettingsUiState(measurementSystem = MeasurementSystem.AS_WRITTEN),
                 onAction = {},
                 onDeveloperOptionsClick = {},
+                appVersion = "1.0-a1b2c3d-debug",
             )
         }
     }
