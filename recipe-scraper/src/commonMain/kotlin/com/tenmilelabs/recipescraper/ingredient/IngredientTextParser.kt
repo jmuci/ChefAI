@@ -72,7 +72,8 @@ internal fun parseIngredient(raw: String, language: String? = null): ScrapedIngr
         .joinToString(" ")
         .removePrefix("of ")
         .removePrefix("Of ")
-        .let { if (language == "es" && quantity != null) it.removeSpanishConnector() else it }
+        // Only behind a unit: without one, a leading "de"/"del" may belong to the name itself.
+        .let { if (language == "es" && unit != null) it.removeSpanishConnector() else it }
         .trim()
         // A line that was nothing but an amount still needs a usable label.
         .ifEmpty { text }
@@ -252,7 +253,11 @@ private val UNITS: Map<String, String> = buildMap {
     unit("piece", "pieces")
     unit("sheet", "sheets")
 
-    // Spanish, mapped onto the same canonical forms.
+    // Spanish, mapped onto the same canonical forms. Recognised whatever the page's language: none
+    // of these is an English word, and a unit is only looked for right after an amount, so a
+    // coincidence elsewhere is unlikely. Not none at all — "sobre" is also Portuguese for "on",
+    // "bote" a Portuguese boat — but "2 sobre …" on a Portuguese page is rare enough that the
+    // worst case, one line with a spurious "package" unit, is cheaper than per-language tables.
     unit("cup", "taza", "tazas")
     unit("tbsp", "cucharada", "cucharadas", "cda", "cdas")
     unit("tsp", "cucharadita", "cucharaditas", "cdta", "cdtas", "cdita", "cditas")

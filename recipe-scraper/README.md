@@ -65,17 +65,22 @@ Markup signals are read most specific first: the recipe's own `inLanguage` (JSON
 `contentLanguage` argument (the HTTP header). The highest-priority one is cross-checked against the
 recipe's text, scored by counting common words from six language profiles (en, es, pt, fr, it, de):
 
-| Markup                | Text         | Result         |
-|-----------------------|--------------|----------------|
-| agrees                | confident    | markup, HIGH   |
-| absent                | confident    | text, HIGH     |
-| disagrees             | confident    | text, LOW      |
-| explicit `inLanguage` | inconclusive | markup, HIGH   |
-| page-level only       | inconclusive | markup, LOW    |
-| absent                | inconclusive | `null`         |
+| Markup                | Text                          | Result       |
+|-----------------------|-------------------------------|--------------|
+| agrees                | confident                     | markup, HIGH |
+| absent                | confident                     | text, HIGH   |
+| disagrees             | confident                     | text, LOW    |
+| explicit `inLanguage` | not confident                 | markup, HIGH |
+| page-level only       | not confident, leans same way | markup, HIGH |
+| page-level only       | leans elsewhere, or no lean   | markup, LOW  |
+| absent                | not confident                 | `null`       |
 
 Text wins a disagreement because page-level markup is often a theme's untouched template default —
 but only at `LOW`, which tells the caller to ask the user.
+
+"Confident" means at least 8 profile-word hits and at least 2× the runner-up. Below that, the text
+can still *lean* one way (a strict lead, no tie); a lean that matches page-level markup counts as
+corroboration, so a three-line English recipe on an English site doesn't make the caller ask.
 
 Ingredient lines are then re-parsed with the detected language. Unit words are recognised in
 English and Spanish regardless of language (they never collide); only connector words are gated —

@@ -216,6 +216,12 @@ class IngredientTextParserTest {
     }
 
     @Test
+    fun `keeps a leading de when no unit was matched`() {
+        // Without a unit, "de" may be part of the name; only the unit-to-ingredient joiner goes.
+        assertParsedSpanish("2 de las cebollas", 2.0, null, "de las cebollas")
+    }
+
+    @Test
     fun `normalizes Spanish units and abbreviations`() {
         assertParsedSpanish("1/2 cdta. de sal", 0.5, "tsp", "sal")
         assertParsedSpanish("2 cdas aceite", 2.0, "tbsp", "aceite")

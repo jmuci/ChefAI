@@ -73,10 +73,17 @@ class LanguageDetectorTest {
         assertNull(scoreText(""))
     }
 
+    @Test
+    fun `returns null on a tie rather than favouring the first profile`() {
+        // One English word, one Spanish word: no lean either way.
+        assertNull(scoreText("the leche"))
+    }
+
     // --- decideLanguage ---
 
     private val confidentSpanish = TextVerdict("es", confident = true)
     private val inconclusive = TextVerdict("es", confident = false)
+    private val leansEnglish = TextVerdict("en", confident = false)
 
     @Test
     fun `markup and text agreeing is HIGH, credited to the markup`() {
@@ -112,11 +119,23 @@ class LanguageDetectorTest {
     }
 
     @Test
-    fun `page-level markup with inconclusive text is LOW`() {
+    fun `page-level markup with a weak text lean the same way is HIGH`() {
         assertEquals(
-            DetectedLanguage("es", LOW, LanguageSource.OG_LOCALE),
+            DetectedLanguage("es", HIGH, LanguageSource.OG_LOCALE),
             decideLanguage(listOf(LanguageSignal("es", LanguageSource.OG_LOCALE)), inconclusive),
         )
+    }
+
+    @Test
+    fun `page-level markup with a weak text lean elsewhere is LOW`() {
+        assertEquals(
+            DetectedLanguage("es", LOW, LanguageSource.HTML_LANG),
+            decideLanguage(listOf(LanguageSignal("es", LanguageSource.HTML_LANG)), leansEnglish),
+        )
+    }
+
+    @Test
+    fun `page-level markup with no text lean at all is LOW`() {
         assertEquals(
             DetectedLanguage("es", LOW, LanguageSource.HTTP_HEADER),
             decideLanguage(listOf(LanguageSignal("es", LanguageSource.HTTP_HEADER)), null),

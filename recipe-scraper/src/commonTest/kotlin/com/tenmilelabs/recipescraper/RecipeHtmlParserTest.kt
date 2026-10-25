@@ -152,6 +152,23 @@ class RecipeHtmlParserTest {
     }
 
     @Test
+    fun `trusts the page's lang attribute when a short recipe's words lean the same way`() {
+        // Too few words to be confident on their own, but they corroborate <html lang>: no prompt.
+        val html = """
+            <html lang="en"><head><script type="application/ld+json">
+            {"@type": "Recipe", "name": "Buttered Toast",
+             "recipeIngredient": ["2 slices bread", "1 tbsp butter"],
+             "recipeInstructions": ["Toast the bread and spread the butter."]}
+            </script></head><body></body></html>
+        """.trimIndent()
+
+        assertEquals(
+            DetectedLanguage("en", LanguageConfidence.HIGH, LanguageSource.HTML_LANG),
+            parseRecipe(html).language,
+        )
+    }
+
+    @Test
     fun `falls back to the Content-Language header at LOW confidence`() {
         val html = """
             <html><head><script type="application/ld+json">

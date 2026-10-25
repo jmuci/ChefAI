@@ -46,17 +46,26 @@ confidence and the source signal. The highest-priority markup signal (`inLanguag
 → `og:locale` → content-language meta → HTTP header) is weighed against a text verdict from
 stop-word scoring of the title, description, ingredients and instructions:
 
-| Markup                | Text         | Result         |
-|-----------------------|--------------|----------------|
-| agrees                | confident    | markup, HIGH   |
-| absent                | confident    | text, HIGH     |
-| disagrees             | confident    | text, **LOW**  |
-| explicit `inLanguage` | inconclusive | markup, HIGH   |
-| page-level only       | inconclusive | markup, LOW    |
-| absent                | inconclusive | `null`         |
+| Markup                | Text                          | Result       |
+|-----------------------|-------------------------------|--------------|
+| agrees                | confident                     | markup, HIGH |
+| absent                | confident                     | text, HIGH   |
+| disagrees             | confident                     | text, **LOW**|
+| explicit `inLanguage` | not confident                 | markup, HIGH |
+| page-level only       | not confident, leans same way | markup, HIGH |
+| page-level only       | leans elsewhere, or no lean   | markup, LOW  |
+| absent                | not confident                 | `null`       |
 
 Text wins a disagreement because of template defaults, but only at `LOW` — the user decides.
 "Confident" means at least 8 profile-word hits and at least 2× the runner-up.
+
+Below that bar the text can still *lean* one way — a strict lead, ties count as no lean. A lean
+that matches page-level markup upgrades it to `HIGH`. Without this, every stub-length recipe on a
+correctly tagged site would prompt (a three-ingredient English recipe rarely reaches 8 hits), and a
+prompt that fires on obviously-English recipes trains users to dismiss it. The accepted cost: a
+short Spanish recipe on an English-template site whose handful of words happen to lean English is
+saved as English without asking — rare, and fixable from the editor's language row. (Added after
+review of PR #271.)
 
 **Stop-word scoring over ML Kit Language ID.** It is pure Kotlin, lives in the KMP module beside the
 parser, is unit-testable on the JVM, and adds no dependency. Recipe text is short but formulaic, so
