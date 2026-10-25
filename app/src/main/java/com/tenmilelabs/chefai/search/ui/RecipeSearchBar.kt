@@ -9,8 +9,11 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -22,7 +25,9 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
@@ -167,6 +172,7 @@ fun RecipeSearchBar(
                 .weight(1f),
             onRecipeClick = viewModel::onRecipeClick,
             onSaveToCollection = viewModel::onSaveToCollection,
+            onLoadMore = viewModel::onLoadMore,
         )
     }
 }
@@ -176,6 +182,7 @@ private fun ColumnScope.SearchResultsContent(
     uiState: SearchUiState,
     onRecipeClick: (UUID) -> Unit,
     onSaveToCollection: (UUID) -> Unit,
+    onLoadMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (uiState) {
@@ -209,7 +216,21 @@ private fun ColumnScope.SearchResultsContent(
         }
 
         is SearchUiState.Results -> Box(modifier = modifier) {
+            val listState = rememberLazyListState()
+            // Keyed on the item count so each appended page re-arms the trigger; fires when the
+            // last row is within a few of the viewport's end.
+            val nearEnd by remember(listState) {
+                derivedStateOf {
+                    val info = listState.layoutInfo
+                    val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+                    lastVisible >= info.totalItemsCount - LOAD_MORE_THRESHOLD
+                }
+            }
+            LaunchedEffect(nearEnd, uiState.items.size, uiState.hasMore) {
+                if (nearEnd && uiState.hasMore && !uiState.isLoadingMore) onLoadMore()
+            }
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 // No side inset: the bar itself is already padded in to the panel edge.
                 contentPadding = PaddingValues(bottom = PanelMetrics.Gap),
@@ -256,7 +277,17 @@ private fun ColumnScope.SearchResultsContent(
                             ),
                     )
                 }
+                if (uiState.isLoadingMore) {
+                    item(key = "loading_more") {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            contentAlignment = Alignment.Center,
+                        ) { CircularProgressIndicator(modifier = Modifier.size(24.dp)) }
+                    }
+                }
             }
         }
     }
 }
+
+private const val LOAD_MORE_THRESHOLD = 4

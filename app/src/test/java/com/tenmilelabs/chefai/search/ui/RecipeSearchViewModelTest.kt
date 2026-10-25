@@ -180,6 +180,37 @@ class RecipeSearchViewModelTest {
     }
 
     @Test
+    fun `onLoadMore appends the next page at the current offset and stops when hasMore is false`() = testScope.runTest {
+        val first = listOf(preview(), preview())
+        val second = listOf(preview())
+        searchRepository.outcomesByOffset[0] = RecipeSearchOutcome(first, true, RecipeSearchSource.REMOTE)
+        searchRepository.outcomesByOffset[2] = RecipeSearchOutcome(second, false, RecipeSearchSource.REMOTE)
+
+        viewModel.uiState.test {
+            assertThat(awaitItem()).isEqualTo(SearchUiState.Idle)
+            viewModel.onQueryChanged("chicken")
+            advanceTimeBy(400)
+            runCurrent()
+            assertThat(awaitItem()).isEqualTo(SearchUiState.Searching)
+            assertThat((awaitItem() as SearchUiState.Results).hasMore).isTrue()
+
+            viewModel.onLoadMore()
+            runCurrent()
+            assertThat((awaitItem() as SearchUiState.Results).isLoadingMore).isTrue()
+            val appended = awaitItem() as SearchUiState.Results
+            assertThat(appended.items).containsExactlyElementsIn(first + second).inOrder()
+            assertThat(appended.hasMore).isFalse()
+            assertThat(appended.isLoadingMore).isFalse()
+
+            viewModel.onLoadMore()
+            runCurrent()
+            expectNoEvents()
+            assertThat(searchRepository.offsetsReceived).containsExactly(0, 2).inOrder()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun `a category's query runs the same search pipeline as typed input`() = testScope.runTest {
         // SearchScreen's onCategoryClick feeds SearchCategory.query straight into
         // onQueryChanged — this proves that term reaches the repository through the normal
