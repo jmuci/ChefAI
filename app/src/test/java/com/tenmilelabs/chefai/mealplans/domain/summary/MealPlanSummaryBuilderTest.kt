@@ -77,6 +77,30 @@ class MealPlanSummaryBuilderTest {
         assertThat(summaries.single().lastCookedOn).isEqualTo(start.plusDays(2))
     }
 
+    @Test
+    fun `the hero skips cooked recipes and falls back once everything is cooked`() {
+        val first = preview("First", image = "https://example.com/1.jpg")
+        val second = preview("Second", image = "https://example.com/2.jpg")
+        val cooked = start.atStartOfDay(zone).toInstant().toEpochMilli()
+        val half = plan(days = listOf(day(0, first.uuid).copy(dinnerCookedAt = cooked), day(1, second.uuid)))
+        val done = plan(
+            days = listOf(
+                day(0, first.uuid).copy(dinnerCookedAt = cooked),
+                day(1, second.uuid).copy(dinnerCookedAt = cooked),
+            ),
+            createdOn = start.minusDays(1),
+        )
+
+        val summaries = MealPlanSummaryBuilder.build(
+            listOf(half, done),
+            listOf(first, second).associateBy { it.uuid },
+            zone,
+        )
+
+        assertThat(summaries[0].heroRecipe?.title).isEqualTo("Second")
+        assertThat(summaries[1].heroRecipe?.title).isEqualTo("First")
+    }
+
     private fun MealPlan.asList() = listOf(this)
 
     private fun day(index: Int, dinner: UUID? = null, lunch: UUID? = null) = MealPlanDay(

@@ -16,8 +16,8 @@ import java.util.UUID
  *   generated default — the UI then builds a title from [dominantTag].
  * @property dominantTag the tag most of the plan's recipes share ("Italian"), the raw material for a
  *   generated title; `null` when the recipes carry none or none are on this device yet.
- * @property heroRecipe the recipe whose photo fronts the card: the first planned one with an image,
- *   else the first planned one, else `null`.
+ * @property heroRecipe the recipe whose photo fronts the card: the first uncooked one with an image,
+ *   else the first planned one with an image, else any planned one, else `null`.
  * @property lastCookedOn the most recent date any meal was marked cooked, so an old plan can say
  *   when it was last used instead of a schedule it no longer has.
  */
@@ -62,6 +62,14 @@ object MealPlanSummaryBuilder {
             .flatMap { listOfNotNull(it.lunchRecipeId, it.dinnerRecipeId) }
             .distinct()
         val previews = planned.mapNotNull { recipes[it] }
+        // A recipe counts as uncooked while any slot it fills is still outstanding.
+        val uncookedPreviews = ordered
+            .flatMap { day ->
+                listOf(day.lunchRecipeId to day.lunchCookedAt, day.dinnerRecipeId to day.dinnerCookedAt)
+            }
+            .filter { (recipeId, cookedAt) -> recipeId != null && cookedAt == null }
+            .mapNotNull { (recipeId, _) -> recipes[recipeId] }
+            .distinctBy { it.uuid }
 
         val lastCookedMillis = days
             .flatMap { listOfNotNull(it.lunchCookedAt, it.dinnerCookedAt) }
@@ -80,8 +88,7 @@ object MealPlanSummaryBuilder {
                 .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
                 .firstOrNull()
                 ?.key,
-            heroRecipe = previews.firstOrNull { it.localImagePath != null || it.imageUrlThumbnail.isNotEmpty() }
-                ?: previews.firstOrNull(),
+            heroRecipe = heroFor(uncooked = uncookedPreviews, all = previews),
             recipeTitles = previews.take(MAX_LISTED_TITLES).map { it.title },
             recipeCount = planned.size,
             dayCount = length,
@@ -93,4 +100,18 @@ object MealPlanSummaryBuilder {
             isShared = householdId != null,
         )
     }
+
+    /**
+     * What is left to cook fronts the card, so a half-finished plan shows its next meal rather
+     * than the one already eaten. Prefers a recipe with a photo; falls back to any recipe once the
+     * plan is fully cooked.
+     */
+    private fun heroFor(uncooked: List<RecipePreview>, all: List<RecipePreview>): RecipePreview? =
+        uncooked.firstOrNull { it.hasImage() }
+            ?: all.firstOrNull { it.hasImage() }
+            ?: uncooked.firstOrNull()
+            ?: all.firstOrNull()
+
+    private fun RecipePreview.hasImage(): Boolean =
+        localImagePath != null || imageUrlThumbnail.isNotEmpty()
 }
