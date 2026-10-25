@@ -93,6 +93,7 @@ class CreateMealPlanViewModelTest {
             sessionManager = sessionManager,
             recipesRepository = recipesRepository,
             generateMealPlanUseCase = generateMealPlanUseCase,
+            savedStateHandle = androidx.lifecycle.SavedStateHandle(),
         )
     }
 

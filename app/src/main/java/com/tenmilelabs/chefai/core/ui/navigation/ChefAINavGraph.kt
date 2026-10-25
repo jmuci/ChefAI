@@ -144,6 +144,7 @@ fun ChefAINavGraph(
                     navController.popBackStack()
                     navScope.launch { snackbarHostState.showSnackbar(message) }
                 },
+                onCreateMealPlan = { recipeId -> navActions.navigateToMealPlanWizard(recipeId) },
             )
         }
     }
@@ -211,11 +212,18 @@ fun ChefAINavGraph(
         recipeDetailsDestination(route = AppDestinations.HOME_RECIPE_DETAIL.route)
         navigation(
             startDestination = ScreenBaseRoutes.MEAL_PLAN_WIZARD_BASICS,
-            route = ScreenBaseRoutes.MEAL_PLAN_WIZARD,
+            route = ScreenBaseRoutes.MEAL_PLAN_WIZARD_GRAPH,
+            arguments = listOf(
+                navArgument(AppDestinationArgs.RECIPE_ID_ARG) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
         ) {
             composable(ScreenBaseRoutes.MEAL_PLAN_WIZARD_BASICS) { entry ->
                 val parentEntry = remember(entry) {
-                    navController.getBackStackEntry(ScreenBaseRoutes.MEAL_PLAN_WIZARD)
+                    navController.getBackStackEntry(ScreenBaseRoutes.MEAL_PLAN_WIZARD_GRAPH)
                 }
                 val wizardViewModel: CreateMealPlanViewModel = hiltViewModel(parentEntry)
                 WizardBasicsScreen(
@@ -228,7 +236,7 @@ fun ChefAINavGraph(
             }
             composable(ScreenBaseRoutes.MEAL_PLAN_WIZARD_PREFERENCES) { entry ->
                 val parentEntry = remember(entry) {
-                    navController.getBackStackEntry(ScreenBaseRoutes.MEAL_PLAN_WIZARD)
+                    navController.getBackStackEntry(ScreenBaseRoutes.MEAL_PLAN_WIZARD_GRAPH)
                 }
                 val wizardViewModel: CreateMealPlanViewModel = hiltViewModel(parentEntry)
                 WizardPreferencesScreen(
@@ -241,7 +249,7 @@ fun ChefAINavGraph(
             }
             composable(ScreenBaseRoutes.MEAL_PLAN_WIZARD_ADVANCED) { entry ->
                 val parentEntry = remember(entry) {
-                    navController.getBackStackEntry(ScreenBaseRoutes.MEAL_PLAN_WIZARD)
+                    navController.getBackStackEntry(ScreenBaseRoutes.MEAL_PLAN_WIZARD_GRAPH)
                 }
                 val wizardViewModel: CreateMealPlanViewModel = hiltViewModel(parentEntry)
 

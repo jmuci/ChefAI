@@ -127,11 +127,18 @@ sealed interface RecipeDetailsAction {
     data object AddToGroceryListClicked : RecipeDetailsAction
     data object SlotPickerDismissed : RecipeDetailsAction
     data class SlotPicked(val planId: UUID, val dayIndex: Int, val slot: MealSlot) : RecipeDetailsAction
+
+    /** "+ Add to new day": appends a day after the plan's last one instead of using an existing day. */
+    data class NewDayPicked(val planId: UUID, val slot: MealSlot) : RecipeDetailsAction
+
+    /** "Create new meal plan": opens the wizard with this recipe pre-included. */
+    data object CreatePlanWithRecipeClicked : RecipeDetailsAction
 }
 
 /** One-shot side effects emitted by [RecipeDetailsViewModel], consumed by the UI. */
 sealed interface RecipeDetailsEffect {
     data object RecipeDeleted : RecipeDetailsEffect
+    data class OpenMealPlanWizard(val recipeId: UUID) : RecipeDetailsEffect
 }
 
 /** Why the slot picker is open — only changes its wording and the confirmation message. */
@@ -374,13 +381,26 @@ class RecipeDetailsViewModel @Inject constructor(
         _pickerPurpose.value = null
     }
 
+    /** Closes the picker and starts the Create Meal Plan wizard with this recipe included. */
+    fun onCreatePlanWithRecipe() {
+        _pickerPurpose.value = null
+        viewModelScope.launch { _effects.send(RecipeDetailsEffect.OpenMealPlanWizard(recipeUuid)) }
+    }
+
     /** Slots this recipe into the picked plan/day/slot and closes the picker. */
-    fun onSlotPicked(planId: UUID, dayIndex: Int, slot: MealSlot) {
+    fun onSlotPicked(planId: UUID, dayIndex: Int, slot: MealSlot) =
+        assignAndClose(planId) { mealPlanRepository.assignRecipeToSlot(planId, dayIndex, slot, recipeUuid) }
+
+    /** Appends a new day to the picked plan holding this recipe in [slot], and closes the picker. */
+    fun onNewDayPicked(planId: UUID, slot: MealSlot) =
+        assignAndClose(planId) { mealPlanRepository.appendRecipeAsNewDay(planId, slot, recipeUuid) }
+
+    private fun assignAndClose(planId: UUID, assign: suspend () -> Boolean) {
         val purpose = _pickerPurpose.value ?: return
         _pickerPurpose.value = null
         viewModelScope.launch {
             _userMessage.value = try {
-                if (mealPlanRepository.assignRecipeToSlot(planId, dayIndex, slot, recipeUuid)) {
+                if (assign()) {
                     when (purpose) {
                         SlotPickerPurpose.MEAL_PLAN -> R.string.recipe_added_to_meal_plan
                         SlotPickerPurpose.GROCERY_LIST -> R.string.recipe_added_to_grocery_list
@@ -390,7 +410,7 @@ class RecipeDetailsViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
-                Timber.e(e, "onSlotPicked: failed for plan $planId day $dayIndex slot $slot")
+                Timber.e(e, "assignAndClose: failed for plan $planId")
                 R.string.recipe_add_to_plan_error
             }
         }
