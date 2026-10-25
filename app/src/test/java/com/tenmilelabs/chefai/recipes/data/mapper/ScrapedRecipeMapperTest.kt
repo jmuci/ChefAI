@@ -9,6 +9,7 @@ import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.Ingredient
 import com.tenmilelabs.chefai.core.domain.model.Tag
 import com.tenmilelabs.chefai.core.domain.model.User
+import com.tenmilelabs.chefai.core.domain.units.IngredientUnits
 import com.tenmilelabs.recipescraper.model.ScrapedIngredient
 import com.tenmilelabs.recipescraper.model.ScrapedRecipe
 import org.junit.Assert.assertEquals
@@ -205,14 +206,41 @@ class ScrapedRecipeMapperTest {
     }
 
     @Test
-    fun `ingredients missing quantity or unit fall back to 1 and unit`() {
+    fun `an ingredient with no stated amount is stored as no amount, never an invented 1`() {
+        // Given lines the scraper could find no amount in — a 1 here used to be scaled into
+        // "0.33" on the shopping list
         val scraped = minimalScrapedRecipe(
-            ingredients = listOf(ScrapedIngredient(raw = "salt to taste", quantity = null, unit = null, name = "salt")),
+            ingredients = listOf(
+                ScrapedIngredient(raw = "salt, to taste", quantity = null, unit = null, name = "salt, to taste"),
+                ScrapedIngredient(
+                    raw = "Perejil fresco (una ramita)",
+                    quantity = null,
+                    unit = null,
+                    name = "Perejil fresco (una ramita)",
+                ),
+            ),
+        )
+
+        // When
+        val draft = scraped.toRecipeDraft(UUID.randomUUID(), emptyList(), emptyList())
+
+        // Then
+        draft.ingredients.forEach { ingredient ->
+            assertEquals(IngredientUnits.NO_AMOUNT, ingredient.quantity, 0.0)
+            assertFalse(IngredientUnits.hasAmount(ingredient.quantity))
+            assertEquals("unit", ingredient.unit)
+        }
+    }
+
+    @Test
+    fun `an amount with no unit keeps its amount and the placeholder unit`() {
+        val scraped = minimalScrapedRecipe(
+            ingredients = listOf(ScrapedIngredient(raw = "2 eggs", quantity = 2.0, unit = null, name = "eggs")),
         )
 
         val draft = scraped.toRecipeDraft(UUID.randomUUID(), emptyList(), emptyList())
 
-        assertEquals(1.0, draft.ingredients.single().quantity, 0.0)
+        assertEquals(2.0, draft.ingredients.single().quantity, 0.0)
         assertEquals("unit", draft.ingredients.single().unit)
     }
 

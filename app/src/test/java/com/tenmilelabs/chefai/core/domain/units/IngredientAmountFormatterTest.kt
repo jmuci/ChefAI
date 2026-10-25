@@ -97,4 +97,27 @@ class IngredientAmountFormatterTest {
 
         assertThat(label.text).isEqualTo("2")
     }
+
+    @Test
+    fun `an ingredient with no amount shows no number and no unit`() {
+        // Given a line imported with no amount, scaled for a different serving count
+        val label = IngredientAmountFormatter.format(
+            quantity = IngredientUnits.NO_AMOUNT * 0.5,
+            unit = "unit",
+            ingredientName = "Sal y pimienta negra recién molida (al gusto)",
+            system = MeasurementSystem.METRIC,
+        )
+
+        // Then
+        assertThat(label.text).isEmpty()
+        assertThat(label.isApproximate).isFalse()
+    }
+
+    @Test
+    fun `a to-taste phrase in the unit column reads alone, without its placeholder quantity`() {
+        // Catalog rows carry "To taste" as the unit behind an invented 1, scaled here to a third.
+        val label = IngredientAmountFormatter.format(1.0 / 3, "To taste", "salt", MeasurementSystem.AS_WRITTEN)
+
+        assertThat(label.text).isEqualTo("To taste")
+    }
 }

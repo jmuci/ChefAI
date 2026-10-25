@@ -6,6 +6,7 @@ import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.Ingredient
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
+import com.tenmilelabs.chefai.core.domain.units.IngredientUnits
 import com.tenmilelabs.chefai.recipes.domain.model.RecipeDraft
 import com.tenmilelabs.recipescraper.model.LanguageConfidence
 import com.tenmilelabs.recipescraper.model.ScrapedIngredient
@@ -15,7 +16,6 @@ import java.util.UUID
 
 private const val MAX_KEYWORDS = 8
 private const val MAX_KEYWORD_LENGTH = 30
-private const val DEFAULT_QUANTITY = 1.0
 private const val DEFAULT_UNIT = "unit"
 
 /**
@@ -91,7 +91,9 @@ private fun List<ScrapedIngredient>.toRecipeIngredients(
         RecipeIngredient(
             ingredientId = known?.uuid ?: UuidV7Generator.newId(),
             ingredientDisplayName = name,
-            quantity = ingredient.quantity ?: DEFAULT_QUANTITY,
+            // "Salt, to taste" has no amount. Inventing a 1 here is what later scaled into
+            // "0.33" on the shopping list; NO_AMOUNT is read as "nothing to show" everywhere.
+            quantity = ingredient.quantity ?: IngredientUnits.NO_AMOUNT,
             unit = ingredient.unit ?: DEFAULT_UNIT,
             allergenName = null,
             srcCategory = null,

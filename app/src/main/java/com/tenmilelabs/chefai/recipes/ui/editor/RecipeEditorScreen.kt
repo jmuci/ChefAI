@@ -52,6 +52,8 @@ import com.tenmilelabs.chefai.core.domain.model.Label
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
 import com.tenmilelabs.chefai.core.domain.model.RecipeLanguage
+import com.tenmilelabs.chefai.core.domain.units.IngredientUnits
+import com.tenmilelabs.chefai.core.domain.units.UnitNormalizer
 import com.tenmilelabs.chefai.core.ui.components.flat.DragReorderColumn
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatBlockButton
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatButtonVariant
@@ -581,9 +583,12 @@ private fun IngredientsSection(
             ) { ingredient, index, dragHandle ->
                 Column {
                     if (index > 0) RowRule()
+                    // A line imported with no amount ("salt, to taste") shows neither a "0" nor
+                    // the placeholder "unit" written alongside it.
+                    val hasAmount = IngredientUnits.hasAmount(ingredient.quantity)
                     IngredientRow(
-                        quantityText = QuantityFormat.decimal(ingredient.quantity),
-                        unit = ingredient.unit,
+                        quantityText = if (hasAmount) QuantityFormat.decimal(ingredient.quantity) else "",
+                        unit = if (hasAmount) UnitNormalizer.withoutPlaceholder(ingredient.unit) else "",
                         name = ingredient.ingredientDisplayName,
                         dragHandle = dragHandle,
                         onDelete = { onRemoveIngredient(ingredient) },
