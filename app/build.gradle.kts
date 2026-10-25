@@ -19,6 +19,15 @@ plugins {
 val releaseApiBaseUrl: String =
     (project.findProperty("chefaiApiBaseUrl") as String?) ?: "https://api.pocket-chef.app"
 
+/**
+ * Short hash of the commit a debug build was made from, shown next to its version name. Falls back
+ * to "unknown" outside a git checkout (e.g. a source tarball) rather than failing the build.
+ */
+val gitCommitHash: String = providers.exec {
+    commandLine("git", "rev-parse", "--short", "HEAD")
+    isIgnoreExitValue = true
+}.standardOutput.asText.get().trim().ifEmpty { "unknown" }
+
 android {
     namespace = "com.tenmilelabs.chefai"
     compileSdk = 36
@@ -48,12 +57,15 @@ android {
             // Overridable from ~/.gradle/gradle.properties or -PchefaiApiBaseUrl=...
             // Must be https: the release build permits no cleartext.
             buildConfigField("String", "API_BASE_URL", "\"${releaseApiBaseUrl}\"")
+            // Release builds show the plain version name; only debug builds carry the commit.
+            buildConfigField("String", "GIT_COMMIT_HASH", "\"\"")
         }
         debug {
             isMinifyEnabled = false
             isDebuggable = true
             // 10.0.2.2 is the host loopback as seen from the Android emulator.
             buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8080\"")
+            buildConfigField("String", "GIT_COMMIT_HASH", "\"${gitCommitHash}\"")
         }
     }
     compileOptions {
