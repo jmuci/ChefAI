@@ -31,6 +31,7 @@ internal object ScreenBaseRoutes {
     const val IMPORT_RECIPE = "import_recipe_screen"
     const val IMPORT_RECIPE_BROWSER = "import_recipe_browser_screen"
     const val SETTINGS = "settings_screen"
+    const val DEVELOPER_OPTIONS = "developer_options_screen"
     const val HOUSEHOLD = "household_screen"
     const val ACCEPT_INVITE = "accept_invite_screen"
     const val LOGIN = "login_screen"
@@ -146,6 +147,7 @@ enum class AppDestinations(
     ),
     MEAL_PLAN_WIZARD(R.string.app_dest_title_meal_plan_wizard, ScreenBaseRoutes.MEAL_PLAN_WIZARD),
     SETTINGS(R.string.app_dest_title_settings, ScreenBaseRoutes.SETTINGS),
+    DEVELOPER_OPTIONS(R.string.app_dest_title_developer_options, ScreenBaseRoutes.DEVELOPER_OPTIONS),
     HOUSEHOLD(R.string.app_dest_title_household, ScreenBaseRoutes.HOUSEHOLD),
     ACCEPT_INVITE(
         R.string.app_dest_title_accept_invite,
@@ -221,6 +223,13 @@ class NavigationActions(private val navController: NavHostController) {
 
     fun navigateToSettings() {
         navController.navigate(ScreenBaseRoutes.SETTINGS) {
+            launchSingleTop = true
+        }
+    }
+
+    /** Debug builds only — the destination is not registered in release. */
+    fun navigateToDeveloperOptions() {
+        navController.navigate(ScreenBaseRoutes.DEVELOPER_OPTIONS) {
             launchSingleTop = true
         }
     }
