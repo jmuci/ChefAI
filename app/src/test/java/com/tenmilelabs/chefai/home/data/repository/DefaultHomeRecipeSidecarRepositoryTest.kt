@@ -362,4 +362,21 @@ class DefaultHomeRecipeSidecarRepositoryTest {
 
         assertThat(recipeDao.getRecipeById(own.uuid)!!.imageUrl).isEqualTo("https://cdn.example.org/mine.jpg")
     }
+
+    @Test
+    fun `hasAllRecipes is false while Room is missing any of the ids`() = runTest {
+        val ids = listOf(UUID.fromString(recipe1Id), UUID.fromString(recipe2Id))
+        assertThat(repository.hasAllRecipes(ids)).isFalse()
+
+        recipeDao.seed(recipes = listOf(sidecar.recipes.first().toRecipeEntity()))
+        assertThat(repository.hasAllRecipes(ids)).isFalse()
+    }
+
+    @Test
+    fun `hasAllRecipes is true once the sidecar has been written`() = runTest {
+        repository.upsertSidecar(sidecar)
+
+        val ids = listOf(UUID.fromString(recipe1Id), UUID.fromString(recipe2Id))
+        assertThat(repository.hasAllRecipes(ids)).isTrue()
+    }
 }

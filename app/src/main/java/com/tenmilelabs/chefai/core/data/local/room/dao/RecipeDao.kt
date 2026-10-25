@@ -69,6 +69,10 @@ interface RecipeDao {
     @Query("SELECT * FROM recipes WHERE uuid = :uuid")
     suspend fun getRecipeById(uuid: UUID): RecipeEntity?
 
+    /** Ids from [uuids] that have a row, soft-deleted or not. */
+    @Query("SELECT uuid FROM recipes WHERE uuid IN (:uuids)")
+    suspend fun getExistingIds(uuids: List<UUID>): List<UUID>
+
     @Query("SELECT * FROM recipes WHERE uuid = :uuid")
     fun observeRecipeById(uuid: UUID): Flow<RecipeEntity?>
 
