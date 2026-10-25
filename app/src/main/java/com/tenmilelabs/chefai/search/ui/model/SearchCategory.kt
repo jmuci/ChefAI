@@ -23,6 +23,8 @@ enum class SearchCategory(
     val group: SearchCategoryGroup,
     @param:StringRes val labelRes: Int,
     val query: String,
+    /** When set, results whose prep + cook time exceeds this many minutes are dropped. */
+    val maxTotalMinutes: Int? = null,
 ) {
     BREAKFAST(SearchCategoryGroup.MEAL, R.string.search_category_breakfast, "breakfast"),
     LUNCH(SearchCategoryGroup.MEAL, R.string.search_category_lunch, "lunch"),
@@ -33,7 +35,7 @@ enum class SearchCategory(
 
     LOW_CARB(SearchCategoryGroup.POPULAR, R.string.search_category_low_carb, "low carb"),
     SANDWICHES_WRAPS(SearchCategoryGroup.POPULAR, R.string.search_category_sandwiches_wraps, "sandwich"),
-    QUICK_EASY(SearchCategoryGroup.POPULAR, R.string.search_category_quick_easy, "quick"),
+    QUICK_EASY(SearchCategoryGroup.POPULAR, R.string.search_category_quick_easy, "quick", maxTotalMinutes = 30),
     BUDGET_FRIENDLY(SearchCategoryGroup.POPULAR, R.string.search_category_budget_friendly, "budget"),
     AIR_FRYER(SearchCategoryGroup.POPULAR, R.string.search_category_air_fryer, "air fryer"),
     VEGETARIAN(SearchCategoryGroup.POPULAR, R.string.search_category_vegetarian, "vegetarian"),

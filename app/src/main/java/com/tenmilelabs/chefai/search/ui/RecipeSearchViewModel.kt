@@ -19,6 +19,7 @@ import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import com.tenmilelabs.chefai.search.domain.repository.RecipeSearchOutcome
 import com.tenmilelabs.chefai.search.domain.repository.RecipeSearchRepository
 import com.tenmilelabs.chefai.search.domain.repository.RecipeSearchSource
+import com.tenmilelabs.chefai.search.ui.model.SearchCategory
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
@@ -49,6 +50,15 @@ import javax.inject.Inject
 
 private const val SEARCH_DEBOUNCE_MILLIS = 300L
 private const val MIN_QUERY_LENGTH = 3
+
+/** Server pages scanned to fill one filtered page before giving up and showing what we have. */
+private const val MAX_FILTER_PAGE_SCANS = 5
+
+/** A text query plus an optional time cap; the cap is applied client-side after the server responds. */
+private data class SearchRequest(val query: String, val maxTotalMinutes: Int?)
+
+/** [RecipeSearchOutcome] after the time cap, with how many server rows were consumed (the next offset). */
+private data class FilteredPage(val outcome: RecipeSearchOutcome, val consumed: Int)
 
 /** UI state for the Home search overlay. */
 sealed interface SearchUiState {
@@ -87,6 +97,9 @@ class RecipeSearchViewModel @Inject constructor(
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
 
+    /** Set by a browse category (e.g. Quick & easy); cleared as soon as the user types their own query. */
+    private val _maxTotalMinutes = MutableStateFlow<Int?>(null)
+
     // A Channel, not a replaying SharedFlow: replay = 1 re-delivered the last snackbar every time
     // the screen re-subscribed (back navigation, rotation, tab switch).
     private val _uiEvent = Channel<SearchUiEvent>(Channel.BUFFERED)
@@ -114,19 +127,22 @@ class RecipeSearchViewModel @Inject constructor(
             }
         }
 
-    private val _searchResult: Flow<SearchUiState> = _query
+    private val _searchResult: Flow<SearchUiState> = combine(_query, _maxTotalMinutes, ::Pair)
         .debounce(SEARCH_DEBOUNCE_MILLIS)
-        .map { it.trim() }
+        .map { (query, max) -> SearchRequest(query.trim(), max) }
         .distinctUntilChanged()
-        .flatMapLatest<_, SearchUiState> { trimmed ->
+        .flatMapLatest<_, SearchUiState> { request ->
+            val trimmed = request.query
             if (trimmed.length < MIN_QUERY_LENGTH) {
                 flowOf(SearchUiState.Idle)
             } else {
                 flow {
                     emit(SearchUiState.Searching)
-                    val first = runSearch(trimmed)
-                    emit(first)
-                    if (first is SearchUiState.Results) emitLoadedPages(trimmed, first)
+                    val first = runSearch(request)
+                    emit(first.state)
+                    if (first.state is SearchUiState.Results) {
+                        emitLoadedPages(request, first.state, first.consumed)
+                    }
                 }.catch { e ->
                     // Caught per query, inside flatMapLatest: a catch on the outer flow would
                     // complete it, and search would stop reacting to typing until the ViewModel
@@ -146,10 +162,13 @@ class RecipeSearchViewModel @Inject constructor(
         initialValue = SearchUiState.Idle,
     )
 
-    private suspend fun runSearch(query: String): SearchUiState {
-        val outcome: RecipeSearchOutcome = recipeSearchRepository.search(query)
+    private data class FirstPage(val state: SearchUiState, val consumed: Int)
+
+    private suspend fun runSearch(request: SearchRequest): FirstPage {
+        val page = fetchFiltered(request, offset = 0)
+        val outcome = page.outcome
         prefetchImages(outcome.results)
-        return if (outcome.results.isEmpty()) {
+        val state = if (outcome.results.isEmpty()) {
             SearchUiState.Empty
         } else {
             SearchUiState.Results(
@@ -158,6 +177,34 @@ class RecipeSearchViewModel @Inject constructor(
                 hasMore = outcome.hasMore,
             )
         }
+        return FirstPage(state, page.consumed)
+    }
+
+    /**
+     * Fetches from [offset] and drops recipes over the request's time cap. The cap is applied here
+     * because the backend has no time filter; when a page filters down to nothing but the server has
+     * more, the next page is scanned (up to [MAX_FILTER_PAGE_SCANS]) so the list isn't left empty
+     * with a spinner-less "no more" state. Recipes with no recorded time can't be shown to be quick,
+     * so they are dropped too.
+     */
+    private suspend fun fetchFiltered(request: SearchRequest, offset: Int): FilteredPage {
+        val max = request.maxTotalMinutes
+        var consumed = offset
+        var scans = 0
+        while (true) {
+            val outcome = recipeSearchRepository.search(request.query, offset = consumed)
+            consumed += outcome.results.size
+            if (max == null) return FilteredPage(outcome, consumed)
+            val kept = outcome.results.filter {
+                val total = it.prepTimeMinutes + it.cookTimeMinutes
+                total in 1..max
+            }
+            scans++
+            val exhausted = !outcome.hasMore || outcome.source != RecipeSearchSource.REMOTE
+            if (kept.isNotEmpty() || exhausted || scans >= MAX_FILTER_PAGE_SCANS) {
+                return FilteredPage(outcome.copy(results = kept), consumed)
+            }
+        }
     }
 
     /**
@@ -165,15 +212,19 @@ class RecipeSearchViewModel @Inject constructor(
      * inside the per-query flow, so typing a new query cancels it along with any in-flight page.
      */
     private suspend fun FlowCollector<SearchUiState>.emitLoadedPages(
-        query: String,
+        request: SearchRequest,
         initial: SearchUiState.Results,
+        initialConsumed: Int,
     ) {
         var current = initial
+        var consumed = initialConsumed
         _loadMoreRequests.collect {
             if (!current.hasMore) return@collect
             emit(current.copy(isLoadingMore = true))
             current = try {
-                val outcome = recipeSearchRepository.search(query, offset = current.items.size)
+                val page = fetchFiltered(request, offset = consumed)
+                consumed = page.consumed
+                val outcome = page.outcome
                 prefetchImages(outcome.results)
                 val known = current.items.mapTo(HashSet()) { it.uuid }
                 current.copy(
@@ -198,7 +249,14 @@ class RecipeSearchViewModel @Inject constructor(
     }
 
     fun onQueryChanged(newQuery: String) {
+        _maxTotalMinutes.value = null
         _query.value = newQuery
+    }
+
+    /** Runs a browse category's search, applying its time cap if it has one. */
+    fun onCategorySelected(category: SearchCategory) {
+        _maxTotalMinutes.value = category.maxTotalMinutes
+        _query.value = category.query
     }
 
     /**
