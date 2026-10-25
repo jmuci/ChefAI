@@ -34,8 +34,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import java.time.Clock
 import java.time.LocalDate
-import java.time.temporal.WeekFields
-import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.CancellationException
 import javax.inject.Inject
@@ -88,13 +86,13 @@ class MealPlansViewModel @Inject constructor(
 ) : ViewModel() {
 
     /**
-     * The week being read, as its first day.
+     * A date inside the week being read; the week's first day follows the user's week-start setting.
      *
      * Deliberately not in `SavedStateHandle`: surviving rotation is what a ViewModel is for, and a
      * user returning to a cold app wants this week rather than whichever week they were browsing
      * yesterday. ADR-015 Decision 4.
      */
-    private val weekStart = MutableStateFlow(weekStartFor(today(), firstDayOfWeek))
+    private val browsedDate = MutableStateFlow(today())
 
     private val plans: Flow<List<MealPlan>> = sessionManager.userSession
         .flatMapLatest { session ->
@@ -144,10 +142,15 @@ class MealPlansViewModel @Inject constructor(
 
     val uiState: StateFlow<MealPlansUiState> = combine(
         plans,
-        weekStart,
+        browsedDate,
+        userPreferencesRepository.weekStart,
         householdRepository.observeMyHousehold(),
-    ) { plans, weekStart, household ->
-        WeekInputs(plans = plans, weekStart = weekStart, household = household)
+    ) { plans, date, firstDay, household ->
+        WeekInputs(
+            plans = plans,
+            weekStart = weekStartFor(date, firstDay.dayOfWeek),
+            household = household,
+        )
     }
         .flatMapLatest { inputs ->
             // The recipes a week needs are only known once the plans are projected onto it, so the
@@ -190,11 +193,11 @@ class MealPlansViewModel @Inject constructor(
         )
 
     fun onPreviousWeek() {
-        weekStart.update { it.minusDays(DAYS_IN_WEEK.toLong()) }
+        browsedDate.update { it.minusDays(DAYS_IN_WEEK.toLong()) }
     }
 
     fun onNextWeek() {
-        weekStart.update { it.plusDays(DAYS_IN_WEEK.toLong()) }
+        browsedDate.update { it.plusDays(DAYS_IN_WEEK.toLong()) }
     }
 
     fun onViewModeChange(mode: MealPlansViewMode) {
@@ -202,8 +205,6 @@ class MealPlansViewModel @Inject constructor(
     }
 
     private fun today(): LocalDate = LocalDate.now(clock)
-
-    private val firstDayOfWeek get() = WeekFields.of(Locale.getDefault()).firstDayOfWeek
 
     /** Everything the projection needs, gathered before the recipe queries it implies. */
     private inner class WeekInputs(

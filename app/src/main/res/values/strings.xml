@@ -387,6 +387,10 @@
     <string name="settings_units_imperial">Imperial</string>
     <string name="settings_units_imperial_example">Ounces, pounds, cups, spoons</string>
     <string name="settings_measurement_units_footnote">Weights marked \u2248 are estimated from a typical density, so they\'re a good guide rather than an exact figure. Amounts counted rather than measured \u2014 cloves, cans, slices \u2014 are never converted.</string>
+    <string name="settings_week_start_title">Week starts on</string>
+    <string name="settings_week_start_subtitle">The first day shown in the meal plan calendar.</string>
+    <string name="settings_week_start_monday">Monday</string>
+    <string name="settings_week_start_sunday">Sunday</string>
     <string name="settings_menu_item">Settings</string>
 
     <!-- Header / shell -->

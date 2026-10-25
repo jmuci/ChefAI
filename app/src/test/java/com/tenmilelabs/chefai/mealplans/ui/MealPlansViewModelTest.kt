@@ -5,6 +5,7 @@ import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.core.data.repository.FakeUserPreferencesRepository
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
+import com.tenmilelabs.chefai.core.domain.model.WeekStart
 import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import com.tenmilelabs.chefai.household.domain.repository.FakeHouseholdRepository
@@ -27,6 +28,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import java.time.DayOfWeek
 import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -76,12 +78,14 @@ class MealPlansViewModelTest {
         viewModel = buildViewModel()
     }
 
-    private fun buildViewModel() = MealPlansViewModel(
+    private fun buildViewModel(
+        preferences: FakeUserPreferencesRepository = FakeUserPreferencesRepository(),
+    ) = MealPlansViewModel(
         mealPlanRepository = repository,
         recipesRepository = recipesRepository,
         shoppingListRepository = shoppingListRepository,
         householdRepository = householdRepository,
-        userPreferencesRepository = FakeUserPreferencesRepository(),
+        userPreferencesRepository = preferences,
         sessionManager = sessionManager,
         clock = clock,
     )
@@ -97,6 +101,24 @@ class MealPlansViewModelTest {
             assertThat(state.week.weekStart).isEqualTo(weekStart)
             assertThat(state.week.weekEnd).isEqualTo(weekStart.plusDays(6))
             assertThat(state.today).isEqualTo(today)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `the week-start setting decides the calendar's first day, live`() = runTest {
+        val preferences = FakeUserPreferencesRepository(initialWeekStart = WeekStart.MONDAY)
+        val vm = buildViewModel(preferences)
+        repository.emitPlans()
+
+        vm.uiState.test {
+            assertThat(awaitSuccess().week.weekStart.dayOfWeek).isEqualTo(DayOfWeek.MONDAY)
+
+            preferences.setWeekStart(WeekStart.SUNDAY)
+
+            val state = awaitSuccess()
+            assertThat(state.week.weekStart.dayOfWeek).isEqualTo(DayOfWeek.SUNDAY)
+            assertThat(state.week.days).hasSize(7)
             cancelAndIgnoreRemainingEvents()
         }
     }

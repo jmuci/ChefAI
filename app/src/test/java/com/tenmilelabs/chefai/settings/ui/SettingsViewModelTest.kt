@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.settings.ui
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.core.data.repository.FakeUserPreferencesRepository
+import com.tenmilelabs.chefai.core.domain.model.WeekStart
 import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -38,6 +39,22 @@ class SettingsViewModelTest {
 
             assertThat(awaitItem().measurementSystem).isEqualTo(MeasurementSystem.METRIC)
             assertThat(preferences.current).isEqualTo(MeasurementSystem.METRIC)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `choosing a week start stores it and emits it back`() = runTest {
+        val preferences = FakeUserPreferencesRepository(initialWeekStart = WeekStart.MONDAY)
+        val viewModel = SettingsViewModel(preferences)
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().weekStart).isEqualTo(WeekStart.MONDAY)
+
+            viewModel.onAction(SettingsAction.WeekStartChanged(WeekStart.SUNDAY))
+
+            assertThat(awaitItem().weekStart).isEqualTo(WeekStart.SUNDAY)
+            assertThat(preferences.currentWeekStart).isEqualTo(WeekStart.SUNDAY)
             cancelAndIgnoreRemainingEvents()
         }
     }

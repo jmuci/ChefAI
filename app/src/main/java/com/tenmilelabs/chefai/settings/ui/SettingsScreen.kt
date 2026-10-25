@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.core.domain.model.WeekStart
 import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatRadio
 import com.tenmilelabs.chefai.core.ui.components.flat.MinHitTarget
@@ -110,8 +111,9 @@ private fun SettingsSections(
                 .padding(top = SettingsMetrics.SubtitleToGroupGap)
                 .selectableGroup(),
         ) { option ->
-            MeasurementSystemRow(
-                option = option,
+            SettingsRadioRow(
+                label = stringResource(option.labelRes),
+                example = stringResource(option.exampleRes),
                 isSelected = uiState.measurementSystem == option.system,
                 onSelect = { onAction(SettingsAction.MeasurementSystemChanged(option.system)) },
             )
@@ -123,13 +125,55 @@ private fun SettingsSections(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = SettingsMetrics.HorizontalPadding),
         )
+
+        Text(
+            text = stringResource(R.string.settings_week_start_title).uppercase(),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(
+                start = SettingsMetrics.HorizontalPadding,
+                end = SettingsMetrics.HorizontalPadding,
+                top = SettingsMetrics.ScreenVerticalPadding,
+            ),
+        )
+        Text(
+            text = stringResource(R.string.settings_week_start_subtitle),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(
+                horizontal = SettingsMetrics.HorizontalPadding,
+                vertical = SettingsMetrics.TitleToSubtitleGap,
+            ),
+        )
+        RuledGroup(
+            items = WeekStartOption.entries,
+            modifier = Modifier
+                .padding(top = SettingsMetrics.SubtitleToGroupGap)
+                .selectableGroup(),
+        ) { option ->
+            SettingsRadioRow(
+                label = stringResource(option.labelRes),
+                example = null,
+                isSelected = uiState.weekStart == option.weekStart,
+                onSelect = { onAction(SettingsAction.WeekStartChanged(option.weekStart)) },
+            )
+        }
     }
+}
+
+private enum class WeekStartOption(
+    val weekStart: WeekStart,
+    @param:StringRes val labelRes: Int,
+) {
+    MONDAY(WeekStart.MONDAY, R.string.settings_week_start_monday),
+    SUNDAY(WeekStart.SUNDAY, R.string.settings_week_start_sunday),
 }
 
 /** One radio row — 44dp minimum, the selected label going 800. See [FlatRadio]'s own preview. */
 @Composable
-private fun MeasurementSystemRow(
-    option: MeasurementSystemOption,
+private fun SettingsRadioRow(
+    label: String,
+    example: String?,
     isSelected: Boolean,
     onSelect: () -> Unit,
 ) {
@@ -148,15 +192,17 @@ private fun MeasurementSystemRow(
         FlatRadio(selected = isSelected, onClick = null)
         Column {
             Text(
-                text = stringResource(option.labelRes),
+                text = label,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Normal,
             )
-            Text(
-                text = stringResource(option.exampleRes),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (example != null) {
+                Text(
+                    text = example,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
