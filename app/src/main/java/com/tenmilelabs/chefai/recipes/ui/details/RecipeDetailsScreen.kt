@@ -679,10 +679,17 @@ fun StepsList(steps: List<RecipeStep>) {
     val timerReplacedMessage = stringResource(R.string.step_timer_replaced_message)
 
     val orderedSteps = steps.sortedBy { it.orderIndex }
+    // Number by position, not by stored orderIndex: the backend seed is 0-based in some
+    // environments and 1-based in others, so orderIndex + 1 read "2, 3, …" for the latter.
+    val stepNumbers = remember(orderedSteps) {
+        orderedSteps.withIndex().associate { (index, step) -> step.uuid to index + 1 }
+    }
     RuledGroup(items = orderedSteps, key = { it.uuid }) { step ->
-        val stepLabel = stringResource(R.string.step_timer_label_format, step.orderIndex + 1)
+        val stepNumber = stepNumbers.getValue(step.uuid)
+        val stepLabel = stringResource(R.string.step_timer_label_format, stepNumber)
         StepListItem(
             step = step,
+            stepNumber = stepNumber,
             onStartTimer = { totalSeconds ->
                 requestNotificationPermission()
                 val replaced = timerViewModel?.start(
@@ -702,7 +709,7 @@ fun StepsList(steps: List<RecipeStep>) {
 private val StepBadgeSize = 26.dp
 
 @Composable
-private fun StepListItem(step: RecipeStep, onStartTimer: (Long) -> Unit) {
+private fun StepListItem(step: RecipeStep, stepNumber: Int, onStartTimer: (Long) -> Unit) {
     val durationSeconds = remember(step.instruction) { parseStepDurationSeconds(step.instruction) }
     Row(
         modifier = Modifier
@@ -718,7 +725,7 @@ private fun StepListItem(step: RecipeStep, onStartTimer: (Long) -> Unit) {
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = (step.orderIndex + 1).toString(),
+                text = stepNumber.toString(),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onPrimary,
             )
