@@ -130,7 +130,7 @@ private fun ShoppingListProgressHeader(
 ) {
     val progress by animateFloatAsState(targetValue = list.progress, label = "shoppingProgress")
 
-    ChefAITopAppBarSurface(modifier = modifier) {
+    ChefAITopAppBarSurface(modifier = modifier, applyStatusBarInsets = false) {
         Text(
             text = stringResource(R.string.shopping_list_progress, list.checkedCount, list.totalCount),
             style = MaterialTheme.typography.bodyMedium,

@@ -93,10 +93,13 @@ fun RecipesContent(
         LoadingContent()
     } else {
         Column(modifier = Modifier.fillMaxSize()) {
-            FilterChipsRow(
-                selected = selectedFilter,
-                onSelect = onFilterSelect,
-            )
+            // Nothing to filter in an empty collection; keep the chips when a filter is what emptied it.
+            if (recipes.isNotEmpty() || selectedFilter != RecipeFilter.ALL) {
+                FilterChipsRow(
+                    selected = selectedFilter,
+                    onSelect = onFilterSelect,
+                )
+            }
 
             if (recipes.isEmpty() && selectedFilter != RecipeFilter.ALL) {
                 // The collection may well be non-empty; it's the filter that matched nothing.

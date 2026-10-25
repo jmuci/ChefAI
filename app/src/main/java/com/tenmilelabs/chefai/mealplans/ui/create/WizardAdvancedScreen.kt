@@ -24,6 +24,7 @@ import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.mealplans.ui.create.components.PrepTimeSelector
 import com.tenmilelabs.chefai.mealplans.ui.create.components.ToggleOptionRow
 import com.tenmilelabs.chefai.mealplans.ui.create.components.VarietyPreferenceSelector
+import com.tenmilelabs.chefai.mealplans.ui.create.components.WizardSectionLabel
 import com.tenmilelabs.chefai.mealplans.ui.create.components.WizardHeader
 
 @Composable
@@ -65,22 +66,25 @@ private fun WizardAdvancedContent(
                 .padding(horizontal = 16.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            RuledGroup {
-                row {
-                    ToggleOptionRow(
-                        title = stringResource(R.string.wizard_batch_cooking_title),
-                        subtitle = stringResource(R.string.wizard_batch_cooking_subtitle),
-                        checked = uiState.batchCooking,
-                        onCheckedChange = { onAction(WizardAction.SetBatchCooking(it)) },
-                    )
-                }
-                row {
-                    ToggleOptionRow(
-                        title = stringResource(R.string.wizard_leftover_title),
-                        subtitle = stringResource(R.string.wizard_leftover_subtitle),
-                        checked = uiState.leftoverFriendly,
-                        onCheckedChange = { onAction(WizardAction.SetLeftoverFriendly(it)) },
-                    )
+            Column {
+                WizardSectionLabel(stringResource(R.string.wizard_options_title))
+                RuledGroup {
+                    row {
+                        ToggleOptionRow(
+                            title = stringResource(R.string.wizard_batch_cooking_title),
+                            subtitle = stringResource(R.string.wizard_batch_cooking_subtitle),
+                            checked = uiState.batchCooking,
+                            onCheckedChange = { onAction(WizardAction.SetBatchCooking(it)) },
+                        )
+                    }
+                    row {
+                        ToggleOptionRow(
+                            title = stringResource(R.string.wizard_leftover_title),
+                            subtitle = stringResource(R.string.wizard_leftover_subtitle),
+                            checked = uiState.leftoverFriendly,
+                            onCheckedChange = { onAction(WizardAction.SetLeftoverFriendly(it)) },
+                        )
+                    }
                 }
             }
 
