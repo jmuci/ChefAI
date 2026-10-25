@@ -30,6 +30,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import com.tenmilelabs.chefai.search.ui.model.SearchCategory
 import java.util.UUID
 
 /**
@@ -229,6 +230,28 @@ class RecipeSearchViewModelTest {
             val results = awaitItem() as SearchUiState.Results
             assertThat(results.items).containsExactly(recipe)
             assertThat(searchRepository.queriesReceived).containsExactly("vegetarian")
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `Quick and easy drops recipes over 30 minutes and scans on when a page filters to nothing`() = testScope.runTest {
+        val slow = preview().copy(prepTimeMinutes = 30, cookTimeMinutes = 90)
+        val unknownTime = preview().copy(prepTimeMinutes = 0, cookTimeMinutes = 0)
+        val quick = preview().copy(prepTimeMinutes = 10, cookTimeMinutes = 20)
+        searchRepository.outcomesByOffset[0] = RecipeSearchOutcome(listOf(slow, unknownTime), true, RecipeSearchSource.REMOTE)
+        searchRepository.outcomesByOffset[2] = RecipeSearchOutcome(listOf(quick, slow), false, RecipeSearchSource.REMOTE)
+
+        viewModel.uiState.test {
+            assertThat(awaitItem()).isEqualTo(SearchUiState.Idle)
+
+            viewModel.onCategorySelected(SearchCategory.QUICK_EASY)
+            advanceTimeBy(400)
+            runCurrent()
+
+            assertThat(awaitItem()).isEqualTo(SearchUiState.Searching)
+            assertThat((awaitItem() as SearchUiState.Results).items).containsExactly(quick)
+            assertThat(searchRepository.offsetsReceived).containsExactly(0, 2).inOrder()
             cancelAndIgnoreRemainingEvents()
         }
     }

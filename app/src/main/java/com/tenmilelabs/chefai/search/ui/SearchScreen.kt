@@ -49,7 +49,7 @@ fun SearchScreen(
     ) {
         SearchBrowseContent(
             onCategoryClick = { category ->
-                viewModel.onQueryChanged(category.query)
+                viewModel.onCategorySelected(category)
                 expanded = true
             },
             contentPadding = PaddingValues(
