@@ -55,6 +55,13 @@ class DefaultHomeRecipeSidecarRepository @Inject constructor(
             tagDao.upsertAll(sidecar.tags.map { it.toTagEntity() })
             labelDao.upsertAll(sidecar.labels.map { it.toLabelEntity() })
 
+            // 1b. Rows saved from an older bundled sidecar still point at a dead image host; the skip
+            //    rule below would leave them there forever, so repoint them first.
+            sidecar.recipes.forEach { dto ->
+                val uuid = runCatching { UUID.fromString(dto.uuid) }.getOrNull() ?: return@forEach
+                recipeDao.replaceRetiredImageHost(uuid, dto.imageUrl, dto.imageUrlThumbnail)
+            }
+
             // 2. Determine which recipes to skip: PENDING rows (unpushed local edits) and any recipe
             //    that already has detail (steps or ingredients) — i.e. one that arrived complete via
             //    sync, fetch, or an earlier sidecar. The sidecar synthesizes its own step/ingredient

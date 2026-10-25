@@ -251,6 +251,13 @@ class FakeRecipeDao : RecipeDao {
         triggerUpdate()
     }
 
+    override suspend fun replaceRetiredImageHost(uuid: UUID, imageUrl: String, imageUrlThumbnail: String) {
+        val existing = recipes[uuid] ?: return
+        if (!existing.imageUrl.startsWith("https://images.chefai.app/")) return
+        recipes[uuid] = existing.copy(imageUrl = imageUrl, imageUrlThumbnail = imageUrlThumbnail)
+        triggerUpdate()
+    }
+
     override suspend fun getDirty(): List<RecipeEntity> {
         return recipes.values.filter { it.syncState == SyncState.PENDING }
     }

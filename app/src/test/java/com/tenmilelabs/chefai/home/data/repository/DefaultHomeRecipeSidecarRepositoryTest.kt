@@ -15,6 +15,7 @@ import com.tenmilelabs.chefai.home.data.model.SidecarIngredient
 import com.tenmilelabs.chefai.home.data.model.SidecarStep
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.home.data.mapper.toRecipeEntity
+import com.tenmilelabs.chefai.home.data.mapper.toRecipeStepEntity
 import com.tenmilelabs.chefai.home.data.model.HomeSidecarDto
 import com.tenmilelabs.chefai.home.data.model.SidecarCreatorDto
 import com.tenmilelabs.chefai.home.data.model.SidecarLabelDto
@@ -328,5 +329,37 @@ class DefaultHomeRecipeSidecarRepositoryTest {
         val steps = recipeStepDao.getStepsForRecipe(UUID.fromString(recipe1Id))
         assertThat(steps).hasSize(1)
         assertThat(steps.first().instruction).isEqualTo("Preheat oven to 200°C.")
+    }
+
+    @Test
+    fun `row stored with the retired image host is repointed even when it is skipped for having detail`() = runTest {
+        val deadHost = sidecar.recipes[0].toRecipeEntity().copy(
+            imageUrl = "https://images.chefai.app/recipes/chicken.jpg",
+            imageUrlThumbnail = "https://images.chefai.app/recipes/thumb/chicken.jpg",
+            updatedAt = 42L,
+        )
+        recipeDao.seed(recipes = listOf(deadHost))
+        recipeStepDao.upsertStep(SidecarStep(0, "Season.").toRecipeStepEntity(deadHost.uuid, now = 1L))
+
+        repository.upsertSidecar(sidecar)
+
+        val r1 = recipeDao.getRecipeById(UUID.fromString(recipe1Id))!!
+        assertThat(r1.imageUrl).isEqualTo("https://example.com/chicken.jpg")
+        assertThat(r1.imageUrlThumbnail).isEqualTo("https://example.com/chicken-thumb.jpg")
+        // A repair, not an edit: nothing to push.
+        assertThat(r1.syncState).isEqualTo(SyncState.SYNCED)
+        assertThat(r1.updatedAt).isEqualTo(42L)
+    }
+
+    @Test
+    fun `row with a different image host is left alone`() = runTest {
+        val own = sidecar.recipes[0].toRecipeEntity().copy(imageUrl = "https://cdn.example.org/mine.jpg")
+        recipeDao.seed(recipes = listOf(own))
+        // Has detail, so the sidecar skips it and only the repair could have changed the URL.
+        recipeStepDao.upsertStep(SidecarStep(0, "Season.").toRecipeStepEntity(own.uuid, now = 1L))
+
+        repository.upsertSidecar(sidecar)
+
+        assertThat(recipeDao.getRecipeById(own.uuid)!!.imageUrl).isEqualTo("https://cdn.example.org/mine.jpg")
     }
 }

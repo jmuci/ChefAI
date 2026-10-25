@@ -123,6 +123,23 @@ interface RecipeDao {
     @Upsert
     suspend fun upsertAll(recipes: List<RecipeEntity>)
 
+    /**
+     * Repoints a row's image at [imageUrl]/[imageUrlThumbnail], but only while it still holds the
+     * retired `images.chefai.app` host (a domain that now serves a parking page).
+     *
+     * A targeted UPDATE, not a row write: the sidecar skips recipes that already have detail, so
+     * this is the only way those rows leave the dead URL, and it must not mark the row PENDING or
+     * move `updatedAt` — that would push a change nobody made. The `LIKE` guard keeps it from ever
+     * touching a real server-supplied or user-owned image.
+     */
+    @Query(
+        """
+        UPDATE recipes SET imageUrl = :imageUrl, imageUrlThumbnail = :imageUrlThumbnail
+        WHERE uuid = :uuid AND imageUrl LIKE 'https://images.chefai.app/%'
+        """
+    )
+    suspend fun replaceRetiredImageHost(uuid: UUID, imageUrl: String, imageUrlThumbnail: String)
+
     @Query("SELECT * FROM recipes WHERE syncState = 'PENDING'")
     suspend fun getDirty(): List<RecipeEntity>
 
