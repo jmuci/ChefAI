@@ -77,6 +77,7 @@ object NetworkModule {
     fun provideApiBaseUrls(): ApiBaseUrls = ApiBaseUrls(
         local = BuildConfig.API_BASE_URL,
         remote = BuildConfig.REMOTE_API_BASE_URL,
+        remoteConfigured = BuildConfig.REMOTE_API_CONFIGURED,
     )
 
     @Provides

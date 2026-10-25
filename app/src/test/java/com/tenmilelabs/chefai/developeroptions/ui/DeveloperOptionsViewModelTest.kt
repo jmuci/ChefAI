@@ -22,7 +22,10 @@ class DeveloperOptionsViewModelTest {
 
     private val baseUrls = ApiBaseUrls(local = "http://10.0.2.2:8080", remote = "https://api.example.com")
 
-    private fun viewModel(repository: FakeApiEnvironmentRepository) = DeveloperOptionsViewModel(
+    private fun viewModel(
+        repository: FakeApiEnvironmentRepository,
+        baseUrls: ApiBaseUrls = this.baseUrls,
+    ) = DeveloperOptionsViewModel(
         apiEnvironmentRepository = repository,
         switchApiEnvironment = SwitchApiEnvironment(
             repository,
@@ -76,6 +79,20 @@ class DeveloperOptionsViewModelTest {
 
             assertThat(awaitItem().isRemote).isFalse()
             assertThat(repository.current).isEqualTo(ApiEnvironment.LOCAL)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `a stored remote choice shows as local when the build has no remote host`() = runTest {
+        val unconfigured = baseUrls.copy(remote = "https://api.invalid", remoteConfigured = false)
+        val viewModel = viewModel(FakeApiEnvironmentRepository(ApiEnvironment.REMOTE), unconfigured)
+
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertThat(state.isRemote).isFalse()
+            assertThat(state.isRemoteConfigured).isFalse()
+            assertThat(state.activeBaseUrl).isEqualTo("http://10.0.2.2:8080")
             cancelAndIgnoreRemainingEvents()
         }
     }
