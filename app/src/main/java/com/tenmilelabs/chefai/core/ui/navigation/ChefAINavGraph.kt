@@ -45,6 +45,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.createGraph
 import androidx.window.core.layout.WindowSizeClass
 import androidx.navigation.navArgument
+import com.tenmilelabs.chefai.BuildConfig
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.ui.LoginScreen
 import com.tenmilelabs.chefai.auth.ui.RegisterScreen
@@ -80,6 +81,7 @@ import com.tenmilelabs.chefai.recipes.ui.urlimport.ImportRecipeRoute
 import com.tenmilelabs.chefai.recipes.ui.urlimport.browser.BrowserImportRoute
 import com.tenmilelabs.chefai.search.ui.SearchScreen
 import com.tenmilelabs.chefai.settings.ui.SettingsScreen
+import com.tenmilelabs.chefai.developeroptions.ui.DeveloperOptionsScreen
 import timber.log.Timber
 import java.util.UUID
 import kotlinx.coroutines.launch
@@ -332,7 +334,18 @@ fun ChefAINavGraph(
             )
         }
         composable(route = AppDestinations.SETTINGS.route) {
-            SettingsScreen()
+            SettingsScreen(
+                onNavigateToDeveloperOptions = if (BuildConfig.DEBUG) {
+                    { navActions.navigateToDeveloperOptions() }
+                } else {
+                    null
+                },
+            )
+        }
+        if (BuildConfig.DEBUG) {
+            composable(route = AppDestinations.DEVELOPER_OPTIONS.route) {
+                DeveloperOptionsScreen()
+            }
         }
         composable(route = AppDestinations.HOUSEHOLD.route) {
             HouseholdScreen(
@@ -376,6 +389,11 @@ fun ChefAINavGraph(
                 onNavigateToHome = { navActions.navigateToHome() },
                 onNavigateToRegister = { navActions.navigateToRegister() },
                 onNavigateToAcceptInvite = { token -> navActions.navigateToAcceptInvite(token) },
+                onNavigateToDeveloperOptions = if (BuildConfig.DEBUG) {
+                    { navActions.navigateToDeveloperOptions() }
+                } else {
+                    null
+                },
             )
         }
         composable(route = AppDestinations.REGISTER.route) {

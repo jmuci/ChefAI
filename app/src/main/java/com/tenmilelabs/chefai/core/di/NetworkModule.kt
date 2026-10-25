@@ -3,6 +3,9 @@ package com.tenmilelabs.chefai.core.di
 import com.tenmilelabs.chefai.BuildConfig
 import com.tenmilelabs.chefai.auth.data.network.AuthInterceptor
 import com.tenmilelabs.chefai.auth.domain.TokenProvider
+import com.tenmilelabs.chefai.developeroptions.data.network.ApiEnvironmentInterceptor
+import com.tenmilelabs.chefai.developeroptions.domain.model.ApiBaseUrls
+import com.tenmilelabs.chefai.developeroptions.domain.repository.ApiEnvironmentRepository
 import com.tenmilelabs.chefai.recipes.data.network.ChefAIApiService
 import com.tenmilelabs.chefai.recipes.data.network.RecipeDetailApiService
 import com.tenmilelabs.chefai.recipes.data.network.RecipeDetailNetworkDataSource
@@ -71,8 +74,28 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideHttpClient(tokenProvider: TokenProvider, json: Json) = HttpClient(CIO) {
+    fun provideApiBaseUrls(): ApiBaseUrls = ApiBaseUrls(
+        local = BuildConfig.API_BASE_URL,
+        remote = BuildConfig.REMOTE_API_BASE_URL,
+    )
+
+    @Provides
+    @Singleton
+    fun provideHttpClient(
+        tokenProvider: TokenProvider,
+        json: Json,
+        apiEnvironmentRepository: ApiEnvironmentRepository,
+        apiBaseUrls: ApiBaseUrls,
+    ) = HttpClient(CIO) {
         expectSuccess = true
+
+        // Debug only: Developer options can point the build at the deployed backend.
+        if (BuildConfig.DEBUG) {
+            install(ApiEnvironmentInterceptor) {
+                repository = apiEnvironmentRepository
+                baseUrls = apiBaseUrls
+            }
+        }
 
         // Install authentication interceptor
         install(AuthInterceptor) {

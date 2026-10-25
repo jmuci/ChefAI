@@ -32,6 +32,10 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "com.tenmilelabs.chefai.HiltTestRunner"
+
+        // The deployed host, in every build type: release talks to it directly (API_BASE_URL
+        // below), and a debug build can be switched onto it from Developer options.
+        buildConfigField("String", "REMOTE_API_BASE_URL", "\"${releaseApiBaseUrl}\"")
     }
 
     buildTypes {

@@ -31,17 +31,21 @@ import com.tenmilelabs.chefai.core.ui.components.flat.MinHitTarget
 import com.tenmilelabs.chefai.core.ui.components.flat.RuledGroup
 import com.tenmilelabs.chefai.core.ui.components.flat.flatSelectable
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
+import com.tenmilelabs.chefai.developeroptions.ui.DeveloperOptionsLink
 
 @Composable
 fun SettingsScreen(
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
+    /** `null` hides the Developer options link — the caller passes one on debug builds only. */
+    onNavigateToDeveloperOptions: (() -> Unit)? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     SettingsContent(
         uiState = uiState,
         onAction = viewModel::onAction,
+        onDeveloperOptionsClick = onNavigateToDeveloperOptions,
         modifier = modifier,
     )
 }
@@ -51,10 +55,35 @@ fun SettingsContent(
     uiState: SettingsUiState,
     onAction: (SettingsAction) -> Unit,
     modifier: Modifier = Modifier,
+    onDeveloperOptionsClick: (() -> Unit)? = null,
+) {
+    Column(modifier = modifier.fillMaxSize()) {
+        SettingsSections(
+            uiState = uiState,
+            onAction = onAction,
+            modifier = Modifier.weight(1f),
+        )
+        if (onDeveloperOptionsClick != null) {
+            DeveloperOptionsLink(
+                onClick = onDeveloperOptionsClick,
+                modifier = Modifier.padding(
+                    horizontal = SettingsMetrics.HorizontalPadding,
+                    vertical = SettingsMetrics.ScreenVerticalPadding,
+                ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsSections(
+    uiState: SettingsUiState,
+    onAction: (SettingsAction) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .verticalScroll(rememberScrollState())
             .padding(vertical = SettingsMetrics.ScreenVerticalPadding),
     ) {
@@ -183,6 +212,7 @@ private fun SettingsContentPreview() {
             SettingsContent(
                 uiState = SettingsUiState(measurementSystem = MeasurementSystem.METRIC),
                 onAction = {},
+                onDeveloperOptionsClick = {},
             )
         }
     }
@@ -196,6 +226,7 @@ private fun SettingsContentDarkPreview() {
             SettingsContent(
                 uiState = SettingsUiState(measurementSystem = MeasurementSystem.AS_WRITTEN),
                 onAction = {},
+                onDeveloperOptionsClick = {},
             )
         }
     }

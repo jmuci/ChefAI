@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.auth.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -57,6 +58,7 @@ import com.tenmilelabs.chefai.core.ui.components.flat.flatToggleable
 import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.core.ui.theme.chefColors
+import com.tenmilelabs.chefai.developeroptions.ui.DeveloperOptionsLink
 
 @Composable
 fun LoginScreen(
@@ -64,7 +66,9 @@ fun LoginScreen(
     snackbarHostState: SnackbarHostState? = null,
     onNavigateToHome: () -> Unit = {},
     onNavigateToRegister: () -> Unit = {},
-    onNavigateToAcceptInvite: (String) -> Unit = {}
+    onNavigateToAcceptInvite: (String) -> Unit = {},
+    /** `null` hides the Developer options link — the caller passes one on debug builds only. */
+    onNavigateToDeveloperOptions: (() -> Unit)? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
@@ -103,7 +107,8 @@ fun LoginScreen(
         onRememberMeChange = viewModel::onRememberMeChange,
         onPasswordVisibilityToggle = viewModel::onPasswordVisibilityToggle,
         onLoginClick = viewModel::onLoginClick,
-        onCreateAccountClick = viewModel::onCreateAccountClick
+        onCreateAccountClick = viewModel::onCreateAccountClick,
+        onDeveloperOptionsClick = onNavigateToDeveloperOptions,
     )
 }
 
@@ -118,108 +123,120 @@ fun LoginScreenContent(
     onRememberMeChange: (Boolean) -> Unit = {},
     onPasswordVisibilityToggle: () -> Unit = {},
     onLoginClick: () -> Unit = {},
-    onCreateAccountClick: () -> Unit = {}
+    onCreateAccountClick: () -> Unit = {},
+    onDeveloperOptionsClick: (() -> Unit)? = null,
 ) {
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        // Flush left, vertically centered — Modernist forbids centered hero copy.
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .testTag("LoginScreen")
-                .padding(
-                    horizontal = dimensionResource(id = R.dimen.padding_medium),
-                    vertical = dimensionResource(id = R.dimen.padding_large),
-                ),
-            horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.Center
-        ) {
-            ChefAIWordmark()
-
-            Spacer(modifier = Modifier.height(AuthMetrics.WordmarkToTitleGap))
-
-            Text(
-                text = stringResource(R.string.welcome_back),
-                style = MaterialTheme.typography.displayMedium,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-
-            Spacer(modifier = Modifier.height(AuthMetrics.TitleToSubtitleGap))
-
-            Text(
-                text = stringResource(R.string.login_subtitle),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(AuthMetrics.SubtitleToFieldsGap))
-
-            // Email Field with autocomplete dropdown
-            EmailTextField(
-                email = uiState.email,
-                suggestions = uiState.emailSuggestions,
-                onEmailChange = onEmailChange,
-                onSuggestionSelected = onEmailSuggestionSelected,
-                onDismissSuggestions = onEmailSuggestionsDismissed,
-                error = uiState.emailError,
-                onNext = { focusManager.clearFocus() },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(AuthMetrics.FieldGap))
-
-            // Password Field
-            PasswordTextField(
-                password = uiState.password,
-                onPasswordChange = onPasswordChange,
-                isVisible = uiState.isPasswordVisible,
-                onVisibilityToggle = onPasswordVisibilityToggle,
-                error = uiState.passwordError,
-                modifier = Modifier.fillMaxWidth(),
-                onDone = onLoginClick
-            )
-
-            Spacer(modifier = Modifier.height(AuthMetrics.FieldGap))
-
-            // Remember Me row
-            RememberMeRow(
-                isChecked = uiState.rememberMe,
-                onCheckedChange = onRememberMeChange
-            )
-
-            Spacer(modifier = Modifier.height(AuthMetrics.FieldGap))
-
-            // Login Button
-            FlatBlockButton(
-                text = stringResource(R.string.login_button),
-                onClick = onLoginClick,
-                loading = uiState.isLoading,
-                modifier = Modifier.testTag("LoginButton"),
-            )
-
-            Spacer(modifier = Modifier.height(AuthMetrics.ButtonToFooterGap))
-
-            // Create Account Link
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(AuthMetrics.FooterItemGap),
-                verticalAlignment = Alignment.CenterVertically
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Flush left, vertically centered — Modernist forbids centered hero copy.
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("LoginScreen")
+                    .padding(
+                        horizontal = dimensionResource(id = R.dimen.padding_medium),
+                        vertical = dimensionResource(id = R.dimen.padding_large),
+                    ),
+                horizontalAlignment = Alignment.Start,
+                verticalArrangement = Arrangement.Center
             ) {
+                ChefAIWordmark()
+
+                Spacer(modifier = Modifier.height(AuthMetrics.WordmarkToTitleGap))
+
                 Text(
-                    text = stringResource(R.string.dont_have_account),
+                    text = stringResource(R.string.welcome_back),
+                    style = MaterialTheme.typography.displayMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+
+                Spacer(modifier = Modifier.height(AuthMetrics.TitleToSubtitleGap))
+
+                Text(
+                    text = stringResource(R.string.login_subtitle),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                Text(
-                    text = stringResource(R.string.create_account),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.chefColors.accentText,
+                Spacer(modifier = Modifier.height(AuthMetrics.SubtitleToFieldsGap))
+
+                // Email Field with autocomplete dropdown
+                EmailTextField(
+                    email = uiState.email,
+                    suggestions = uiState.emailSuggestions,
+                    onEmailChange = onEmailChange,
+                    onSuggestionSelected = onEmailSuggestionSelected,
+                    onDismissSuggestions = onEmailSuggestionsDismissed,
+                    error = uiState.emailError,
+                    onNext = { focusManager.clearFocus() },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(AuthMetrics.FieldGap))
+
+                // Password Field
+                PasswordTextField(
+                    password = uiState.password,
+                    onPasswordChange = onPasswordChange,
+                    isVisible = uiState.isPasswordVisible,
+                    onVisibilityToggle = onPasswordVisibilityToggle,
+                    error = uiState.passwordError,
+                    modifier = Modifier.fillMaxWidth(),
+                    onDone = onLoginClick
+                )
+
+                Spacer(modifier = Modifier.height(AuthMetrics.FieldGap))
+
+                // Remember Me row
+                RememberMeRow(
+                    isChecked = uiState.rememberMe,
+                    onCheckedChange = onRememberMeChange
+                )
+
+                Spacer(modifier = Modifier.height(AuthMetrics.FieldGap))
+
+                // Login Button
+                FlatBlockButton(
+                    text = stringResource(R.string.login_button),
+                    onClick = onLoginClick,
+                    loading = uiState.isLoading,
+                    modifier = Modifier.testTag("LoginButton"),
+                )
+
+                Spacer(modifier = Modifier.height(AuthMetrics.ButtonToFooterGap))
+
+                // Create Account Link
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(AuthMetrics.FooterItemGap),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.dont_have_account),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Text(
+                        text = stringResource(R.string.create_account),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.chefColors.accentText,
+                        modifier = Modifier
+                            .flatClickable(onClick = onCreateAccountClick, role = Role.Button)
+                            .testTag("CreateAccountButton"),
+                    )
+                }
+            }
+
+            if (onDeveloperOptionsClick != null) {
+                DeveloperOptionsLink(
+                    onClick = onDeveloperOptionsClick,
                     modifier = Modifier
-                        .flatClickable(onClick = onCreateAccountClick, role = Role.Button)
-                        .testTag("CreateAccountButton"),
+                        .align(Alignment.BottomStart)
+                        .padding(horizontal = dimensionResource(id = R.dimen.padding_medium)),
                 )
             }
         }
@@ -399,7 +416,8 @@ private fun LoginScreenPreview() {
                 email = "alice@example.com",
                 password = "Password123!"
             ),
-            focusManager = LocalFocusManager.current
+            focusManager = LocalFocusManager.current,
+            onDeveloperOptionsClick = {},
         )
     }
 }
@@ -413,7 +431,8 @@ private fun LoginScreenDarkPreview() {
                 email = "alice@example.com",
                 password = "Password123!"
             ),
-            focusManager = LocalFocusManager.current
+            focusManager = LocalFocusManager.current,
+            onDeveloperOptionsClick = {},
         )
     }
 }
