@@ -20,7 +20,8 @@ import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.core.ui.theme.chefColors
 
 /**
- * The underlined "Developer options" link pinned to the bottom of the login and Settings screens.
+ * The underlined "Developer options" link — pinned to the bottom of the login screen, and the body
+ * of the Developer options section in Settings.
  *
  * Renders unconditionally: callers decide whether to show it (debug builds only), so previews and
  * tests can still see it.
@@ -29,6 +30,7 @@ import com.tenmilelabs.chefai.core.ui.theme.chefColors
 fun DeveloperOptionsLink(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    text: String = stringResource(R.string.developer_options_link),
 ) {
     Row(
         modifier = modifier
@@ -38,7 +40,7 @@ fun DeveloperOptionsLink(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = stringResource(R.string.developer_options_link),
+            text = text,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.chefColors.accentText,
             textDecoration = TextDecoration.Underline,

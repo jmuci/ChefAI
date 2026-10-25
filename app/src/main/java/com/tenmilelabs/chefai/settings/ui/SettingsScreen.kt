@@ -55,35 +55,12 @@ fun SettingsContent(
     uiState: SettingsUiState,
     onAction: (SettingsAction) -> Unit,
     modifier: Modifier = Modifier,
+    /** `null` hides the Developer options section — the caller passes one on debug builds only. */
     onDeveloperOptionsClick: (() -> Unit)? = null,
-) {
-    Column(modifier = modifier.fillMaxSize()) {
-        SettingsSections(
-            uiState = uiState,
-            onAction = onAction,
-            modifier = Modifier.weight(1f),
-        )
-        if (onDeveloperOptionsClick != null) {
-            DeveloperOptionsLink(
-                onClick = onDeveloperOptionsClick,
-                modifier = Modifier.padding(
-                    horizontal = SettingsMetrics.HorizontalPadding,
-                    vertical = SettingsMetrics.ScreenVerticalPadding,
-                ),
-            )
-        }
-    }
-}
-
-@Composable
-private fun SettingsSections(
-    uiState: SettingsUiState,
-    onAction: (SettingsAction) -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
-            .fillMaxWidth()
+            .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(vertical = SettingsMetrics.ScreenVerticalPadding),
     ) {
@@ -123,7 +100,40 @@ private fun SettingsSections(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = SettingsMetrics.HorizontalPadding),
         )
+
+        if (onDeveloperOptionsClick != null) {
+            DeveloperOptionsSection(onClick = onDeveloperOptionsClick)
+        }
     }
+}
+
+/** Debug builds only — its own section, straight after measurement units. */
+@Composable
+private fun DeveloperOptionsSection(onClick: () -> Unit) {
+    Text(
+        text = stringResource(R.string.app_dest_title_developer_options).uppercase(),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(
+            start = SettingsMetrics.HorizontalPadding,
+            end = SettingsMetrics.HorizontalPadding,
+            top = SettingsMetrics.SectionGap,
+        ),
+    )
+    Text(
+        text = stringResource(R.string.settings_developer_options_subtitle),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(
+            horizontal = SettingsMetrics.HorizontalPadding,
+            vertical = SettingsMetrics.TitleToSubtitleGap,
+        ),
+    )
+    DeveloperOptionsLink(
+        onClick = onClick,
+        text = stringResource(R.string.settings_developer_options_open),
+        modifier = Modifier.padding(horizontal = SettingsMetrics.HorizontalPadding),
+    )
 }
 
 /** One radio row — 44dp minimum, the selected label going 800. See [FlatRadio]'s own preview. */
@@ -175,6 +185,9 @@ private object SettingsMetrics {
     /** `padding: var(--space-3) 0` inside each row. */
     val RowVerticalPadding = 12.dp
     val RadioGap = 12.dp
+
+    /** Space above a section label that follows another section. */
+    val SectionGap = 32.dp
 }
 
 /**

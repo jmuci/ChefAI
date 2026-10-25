@@ -30,6 +30,15 @@ class ApiEnvironmentInterceptorTest {
     }
 
     @Test
+    fun `remote falls back to local when the build has no remote host`() {
+        val unconfigured = baseUrls.copy(remote = "https://api.invalid", remoteConfigured = false)
+
+        val result = rewriteForEnvironment("http://10.0.2.2:8080/sync/pull", unconfigured, ApiEnvironment.REMOTE)
+
+        assertThat(result).isNull()
+    }
+
+    @Test
     fun `remote never touches a host that is not the ChefAI backend`() {
         val result = rewriteForEnvironment(
             "https://jmuci.github.io/ChATestAPI/api/v1/recipes.json",
