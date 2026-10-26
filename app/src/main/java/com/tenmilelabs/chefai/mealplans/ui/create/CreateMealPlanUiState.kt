@@ -39,12 +39,22 @@ sealed interface WizardAction {
     data object SaveMealPlan : WizardAction
 }
 
+/**
+ * One-shot wizard outcomes. `overlappingPlanName` names an existing plan whose dates the new one
+ * shares (`null` when none) — a non-blocking notice, since the week view shows both.
+ */
 sealed interface CreateMealPlanEvent {
     /** Plan created and generation completed — navigate to detail screen. */
-    data class MealPlanReady(val mealPlanId: java.util.UUID) : CreateMealPlanEvent
+    data class MealPlanReady(
+        val mealPlanId: java.util.UUID,
+        val overlappingPlanName: String? = null,
+    ) : CreateMealPlanEvent
 
     /** Plan saved locally but generation failed (offline/BE error) — navigate to detail as DRAFT. */
-    data class MealPlanSavedAsDraft(val mealPlanId: java.util.UUID) : CreateMealPlanEvent
+    data class MealPlanSavedAsDraft(
+        val mealPlanId: java.util.UUID,
+        val overlappingPlanName: String? = null,
+    ) : CreateMealPlanEvent
 
     data class ShowError(val message: Int) : CreateMealPlanEvent
 }

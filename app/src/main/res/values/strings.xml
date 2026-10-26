@@ -305,10 +305,18 @@
     <string name="meal_plans_next_week">Next week</string>
     <string name="meal_plans_add_meal">+ Add meal</string>
     <string name="meal_plans_grocery_list_label">Grocery list</string>
+    <!-- Snackbar after creating a plan whose dates overlap an existing one. %1$s = that plan's name. -->
+    <string name="meal_plan_overlap_notice">Overlaps “%1$s” — both plans show in your week</string>
     <string name="meal_plans_grocery_summary">%1$s · %2$s</string>
     <string name="meal_plans_generate_grocery_list">Generate Grocery List</string>
     <string name="meal_plans_grocery_unavailable_empty">Plan a meal this week to build a list</string>
     <string name="meal_plans_grocery_unavailable_multi">This week spans more than one plan — open a plan to shop for it</string>
+    <!-- Used instead of meal_plans_grocery_summary when the week's meals come from several plans: "8 meals planned across 2 plans · 45 ingredients". -->
+    <string name="meal_plans_grocery_summary_multi">%1$s across %2$s · %3$s</string>
+    <plurals name="meal_plans_plan_count">
+        <item quantity="one">%d plan</item>
+        <item quantity="other">%d plans</item>
+    </plurals>
     <plurals name="meal_plans_meals_planned">
         <item quantity="one">%d meal planned</item>
         <item quantity="other">%d meals planned</item>

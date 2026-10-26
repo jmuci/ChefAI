@@ -250,3 +250,26 @@ is a vertical list of hero cards (`MealPlanHeroCard`) built by the pure `MealPla
 from every non-archived plan, newest first. A plan without a user-given title gets one generated
 from its most common recipe tag ("Italian week"). The card's calendar button is a deliberate no-op
 until plan scheduling lands.
+
+## Amendment — Decision 3 superseded (overlapping plans all show)
+
+"One meal per (date, slot), highest `updatedAt` wins" hid planned data in practice. A 3-day and a
+5-day plan created the same day showed only the newer plan's dinner on the shared days; the older
+plan's meal *and its cooked mark* vanished from the week, while the summary line still counted
+ingredients for the visible meals only, and nothing told the user a plan was being hidden.
+
+`MealPlanWeekProjector` no longer picks a winner. Every live plan's meal lands on its date, ordered
+by slot and then by plan `createdAt` (oldest first, `uuid` as tiebreak) — not `updatedAt`, which a
+regeneration or slot edit bumps and would reshuffle rows for no visible reason. When two plans fill
+the same slot, both rows render and each is tagged with its plan's name (`WeekDay.sharedSlots`,
+`PlannedWeekMeal.planName`). Each row still carries its own `dayId`/`slot`, so the cooked toggle
+reached from it acts on that plan's slot only.
+
+The ADR-006 alignment argument for Decision 3 no longer applies: sync resolves two versions of the
+*same* entity, whereas overlapping plans are different entities that are both live.
+
+The grocery summary counts every meal shown and says when they come from several plans
+("8 meals planned across 2 plans · 45 ingredients"). "Generate Grocery List" stays disabled for a
+multi-plan week (Decision 6 unchanged). The wizard now warns, non-blockingly, when a new plan's dates
+overlap an existing one (`MealPlanOverlap`, a snackbar after creation). Still no schema change: plans
+remain anchored on `createdAt` (Decision 2), so "Schedule this plan" stays a no-op.

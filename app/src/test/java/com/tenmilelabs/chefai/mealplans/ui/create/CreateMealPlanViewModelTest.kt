@@ -13,7 +13,9 @@ import com.tenmilelabs.chefai.mealplans.data.repository.FakeMealPlanRepository
 import com.tenmilelabs.chefai.core.testutil.recipePreview1
 import com.tenmilelabs.chefai.core.testutil.recipePreview2
 import com.tenmilelabs.chefai.mealplans.domain.model.DietaryRestriction
+import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay
+import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
@@ -95,8 +97,13 @@ class CreateMealPlanViewModelTest {
             recipesRepository = recipesRepository,
             generateMealPlanUseCase = generateMealPlanUseCase,
             savedStateHandle = savedStateHandle,
+            clock = clock,
         )
     }
+
+    /** Midday, so "yesterday" and "today" never straddle a DST shift or midnight. */
+    private val now = java.time.ZonedDateTime.of(2026, 10, 25, 12, 0, 0, 0, java.time.ZoneOffset.UTC)
+    private val clock = java.time.Clock.fixed(now.toInstant(), java.time.ZoneOffset.UTC)
 
     // --- Default state ---
 
@@ -519,6 +526,60 @@ class CreateMealPlanViewModelTest {
 
         assertThat(repository.generationRequestedIds).hasSize(1)
         assertThat(repository.statelessGenerationRequestedIds).isEmpty()
+    }
+
+    // --- Overlap notice ---
+
+    @Test
+    fun `SaveMealPlan names an existing plan the new one overlaps`() = runTest {
+        // Given a 3-day plan created yesterday (it still covers today and tomorrow)
+        repository.emitPlans(existingPlan(name = "3-day meal plan", createdAt = now.minusDays(1), lengthDays = 3))
+
+        viewModel.uiEvents.test {
+            // When a 5-day plan is created today
+            viewModel.onAction(WizardAction.SaveMealPlan)
+
+            // Then the outcome names the overlapped plan
+            val event = awaitItem() as CreateMealPlanEvent.MealPlanSavedAsDraft
+            assertThat(event.overlappingPlanName).isEqualTo("3-day meal plan")
+        }
+    }
+
+    @Test
+    fun `SaveMealPlan names no plan when existing plans have already ended`() = runTest {
+        // Given a 3-day plan that ended yesterday
+        repository.emitPlans(existingPlan(name = "Last week", createdAt = now.minusDays(3), lengthDays = 3))
+
+        viewModel.uiEvents.test {
+            viewModel.onAction(WizardAction.SaveMealPlan)
+
+            val event = awaitItem() as CreateMealPlanEvent.MealPlanSavedAsDraft
+            assertThat(event.overlappingPlanName).isNull()
+        }
+    }
+
+    private fun existingPlan(name: String, createdAt: java.time.ZonedDateTime, lengthDays: Int): MealPlan {
+        val millis = createdAt.toInstant().toEpochMilli()
+        return MealPlan(
+            uuid = UUID.randomUUID(),
+            userId = testUserId,
+            name = name,
+            preferences = MealPlanPreferences(
+                planLengthDays = lengthDays,
+                mealType = MealType.DINNER,
+                dietaryRestrictions = emptySet(),
+                recipeSource = RecipeSource.COLLECTION_ONLY,
+                maxPrepTimeMinutes = null,
+                servingsPerMeal = 2,
+                batchCooking = false,
+                leftoverFriendly = false,
+                varietyPreference = VarietyPreference.MEDIUM,
+            ),
+            status = MealPlanStatus.READY,
+            createdAt = millis,
+            updatedAt = millis,
+            days = emptyList(),
+        )
     }
 
     /** A day standing in for one the backend generator produced. */

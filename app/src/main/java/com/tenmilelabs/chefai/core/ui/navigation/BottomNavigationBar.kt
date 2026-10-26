@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -51,36 +52,11 @@ import com.tenmilelabs.chefai.core.ui.theme.chefColors
 enum class TopLevelDestination(
     @param:DrawableRes val icon: Int,
     val appDestination: AppDestinations,
-    /**
-     * Base routes of child screens (e.g. a recipe detail opened from this tab) that should keep
-     * this tab highlighted in the bottom nav — see [isRouteInSection].
-     */
-    val childRoutePrefixes: Set<String> = emptySet(),
 ) {
-    HOME(
-        icon = ChefAIIcons.House,
-        appDestination = AppDestinations.HOME,
-        childRoutePrefixes = setOf(ScreenBaseRoutes.HOME_RECIPE_DETAIL),
-    ),
-    SEARCH(
-        icon = ChefAIIcons.Search,
-        appDestination = AppDestinations.SEARCH,
-        childRoutePrefixes = setOf(ScreenBaseRoutes.SEARCH_RECIPE_DETAIL),
-    ),
-    RECIPES(
-        icon = ChefAIIcons.BookOpen,
-        appDestination = AppDestinations.RECIPES,
-        childRoutePrefixes = setOf(ScreenBaseRoutes.RECIPE_DETAILS),
-    ),
-    MEAL_PLANS(
-        icon = ChefAIIcons.ChefHat,
-        appDestination = AppDestinations.MEAL_PLANS,
-        childRoutePrefixes = setOf(
-            ScreenBaseRoutes.MEAL_PLAN_DETAIL,
-            ScreenBaseRoutes.MEAL_PLAN_RECIPE_DETAIL,
-            ScreenBaseRoutes.MEAL_PLAN_SHOPPING_LIST,
-        ),
-    ),
+    HOME(icon = ChefAIIcons.House, appDestination = AppDestinations.HOME),
+    SEARCH(icon = ChefAIIcons.Search, appDestination = AppDestinations.SEARCH),
+    RECIPES(icon = ChefAIIcons.BookOpen, appDestination = AppDestinations.RECIPES),
+    MEAL_PLANS(icon = ChefAIIcons.ChefHat, appDestination = AppDestinations.MEAL_PLANS),
 }
 
 /**
@@ -137,8 +113,7 @@ fun BottomNavigationBar(
     navController: NavController,
     modifier: Modifier = Modifier,
 ) {
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
+    val selectedTab = rememberSelectedTab(navController)
 
     val shade = MaterialTheme.chefColors.navShade
 
@@ -167,8 +142,8 @@ fun BottomNavigationBar(
             TopLevelDestination.entries.forEach { destination ->
                 NavItem(
                     destination = destination,
-                    selected = isRouteInSection(currentRoute, destination),
-                    onClick = { navController.navigateToTab(destination) },
+                    selected = destination == selectedTab,
+                    onClick = { navController.selectTab(destination) },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -186,8 +161,7 @@ fun NavigationRailBar(
     navController: NavController,
     modifier: Modifier = Modifier,
 ) {
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
+    val selectedTab = rememberSelectedTab(navController)
 
     Column(
         modifier = modifier
@@ -201,8 +175,8 @@ fun NavigationRailBar(
         TopLevelDestination.entries.forEach { destination ->
             NavItem(
                 destination = destination,
-                selected = isRouteInSection(currentRoute, destination),
-                onClick = { navController.navigateToTab(destination) },
+                selected = destination == selectedTab,
+                onClick = { navController.selectTab(destination) },
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -268,10 +242,32 @@ private fun NavItem(
 }
 
 /**
+ * The tab whose back stack is showing, re-read whenever the top entry changes — any push or pop
+ * moves it, and [owningTab] reads ownership off the whole stack rather than off that entry.
+ */
+@Composable
+private fun rememberSelectedTab(navController: NavController): TopLevelDestination? {
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    return remember(navBackStackEntry) { navController.owningTab() }
+}
+
+/**
+ * Handles a tap on [destination]: re-selecting the tab the user is already in pops back to that
+ * tab's root (the platform convention); any other tab is switched to, restoring its saved stack.
+ */
+internal fun NavController.selectTab(destination: TopLevelDestination) {
+    if (destination == owningTab()) {
+        popBackStack(destination.appDestination.route, inclusive = false)
+    } else {
+        navigateToTab(destination)
+    }
+}
+
+/**
  * Switches tabs without stacking them: pop to the graph's start, keep each tab's own back stack,
  * and never start a second copy of a tab already on top.
  */
-private fun NavController.navigateToTab(destination: TopLevelDestination) {
+internal fun NavController.navigateToTab(destination: TopLevelDestination) {
     navigate(destination.appDestination.route) {
         popUpTo(graph.startDestinationId) { saveState = true }
         launchSingleTop = true
@@ -280,14 +276,31 @@ private fun NavController.navigateToTab(destination: TopLevelDestination) {
 }
 
 /**
- * Determines if the current route belongs to a given top-level section.
- * This allows child routes (e.g., meal plan detail, recipe opened from meal plans)
- * to keep the parent tab highlighted in the bottom navigation bar.
+ * The tab whose back stack the current screen belongs to, or `null` when no tab root is on the
+ * stack (no graph yet, e.g. a preview).
+ *
+ * Read off the back stack, not the current route: shared screens (a meal plan's detail, a recipe)
+ * are reachable from more than one tab, so their route alone cannot say whose stack they are in —
+ * a plan created from a recipe lives in the Recipes stack, and highlighting Meal Plans there made
+ * the Recipes tab look unselected while tapping it restored the very same plan.
+ *
+ * The graph is flat, and [navigateToTab] always pops to the start destination before pushing a
+ * tab, so a stack is `[start tab root, (other tab root, …)]`: the other tab's root, when present,
+ * owns everything above it; otherwise the start tab does.
  */
-internal fun isRouteInSection(currentRoute: String?, item: TopLevelDestination): Boolean {
-    if (currentRoute == null) return false
-    if (currentRoute == item.appDestination.route) return true
-    return item.childRoutePrefixes.any { currentRoute.startsWith(it) }
+internal fun NavController.owningTab(): TopLevelDestination? {
+    val rootsOnStack = TopLevelDestination.entries.filter { hasBackStackEntry(it.appDestination.route) }
+    if (rootsOnStack.isEmpty()) return null
+    val startRoute = graph.startDestinationRoute
+    return rootsOnStack.firstOrNull { it.appDestination.route != startRoute } ?: rootsOnStack.first()
+}
+
+/** [NavController.getBackStackEntry] reports a miss by throwing; this is the boolean it implies. */
+private fun NavController.hasBackStackEntry(route: String): Boolean = try {
+    getBackStackEntry(route)
+    true
+} catch (_: IllegalArgumentException) {
+    false
 }
 
 @Preview(name = "Bottom nav — light")

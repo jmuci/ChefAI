@@ -242,20 +242,30 @@ private fun GrocerySummary(
             color = MaterialTheme.chefColors.accentText,
         )
         Spacer(Modifier.height(4.dp))
+        val meals = pluralStringResource(
+            R.plurals.meal_plans_meals_planned,
+            uiState.mealCount,
+            uiState.mealCount,
+        )
+        val ingredients = pluralStringResource(
+            R.plurals.meal_plans_ingredient_count,
+            uiState.ingredientCount,
+            uiState.ingredientCount,
+        )
+        val planCount = uiState.week.planIds.size
         Text(
-            text = stringResource(
-                R.string.meal_plans_grocery_summary,
-                pluralStringResource(
-                    R.plurals.meal_plans_meals_planned,
-                    uiState.mealCount,
-                    uiState.mealCount,
-                ),
-                pluralStringResource(
-                    R.plurals.meal_plans_ingredient_count,
-                    uiState.ingredientCount,
-                    uiState.ingredientCount,
-                ),
-            ),
+            // Overlapping plans are all counted, so say so rather than present a merged figure as
+            // if it were one plan's.
+            text = if (planCount > 1) {
+                stringResource(
+                    R.string.meal_plans_grocery_summary_multi,
+                    meals,
+                    pluralStringResource(R.plurals.meal_plans_plan_count, planCount, planCount),
+                    ingredients,
+                )
+            } else {
+                stringResource(R.string.meal_plans_grocery_summary, meals, ingredients)
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

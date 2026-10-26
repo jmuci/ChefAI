@@ -288,16 +288,16 @@ class NavigationActions(private val navController: NavHostController) {
     }
 
     /**
-     * Opens recipe details from the Search tab, on its own route so the bottom nav keeps Search
-     * highlighted instead of falling back to Recipes (see [isRouteInSection]).
+     * Opens recipe details from the Search tab. Its own route predates back-stack-based tab
+     * highlighting ([owningTab]), which no longer needs it; kept so the route stays stable.
      */
     fun navigateToSearchRecipeDetail(recipeId: UUID) {
         navController.navigate("${ScreenBaseRoutes.SEARCH_RECIPE_DETAIL}/$recipeId")
     }
 
     /**
-     * Opens recipe details from the Home tab, on its own route so the bottom nav keeps Home
-     * highlighted instead of falling back to Recipes (see [isRouteInSection]).
+     * Opens recipe details from the Home tab. Its own route predates back-stack-based tab
+     * highlighting ([owningTab]), which no longer needs it; kept so the route stays stable.
      */
     fun navigateToHomeRecipeDetail(recipeId: UUID) {
         navController.navigate("${ScreenBaseRoutes.HOME_RECIPE_DETAIL}/$recipeId")
