@@ -36,8 +36,28 @@ The domain carries the code as `String?` (`Recipe.languageCode`), **not** an enu
 it on the next edit — the same hazard that made `imageBlobId` and calories thread through the
 domain model. `RecipeLanguage` (EN, ES, FR, IT, PT, DE) exists only as the picker vocabulary.
 
-Existing recipes are **not** backfilled. Most are probably English, but guessing would hide the ones
-that aren't; `null` is honest and the editor shows "Not set".
+~~Existing recipes are **not** backfilled. Most are probably English, but guessing would hide the
+ones that aren't; `null` is honest and the editor shows "Not set".~~
+
+**Amended (October 2026): existing recipes are backfilled to `en`, server-side only.** On inspection
+every recipe that predated the column *was* English — the seed recipes, the TheMealDB catalog
+(English-only), and the user's own pre-release imports — so "Not set" on all of them was noise
+rather than honesty.
+
+- **Backend:** `fix_recipe_language_backfill_en.sql` (jmuci/Chef.ai_Backend#106, run once on
+  production like the other `fix_*.sql` scripts) set every live `null` row to `en` and bumped
+  `server_updated_at`. The seed scripts and the TheMealDB importer write `en` themselves from now on.
+- **Android gets it through sync, not a migration.** A pulled recipe overwrites any local row that is
+  `SYNCED`, so every synced device picks up `en` on its next pull; a row with unpushed edits skips
+  that pull, pushes (the server keeps `en`), and takes `en` on the following one.
+- **Accepted gap:** recipes the server never sees keep `null` locally and show "Not set" until the
+  user picks a language — those on anonymous sessions (which never pull) and pre-release recipes
+  that were never pushed, plus any old edit draft. A Room migration was written for these and
+  dropped: the app is unshipped, the affected set is a handful of test-device recipes, and Room v12
+  had already gone to another migration (#294).
+
+Only rows that were still `null` were touched, so nothing the multi-language release detected or
+the user confirmed was overwritten.
 
 ## Decision 2: Detection cross-checks markup against text, in `:recipe-scraper`
 
@@ -136,8 +156,9 @@ The cost is that no device can clear a language back to unknown, which nothing n
   `recipe_drafts.languageNeedsConfirmation`.
 - `:recipe-scraper` public API grows additively: `ScrapedRecipe.language`, `DetectedLanguage`,
   `LanguageConfidence`, `LanguageSource`, `RecipeHtmlParser.parse(…, contentLanguage = null)`.
-- The backend (`ktor-chefai`) needs a nullable `recipes.language` column and the `SyncRecipe` field
-  before the language travels across devices; until then it stays local, safely.
+- Backend: `recipes.language` and `SyncRecipe.language` shipped in jmuci/Chef.ai_Backend#103, with
+  the same "absent on push keeps the stored value" rule as the client's pull fallback; the `en`
+  backfill shipped in jmuci/Chef.ai_Backend#106 (Decision 1, amended).
 
 ## Follow-ups
 
