@@ -294,6 +294,24 @@ class RecipeSearchViewModelTest {
     }
 
     @Test
+    fun `an empty LOCAL_FALLBACK surfaces as Error, not Empty`() = testScope.runTest {
+        searchRepository.outcomeToReturn =
+            RecipeSearchOutcome(emptyList(), false, RecipeSearchSource.LOCAL_FALLBACK)
+
+        viewModel.uiState.test {
+            assertThat(awaitItem()).isEqualTo(SearchUiState.Idle)
+
+            viewModel.onQueryChanged("chicken")
+            advanceTimeBy(400)
+            runCurrent()
+
+            assertThat(awaitItem()).isEqualTo(SearchUiState.Searching)
+            assertThat(awaitItem()).isEqualTo(SearchUiState.Error(R.string.search_error))
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun `bookmarked recipe ids from CollectionsRepository are reflected in Results`() = testScope.runTest {
         val recipe = preview()
         searchRepository.outcomeToReturn = RecipeSearchOutcome(listOf(recipe), false, RecipeSearchSource.REMOTE)
