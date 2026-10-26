@@ -39,9 +39,13 @@ class FakeSyncNetworkDataSource : SyncNetworkDataSource {
      */
     var pullException: Exception? = null
 
+    /** Runs once the request is captured, before the response — simulates an edit made while the push is in flight. */
+    var onPush: (suspend () -> Unit)? = null
+
     override suspend fun pushRecipes(request: SyncPushRequest): SyncPushResponse {
         pushException?.let { throw it }
         capturedPushRequests.add(request)
+        onPush?.invoke()
 
         return if (pushResponses.isNotEmpty()) {
             pushResponses.removeFirst()
