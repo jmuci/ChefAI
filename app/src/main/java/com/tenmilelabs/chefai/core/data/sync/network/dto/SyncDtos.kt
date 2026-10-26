@@ -7,7 +7,8 @@ data class SyncPushRequest(
     val recipes: List<SyncRecipeDto>,
     val bookmarkedRecipes: List<SyncBookmarkPushDto> = emptyList(),
     val mealPlans: List<SyncMealPlanDto> = emptyList(),
-    val groceryListItems: List<SyncGroceryListItem> = emptyList()
+    val groceryListItems: List<SyncGroceryListItem> = emptyList(),
+    val cookEvents: List<SyncCookEventDto> = emptyList()
 )
 
 @Serializable
@@ -77,7 +78,8 @@ data class SyncPushResponse(
     val bookmarkedRecipes: List<BookmarkAcceptedDto> = emptyList(),
     val bookmarkErrors: List<BookmarkErrorDto> = emptyList(),
     val mealPlans: MealPlanPushResults = MealPlanPushResults(),
-    val groceryListItems: GroceryItemPushResults = GroceryItemPushResults()
+    val groceryListItems: GroceryItemPushResults = GroceryItemPushResults(),
+    val cookEvents: CookEventPushResults = CookEventPushResults()
 )
 
 @Serializable
@@ -203,7 +205,8 @@ data class SyncPullResponse(
     val labels: List<SyncLabelDto> = emptyList(),
     val bookmarkedRecipes: List<SyncBookmarkPullDto> = emptyList(),
     val mealPlans: List<SyncMealPlanDto> = emptyList(),
-    val groceryListItems: List<SyncGroceryListItem> = emptyList()
+    val groceryListItems: List<SyncGroceryListItem> = emptyList(),
+    val cookEvents: List<SyncCookEventDto> = emptyList()
 )
 
 @Serializable
@@ -325,4 +328,43 @@ data class GroceryItemPushResults(
     val accepted: List<GroceryItemAcceptedDto> = emptyList(),
     val conflicts: List<GroceryItemIdentifierDto> = emptyList(),
     val errors: List<GroceryItemErrorDto> = emptyList()
+)
+
+// --- Cook History Sync DTOs (ADR-017) ---
+
+/**
+ * One time a recipe was cooked, in both directions. On push `updatedAt` is ignored (the server
+ * stamps its own); on pull it is the row's server timestamp. A non-null [deletedAt] is a tombstone
+ * — the meal was un-marked — and is final for [id].
+ */
+@Serializable
+data class SyncCookEventDto(
+    val id: String,
+    val recipeId: String,
+    val mealPlanId: String,
+    val dayIndex: Int,
+    val slot: String,
+    val cookedAt: Long,
+    val updatedAt: Long = 0L,
+    val deletedAt: Long? = null
+)
+
+@Serializable
+data class CookEventAcceptedDto(
+    val id: String,
+    val serverUpdatedAt: Long
+)
+
+/** [reason] is the backend's `CookEventErrors` name, kept a String so a new code can't break parsing. */
+@Serializable
+data class CookEventErrorDto(
+    val id: String,
+    val reason: String,
+    val message: String
+)
+
+@Serializable
+data class CookEventPushResults(
+    val accepted: List<CookEventAcceptedDto> = emptyList(),
+    val errors: List<CookEventErrorDto> = emptyList()
 )

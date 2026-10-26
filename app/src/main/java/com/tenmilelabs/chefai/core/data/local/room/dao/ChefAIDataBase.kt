@@ -54,7 +54,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         TagEntity::class,
         UserEntity::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = true
 )
 @TypeConverters(UuidConverters::class)
@@ -395,5 +395,22 @@ val MIGRATION_11_12 = object : Migration(11, 12) {
             WHERE lunchCookedAt IS NOT NULL AND lunchRecipeId IS NOT NULL
             """.trimIndent()
         )
+    }
+}
+
+/**
+ * Makes `recipe_cook_events` syncable (ADR-017): adds `updatedAt`, `deletedAt` and `syncState`.
+ *
+ * Existing rows backfill as `PENDING`, unlike [MIGRATION_6_7]'s `SYNCED`: cook history has never
+ * been on the server, so every event already here must upload or it exists on this device only.
+ * `updatedAt` backfills from `cookedAt`, the closest fact a row carries about "when" (the server
+ * ignores it on push and stamps its own).
+ */
+val MIGRATION_12_13 = object : Migration(12, 13) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE recipe_cook_events ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE recipe_cook_events ADD COLUMN deletedAt INTEGER")
+        db.execSQL("ALTER TABLE recipe_cook_events ADD COLUMN syncState TEXT NOT NULL DEFAULT 'PENDING'")
+        db.execSQL("UPDATE recipe_cook_events SET updatedAt = cookedAt")
     }
 }

@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.mealplans.data.repository
 
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.carryForwardCookedMarks
 import com.tenmilelabs.chefai.core.data.local.room.MealPlanDayEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeCookEventEntity
@@ -164,12 +165,16 @@ class DefaultMealPlanRepository @Inject constructor(
             }
             if (recipeId != null) recordCookEvent(day, slot, recipeId, cookedAt)
         }
+        // The cooked mark itself is local-only, but the cook event it wrote syncs (ADR-017).
+        if (recipeId != null) syncScheduler.requestMutationSync()
     }
 
     /**
-     * Keeps the durable cook history in step with the slot's mark. Delete-then-insert makes
-     * re-marking an already-cooked slot idempotent (one event per slot and recipe), and un-marking
-     * removes the event, so an accidental tap that is undone leaves no history behind.
+     * Keeps the durable cook history in step with the slot's mark. Marking is idempotent — a slot
+     * that already has a live event for [recipeId] keeps it. Un-marking tombstones the event
+     * rather than deleting it so the deletion syncs (ADR-017); it still leaves no history behind,
+     * since tombstones are excluded from "cooked before". Marking again afterwards mints a new
+     * event id: the server treats a tombstone as final for its id.
      */
     private suspend fun recordCookEvent(
         day: MealPlanDayEntity,
@@ -177,11 +182,16 @@ class DefaultMealPlanRepository @Inject constructor(
         recipeId: UUID,
         cookedAt: Long?,
     ) {
-        recipeCookEventDao.deleteForSlot(day.mealPlanId, day.dayIndex, slot.name, recipeId)
-        if (cookedAt == null) return
+        if (cookedAt == null) {
+            recipeCookEventDao.tombstoneForSlot(
+                day.mealPlanId, day.dayIndex, slot.name, recipeId, deletedAt = System.currentTimeMillis(),
+            )
+            return
+        }
+        if (recipeCookEventDao.getLiveForSlot(day.mealPlanId, day.dayIndex, slot.name, recipeId) != null) return
         recipeCookEventDao.insert(
             RecipeCookEventEntity(
-                uuid = UUID.randomUUID(),
+                uuid = UuidV7Generator.newId(),
                 recipeId = recipeId,
                 mealPlanId = day.mealPlanId,
                 dayIndex = day.dayIndex,

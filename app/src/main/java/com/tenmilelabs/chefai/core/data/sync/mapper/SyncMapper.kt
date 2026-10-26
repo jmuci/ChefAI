@@ -6,6 +6,7 @@ import com.tenmilelabs.chefai.core.data.local.room.ShoppingListCheckEntity
 import com.tenmilelabs.chefai.core.data.local.room.AllergenEntity
 import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.LabelEntity
+import com.tenmilelabs.chefai.core.data.local.room.RecipeCookEventEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
@@ -27,6 +28,7 @@ import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncTagDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncCreatorDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDayDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncCookEventDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncGroceryListItem
 import java.util.UUID
 
@@ -290,6 +292,31 @@ fun SyncGroceryListItem.toEntity(): ShoppingListCheckEntity = ShoppingListCheckE
     checkedAt = updatedAt,
     checked = checked,
     checkedBy = checkedBy?.let { UUID.fromString(it) },
+    updatedAt = updatedAt,
+    deletedAt = deletedAt,
+    syncState = SyncState.SYNCED,
+)
+
+// --- Cook History: both directions ---
+
+fun RecipeCookEventEntity.toSyncDto(): SyncCookEventDto = SyncCookEventDto(
+    id = uuid.toString(),
+    recipeId = recipeId.toString(),
+    mealPlanId = mealPlanId.toString(),
+    dayIndex = dayIndex,
+    slot = slot,
+    cookedAt = cookedAt,
+    updatedAt = updatedAt,
+    deletedAt = deletedAt,
+)
+
+fun SyncCookEventDto.toEntity(): RecipeCookEventEntity = RecipeCookEventEntity(
+    uuid = UUID.fromString(id),
+    recipeId = UUID.fromString(recipeId),
+    mealPlanId = UUID.fromString(mealPlanId),
+    dayIndex = dayIndex,
+    slot = slot,
+    cookedAt = cookedAt,
     updatedAt = updatedAt,
     deletedAt = deletedAt,
     syncState = SyncState.SYNCED,

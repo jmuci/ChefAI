@@ -15,6 +15,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeImageStateDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeBookmarkedRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeMealPlanDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeCookEventDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeShoppingListCheckDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
@@ -131,6 +132,7 @@ class SyncE2ETest {
             bookmarkedRecipeDao = bookmarkedRecipeDao,
             mealPlanDao = FakeMealPlanDao(),
             shoppingListCheckDao = FakeShoppingListCheckDao(),
+            recipeCookEventDao = FakeRecipeCookEventDao(),
             sessionManager = sessionManager,
             syncMetadataDao = syncMetadataDao,
             transactionRunner = fakeTransactionRunner,
