@@ -209,7 +209,7 @@ class IngredientTextParserTest {
     @Test
     fun `strips the de between a Spanish unit and its ingredient`() {
         assertParsedSpanish("200 g de harina", 200.0, "g", "harina")
-        assertParsedSpanish("1 diente de ajo", 1.0, "clove", "ajo")
+        assertParsedSpanish("1 diente de ajo", 1.0, "diente", "ajo")
         assertParsedSpanish("1 taza de leche", 1.0, "cup", "leche")
         assertParsedSpanish("2 cucharadas de la salsa", 2.0, "tbsp", "salsa")
         assertParsedSpanish("300g de garbanzos", 300.0, "g", "garbanzos")
@@ -225,15 +225,26 @@ class IngredientTextParserTest {
     fun `normalizes Spanish units and abbreviations`() {
         assertParsedSpanish("1/2 cdta. de sal", 0.5, "tsp", "sal")
         assertParsedSpanish("2 cdas aceite", 2.0, "tbsp", "aceite")
-        assertParsedSpanish("1 lata de tomate triturado", 1.0, "can", "tomate triturado")
+        assertParsedSpanish("1 lata de tomate triturado", 1.0, "lata", "tomate triturado")
         assertParsedSpanish("1 litro de caldo", 1.0, "l", "caldo")
-        assertParsedSpanish("1 sobre de levadura", 1.0, "package", "levadura")
+        assertParsedSpanish("1 sobre de levadura", 1.0, "sobre", "levadura")
+    }
+
+    @Test
+    fun `Spanish counting units stay Spanish, singular`() {
+        // Given counting units, which the app never converts and shows verbatim
+        // When parsed / Then they keep their Spanish word rather than becoming "clove", "pinch"…
+        assertParsedSpanish("2 dientes de ajo", 2.0, "diente", "ajo")
+        assertParsedSpanish("1 pizca de sal", 1.0, "pizca", "sal")
+        assertParsedSpanish("1 ramita de perejil", 1.0, "ramita", "perejil")
+        assertParsedSpanish("2 botes de garbanzos", 2.0, "bote", "garbanzos")
+        assertParsedSpanish("3 lonchas de jamón", 3.0, "loncha", "jamón")
     }
 
     @Test
     fun `reads Spanish spelled-out ranges`() {
         assertParsedSpanish("2 a 3 cucharadas de aceite", 2.0, "tbsp", "aceite")
-        assertParsedSpanish("1 o 2 dientes de ajo", 1.0, "clove", "ajo")
+        assertParsedSpanish("1 o 2 dientes de ajo", 1.0, "diente", "ajo")
     }
 
     @Test

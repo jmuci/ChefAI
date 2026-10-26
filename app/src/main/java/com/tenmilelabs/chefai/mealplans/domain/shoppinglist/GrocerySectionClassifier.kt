@@ -9,6 +9,7 @@ import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.GrocerySection.OTHER
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.GrocerySection.PANTRY
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.GrocerySection.PRODUCE
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.GrocerySection.SPICES_AND_BAKING
+import java.text.Normalizer
 
 /**
  * Maps an ingredient's display name to the [GrocerySection] it is shopped in.
@@ -23,36 +24,50 @@ object GrocerySectionClassifier {
     fun classify(ingredientName: String): GrocerySection {
         val normalized = normalize(ingredientName)
         if (normalized.isBlank()) return OTHER
+        // Phrases match whole words only — a bare substring test lets "tin of" match inside
+        // "martin of" — with an optional plural on the last word ("chicken breasts").
+        val padded = " $normalized "
+        fun hasPhrase(phrase: String) = PLURAL_ENDINGS.any { padded.contains(" $phrase$it ") }
 
-        FROZEN_OVERRIDE_PHRASES.firstOrNull { normalized.contains(it) }?.let { return FROZEN }
-        PANTRY_OVERRIDE_PHRASES.firstOrNull { normalized.contains(it) }?.let { return PANTRY }
+        FROZEN_OVERRIDE_PHRASES.firstOrNull(::hasPhrase)?.let { return FROZEN }
+        PANTRY_OVERRIDE_PHRASES.firstOrNull(::hasPhrase)?.let { return PANTRY }
 
         for (section in PHRASE_PRIORITY) {
             val phrases = phraseRules.getValue(section)
-            if (phrases.any { normalized.contains(it) }) return section
+            if (phrases.any(::hasPhrase)) return section
         }
 
         val tokens = normalized.split(' ').filter { it.isNotEmpty() }
         for (section in TOKEN_PRIORITY) {
             val keywords = tokenRules.getValue(section)
-            if (tokens.any { it in keywords || it.removeSuffix("s") in keywords }) return section
+            // Singular via "s" (eggs, patatas) or "es" (tomatoes, limones, champiñones).
+            if (tokens.any { it in keywords || it.removeSuffix("s") in keywords || it.removeSuffix("es") in keywords }) {
+                return section
+            }
         }
 
         return OTHER
     }
 
-    /** Lowercased, punctuation replaced by spaces, whitespace collapsed. */
+    /**
+     * Lowercased, accents folded ("piña" → "pina", "jamón" → "jamon"), punctuation replaced by
+     * spaces, whitespace collapsed. Folding first is what keeps a Spanish name in one piece — the
+     * `[^a-z0-9]` pass used to split "piña" into "pi a".
+     */
     internal fun normalize(raw: String): String =
-        raw.lowercase()
+        Normalizer.normalize(raw.lowercase(), Normalizer.Form.NFD)
+            .replace(COMBINING_MARKS, "")
             .replace(NON_ALPHANUMERIC, " ")
             .replace(WHITESPACE, " ")
             .trim()
 
+    private val PLURAL_ENDINGS = listOf("", "s", "es")
+    private val COMBINING_MARKS = Regex("\\p{Mn}+")
     private val NON_ALPHANUMERIC = Regex("[^a-z0-9]+")
     private val WHITESPACE = Regex("\\s+")
 
-    private val FROZEN_OVERRIDE_PHRASES = listOf("frozen", "ice cream")
-    private val PANTRY_OVERRIDE_PHRASES = listOf("canned", "tinned", "jarred", "tin of")
+    private val FROZEN_OVERRIDE_PHRASES = listOf("frozen", "ice cream", "congelado", "congelada", "congelados", "congeladas")
+    private val PANTRY_OVERRIDE_PHRASES = listOf("canned", "tinned", "jarred", "tin of", "en lata", "en conserva")
 
     /** Phrases are checked before tokens; PANTRY leads only here — see the class doc. */
     private val PHRASE_PRIORITY = listOf(
@@ -63,7 +78,7 @@ object GrocerySectionClassifier {
         SPICES_AND_BAKING, DAIRY_AND_EGGS, MEAT_AND_SEAFOOD, BAKERY, BEVERAGES, PRODUCE, PANTRY,
     )
 
-    private val phraseRules: Map<GrocerySection, List<String>> = mapOf(
+    private val englishPhraseRules: Map<GrocerySection, List<String>> = mapOf(
         SPICES_AND_BAKING to listOf(
             "baking powder", "baking soda", "vanilla extract", "brown sugar", "icing sugar",
             "powdered sugar", "food colouring", "food coloring", "cocoa powder", "curry powder",
@@ -91,6 +106,8 @@ object GrocerySectionClassifier {
             "baby spinach", "romaine lettuce", "butternut squash", "fresh parsley", "fresh basil",
             "fresh coriander", "fresh cilantro", "fresh mint", "fresh dill", "fresh ginger",
             "salad leaves", "mixed salad",
+            // Written as two words, "egg" would otherwise match dairy & eggs as a token.
+            "egg plant",
         ),
         PANTRY to listOf(
             "chicken stock", "vegetable stock", "beef stock", "chicken broth", "vegetable broth",
@@ -99,11 +116,11 @@ object GrocerySectionClassifier {
             "tomato puree", "tomato passata", "chopped tomatoes", "peanut butter", "maple syrup",
             "coconut milk", "coconut cream", "stock cube", "stock cubes", "bouillon cube",
             "chickpea flour", "dijon mustard", "worcestershire sauce", "balsamic vinegar",
-            "apple cider vinegar",
+            "apple cider vinegar", "egg noodle",
         ),
     )
 
-    private val tokenRules: Map<GrocerySection, Set<String>> = mapOf(
+    private val englishTokenRules: Map<GrocerySection, Set<String>> = mapOf(
         SPICES_AND_BAKING to setOf(
             "salt", "pepper", "peppercorn", "cinnamon", "nutmeg", "paprika", "cumin", "coriander",
             "turmeric", "oregano", "thyme", "rosemary", "sage", "chilli", "chili", "cayenne",
@@ -156,4 +173,62 @@ object GrocerySectionClassifier {
             "molasses", "cornmeal", "polenta", "semolina",
         ),
     )
+
+    /**
+     * Spanish staples (ADR-016), written without accents because [normalize] folds them. A few
+     * dozen common ingredients rather than a dictionary; anything missing still lands in `OTHER`.
+     * Plurals come free from the `s`/`es` stripping in [classify].
+     */
+    private val spanishPhraseRules: Map<GrocerySection, List<String>> = mapOf(
+        SPICES_AND_BAKING to listOf(
+            "pan rallado", "nuez moscada", "pimienta negra", "azucar glas", "levadura quimica",
+        ),
+        // "aceite" alone: "aceite de oliva … para freír las patatas" must not fall to the potatoes.
+        // "caldo" alone: "caldo de pollo" is stock, not chicken.
+        PANTRY to listOf(
+            "aceite", "caldo", "tomate frito", "tomate triturado", "tomate concentrado",
+            "leche de coco", "salsa de soja",
+        ),
+        PRODUCE to listOf("judias verdes"),
+    )
+
+    private val spanishTokenRules: Map<GrocerySection, Set<String>> = mapOf(
+        SPICES_AND_BAKING to setOf(
+            "sal", "pimienta", "pimenton", "comino", "canela", "tomillo", "romero", "laurel",
+            "azafran", "curcuma", "clavo", "guindilla", "cayena", "especia", "azucar", "harina",
+            "levadura", "maicena",
+        ),
+        DAIRY_AND_EGGS to setOf(
+            "huevo", "leche", "mantequilla", "queso", "nata", "yogur", "requeson",
+        ),
+        MEAT_AND_SEAFOOD to setOf(
+            "pollo", "ternera", "cerdo", "cordero", "pavo", "jamon", "beicon", "panceta",
+            "salchicha", "carne", "lomo", "solomillo", "pescado", "atun", "bacalao", "merluza",
+            "gamba", "langostino", "mejillon", "almeja", "calamar", "sepia", "pulpo", "anchoa",
+            "boqueron", "sardina",
+        ),
+        BAKERY to setOf("pan", "panecillo", "bollo", "hojaldre"),
+        BEVERAGES to setOf("zumo", "agua", "vino", "cerveza", "cafe", "sidra"),
+        PRODUCE to setOf(
+            "cebolla", "cebolleta", "ajo", "chalota", "puerro", "tomate", "patata", "papa",
+            "zanahoria", "apio", "pepino", "calabacin", "berenjena", "pimiento", "champinon",
+            "seta", "boletus", "brocoli", "coliflor", "col", "repollo", "espinaca", "lechuga",
+            "rucula", "acelga", "esparrago", "alcachofa", "guisante", "judia", "maiz", "calabaza",
+            "remolacha", "jengibre", "aguacate", "limon", "lima", "naranja", "manzana", "platano",
+            "pera", "uva", "fresa", "mango", "pina", "melocoton", "cereza", "perejil", "albahaca",
+            "menta", "hierbabuena", "eneldo", "cebollino", "hierba", "ensalada",
+        ),
+        PANTRY to setOf(
+            "vinagre", "arroz", "fideo", "espagueti", "macarron", "garbanzo", "lenteja", "alubia",
+            "miel", "mermelada", "mostaza", "mayonesa", "avena", "nuez", "nueces", "almendra",
+            "avellana", "pinon", "cacahuete", "pasa", "aceituna", "alcaparra",
+        ),
+    )
+
+    // Declared last: an object initialises its properties in order.
+    private val phraseRules: Map<GrocerySection, List<String>> =
+        PHRASE_PRIORITY.associateWith { englishPhraseRules[it].orEmpty() + spanishPhraseRules[it].orEmpty() }
+
+    private val tokenRules: Map<GrocerySection, Set<String>> =
+        TOKEN_PRIORITY.associateWith { englishTokenRules[it].orEmpty() + spanishTokenRules[it].orEmpty() }
 }

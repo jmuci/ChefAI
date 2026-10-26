@@ -1,12 +1,14 @@
 package com.tenmilelabs.chefai.mealplans.domain.shoppinglist
 
 import com.tenmilelabs.chefai.core.domain.units.CountingUnits
+import com.tenmilelabs.chefai.core.domain.units.IngredientDensity
 import com.tenmilelabs.chefai.core.domain.units.IngredientUnits
 import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
-import com.tenmilelabs.chefai.core.domain.units.PreparationNotes
 import com.tenmilelabs.chefai.core.domain.units.UnitConversion
+import com.tenmilelabs.chefai.core.domain.units.UnitDimension
 import com.tenmilelabs.chefai.core.domain.units.UnitNormalizer
 import com.tenmilelabs.chefai.core.domain.units.UnitReading
+import com.tenmilelabs.chefai.core.domain.units.UnitSystem
 import com.tenmilelabs.chefai.recipes.domain.scaling.RecipeScaling
 import java.util.UUID
 
@@ -84,13 +86,16 @@ object ShoppingListBuilder {
         checkedByNames: Map<String, String> = emptyMap(),
     ): ShoppingList {
         data class ScaledRow(
-            // Without any trailing preparation note: "garlic, peeled and crushed" is still the
-            // garlic on the line above it. The raw name still feeds conversion, where "chopped"
-            // is a reason not to guess a density.
+            // Without any parenthetical, serving or trailing preparation note: "garlic, peeled
+            // and crushed" and "Perejil fresco (una ramita)" are still just the garlic and the
+            // parsley. See ShoppingItemNames.
             val displayName: String,
             val unit: String,
             val amount: Double,
             val isApproximate: Boolean,
+            // The raw name (plus any note lifted off the unit) — what conversion looked a density
+            // up by, where "chopped" is a reason not to guess one. Reused when merging totals.
+            val densityName: String,
         )
 
         val scaledRows = ingredients
@@ -105,20 +110,23 @@ object ShoppingListBuilder {
                     1.0
                 }
                 val slots = slotCountByRecipe[row.recipeId] ?: 1
-                val displayName = PreparationNotes.stripFrom(row.displayName)
+                val displayName = ShoppingItemNames.displayName(row.displayName)
                 when (val reading = IngredientUnits.read(row.quantity, row.unit)) {
                     // "To taste", "to serve", a line with no amount: the item still goes on the
                     // list, but nothing is scaled or summed into a measured total beside it.
-                    is UnitReading.Unmeasured -> ScaledRow(displayName, unit = "", amount = 0.0, isApproximate = false)
+                    is UnitReading.Unmeasured -> ScaledRow(
+                        displayName, unit = "", amount = 0.0, isApproximate = false, densityName = row.displayName,
+                    )
                     is UnitReading.Measured -> {
                         // Scale first, convert second — converting first would put the
                         // multiplication on top of a rounded value. Same order the recipe details
                         // screen applies them in. A note lifted off the unit ("cup chopped") rides
                         // along on the name, where it stops a density being guessed.
+                        val densityName = if (reading.note.isBlank()) row.displayName else "${row.displayName}, ${reading.note}"
                         val converted = UnitConversion.convert(
                             quantity = row.quantity * servingsFactor * slots,
                             unit = reading.unit,
-                            ingredientName = if (reading.note.isBlank()) row.displayName else "${row.displayName}, ${reading.note}",
+                            ingredientName = densityName,
                             target = measurementSystem,
                         )
                         ScaledRow(
@@ -126,6 +134,7 @@ object ShoppingListBuilder {
                             unit = converted.unit,
                             amount = converted.quantity,
                             isApproximate = converted.isApproximate,
+                            densityName = densityName,
                         )
                     }
                 }
@@ -134,11 +143,12 @@ object ShoppingListBuilder {
         val items = scaledRows
             .groupBy { nameKey(it.displayName) }
             .map { (key, rows) ->
+                // The most common spelling; on a tie, the first one met. Synonyms share a key, so
+                // "Aubergine" and "Egg Plants" are one line shown under one of the two names.
                 val displayName = rows.groupingBy { it.displayName }.eachCount().entries
-                    .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
-                    .first().key
+                    .maxBy { it.value }.key
 
-                val quantityLabel = rows
+                val totals = rows
                     // Bucket by the unit a spelling *means*, not the spelling itself: two recipes
                     // can say "300 g" and "200 gram" for the same thing, and "300 g + 200 gram" is
                     // not something anyone can shop from. Counting units (clove/cloves, diente/
@@ -153,12 +163,23 @@ object ShoppingListBuilder {
                         display to unitRows.sumOf { it.amount }
                     }
                     .mergeSameDimension()
-                    .entries
+                    .mergeByDensity(
+                        gramsPerMillilitre = sharedDensity(
+                            rows.filter { UnitNormalizer.normalize(it.unit) != null }.map { it.densityName },
+                        ),
+                        target = measurementSystem,
+                    )
+
+                val parts = totals.amounts.entries
                     .sortedWith(compareBy({ it.key.isEmpty() }, { it.key }))
-                    .mapNotNull { (_, unitAndSum) ->
+                    .filter { (_, unitAndSum) -> unitAndSum.second > 0.0 }
+                val quantityLabel = parts
+                    .map { (_, unitAndSum) ->
                         val (unit, sum) = unitAndSum
-                        if (sum <= 0.0) return@mapNotNull null
-                        ShoppingAmountFormat.format(sum, unit)
+                        val amount = ShoppingAmountFormat.format(sum, unit)
+                        // A bare count beside a measure — cherry tomatoes "½ cup + 6" — reads as a
+                        // stray number; say what is being counted.
+                        if (unit.isBlank() && parts.size > 1) "$amount $BARE_COUNT_LABEL" else amount
                     }
                     .joinToString(" + ")
                     .ifEmpty { null }
@@ -168,8 +189,9 @@ object ShoppingListBuilder {
                     key = key,
                     displayName = displayName,
                     quantityLabel = quantityLabel,
-                    // One estimated contributor makes the whole total an estimate.
-                    isApproximate = rows.any { it.isApproximate },
+                    // One estimated contributor — or a density used to merge — makes the whole
+                    // total an estimate.
+                    isApproximate = totals.isApproximate || rows.any { it.isApproximate },
                     section = GrocerySectionClassifier.classify(displayName),
                     isChecked = isChecked,
                     checkedByName = if (isChecked) checkedByNames[key] else null,
@@ -190,16 +212,73 @@ object ShoppingListBuilder {
         return ShoppingList(sections)
     }
 
-    /** Lowercased, trimmed, internal whitespace collapsed. The tick key and the grouping key. */
-    fun nameKey(displayName: String): String =
-        displayName.trim().lowercase().replace(WHITESPACE, " ")
+    /**
+     * The tick key and the grouping key: lowercased, trimmed, internal whitespace collapsed, and
+     * regional synonyms folded onto one spelling ("aubergine" and "egg plants" both key
+     * "eggplant"). Expects a name already stripped of notes, as [build] passes it.
+     */
+    fun nameKey(displayName: String): String = ShoppingItemNames.key(displayName)
 
     private fun bucketKey(unit: String): String =
         UnitNormalizer.normalize(unit)?.canonical
             ?: CountingUnits.resolve(unit)?.singular
             ?: unit.trim().lowercase()
 
-    private val WHITESPACE = Regex("\\s+")
+    /** The one density every measured row agrees on; `null` when any row lacks one or they differ. */
+    private fun sharedDensity(densityNames: List<String>): Double? =
+        densityNames.map { IngredientDensity.gramsPerMillilitre(it) }.distinct().singleOrNull()
+
+    /** Follows a bare count that shares a line with a measured amount: "½ cup + 6 whole". */
+    private const val BARE_COUNT_LABEL = "whole"
+}
+
+/** An item's per-unit totals after merging, and whether a merge leaned on an assumed density. */
+private data class MergedTotals(
+    val amounts: Map<String, Pair<String, Double>>,
+    val isApproximate: Boolean,
+)
+
+/**
+ * In Metric or Imperial, folds a volume total and a weight total of one ingredient into a single
+ * amount when [gramsPerMillilitre] is known — ADR-013's curated density table is the only sound way
+ * across that line. Metric lands on weight and Imperial on volume, the direction
+ * [UnitConversion.convert] already takes for these ingredients, and the result is approximate.
+ *
+ * As written is left alone: it promises the recipes' own units, and "1 cup + 125 g" is what they
+ * say. Counting units, bare counts and unrecognised units never merge with anything.
+ */
+private fun Map<String, Pair<String, Double>>.mergeByDensity(
+    gramsPerMillilitre: Double?,
+    target: MeasurementSystem,
+): MergedTotals {
+    val unmerged = MergedTotals(this, isApproximate = false)
+    val system = when (target) {
+        MeasurementSystem.METRIC -> UnitSystem.METRIC
+        MeasurementSystem.IMPERIAL -> UnitSystem.IMPERIAL
+        MeasurementSystem.AS_WRITTEN -> return unmerged
+    }
+    if (gramsPerMillilitre == null) return unmerged
+
+    // mergeSameDimension has already left at most one bucket per dimension within a system.
+    fun bucketOf(dimension: UnitDimension) = entries.singleOrNull { (_, unitAndSum) ->
+        UnitNormalizer.normalize(unitAndSum.first)?.let { it.dimension == dimension && it.system == system } == true
+    }
+    val mass = bucketOf(UnitDimension.MASS) ?: return unmerged
+    val volume = bucketOf(UnitDimension.VOLUME) ?: return unmerged
+
+    fun inBase(bucket: Map.Entry<String, Pair<String, Double>>): Double {
+        val unit = requireNotNull(UnitNormalizer.normalize(bucket.value.first)) { "matched as a known unit" }
+        return bucket.value.second * unit.inBaseUnits
+    }
+    val grams = inBase(mass)
+    val millilitres = inBase(volume)
+
+    val merged = when (system) {
+        UnitSystem.METRIC -> UnitConversion.present(grams + millilitres * gramsPerMillilitre, UnitDimension.MASS, system)
+        UnitSystem.IMPERIAL -> UnitConversion.present(millilitres + grams / gramsPerMillilitre, UnitDimension.VOLUME, system)
+    }
+    val rest = filterKeys { it != mass.key && it != volume.key }
+    return MergedTotals(rest + (merged.unit to (merged.unit to merged.quantity)), isApproximate = true)
 }
 
 /**

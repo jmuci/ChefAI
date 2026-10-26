@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.mealplans.domain.shoppinglist
 
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import com.tenmilelabs.chefai.core.domain.units.IngredientUnits
 import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
 import com.tenmilelabs.chefai.recipes.domain.scaling.RecipeScaling
@@ -478,7 +479,7 @@ class ShoppingListBuilderTest {
 
         // Then it is on the list, with no "0.33" invented for it
         val item = list.allItems().single()
-        assertThat(item.displayName).isEqualTo("Sal y pimienta negra recién molida (al gusto)")
+        assertThat(item.displayName).isEqualTo("Sal y pimienta negra recién molida")
         assertThat(item.quantityLabel).isNull()
     }
 
@@ -599,5 +600,174 @@ class ShoppingListBuilderTest {
         // ⅓ cup is 78.9 ml; 250 ml ÷ 3 is 83.3 ml, which is about ⅓ cup
         assertThat(metric.allItems().single().quantityLabel).isEqualTo("80 ml")
         assertThat(imperial.allItems().single().quantityLabel).isEqualTo("⅓ cup")
+    }
+
+    // --- Synonyms, notes and cross-kind totals (production run, Oct 2026) ---
+
+    private fun buildUnscaled(
+        vararg rows: Triple<String, Double, String>,
+        system: MeasurementSystem = MeasurementSystem.AS_WRITTEN,
+    ): ShoppingList {
+        val recipes = rows.map { UUID.randomUUID() }
+        return ShoppingListBuilder.build(
+            ingredients = rows.mapIndexed { index, (name, quantity, unit) -> ingredient(recipes[index], 0, name, quantity, unit) },
+            slotCountByRecipe = recipes.associateWith { 1 },
+            plannedServings = 0,
+            checkedKeys = emptySet(),
+            measurementSystem = system,
+        )
+    }
+
+    @Test
+    fun `aubergine and egg plants are one produce line`() {
+        // Given the British and the US name from two recipes
+        // When
+        val list = buildUnscaled(Triple("Aubergine", 1.0, ""), Triple("Egg Plants", 225.0, "g"))
+
+        // Then one line, filed under produce rather than dairy & eggs, shown under a name a recipe used
+        val item = list.allItems().single()
+        assertThat(item.key).isEqualTo("eggplant")
+        assertThat(item.displayName).isEqualTo("Aubergine")
+        assertThat(item.section).isEqualTo(GrocerySection.PRODUCE)
+        assertThat(item.quantityLabel).isEqualTo("225 g + 1 whole")
+    }
+
+    @Test
+    fun `olive oil and extra virgin olive oil are one line`() {
+        val list = buildUnscaled(
+            Triple("Olive Oil", 2.0, "tbsp"),
+            Triple("Extra Virgin Olive Oil", 1.0, "tbsp"),
+            Triple("olive oil", 1.0, "tbsp"),
+        )
+
+        val item = list.allItems().single()
+        assertThat(item.key).isEqualTo("olive oil")
+        assertThat(item.quantityLabel).isEqualTo("4 tbsp")
+    }
+
+    @Test
+    fun `the synonym table folds each regional pair onto one line`() {
+        val pairs = listOf(
+            "courgette" to "zucchini",
+            "fresh coriander" to "fresh cilantro",
+            "rocket" to "arugula",
+            "spring onions" to "scallions",
+            "green onion" to "spring onion",
+        )
+        for ((a, b) in pairs) {
+            val list = buildUnscaled(Triple(a, 1.0, ""), Triple(b, 2.0, ""))
+            assertWithMessage("$a / $b").that(list.allItems()).hasSize(1)
+            assertWithMessage("$a / $b").that(list.allItems().single().quantityLabel).isEqualTo("3")
+        }
+    }
+
+    @Test
+    fun `a name without a synonym keeps the key it always had, so existing ticks survive`() {
+        assertThat(ShoppingListBuilder.nameKey("Eggs")).isEqualTo("eggs")
+        assertThat(ShoppingListBuilder.nameKey("Cherry  Tomatoes")).isEqualTo("cherry tomatoes")
+        assertThat(ShoppingListBuilder.nameKey("Jamón serrano")).isEqualTo("jamón serrano")
+    }
+
+    @Test
+    fun `parenthetical notes are dropped from the name and do not split the item`() {
+        // Given the imported Spanish recipe's lines, and the same ingredient written plainly
+        val list = buildUnscaled(
+            Triple("Aceite de oliva virgen extra (para freír las patatas)", 100.0, "ml"),
+            Triple("setas Boletus frescos (si no tenemos frescos, pues se puede usar un bote de desecados)", 300.0, "g"),
+            Triple("Sal y pimienta negra recién molida (al gusto)", IngredientUnits.NO_AMOUNT, "unit"),
+            Triple("Perejil fresco (una ramita)", 1.0, "ramita"),
+            Triple("perejil fresco", 1.0, "ramita"),
+            Triple("aceite de oliva", 50.0, "ml"),
+        )
+
+        // Then
+        val byName = list.allItems().associateBy { it.displayName }
+        assertThat(byName.keys).containsExactly(
+            "Aceite de oliva virgen extra",
+            "setas Boletus frescos",
+            "Sal y pimienta negra recién molida",
+            "Perejil fresco",
+        )
+        assertThat(byName.getValue("Aceite de oliva virgen extra").quantityLabel).isEqualTo("150 ml")
+        assertThat(byName.getValue("Perejil fresco").quantityLabel).isEqualTo("2 ramitas")
+    }
+
+    @Test
+    fun `a trailing serving note after a comma does not split the item`() {
+        val list = buildUnscaled(Triple("salt, to taste", 1.0, "tsp"), Triple("salt", 1.0, "tsp"))
+
+        val item = list.allItems().single()
+        assertThat(item.displayName).isEqualTo("salt")
+        assertThat(item.quantityLabel).isEqualTo("2 tsp")
+    }
+
+    @Test
+    fun `the Spanish recipe's staples are filed by section, not under other`() {
+        val list = buildUnscaled(
+            Triple("huevos M", 6.0, "unit"),
+            Triple("cebolla pequeña", 1.0, "unit"),
+            Triple("ajo", 1.0, "diente"),
+            Triple("patatas especiales para freír", 1.0, "kg"),
+            Triple("Perejil fresco (una ramita)", 1.0, "ramita"),
+            Triple("Aceite de oliva virgen extra (para freír las patatas)", 100.0, "ml"),
+            Triple("Sal y pimienta negra recién molida (al gusto)", IngredientUnits.NO_AMOUNT, "unit"),
+        )
+
+        assertThat(list.sections.map { it.section }).doesNotContain(GrocerySection.OTHER)
+        val huevos = list.allItems().single { it.displayName == "huevos M" }
+        assertThat(huevos.section).isEqualTo(GrocerySection.DAIRY_AND_EGGS)
+        // The placeholder "unit" never reaches the label
+        assertThat(huevos.quantityLabel).isEqualTo("6")
+    }
+
+    @Test
+    fun `a bare count beside a volume says it is a count`() {
+        // Given "½ cup" of cherry tomatoes in one recipe and "6" in another
+        val asWritten = buildUnscaled(Triple("Cherry Tomatoes", 0.5, "cup"), Triple("Cherry Tomatoes", 6.0, ""))
+        val metric = buildUnscaled(
+            Triple("Cherry Tomatoes", 0.5, "cup"), Triple("Cherry Tomatoes", 6.0, ""),
+            system = MeasurementSystem.METRIC,
+        )
+
+        // Then the two can't merge, but the count no longer reads as a stray number
+        assertThat(asWritten.allItems().single().quantityLabel).isEqualTo("½ cup + 6 whole")
+        assertThat(metric.allItems().single().quantityLabel).isEqualTo("120 ml + 6 whole")
+    }
+
+    @Test
+    fun `a can and a weight stay separate parts`() {
+        // There is no sound conversion between a can and grams — the density table doesn't cover it
+        val list = buildUnscaled(
+            Triple("Chopped Tomatoes", 0.5, "can"), Triple("Chopped Tomatoes", 133.33, "g"),
+            system = MeasurementSystem.METRIC,
+        )
+
+        assertThat(list.allItems().single().quantityLabel).isEqualTo("1 can + 135 g")
+    }
+
+    @Test
+    fun `in metric a volume and a weight of a known-density ingredient merge into an approximate weight`() {
+        // Given 50 ml stays ml (already metric) while 2 tbsp is weighed by the oil density (≈27 g)
+        val rows = arrayOf(Triple("olive oil", 50.0, "ml"), Triple("olive oil", 2.0, "tbsp"))
+
+        // When
+        val metric = buildUnscaled(*rows, system = MeasurementSystem.METRIC)
+        val asWritten = buildUnscaled(*rows)
+
+        // Then metric reads one total, marked approximate; as written keeps the recipes' own units
+        val item = metric.allItems().single()
+        assertThat(item.quantityLabel).isEqualTo("73 g")
+        assertThat(item.isApproximate).isTrue()
+        assertThat(asWritten.allItems().single().quantityLabel).isEqualTo("50 ml + 2 tbsp")
+    }
+
+    @Test
+    fun `a volume and a weight with no known density stay separate in metric`() {
+        val list = buildUnscaled(
+            Triple("chicken stock", 50.0, "ml"), Triple("chicken stock", 100.0, "g"),
+            system = MeasurementSystem.METRIC,
+        )
+
+        assertThat(list.allItems().single().quantityLabel).isEqualTo("100 g + 50 ml")
     }
 }

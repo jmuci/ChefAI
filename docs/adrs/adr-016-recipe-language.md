@@ -91,6 +91,13 @@ cup (English or undetected pages only — which also fixes French `c. à soupe`)
 The consequence that matters: a wrong or missing language costs little, so the editor never needs
 to re-parse ingredients when the user corrects the language.
 
+**Amended (shopping-list fixes, Oct 2026):** only *measuring* units (`taza`, `cucharada`, `gramo`, …)
+map onto the English canonical forms, because the app converts them and knows only those
+spellings. *Counting* units (`diente`, `lata`, `pizca`, `ramita`, `bote`, …) keep their singular
+Spanish word: they are never converted and are shown verbatim, so mapping them made a Spanish
+recipe read "1 clove ajo". The app's `CountingUnits` already pairs each with its plural. Rows
+imported before this change still say `clove`; they are not rewritten.
+
 ## Decision 4: Ask only when unsure, in the editor
 
 The import mapper flags a draft `languageNeedsConfirmation` unless detection came back `HIGH`. The
@@ -137,7 +144,7 @@ The cost is that no device can clear a language back to unknown, which nothing n
 - **Per-language backend search.** The `tsvector` is generated with the `'english'` config;
   `to_tsvector(language::regconfig, …)` isn't IMMUTABLE, so a per-row config needs a trigger or a
   `CASE` over fixed configs.
-- **Spanish beyond the scraper:** `GrocerySectionClassifier` (English keywords, and `[^a-z0-9]`
-  mangles `piña`), `IngredientDensity` (assumes the head noun comes last), `StepDurationParser`
+- **Spanish beyond the scraper:** ~~`GrocerySectionClassifier`~~ (done: Spanish keywords, accents
+  folded before matching), `IngredientDensity` (assumes the head noun comes last), `StepDurationParser`
   (`minutos`/`horas`, `y`), and the meal-plan diet keywords (`vegano`, `sin gluten`).
 - Showing the language on the recipe details screen.
