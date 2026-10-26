@@ -4,6 +4,11 @@ import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.MealPlanDayEntity
+import com.tenmilelabs.chefai.core.data.local.room.RecipeCookEventEntity
+import com.tenmilelabs.chefai.core.data.sync.network.dto.CookEventAcceptedDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.CookEventErrorDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.CookEventPushResults
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncCookEventDto
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
@@ -22,6 +27,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeCookEventDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeShoppingListCheckDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSourceClassificationDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSyncMetadataDao
@@ -83,6 +89,7 @@ class SyncOrchestratorTest {
     private lateinit var bookmarkedRecipeDao: FakeBookmarkedRecipeDao
     private lateinit var mealPlanDao: FakeMealPlanDao
     private lateinit var shoppingListCheckDao: FakeShoppingListCheckDao
+    private lateinit var cookEventDao: FakeRecipeCookEventDao
     private lateinit var sessionManager: SessionManager
     private lateinit var userDao: FakeUserDao
     private lateinit var syncMetadataDao: FakeSyncMetadataDao
@@ -119,6 +126,7 @@ class SyncOrchestratorTest {
         bookmarkedRecipeDao = FakeBookmarkedRecipeDao()
         mealPlanDao = FakeMealPlanDao()
         shoppingListCheckDao = FakeShoppingListCheckDao()
+        cookEventDao = FakeRecipeCookEventDao()
         sessionManager = createTestSessionManager(CoroutineScope(testDispatcher))
         syncMetadataDao = FakeSyncMetadataDao()
         syncNetworkDataSource = FakeSyncNetworkDataSource()
@@ -142,6 +150,7 @@ class SyncOrchestratorTest {
             bookmarkedRecipeDao = bookmarkedRecipeDao,
             mealPlanDao = mealPlanDao,
             shoppingListCheckDao = shoppingListCheckDao,
+            recipeCookEventDao = cookEventDao,
             sessionManager = sessionManager,
             syncMetadataDao = syncMetadataDao,
             transactionRunner = fakeTransactionRunner,
@@ -1458,4 +1467,255 @@ class SyncOrchestratorTest {
 
             assertThat(recipeDao.getRecipeById(recipeId1)?.title).isEqualTo("Fresh Server Title")
         }
+
+    // ==================== COOK EVENT SYNC TESTS (ADR-017) ====================
+
+    private fun cookEvent(
+        uuid: UUID = UuidV7Generator.newId(),
+        recipeId: UUID = recipeId1,
+        updatedAt: Long = 1000L,
+        deletedAt: Long? = null,
+        syncState: SyncState = SyncState.PENDING,
+    ) = RecipeCookEventEntity(
+        uuid = uuid,
+        recipeId = recipeId,
+        mealPlanId = UuidV7Generator.newId(),
+        dayIndex = 2,
+        slot = "DINNER",
+        cookedAt = 1000L,
+        updatedAt = updatedAt,
+        deletedAt = deletedAt,
+        syncState = syncState,
+    )
+
+    private fun cookEventDto(
+        uuid: UUID = UuidV7Generator.newId(),
+        recipeId: UUID = recipeId1,
+        updatedAt: Long = 5000L,
+        deletedAt: Long? = null,
+    ) = SyncCookEventDto(
+        id = uuid.toString(),
+        recipeId = recipeId.toString(),
+        mealPlanId = UuidV7Generator.newId().toString(),
+        dayIndex = 1,
+        slot = "LUNCH",
+        cookedAt = 900L,
+        updatedAt = updatedAt,
+        deletedAt = deletedAt,
+    )
+
+    private fun pullOf(vararg events: SyncCookEventDto) = SyncPullResponse(
+        recipes = emptyList(),
+        serverTimestamp = 5000L,
+        hasMore = false,
+        cookEvents = events.toList(),
+    )
+
+    private fun pushOf(results: CookEventPushResults) = SyncPushResponse(
+        accepted = emptyList(),
+        conflicts = emptyList(),
+        errors = emptyList(),
+        serverTimestamp = 5000L,
+        cookEvents = results,
+    )
+
+    @Test
+    fun `push sends pending cook events and tombstones but not synced ones`() = runTest(testDispatcher) {
+        val live = cookEvent()
+        val tombstone = cookEvent(deletedAt = 2000L, updatedAt = 2000L)
+        cookEventDao.insert(live)
+        cookEventDao.insert(tombstone)
+        cookEventDao.insert(cookEvent(syncState = SyncState.SYNCED))
+
+        syncOrchestrator.sync()
+
+        val sent = syncNetworkDataSource.capturedPushRequests.single().cookEvents.associateBy { it.id }
+        assertThat(sent.keys).containsExactly(live.uuid.toString(), tombstone.uuid.toString())
+        assertThat(sent.getValue(live.uuid.toString()).deletedAt).isNull()
+        assertThat(sent.getValue(tombstone.uuid.toString()).deletedAt).isEqualTo(2000L)
+        assertThat(sent.getValue(live.uuid.toString()).slot).isEqualTo("DINNER")
+    }
+
+    @Test
+    fun `push with only a dirty cook event still calls the backend`() = runTest(testDispatcher) {
+        cookEventDao.insert(cookEvent())
+
+        syncOrchestrator.sync()
+
+        assertThat(syncNetworkDataSource.capturedPushRequests).hasSize(1)
+    }
+
+    @Test
+    fun `accepted cook event is marked synced with the server timestamp`() = runTest(testDispatcher) {
+        val event = cookEvent()
+        cookEventDao.insert(event)
+        syncNetworkDataSource.pushResponses.addLast(
+            pushOf(CookEventPushResults(accepted = listOf(CookEventAcceptedDto(event.uuid.toString(), 7000L))))
+        )
+
+        syncOrchestrator.sync()
+
+        val saved = requireNotNull(cookEventDao.getById(event.uuid))
+        assertThat(saved.syncState).isEqualTo(SyncState.SYNCED)
+        assertThat(saved.updatedAt).isEqualTo(7000L)
+        assertThat(cookEventDao.getAllDirty()).isEmpty()
+    }
+
+    @Test
+    fun `cook event un-marked while its push is in flight stays pending`() = runTest(testDispatcher) {
+        val event = cookEvent()
+        cookEventDao.insert(event)
+        syncNetworkDataSource.onPush = {
+            cookEventDao.tombstoneForSlot(event.mealPlanId, event.dayIndex, event.slot, event.recipeId, deletedAt = 3000L)
+        }
+        syncNetworkDataSource.pushResponses.addLast(
+            pushOf(CookEventPushResults(accepted = listOf(CookEventAcceptedDto(event.uuid.toString(), 7000L))))
+        )
+
+        syncOrchestrator.sync()
+
+        val saved = requireNotNull(cookEventDao.getById(event.uuid))
+        assertThat(saved.syncState).isEqualTo(SyncState.PENDING)
+        assertThat(saved.deletedAt).isEqualTo(3000L)
+    }
+
+    @Test
+    fun `EVENT_ID_TAKEN re-keys a live cook event and queues it again`() = runTest(testDispatcher) {
+        val event = cookEvent()
+        cookEventDao.insert(event)
+        syncNetworkDataSource.pushResponses.addLast(
+            pushOf(CookEventPushResults(errors = listOf(CookEventErrorDto(event.uuid.toString(), "EVENT_ID_TAKEN", "taken"))))
+        )
+
+        syncOrchestrator.sync()
+
+        assertThat(cookEventDao.getById(event.uuid)).isNull()
+        val rekeyed = cookEventDao.all.single()
+        assertThat(rekeyed.uuid).isNotEqualTo(event.uuid)
+        assertThat(rekeyed.syncState).isEqualTo(SyncState.PENDING)
+        assertThat(rekeyed.recipeId).isEqualTo(event.recipeId)
+        assertThat(rekeyed.deletedAt).isNull()
+    }
+
+    @Test
+    fun `EVENT_ID_TAKEN drops a cook event tombstone`() = runTest(testDispatcher) {
+        val tombstone = cookEvent(deletedAt = 2000L, updatedAt = 2000L)
+        cookEventDao.insert(tombstone)
+        syncNetworkDataSource.pushResponses.addLast(
+            pushOf(CookEventPushResults(errors = listOf(CookEventErrorDto(tombstone.uuid.toString(), "EVENT_ID_TAKEN", "taken"))))
+        )
+
+        syncOrchestrator.sync()
+
+        assertThat(cookEventDao.all).isEmpty()
+    }
+
+    @Test
+    fun `a validation error parks the cook event so it is not resent forever`() = runTest(testDispatcher) {
+        val event = cookEvent()
+        cookEventDao.insert(event)
+        syncNetworkDataSource.pushResponses.addLast(
+            pushOf(CookEventPushResults(errors = listOf(CookEventErrorDto(event.uuid.toString(), "INVALID_SLOT", "bad"))))
+        )
+
+        syncOrchestrator.sync()
+        syncOrchestrator.sync()
+
+        assertThat(cookEventDao.getById(event.uuid)?.syncState).isEqualTo(SyncState.CANCELLED)
+        assertThat(syncNetworkDataSource.capturedPushRequests).hasSize(1)
+    }
+
+    @Test
+    fun `pull inserts a new cook event as synced`() = runTest(testDispatcher) {
+        val dto = cookEventDto()
+        syncNetworkDataSource.pullResponses.addLast(pullOf(dto))
+
+        syncOrchestrator.sync()
+
+        val saved = requireNotNull(cookEventDao.getById(UUID.fromString(dto.id)))
+        assertThat(saved.syncState).isEqualTo(SyncState.SYNCED)
+        assertThat(saved.deletedAt).isNull()
+        assertThat(saved.slot).isEqualTo("LUNCH")
+        assertThat(saved.updatedAt).isEqualTo(5000L)
+    }
+
+    @Test
+    fun `pulling the same cook event twice is idempotent`() = runTest(testDispatcher) {
+        val dto = cookEventDto()
+        syncNetworkDataSource.pullResponses.addLast(pullOf(dto))
+        syncNetworkDataSource.pullResponses.addLast(pullOf(dto))
+
+        syncOrchestrator.sync()
+        syncOrchestrator.sync()
+
+        assertThat(cookEventDao.all).hasSize(1)
+    }
+
+    @Test
+    fun `pulled tombstone hides a known cook event`() = runTest(testDispatcher) {
+        val event = cookEvent(syncState = SyncState.SYNCED)
+        cookEventDao.insert(event)
+        syncNetworkDataSource.pullResponses.addLast(
+            pullOf(cookEventDto(uuid = event.uuid, updatedAt = 6000L, deletedAt = 5500L))
+        )
+
+        syncOrchestrator.sync()
+
+        val saved = requireNotNull(cookEventDao.getById(event.uuid))
+        assertThat(saved.deletedAt).isEqualTo(5500L)
+        assertThat(saved.syncState).isEqualTo(SyncState.SYNCED)
+        assertThat(cookEventDao.observeCookedRecipeIds().first()).isEmpty()
+    }
+
+    @Test
+    fun `pulled tombstone is final even over a pending local live event`() = runTest(testDispatcher) {
+        val event = cookEvent(syncState = SyncState.PENDING)
+        cookEventDao.insert(event)
+        syncNetworkDataSource.pushResponses.addLast(pushOf(CookEventPushResults()))
+        syncNetworkDataSource.pullResponses.addLast(
+            pullOf(cookEventDto(uuid = event.uuid, updatedAt = 6000L, deletedAt = 5500L))
+        )
+
+        syncOrchestrator.sync()
+
+        assertThat(cookEventDao.getById(event.uuid)?.deletedAt).isEqualTo(5500L)
+    }
+
+    @Test
+    fun `pulled tombstone for an unknown cook event is skipped`() = runTest(testDispatcher) {
+        syncNetworkDataSource.pullResponses.addLast(pullOf(cookEventDto(deletedAt = 5500L)))
+
+        syncOrchestrator.sync()
+
+        assertThat(cookEventDao.all).isEmpty()
+    }
+
+    @Test
+    fun `pulled live event does not revive a locally un-marked one`() = runTest(testDispatcher) {
+        val tombstone = cookEvent(deletedAt = 2000L, updatedAt = 2000L)
+        cookEventDao.insert(tombstone)
+        syncNetworkDataSource.pushResponses.addLast(pushOf(CookEventPushResults()))
+        syncNetworkDataSource.pullResponses.addLast(pullOf(cookEventDto(uuid = tombstone.uuid)))
+
+        syncOrchestrator.sync()
+
+        assertThat(cookEventDao.getById(tombstone.uuid)?.deletedAt).isEqualTo(2000L)
+        assertThat(cookEventDao.observeCookedRecipeIds().first()).isEmpty()
+    }
+
+    @Test
+    fun `cook events do not move the pull cursor`() = runTest(testDispatcher) {
+        syncNetworkDataSource.pullResponses.addLast(
+            SyncPullResponse(
+                recipes = emptyList(),
+                serverTimestamp = 5000L,
+                hasMore = false,
+                cookEvents = listOf(cookEventDto(updatedAt = 99_000L)),
+            )
+        )
+
+        syncOrchestrator.sync()
+
+        assertThat(syncMetadataDao.getLastSyncedAt(SyncOrchestrator.ENTITY_TYPE_RECIPES)).isEqualTo(5000L)
+    }
 }

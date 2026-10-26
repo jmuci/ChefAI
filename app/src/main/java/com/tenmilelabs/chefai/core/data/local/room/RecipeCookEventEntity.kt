@@ -3,6 +3,8 @@ package com.tenmilelabs.chefai.core.data.local.room
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.tenmilelabs.chefai.core.data.local.util.SyncState
+import com.tenmilelabs.chefai.core.data.local.util.SyncableEntity
 import java.util.UUID
 
 /**
@@ -19,8 +21,13 @@ import java.util.UUID
  * [carryForwardCookedMarks]). That triple plus [recipeId] is what un-marking a meal deletes, so a
  * mis-tap that is undone leaves no history behind.
  *
- * Local-only, like the cooked marks themselves: nothing here is in the sync payload. Wiped with
- * every other table on an account switch (`clearAllTables()`), which is what scopes it to a user.
+ * Syncs as an append-only event log (ADR-017), unlike the cooked marks on [MealPlanDayEntity],
+ * which stay local. An event is immutable apart from being tombstoned: un-marking a meal sets
+ * [deletedAt] (and goes `PENDING`) instead of deleting the row, and the server treats a tombstone
+ * as final for that [uuid]. Re-marking the meal therefore mints a **new** uuid rather than
+ * reviving the tombstone, so there is no resurrection and no last-writer-wins conflict. Scoped to
+ * a user by the server (never shared with a household) and, locally, by `clearAllTables()` on an
+ * account switch.
  */
 @Entity(
     tableName = "recipe_cook_events",
@@ -30,7 +37,7 @@ import java.util.UUID
     ]
 )
 data class RecipeCookEventEntity(
-    @PrimaryKey val uuid: UUID,
+    @PrimaryKey override val uuid: UUID,
     val recipeId: UUID,
     val mealPlanId: UUID,
     val dayIndex: Int,
@@ -38,4 +45,9 @@ data class RecipeCookEventEntity(
     val slot: String,
     /** Epoch millis the meal was marked cooked. */
     val cookedAt: Long,
-)
+    /** Local edit time (epoch millis) while `PENDING`; the server's stamp once `SYNCED`. */
+    override val updatedAt: Long = cookedAt,
+    /** Set when the meal was un-marked: a tombstone, kept so the deletion can sync. */
+    override val deletedAt: Long? = null,
+    override val syncState: SyncState = SyncState.PENDING,
+) : SyncableEntity

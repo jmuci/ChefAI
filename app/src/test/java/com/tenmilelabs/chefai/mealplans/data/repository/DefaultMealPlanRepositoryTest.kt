@@ -273,7 +273,7 @@ class DefaultMealPlanRepositoryTest {
     }
 
     @Test
-    fun `setMealCooked with cooked=false removes the slot's cook event`() = runTest {
+    fun `setMealCooked with cooked=false tombstones the slot's cook event and leaves the other slot`() = runTest {
         val plan = planWithOneDay()
         repository.createMealPlan(plan)
         val dayId = plan.days.single().uuid
@@ -282,7 +282,31 @@ class DefaultMealPlanRepositoryTest {
 
         repository.setMealCooked(dayId, MealSlot.DINNER, cooked = false)
 
-        assertThat(cookEventDao.all.map { it.slot }).containsExactly("LUNCH")
+        val bySlot = cookEventDao.all.associateBy { it.slot }
+        val dinner = requireNotNull(bySlot["DINNER"])
+        assertThat(dinner.deletedAt).isNotNull()
+        assertThat(dinner.syncState).isEqualTo(SyncState.PENDING)
+        assertThat(requireNotNull(bySlot["LUNCH"]).deletedAt).isNull()
+        assertThat(cookEventDao.observeCookedRecipeIds().first()).containsExactly(plan.days.single().lunchRecipeId)
+    }
+
+    @Test
+    fun `re-marking an un-marked slot mints a new event instead of reviving the tombstone`() = runTest {
+        val plan = planWithOneDay()
+        repository.createMealPlan(plan)
+        val dayId = plan.days.single().uuid
+        repository.setMealCooked(dayId, MealSlot.DINNER, cooked = true)
+        val first = cookEventDao.all.single()
+        repository.setMealCooked(dayId, MealSlot.DINNER, cooked = false)
+
+        repository.setMealCooked(dayId, MealSlot.DINNER, cooked = true)
+
+        assertThat(cookEventDao.all).hasSize(2)
+        val tombstone = requireNotNull(cookEventDao.getById(first.uuid))
+        assertThat(tombstone.deletedAt).isNotNull()
+        val live = cookEventDao.all.single { it.deletedAt == null }
+        assertThat(live.uuid).isNotEqualTo(first.uuid)
+        assertThat(live.syncState).isEqualTo(SyncState.PENDING)
     }
 
     @Test
@@ -298,8 +322,8 @@ class DefaultMealPlanRepositoryTest {
         repository.setMealCooked(day.uuid, MealSlot.DINNER, cooked = true)
         repository.setMealCooked(day.uuid, MealSlot.DINNER, cooked = false)
 
-        // Then: only the original recipe's event remains
-        assertThat(cookEventDao.all.map { it.recipeId }).containsExactly(day.dinnerRecipeId)
+        // Then: only the original recipe still counts as cooked
+        assertThat(cookEventDao.observeCookedRecipeIds().first()).containsExactly(day.dinnerRecipeId)
     }
 
     @Test

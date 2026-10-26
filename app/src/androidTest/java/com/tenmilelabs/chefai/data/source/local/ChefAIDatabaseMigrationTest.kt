@@ -15,6 +15,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_8_9
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_9_10
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_10_11
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_11_12
+import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_12_13
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -565,13 +566,40 @@ class ChefAIDatabaseMigrationTest {
     }
 
     @Test
-    fun migrateAll1To12_succeeds() {
+    fun migrate12To13_backfillsExistingCookEventsAsPendingSoTheyUpload() {
+        val eventId = UUID.randomUUID()
+        val recipeId = UUID.randomUUID()
+        val planId = UUID.randomUUID()
+
+        helper.createDatabase(TEST_DB, 12).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO recipe_cook_events (uuid, recipeId, mealPlanId, dayIndex, slot, cookedAt)
+                VALUES (?, ?, ?, 3, 'DINNER', 4242)
+                """.trimIndent(),
+                arrayOf(eventId.toBlob(), recipeId.toBlob(), planId.toBlob())
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 13, true, MIGRATION_12_13)
+
+        db.query("SELECT cookedAt, updatedAt, deletedAt, syncState FROM recipe_cook_events").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(4242L, cursor.getLong(0))
+            assertEquals("updatedAt backfills from cookedAt", 4242L, cursor.getLong(1))
+            assertTrue("an existing event is not a tombstone", cursor.isNull(2))
+            assertEquals("never uploaded, so it must be pushed", "PENDING", cursor.getString(3))
+        }
+    }
+
+    @Test
+    fun migrateAll1To13_succeeds() {
         helper.createDatabase(TEST_DB, 1).close()
 
         helper.runMigrationsAndValidate(
-            TEST_DB, 12, true,
+            TEST_DB, 13, true,
             MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
         )
     }
 }
