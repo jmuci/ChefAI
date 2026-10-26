@@ -30,7 +30,9 @@ enum class RecipeFilter(
 
     /**
      * Recipes cooked at least once, per the durable history behind `recipe_cook_events` — so it
-     * survives the meal plan it was cooked in being deleted. The one filter whose predicate needs
+     * survives the meal plan it was cooked in being deleted. Like every filter it narrows the
+     * user's collection, so a cooked recipe that was never saved to it (auto-generated plans draw on
+     * public recipes) is not listed — the empty-state copy says so. The one filter whose predicate needs
      * data that is not on [RecipePreview], hence `cookedRecipeIds` on [matches].
      */
     COOKED_BEFORE(
