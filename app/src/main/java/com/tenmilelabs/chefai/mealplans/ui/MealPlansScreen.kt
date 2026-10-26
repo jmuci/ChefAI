@@ -44,6 +44,12 @@ import java.time.LocalDate
 import java.util.UUID
 
 /**
+ * Bottom space the lists reserve for the "+" FAB the nav graph's Scaffold floats over this tab:
+ * 56dp button + 16dp margin, plus 16dp of air so the last control never sits under it.
+ */
+private val FabClearance = 88.dp
+
+/**
  * Screen 06 — the week view, or (via the header toggle) the list of every plan.
  *
  * Date-first, not plan-first: seven rows, Mon–Sun (or whatever the locale calls the first day),
@@ -168,7 +174,7 @@ private fun PlanList(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.chefColors.panelGround),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = FabClearance),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         items(plans, key = { it.planId }) { summary ->
@@ -226,6 +232,8 @@ private fun WeekContent(
             uiState = uiState,
             onGenerateGroceryList = onGenerateGroceryList,
         )
+        // The FAB floats over the bottom-right; scrolling past the button keeps it clear.
+        Spacer(Modifier.height(FabClearance))
     }
 }
 

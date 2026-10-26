@@ -402,6 +402,7 @@ fun ChefAINavGraph(
                 onNavigateToHome = { navActions.navigateToHome() },
                 onNavigateToRegister = { navActions.navigateToRegister() },
                 onNavigateToAcceptInvite = { token -> navActions.navigateToAcceptInvite(token) },
+                onNavigateBack = { navController.popBackStack() },
                 onNavigateToDeveloperOptions = if (BuildConfig.DEBUG) {
                     { navActions.navigateToDeveloperOptions() }
                 } else {

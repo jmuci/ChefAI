@@ -66,7 +66,7 @@
     <string name="no_recipes_title">No recipes in your collection</string>
     <string name="no_filtered_recipes_title">No matching recipes</string>
     <string name="no_cooked_recipes_title">Nothing cooked yet</string>
-    <string name="no_cooked_recipes_subtitle">You haven\'t cooked anything yet. Mark a meal as cooked in your meal plan and it will show up here.</string>
+    <string name="no_cooked_recipes_subtitle">Mark a meal as cooked in your meal plan. Cooked recipes that are saved to your collection appear here.</string>
     <string name="no_filtered_recipes_subtitle">None of the recipes in your collection match this filter. Try another one, or tap All.</string>
     <string name="no_steps_listed">No steps listed for this recipe.</string>
     <string name="nutrition_calories_format">%1$d kcal</string>
@@ -120,7 +120,7 @@
     <string name="recipe_filter_all">All</string>
     <string name="recipe_filter_cooked_before">Cooked before</string>
     <string name="recipe_add_to_meal_plan">Add to Meal Plan</string>
-    <string name="recipe_add_to_grocery_list_content_description">Add to grocery list</string>
+    <string name="recipe_add_to_grocery_list_content_description">Add to shopping list</string>
     <string name="save_button">Save</string>
     <string name="search_added_to_collection">Added to your collection</string>
     <string name="search_clear_content_description">Clear search</string>
@@ -260,7 +260,7 @@
     <string name="recipe_added_to_grocery_list">Ingredients added to the plan\'s shopping list</string>
     <string name="recipe_add_to_plan_error">Couldn\'t add this recipe to the plan</string>
     <string name="slot_picker_meal_plan_title">Add to meal plan</string>
-    <string name="slot_picker_grocery_list_title">Add to grocery list</string>
+    <string name="slot_picker_grocery_list_title">Add to shopping list</string>
     <string name="slot_picker_choose_plan">Choose a plan</string>
     <string name="slot_picker_choose_slot">Choose a day and meal</string>
     <string name="slot_picker_no_plans">Create a meal plan first, then add recipes to it.</string>
@@ -269,7 +269,6 @@
     <string name="slot_picker_create_plan">+ Create new meal plan</string>
     <string name="slot_picker_add_new_day">+ Add to new day</string>
     <string name="meal_plan_recipe_unavailable">Recipe not available</string>
-    <string name="meal_plan_cooked_section_title">Cooked this week</string>
     <string name="meal_plan_progress">%1$d of %2$d meals cooked</string>
     <string name="meal_plan_progress_none">Nothing cooked yet — pick a day to start</string>
     <string name="meal_plan_progress_complete">Every meal cooked. Great week! 🎉</string>
@@ -322,14 +321,14 @@
     <string name="meal_plans_previous_week">Previous week</string>
     <string name="meal_plans_next_week">Next week</string>
     <string name="meal_plans_add_meal">+ Add meal</string>
-    <string name="meal_plans_grocery_list_label">Grocery list</string>
+    <string name="meal_plans_grocery_list_label">Shopping list</string>
     <!-- Snackbar after creating a plan whose dates overlap an existing one. %1$s = that plan's name. -->
     <string name="meal_plan_overlap_notice">Overlaps “%1$s” — both plans show in your week</string>
     <string name="meal_plans_grocery_summary">%1$s · %2$s</string>
-    <string name="meal_plans_generate_grocery_list">Generate Grocery List</string>
+    <string name="meal_plans_generate_grocery_list">Open shopping list</string>
     <string name="meal_plans_grocery_unavailable_empty">Plan a meal this week to build a list</string>
     <string name="meal_plans_grocery_unavailable_multi">This week spans more than one plan — open a plan to shop for it</string>
-    <!-- Used instead of meal_plans_grocery_summary when the week's meals come from several plans: "8 meals planned across 2 plans · 45 ingredients". -->
+    <!-- Used instead of meal_plans_grocery_summary when the week's meals come from several plans: "8 meals planned across 2 plans · 45 items". -->
     <string name="meal_plans_grocery_summary_multi">%1$s across %2$s · %3$s</string>
     <plurals name="meal_plans_plan_count">
         <item quantity="one">%d plan</item>
@@ -340,8 +339,8 @@
         <item quantity="other">%d meals planned</item>
     </plurals>
     <plurals name="meal_plans_ingredient_count">
-        <item quantity="one">%d ingredient</item>
-        <item quantity="other">%d ingredients</item>
+        <item quantity="one">%d item</item>
+        <item quantity="other">%d items</item>
     </plurals>
     <string name="meal_plan_shopping_list_button">Shopping list · %1$d items</string>
 
@@ -463,7 +462,7 @@
     <!-- Household -->
     <string name="household_menu_item">Household</string>
     <string name="household_no_household_title">No household yet</string>
-    <string name="household_no_household_subtitle">Create one to share your meal plan and grocery list with the people you cook with.</string>
+    <string name="household_no_household_subtitle">Create one to share your meal plan and shopping list with the people you cook with.</string>
     <string name="household_create_name_label">Household name</string>
     <string name="household_create_button">Create household</string>
     <string name="household_error_title">Something went wrong</string>
@@ -483,10 +482,10 @@
     <string name="household_invite_sent">Invite sent</string>
     <string name="household_leave_button">Leave household</string>
     <string name="household_leave_confirm_title">Leave household?</string>
-    <string name="household_leave_confirm_message">You\'ll lose access to the shared meal plan and grocery list.</string>
+    <string name="household_leave_confirm_message">You\'ll lose access to the shared meal plan and shopping list.</string>
     <string name="household_remove_member_button">Remove</string>
     <string name="household_remove_member_confirm_title">Remove member?</string>
-    <string name="household_remove_member_confirm_message">%1$s will lose access to the shared meal plan and grocery list.</string>
+    <string name="household_remove_member_confirm_message">%1$s will lose access to the shared meal plan and shopping list.</string>
     <string name="household_share_chooser_title">Invite to household</string>
     <string name="household_pending_invites_title">Pending invites</string>
     <string name="household_pending_invite_expires">Expires %1$s</string>
@@ -502,14 +501,14 @@
     <string name="accept_invite_code_label">Invite code</string>
     <string name="accept_invite_code_button">Continue</string>
     <string name="accept_invite_invited_by">Invited by %1$s</string>
-    <string name="accept_invite_description">Join to see and edit the shared meal plan and grocery list. Your existing recipes stay yours.</string>
+    <string name="accept_invite_description">Join to see and edit the shared meal plan and shopping list. Your existing recipes stay yours.</string>
     <string name="accept_invite_accept_button">Join household</string>
     <string name="accept_invite_invalid_title">This invite isn\'t valid</string>
     <string name="accept_invite_invalid_subtitle">It may have expired, been revoked, or already been used.</string>
     <string name="accept_invite_already_title">You\'re already in a household</string>
     <string name="accept_invite_already_subtitle">Leave your current household before joining a new one.</string>
     <string name="accept_invite_joined_title">You\'re in!</string>
-    <string name="accept_invite_joined_subtitle">You can now see and edit the shared meal plan and grocery list.</string>
+    <string name="accept_invite_joined_subtitle">You can now see and edit the shared meal plan and shopping list.</string>
     <string name="accept_invite_joined_button">Go to household</string>
     <string name="accept_invite_signin_title">Sign in to join</string>
     <string name="accept_invite_signin_subtitle">Create an account or sign in to accept this invite. Your existing recipes stay yours.</string>
