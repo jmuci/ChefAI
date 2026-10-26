@@ -169,7 +169,13 @@ class RecipeSearchViewModel @Inject constructor(
         val outcome = page.outcome
         prefetchImages(outcome.results)
         val state = if (outcome.results.isEmpty()) {
-            SearchUiState.Empty
+            // An empty on-device fallback means the server was unreachable, not that nothing
+            // matches — "No recipes found" would send the user off retyping a good query.
+            if (outcome.source == RecipeSearchSource.LOCAL_FALLBACK) {
+                SearchUiState.Error(R.string.search_error)
+            } else {
+                SearchUiState.Empty
+            }
         } else {
             SearchUiState.Results(
                 items = outcome.results,
