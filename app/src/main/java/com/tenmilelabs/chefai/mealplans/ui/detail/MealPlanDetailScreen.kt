@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -115,10 +116,11 @@ private fun MealPlanDetailContent(
     onGenerate: () -> Unit,
     onShoppingListClick: () -> Unit,
     modifier: Modifier = Modifier,
+    preferencesInitiallyExpanded: Boolean = false,
 ) {
     // Preferences start collapsed: they were chosen moments ago in the wizard, so the week itself
     // is what the user came here for.
-    var preferencesExpanded by rememberSaveable { mutableStateOf(false) }
+    var preferencesExpanded by rememberSaveable { mutableStateOf(preferencesInitiallyExpanded) }
     val isGenerating = state.isGenerating || state.mealPlan.status == MealPlanStatus.GENERATING
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -327,31 +329,24 @@ private fun PreferencesDisclosure(
 
         AnimatedVisibility(visible = expanded) {
             Column(modifier = Modifier.padding(bottom = 12.dp)) {
-                val prefs = mealPlan.preferences
-
-                PreferenceRow("Meals", prefs.mealType.label)
-                PreferenceRow("Duration", "${prefs.planLengthDays} days")
-                PreferenceRow("Servings", "${prefs.servingsPerMeal} per meal")
-
-                val dietary = prefs.dietaryRestrictions.filter { it != DietaryRestriction.NONE }
-                if (dietary.isNotEmpty()) {
-                    PreferenceRow("Dietary", dietary.joinToString(", ") { it.label })
-                }
-
-                prefs.maxPrepTimeMinutes?.let { PreferenceRow("Max prep", "$it min") }
-                PreferenceRow("Recipes from", prefs.recipeSource.label)
-                PreferenceRow("Variety", prefs.varietyPreference.label)
-
-                val extras = buildList {
-                    if (prefs.batchCooking) add("Batch cooking")
-                    if (prefs.leftoverFriendly) add("Leftover-friendly")
-                }
-                if (extras.isNotEmpty()) {
-                    PreferenceRow("Options", extras.joinToString(", "))
+                mealPlan.preferences.toDisplayRows().forEach { row ->
+                    PreferenceRow(
+                        label = stringResource(row.labelRes),
+                        value = row.value.asText(),
+                    )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun PlanPreferenceValue.asText(): String = when (this) {
+    is PlanPreferenceValue.Literal -> text
+    is PlanPreferenceValue.Days -> pluralStringResource(R.plurals.meal_plans_card_days, count, count)
+    is PlanPreferenceValue.Servings -> pluralStringResource(R.plurals.meal_plan_pref_servings_per_meal, count, count)
+    is PlanPreferenceValue.Minutes -> pluralStringResource(R.plurals.meal_plan_pref_minutes, count, count)
+    is PlanPreferenceValue.Resources -> ids.map { stringResource(it) }.joinToString(", ")
 }
 
 @Composable
@@ -516,6 +511,36 @@ private fun MealPlanDetailEmptyPreview() {
             onToggleCooked = {},
             onGenerate = {},
             onShoppingListClick = {},
+        )
+    }
+}
+
+@Preview(name = "Detail — preferences open — Light", showBackground = true, heightDp = 1100)
+@Composable
+private fun MealPlanDetailPreferencesLightPreview() {
+    ChefAITheme(darkTheme = false) {
+        MealPlanDetailContent(
+            state = previewState(),
+            onMealClick = {},
+            onToggleCooked = {},
+            onGenerate = {},
+            onShoppingListClick = {},
+            preferencesInitiallyExpanded = true,
+        )
+    }
+}
+
+@Preview(name = "Detail — preferences open — Dark", showBackground = true, heightDp = 1100)
+@Composable
+private fun MealPlanDetailPreferencesDarkPreview() {
+    ChefAITheme(darkTheme = true) {
+        MealPlanDetailContent(
+            state = previewState(),
+            onMealClick = {},
+            onToggleCooked = {},
+            onGenerate = {},
+            onShoppingListClick = {},
+            preferencesInitiallyExpanded = true,
         )
     }
 }

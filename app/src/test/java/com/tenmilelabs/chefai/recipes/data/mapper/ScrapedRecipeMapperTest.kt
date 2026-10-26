@@ -77,12 +77,13 @@ class ScrapedRecipeMapperTest {
     }
 
     @Test
-    fun `a scraped recipe always starts PUBLIC`() {
-        // Unlike a recipe written from scratch (RecipeDraft's own default is PRIVATE), a scraped
-        // recipe is someone else's already-published page.
+    fun `a scraped recipe always starts PRIVATE`() {
+        // Given a recipe scraped from a third-party page the user did not write
+        // When it is mapped to an editor draft
         val draft = minimalScrapedRecipe().toRecipeDraft(UUID.randomUUID(), emptyList(), emptyList())
 
-        assertEquals(RecipePrivacy.PUBLIC, draft.privacy)
+        // Then it defaults to PRIVATE; the user can still switch it to PUBLIC in the editor
+        assertEquals(RecipePrivacy.PRIVATE, draft.privacy)
     }
 
     @Test

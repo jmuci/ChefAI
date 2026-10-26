@@ -276,6 +276,24 @@
     <string name="meal_plan_preferences_title">Plan preferences</string>
     <string name="meal_plan_preferences_show">Show plan preferences</string>
     <string name="meal_plan_preferences_hide">Hide plan preferences</string>
+    <string name="meal_plan_pref_meals">Meals</string>
+    <string name="meal_plan_pref_duration">Duration</string>
+    <string name="meal_plan_pref_servings">Servings</string>
+    <string name="meal_plan_pref_dietary">Dietary</string>
+    <string name="meal_plan_pref_max_prep">Max prep</string>
+    <string name="meal_plan_pref_recipe_source">Recipes from</string>
+    <string name="meal_plan_pref_variety">Variety</string>
+    <string name="meal_plan_pref_cooking_style">Cooking style</string>
+    <string name="meal_plan_pref_batch_cooking">Batch cooking</string>
+    <string name="meal_plan_pref_leftover_friendly">Leftover-friendly</string>
+    <plurals name="meal_plan_pref_servings_per_meal">
+        <item quantity="one">%d per meal</item>
+        <item quantity="other">%d per meal</item>
+    </plurals>
+    <plurals name="meal_plan_pref_minutes">
+        <item quantity="one">%d min</item>
+        <item quantity="other">%d min</item>
+    </plurals>
     <string name="meal_plan_not_generated_title">No recipes yet</string>
     <string name="meal_plan_not_generated_subtitle">Build this plan from the recipes in your collection.</string>
     <string name="meal_plan_generate">Build my plan</string>

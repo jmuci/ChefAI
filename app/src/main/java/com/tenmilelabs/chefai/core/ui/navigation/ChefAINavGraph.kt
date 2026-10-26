@@ -482,14 +482,17 @@ fun ChefAINavGraph(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             // Don't show the generic Back bar on login, register, the wizard's own-header
-            // screens, accept-invite, or a recipe's details — accept-invite draws its own close
-            // (X) header (screen 12's "you came *to* this screen and will leave without a trail"
-            // shape rather than Back), and recipe details (05) draws its back arrow overlaid on
-            // its full-bleed hero image instead, which a generic bar above it would duplicate.
+            // screens, accept-invite, the import/editor screens, or a recipe's details —
+            // accept-invite draws its own close (X) header (screen 12's "you came *to* this screen
+            // and will leave without a trail" shape rather than Back), the import and editor
+            // screens do the same (Close X, plus the editor's Draft tag), and recipe details (05)
+            // draws its back arrow overlaid on its full-bleed hero image instead, which a generic
+            // bar above it would duplicate.
             if (currentRoute != AppDestinations.LOGIN.route &&
                 currentRoute != AppDestinations.REGISTER.route &&
                 currentRoute != AppDestinations.ACCEPT_INVITE.route &&
                 currentRoute !in recipeDetailRoutes &&
+                currentRoute !in ownHeaderRoutes &&
                 currentRoute !in wizardRoutes
             ) {
                 val navigation = if (!isTopLevelDestination) {
@@ -692,6 +695,18 @@ fun ChefAINavGraph(
  */
 private val paneledRoutes = setOf(
     AppDestinations.SEARCH.route,
+)
+
+/**
+ * Routes whose screen draws its own header (a Close X rather than the generic Back bar), so the
+ * Scaffold's [ChefAITopAppBar] is suppressed for them — same treatment as [wizardRoutes] and
+ * accept-invite. Each screen owns its bar: `ImportRecipeScreen`, `BrowserImportScreen` and
+ * `RecipeEditorScreen` all start with a `ChefAITopAppBar*` of their own.
+ */
+private val ownHeaderRoutes = setOf(
+    AppDestinations.IMPORT_RECIPE.route,
+    AppDestinations.IMPORT_RECIPE_BROWSER.route,
+    AppDestinations.RECIPE_EDITOR.route,
 )
 
 /** Every route that shows a recipe's details screen (it draws its own back arrow over the hero). */
