@@ -6,6 +6,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
@@ -54,6 +55,40 @@ class RecipeListCardTest {
         composeTestRule.onNodeWithTag("SaveToCollectionButton").assertIsDisplayed().performClick()
 
         assertEquals(PreviewData.grilledChickenRecipe.uuid, savedId)
+    }
+
+    @Test
+    fun bookmarkButton_announcesSave_whenNotInCollection() {
+        composeTestRule.setContent {
+            ChefAITheme {
+                RecipeListCard(
+                    recipe = PreviewData.grilledChickenRecipe,
+                    isInCollection = false,
+                    onSaveToCollection = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Save to collection").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Remove from collection").assertDoesNotExist()
+    }
+
+    @Test
+    fun bookmarkButton_announcesRemove_whenInCollection() {
+        // The filled glyph is the only other signal of the saved state; a screen reader needs
+        // it in the label.
+        composeTestRule.setContent {
+            ChefAITheme {
+                RecipeListCard(
+                    recipe = PreviewData.grilledChickenRecipe,
+                    isInCollection = true,
+                    onSaveToCollection = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Remove from collection").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Save to collection").assertDoesNotExist()
     }
 
     @Test

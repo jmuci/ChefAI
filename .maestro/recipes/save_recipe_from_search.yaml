@@ -1,8 +1,9 @@
 # Recipes: an anonymous user finds a recipe in Search, saves it, and sees it in their collection.
 #
 # Needs a backend with at least one public recipe matching the query (search hits the server; the
-# debug build talks to http://10.0.2.2:8080). It does not depend on a particular recipe: it opens
-# whichever result comes first, matched by the "<time> · Serves N" meta line every card carries.
+# debug build talks to http://10.0.2.2:8080). It does not depend on a particular recipe: it saves
+# whichever result comes first, then checks the collection by the "<time> · Serves N" meta line
+# every card carries.
 appId: com.tenmilelabs.chefai
 tags:
   - recipes
@@ -24,13 +25,11 @@ env:
     visible: ".*RESULTS?"
     timeout: 15000
 
-# Open the first result and bookmark it.
+# Bookmark the first result straight from its card; the button's label flips once saved.
 - tapOn:
-    text: ".* · Serves .*"
+    text: "Save to collection"
     index: 0
-- tapOn: "Save to collection"
 - assertVisible: "Remove from collection"
-- back
 
 - tapOn: "Recipes"
 - assertNotVisible: "No recipes in your collection"

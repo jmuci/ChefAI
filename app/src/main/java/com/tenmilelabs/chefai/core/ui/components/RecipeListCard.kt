@@ -139,7 +139,12 @@ fun RecipeListCard(
                         painter = painterResource(
                             if (isInCollection) ChefAIIcons.BookmarkFilled else ChefAIIcons.Bookmark,
                         ),
-                        contentDescription = stringResource(R.string.save_to_collection_content_description),
+                        // Names the state, not just the action: the filled/outline glyph is the
+                        // only other signal, and a screen reader cannot see it.
+                        contentDescription = stringResource(
+                            if (isInCollection) R.string.remove_from_collection_content_description
+                            else R.string.save_to_collection_content_description
+                        ),
                         // Accent as an icon directly on the ground needs the AA-safe step, not the
                         // brand fill — see ChefColors.accentText.
                         tint = if (isInCollection) {
