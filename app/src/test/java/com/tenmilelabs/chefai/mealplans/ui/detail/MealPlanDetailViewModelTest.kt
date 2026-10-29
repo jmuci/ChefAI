@@ -437,6 +437,35 @@ class MealPlanDetailViewModelTest {
         }
     }
 
+    // --- Deleting the plan ---
+
+    @Test
+    fun `onDeleteConfirmed deletes the plan and emits Deleted`() = runTest {
+        mealPlanRepository.emitPlans(planWith(fullDay()))
+        val viewModel = createViewModel()
+
+        viewModel.events.test {
+            viewModel.onDeleteConfirmed()
+            assertThat(awaitItem()).isEqualTo(MealPlanDetailEvent.Deleted)
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertThat(mealPlanRepository.observeMealPlan(planId).first()).isNull()
+    }
+
+    @Test
+    fun `onDeleteConfirmed emits ShowError and keeps the plan when deleting fails`() = runTest {
+        mealPlanRepository.emitPlans(planWith(fullDay()))
+        mealPlanRepository.shouldThrowOnDelete = true
+        val viewModel = createViewModel()
+
+        viewModel.events.test {
+            viewModel.onDeleteConfirmed()
+            assertThat(awaitItem()).isInstanceOf(MealPlanDetailEvent.ShowError::class.java)
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertThat(mealPlanRepository.observeMealPlan(planId).first()).isNotNull()
+    }
+
     // --- Helpers ---
 
     private fun createViewModel(): MealPlanDetailViewModel {

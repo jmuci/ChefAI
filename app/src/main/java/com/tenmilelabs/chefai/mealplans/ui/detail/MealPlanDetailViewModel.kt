@@ -66,6 +66,9 @@ sealed interface MealPlanDetailUiState {
 sealed interface MealPlanDetailEvent {
     data class ShowError(val message: String) : MealPlanDetailEvent
     data class PrintReady(val document: MealPlanPrintDocument) : MealPlanDetailEvent
+
+    /** The plan was soft-deleted; the screen should leave. */
+    data object Deleted : MealPlanDetailEvent
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -153,6 +156,20 @@ class MealPlanDetailViewModel @Inject constructor(
                 if (e is CancellationException) throw e
                 Timber.e(e, "onToggleCooked: failed for day ${meal.dayId} slot ${meal.slot}")
                 _events.emit(MealPlanDetailEvent.ShowError("Couldn't update this meal"))
+            }
+        }
+    }
+
+    /** Soft-deletes the plan (syncs the deletion) and tells the screen to navigate away via [events]. */
+    fun onDeleteConfirmed() {
+        viewModelScope.launch {
+            try {
+                mealPlanRepository.deleteMealPlan(mealPlanId)
+                _events.emit(MealPlanDetailEvent.Deleted)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "onDeleteConfirmed: failed to delete plan $mealPlanId")
+                _events.emit(MealPlanDetailEvent.ShowError("Couldn't delete this meal plan"))
             }
         }
     }

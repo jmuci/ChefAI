@@ -63,6 +63,7 @@ import com.tenmilelabs.chefai.mealplans.ui.MealPlansScreen
 import com.tenmilelabs.chefai.mealplans.ui.MealPlansUiState
 import com.tenmilelabs.chefai.mealplans.ui.MealPlansViewModel
 import com.tenmilelabs.chefai.mealplans.ui.components.MealPlansViewToggle
+import com.tenmilelabs.chefai.mealplans.ui.detail.DeleteMealPlanDialog
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailScreen
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailUiState
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailViewModel
@@ -127,6 +128,7 @@ fun ChefAINavGraph(
     // Outlives any single destination, so a snackbar raised while leaving a screen isn't cancelled
     // with it.
     val navScope = rememberCoroutineScope()
+    val mealPlanDeletedMessage = stringResource(R.string.meal_plan_deleted)
 
     // Shared by every recipe-details entry point so they all get edit + back navigation wired
     // in the same way; MEAL_PLAN_RECIPE_DETAIL is the only one with extra route args.
@@ -195,6 +197,14 @@ fun ChefAINavGraph(
                 },
                 onShoppingListClick = {
                     planIdArg?.let { navActions.navigateToMealPlanShoppingList(UUID.fromString(it)) }
+                },
+                onDeleted = {
+                    navController.popBackStack()
+                    // navScope, not the screen's: this screen leaves composition on the pop, which
+                    // would cancel a snackbar it launched.
+                    navScope.launch {
+                        snackbarHostState.showSnackbar(mealPlanDeletedMessage)
+                    }
                 },
                 snackbarHostState = snackbarHostState,
             )
@@ -508,10 +518,7 @@ fun ChefAINavGraph(
                 } else {
                     ChefAINavigation.None
                 }
-                val trailingActions: @Composable RowScope.() -> Unit = {
-                    // Sync status indicator (hidden when idle)
-                    SyncStatusIndicator()
-                    // User profile menu on the right side
+                val profileMenu: @Composable () -> Unit = {
                     UserProfileMenu(
                         // Detail screens (meal plan, shopping list, household) are keyed by id, not
                         // by session, so they would keep rendering the departed account's data
@@ -521,6 +528,12 @@ fun ChefAINavGraph(
                         onSettings = { navActions.navigateToSettings() },
                         onHousehold = { navActions.navigateToHousehold() },
                     )
+                }
+                val trailingActions: @Composable RowScope.() -> Unit = {
+                    // Sync status indicator (hidden when idle)
+                    SyncStatusIndicator()
+                    // User profile menu on the right side
+                    profileMenu()
                 }
 
                 when (currentRoute) {
@@ -565,6 +578,16 @@ fun ChefAINavGraph(
                             val detailViewModel: MealPlanDetailViewModel = hiltViewModel(entry)
                             val detailState by detailViewModel.uiState.collectAsStateWithLifecycle()
                             val success = detailState as? MealPlanDetailUiState.Success
+                            var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
+                            if (showDeleteConfirm) {
+                                DeleteMealPlanDialog(
+                                    onConfirm = {
+                                        showDeleteConfirm = false
+                                        detailViewModel.onDeleteConfirmed()
+                                    },
+                                    onDismiss = { showDeleteConfirm = false },
+                                )
+                            }
                             ChefAITopAppBarWithSubtitle(
                                 title = success?.mealPlan?.name ?: stringResource(titleRes),
                                 subtitle = success?.let {
@@ -580,7 +603,17 @@ fun ChefAINavGraph(
                                             )
                                         }
                                     }
-                                    trailingActions()
+                                    // Replaces the sync indicator here: deleting a plan is the
+                                    // action this screen needs, and the sync state is not.
+                                    if (success != null) {
+                                        IconButton(onClick = { showDeleteConfirm = true }) {
+                                            Icon(
+                                                painter = painterResource(ChefAIIcons.Trash),
+                                                contentDescription = stringResource(R.string.meal_plan_delete),
+                                            )
+                                        }
+                                    }
+                                    profileMenu()
                                 },
                             )
                         }
