@@ -66,6 +66,15 @@ class MealPlanMapperTest {
     }
 
     @Test
+    fun `start date round-trips through the entity, and its absence stays null`() {
+        val dated = mealPlan().copy(startDate = java.time.LocalDate.of(2026, 10, 29))
+
+        assertThat(dated.toEntity().toDomain(days = emptyList()).startDate)
+            .isEqualTo(java.time.LocalDate.of(2026, 10, 29))
+        assertThat(mealPlan().toEntity().startEpochDay).isNull()
+    }
+
+    @Test
     fun `entity mapping serializes preferences as json and defaults deletedAt to null`() {
         val plan = mealPlan()
 

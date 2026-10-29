@@ -218,6 +218,17 @@ class MealPlansViewModel @Inject constructor(
         browsedDate.update { it.plusDays(DAYS_IN_WEEK.toLong()) }
     }
 
+    /**
+     * The first day of the week on screen, or `null` when the plans list is showing (or the week
+     * has not loaded) — what the "+" hands the wizard to default its start date within this week.
+     */
+    fun browsedWeekStart(): LocalDate? =
+        if (_viewMode.value == MealPlansViewMode.WEEK) {
+            (uiState.value as? MealPlansUiState.Success)?.week?.weekStart
+        } else {
+            null
+        }
+
     fun onViewModeChange(mode: MealPlansViewMode) {
         _viewMode.value = mode
     }

@@ -112,7 +112,7 @@ object MealPlanWeekProjector {
             .filter { it.status != MealPlanStatus.ARCHIVED }
             .flatMap { plan ->
                 plan.days.flatMap { day ->
-                    val date = planDateFor(plan.createdAt, day.dayIndex, zone)
+                    val date = plan.dateOf(day.dayIndex, zone)
                     if (date !in window) return@flatMap emptyList()
                     MealSlot.entries.mapNotNull { slot ->
                         val recipeId = day.recipeIdFor(slot) ?: return@mapNotNull null
@@ -169,12 +169,16 @@ object MealPlanWeekProjector {
 }
 
 /**
- * The calendar date a plan's [dayIndex] lands on: day 0 is the date the plan was created.
- *
- * `MealPlan` carries no start date, so this assumption *is* the schedule — see ADR-015 Decision 2,
- * including what it costs when a plan is created mid-week. Duplicated deliberately from
- * `MealPlanBoard.mealPlanDateFor`, which is the same two lines in the UI layer; domain cannot
- * import from `ui/`, and the pair should collapse into this one when a `startDate` column lands.
+ * The calendar date this plan's [dayIndex] lands on: day 0 is [MealPlan.startDate], the day the
+ * wizard asked for. Plans created before it asked have none and fall back to their `createdAt`
+ * date — ADR-015 Decision 2's original rule.
+ */
+fun MealPlan.dateOf(dayIndex: Int, zone: ZoneId): LocalDate =
+    (startDate ?: planDateFor(createdAt, dayIndex = 0, zone = zone)).plusDays(dayIndex.toLong())
+
+/**
+ * The calendar date [dayIndex] lands on when day 0 is the date the plan was created — the fallback
+ * [dateOf] uses for plans without a [MealPlan.startDate].
  */
 fun planDateFor(planCreatedAt: Long, dayIndex: Int, zone: ZoneId): LocalDate =
     Instant.ofEpochMilli(planCreatedAt).atZone(zone).toLocalDate().plusDays(dayIndex.toLong())

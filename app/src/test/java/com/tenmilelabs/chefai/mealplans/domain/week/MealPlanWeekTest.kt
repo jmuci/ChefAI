@@ -94,9 +94,8 @@ class MealPlanWeekTest {
     }
 
     @Test
-    fun `a plan created mid-week straddles two weeks`() {
-        // The known cost of anchoring on createdAt — ADR-015 Decision 2. Asserted rather than
-        // merely documented, so that adding MealPlan.startDate fails this test loudly.
+    fun `a plan without a start date created mid-week straddles two weeks`() {
+        // Plans that predate MealPlan.startDate still anchor on createdAt — ADR-015 Decision 2.
         val thursday = monday.plusDays(3)
         val plan = plan(
             createdAt = thursday,
@@ -108,6 +107,17 @@ class MealPlanWeekTest {
 
         assertThat(thisWeek.mealCount).isEqualTo(4)
         assertThat(nextWeek.mealCount).isEqualTo(3)
+    }
+
+    @Test
+    fun `a plan with a start date lands on that date, not its creation date`() {
+        val plan = plan(
+            createdAt = monday.plusDays(3),
+            days = (0..6).map { day(it, dinner = UUID.randomUUID()) },
+        ).copy(startDate = monday.plusDays(7))
+
+        assertThat(project(plans = listOf(plan), weekStart = monday).mealCount).isEqualTo(0)
+        assertThat(project(plans = listOf(plan), weekStart = monday.plusDays(7)).mealCount).isEqualTo(7)
     }
 
     @Test

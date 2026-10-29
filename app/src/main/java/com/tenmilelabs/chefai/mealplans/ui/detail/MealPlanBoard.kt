@@ -3,7 +3,7 @@ package com.tenmilelabs.chefai.mealplans.ui.detail
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
-import java.time.Instant
+import com.tenmilelabs.chefai.mealplans.domain.week.dateOf
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
@@ -73,10 +73,8 @@ data class MealPlanBoard(
 }
 
 /**
- * The calendar date [dayIndex] lands on, treating the plan's `createdAt` (epoch millis) as day
- * zero. The domain model carries no per-day date — a plan is authored as "day 1, day 2, …" — so
- * this is a display-only derivation for the Modernist day column (16) and header date range, not a
- * stored fact. Two plans created on the same device on the same day always agree with each other.
+ * The calendar date [dayIndex] lands on, in the device's zone, for the Modernist day column (16)
+ * and header date range. Same rule as the week view — see [dateOf].
  */
-fun mealPlanDateFor(planCreatedAt: Long, dayIndex: Int): LocalDate =
-    Instant.ofEpochMilli(planCreatedAt).atZone(ZoneId.systemDefault()).toLocalDate().plusDays(dayIndex.toLong())
+fun mealPlanDateFor(mealPlan: MealPlan, dayIndex: Int): LocalDate =
+    mealPlan.dateOf(dayIndex, ZoneId.systemDefault())

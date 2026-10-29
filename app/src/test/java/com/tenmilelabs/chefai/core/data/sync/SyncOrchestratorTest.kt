@@ -214,6 +214,7 @@ class SyncOrchestratorTest {
         updatedAt: Long = 2000L,
         deletedAt: Long? = null,
         days: List<SyncMealPlanDayDto> = emptyList(),
+        startDate: String? = null,
     ): SyncMealPlanDto = SyncMealPlanDto(
         uuid = uuid.toString(),
         ownerId = ownerId.toString(),
@@ -225,6 +226,7 @@ class SyncOrchestratorTest {
         updatedAt = updatedAt,
         deletedAt = deletedAt,
         days = days,
+        startDate = startDate,
     )
 
     private fun createSyncGroceryListItem(
@@ -1057,6 +1059,46 @@ class SyncOrchestratorTest {
 
             assertThat(mealPlanDao.getDaysForMealPlan(planId).single().dinnerRecipeId).isEqualTo(recipeId)
         }
+
+    @Test
+    fun `pull applies the server's start date`() = runTest(testDispatcher) {
+        val planId = UuidV7Generator.newId()
+        syncNetworkDataSource.pullResponses.addLast(
+            SyncPullResponse(
+                recipes = emptyList(),
+                serverTimestamp = 5000L,
+                hasMore = false,
+                mealPlans = listOf(createSyncMealPlanDto(uuid = planId, startDate = "2026-11-02")),
+            )
+        )
+
+        syncOrchestrator.sync()
+
+        assertThat(mealPlanDao.getMealPlanById(planId)?.startEpochDay)
+            .isEqualTo(java.time.LocalDate.of(2026, 11, 2).toEpochDay())
+    }
+
+    @Test
+    fun `pull keeps the local start date when the server sends none`() = runTest(testDispatcher) {
+        // A backend that does not store startDate yet echoes the plan back without it.
+        val planId = UuidV7Generator.newId()
+        val localStart = java.time.LocalDate.of(2026, 11, 2).toEpochDay()
+        mealPlanDao.upsertMealPlan(
+            createSyncMealPlanDto(uuid = planId).toMealPlanEntity().copy(startEpochDay = localStart)
+        )
+        syncNetworkDataSource.pullResponses.addLast(
+            SyncPullResponse(
+                recipes = emptyList(),
+                serverTimestamp = 5000L,
+                hasMore = false,
+                mealPlans = listOf(createSyncMealPlanDto(uuid = planId, updatedAt = 3000L)),
+            )
+        )
+
+        syncOrchestrator.sync()
+
+        assertThat(mealPlanDao.getMealPlanById(planId)?.startEpochDay).isEqualTo(localStart)
+    }
 
     @Test
     fun `pull carries a cooked mark forward when the day still holds the same recipe`() = runTest(testDispatcher) {

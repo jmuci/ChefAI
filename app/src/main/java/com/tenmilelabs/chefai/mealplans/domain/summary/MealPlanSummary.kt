@@ -3,7 +3,7 @@ package com.tenmilelabs.chefai.mealplans.domain.summary
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
-import com.tenmilelabs.chefai.mealplans.domain.week.planDateFor
+import com.tenmilelabs.chefai.mealplans.domain.week.dateOf
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
@@ -92,8 +92,8 @@ object MealPlanSummaryBuilder {
             recipeTitles = previews.take(MAX_LISTED_TITLES).map { it.title },
             recipeCount = planned.size,
             dayCount = length,
-            startDate = planDateFor(createdAt, 0, zone),
-            endDate = planDateFor(createdAt, length - 1, zone),
+            startDate = dateOf(0, zone),
+            endDate = dateOf(length - 1, zone),
             lastCookedOn = lastCookedMillis?.let {
                 java.time.Instant.ofEpochMilli(it).atZone(zone).toLocalDate()
             },

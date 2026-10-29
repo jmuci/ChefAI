@@ -8,6 +8,7 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
 import kotlinx.serialization.json.Json
+import java.time.LocalDate
 import java.util.UUID
 
 private val json = Json { ignoreUnknownKeys = true }
@@ -22,6 +23,7 @@ fun MealPlanEntity.toDomain(days: List<MealPlanDayEntity>): MealPlan = MealPlan(
     updatedAt = updatedAt,
     days = days.map { it.toDomain() },
     householdId = householdId,
+    startDate = startEpochDay?.let(LocalDate::ofEpochDay),
 )
 
 fun MealPlanDayEntity.toDomain(): MealPlanDay = MealPlanDay(
@@ -43,6 +45,7 @@ fun MealPlan.toEntity(): MealPlanEntity = MealPlanEntity(
     updatedAt = updatedAt,
     deletedAt = null,
     householdId = householdId,
+    startEpochDay = startDate?.toEpochDay(),
 )
 
 /**

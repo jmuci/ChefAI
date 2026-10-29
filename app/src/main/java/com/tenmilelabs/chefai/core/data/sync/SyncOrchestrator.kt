@@ -677,7 +677,11 @@ class SyncOrchestrator @Inject constructor(
             return
         }
 
-        val entity = dto.toMealPlanEntity()
+        // A backend that does not store startDate yet echoes the plan back without it; keep the
+        // local one rather than letting the pull snap the plan back to its createdAt date.
+        val entity = dto.toMealPlanEntity().let { pulled ->
+            if (pulled.startEpochDay == null) pulled.copy(startEpochDay = localPlan?.startEpochDay) else pulled
+        }
         mealPlanDao.upsertMealPlan(entity)
 
         // "Cooked" is local-only state the sync payload knows nothing about, so capture it before

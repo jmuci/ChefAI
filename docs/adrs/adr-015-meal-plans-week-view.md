@@ -293,3 +293,21 @@ costs: every uncovered date becomes its own one-day plan (the plan list fills wi
 `startDate` lands), `planLengthDays = 1` is outside the wizard's 3/5/7 and is not yet confirmed
 against backend validation, and shopping lists stay per-plan, so a week of such meals has no single
 list to open (Decision 6's disabled button).
+
+## Amendment — Decision 2 superseded (plans have a start date)
+
+The wizard's Basics step now opens with "Which day does the meal plan start?", so day 0 is a date
+the user picked rather than the moment they tapped Create. `MealPlan.startDate` (`LocalDate?`) is
+stored as `meal_plans.startEpochDay` (DB v13, `MIGRATION_12_13`, nullable, no backfill) and travels
+as an optional ISO date `SyncMealPlanDto.startDate` — a calendar date, not an instant, so devices in
+different zones agree on the day. Every date derivation goes through `MealPlan.dateOf`, which falls
+back to `createdAt`'s date when `startDate` is null, so plans created before v13 do not move.
+
+Until the backend stores the field it echoes plans back without it; `applyPulledMealPlan` keeps the
+local value when a pull carries none, the same carry-forward shape as cooked marks.
+
+**Default start date** (`defaultMealPlanStartDate`): the day after the last date that already has a
+meal, never before today — gaps before that last meal are skipped, since a plan is a run of
+consecutive days. When the "+" is tapped on the week view, the route carries that week's first day
+(`weekStart` nav arg) and only meals inside the week count; an empty week defaults to its first day
+(or today, if the week is under way). From the plans list, every future meal counts.

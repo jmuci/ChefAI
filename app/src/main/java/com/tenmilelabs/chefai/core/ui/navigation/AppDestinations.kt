@@ -15,6 +15,7 @@ import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.RECIPE_ID_AR
 import com.tenmilelabs.chefai.core.ui.navigation.ScreenBaseRoutes.RECIPE_DETAILS
 import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import java.net.URLEncoder
+import java.time.LocalDate
 import java.util.UUID
 
 /**
@@ -44,8 +45,12 @@ internal object ScreenBaseRoutes {
     const val HOME_RECIPE_DETAIL = "home_recipe_detail"
     const val MEAL_PLAN_WIZARD = "meal_plan_wizard"
 
-    /** Wizard graph route; the optional recipe arg pre-includes that recipe in the generated plan. */
-    const val MEAL_PLAN_WIZARD_GRAPH = "$MEAL_PLAN_WIZARD?${AppDestinationArgs.RECIPE_ID_ARG}={${AppDestinationArgs.RECIPE_ID_ARG}}"
+    /**
+     * Wizard graph route; the optional recipe arg pre-includes that recipe in the generated plan,
+     * and the optional week start narrows the default start date to the week the user was viewing.
+     */
+    const val MEAL_PLAN_WIZARD_GRAPH = "$MEAL_PLAN_WIZARD?${AppDestinationArgs.RECIPE_ID_ARG}={${AppDestinationArgs.RECIPE_ID_ARG}}" +
+        "&${AppDestinationArgs.WEEK_START_ARG}={${AppDestinationArgs.WEEK_START_ARG}}"
     const val MEAL_PLAN_WIZARD_BASICS = "meal_plan_wizard_basics"
     const val MEAL_PLAN_WIZARD_PREFERENCES = "meal_plan_wizard_preferences"
     const val MEAL_PLAN_WIZARD_ADVANCED = "meal_plan_wizard_advanced"
@@ -57,6 +62,9 @@ internal object ScreenBaseRoutes {
 object AppDestinationArgs {
     const val RECIPE_ID_ARG = "recipeUuid"
     const val MEAL_PLAN_ID_ARG = "mealPlanId"
+
+    /** ISO date (`2026-10-26`) of the first day of the week the meal-plan wizard was opened from. */
+    const val WEEK_START_ARG = "weekStart"
 
     /**
      * Id of the [com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay] a recipe was opened
@@ -310,12 +318,20 @@ class NavigationActions(private val navController: NavHostController) {
         navController.navigate("${ScreenBaseRoutes.HOME_RECIPE_DETAIL}/$recipeId")
     }
 
-    fun navigateToMealPlanWizard(includeRecipeId: UUID? = null) {
+    /**
+     * @param weekStart first day of the week the week view is showing, when opened from there — the
+     *   wizard then defaults its start date within that week.
+     */
+    fun navigateToMealPlanWizard(includeRecipeId: UUID? = null, weekStart: LocalDate? = null) {
+        val args = listOfNotNull(
+            includeRecipeId?.let { "${AppDestinationArgs.RECIPE_ID_ARG}=$it" },
+            weekStart?.let { "${AppDestinationArgs.WEEK_START_ARG}=$it" },
+        )
         navController.navigate(
-            if (includeRecipeId == null) {
+            if (args.isEmpty()) {
                 ScreenBaseRoutes.MEAL_PLAN_WIZARD
             } else {
-                "${ScreenBaseRoutes.MEAL_PLAN_WIZARD}?${AppDestinationArgs.RECIPE_ID_ARG}=$includeRecipeId"
+                "${ScreenBaseRoutes.MEAL_PLAN_WIZARD}?${args.joinToString("&")}"
             }
         )
     }

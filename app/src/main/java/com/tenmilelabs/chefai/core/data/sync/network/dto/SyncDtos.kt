@@ -235,7 +235,13 @@ data class SyncMealPlanDto(
     val createdAt: Long,
     val updatedAt: Long,
     val deletedAt: Long?,
-    val days: List<SyncMealPlanDayDto>
+    val days: List<SyncMealPlanDayDto>,
+    /**
+     * ISO-8601 calendar date (`2026-10-28`) day 0 lands on — a date, not an instant, so every
+     * device reads the same day whatever its zone. Optional: `null` for plans that predate the
+     * field and from a backend that does not store it yet; the pull path then keeps the local value.
+     */
+    val startDate: String? = null,
 )
 
 @Serializable

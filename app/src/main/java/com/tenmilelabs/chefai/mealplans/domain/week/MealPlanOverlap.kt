@@ -14,12 +14,12 @@ import java.time.ZoneId
 object MealPlanOverlap {
 
     /**
-     * The calendar dates [plan] occupies under ADR-015 Decision 2: day 0 is its `createdAt` date.
+     * The calendar dates [plan] occupies: day 0 is its start date (see [dateOf]).
      * Length is the larger of what the wizard asked for and what was actually generated, so an
      * ungenerated draft still claims the days it is about to fill.
      */
     fun dateRange(plan: MealPlan, zone: ZoneId): ClosedRange<LocalDate> {
-        val start = planDateFor(plan.createdAt, dayIndex = 0, zone = zone)
+        val start = plan.dateOf(dayIndex = 0, zone = zone)
         val generatedLength = (plan.days.maxOfOrNull { it.dayIndex } ?: -1) + 1
         val length = maxOf(plan.preferences.planLengthDays, generatedLength, 1)
         return start..start.plusDays(length - 1L)
