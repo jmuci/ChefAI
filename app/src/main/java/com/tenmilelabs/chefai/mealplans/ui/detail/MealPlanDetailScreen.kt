@@ -73,6 +73,7 @@ import kotlin.math.roundToInt
 fun MealPlanDetailScreen(
     onMealClick: (PlannedMeal) -> Unit,
     onShoppingListClick: () -> Unit,
+    onDeleted: () -> Unit,
     snackbarHostState: SnackbarHostState = SnackbarHostState(),
     viewModel: MealPlanDetailViewModel = hiltViewModel(),
     modifier: Modifier = Modifier,
@@ -85,6 +86,7 @@ fun MealPlanDetailScreen(
             when (event) {
                 is MealPlanDetailEvent.ShowError -> snackbarHostState.showSnackbar(event.message)
                 is MealPlanDetailEvent.PrintReady -> printMealPlan(context, event.document)
+                is MealPlanDetailEvent.Deleted -> onDeleted()
             }
         }
     }

@@ -167,9 +167,12 @@ private fun LanguagePromptContent(
     }
 }
 
-/** The bordered, shadowed panel every editor dialog sits in — the profile-menu treatment (screen 09). */
+/**
+ * The bordered, shadowed panel every flat dialog sits in — the profile-menu treatment (screen 09).
+ * `internal` so other features' confirmation dialogs share the treatment.
+ */
 @Composable
-private fun DialogPanel(content: @Composable ColumnScope.() -> Unit) {
+internal fun DialogPanel(content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier
             .padding(DialogPadding)

@@ -298,6 +298,10 @@
     <string name="meal_plan_generate">Build my plan</string>
     <string name="meal_plan_generating">Building your meal plan…</string>
     <string name="meal_plan_print">Print meal plan</string>
+    <string name="meal_plan_delete">Delete meal plan</string>
+    <string name="meal_plan_delete_title">Delete meal plan?</string>
+    <string name="meal_plan_delete_message">Are you sure you want to delete?</string>
+    <string name="meal_plan_delete_confirm">Delete</string>
     <string name="meal_plan_shared_by">Shared by %1$s</string>
 
     <!-- Meal Plans week view (screen 06) -->
