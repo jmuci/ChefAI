@@ -1,0 +1,37 @@
+# Recipes: an anonymous user finds a recipe in Search, saves it, and sees it in their collection.
+#
+# Needs a backend with at least one public recipe matching the query (search hits the server; the
+# debug build talks to http://10.0.2.2:8080). It does not depend on a particular recipe: it opens
+# whichever result comes first, matched by the "<time> · Serves N" meta line every card carries.
+appId: com.tenmilelabs.chefai
+tags:
+  - recipes
+  - backend
+env:
+  QUERY: pasta
+---
+- launchApp:
+    clearState: true
+
+- tapOn: "Recipes"
+- assertVisible: "No recipes in your collection"
+
+- tapOn: "Search"
+- tapOn: "Search…"
+- inputText: ${QUERY}
+- hideKeyboard
+- extendedWaitUntil:
+    visible: ".*RESULTS?"
+    timeout: 15000
+
+# Open the first result and bookmark it.
+- tapOn:
+    text: ".* · Serves .*"
+    index: 0
+- tapOn: "Save to collection"
+- assertVisible: "Remove from collection"
+- back
+
+- tapOn: "Recipes"
+- assertNotVisible: "No recipes in your collection"
+- assertVisible: ".* · Serves .*"
