@@ -10,6 +10,7 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
+import com.tenmilelabs.chefai.mealplans.domain.week.dateOf
 import com.tenmilelabs.chefai.mealplans.domain.week.planDateFor
 import java.time.Clock
 import java.time.LocalDate
@@ -25,11 +26,12 @@ data class PlanDayTarget(val planId: UUID, val dayIndex: Int)
 /**
  * Binds one recipe to one calendar date's [MealSlot].
  *
- * Plans carry no start date — day 0 is the date the plan was created (ADR-015 Decision 2) — so
- * "put this recipe on Thursday" has two cases:
- * - a live plan of the user's already spans that date: the recipe goes into that plan's day;
- * - none does: a new one-day plan is created *anchored on that date* (`createdAt` at local noon,
- *   so [planDateFor] resolves back to it across any DST shift), holding just that meal.
+ * "Put this recipe on Thursday" has two cases:
+ * - a live plan of the user's already spans that date (see [dateOf]): the recipe goes into that
+ *   plan's day;
+ * - none does: a new one-day plan is created *starting on that date*, holding just that meal. Its
+ *   `createdAt` is also that date's local noon, so a device that never receives `startDate` (the
+ *   backend does not store it yet) still projects it onto the same row via [planDateFor].
  *
  * Only [MealPlanStatus.READY] plans are written into. A draft or generating plan has its days
  * replaced wholesale when generation lands, which would silently drop the meal just added.
@@ -76,6 +78,7 @@ class AddRecipeToDateUseCase @Inject constructor(
                 createdAt = date.atTime(NOON).atZone(clock.zone).toInstant().toEpochMilli(),
                 updatedAt = now,
                 days = listOf(day),
+                startDate = date,
             )
         )
         return true
@@ -113,7 +116,7 @@ class AddRecipeToDateUseCase @Inject constructor(
             .filter { it.userId == userId && it.status == MealPlanStatus.READY }
             .sortedWith(compareBy({ it.createdAt }, { it.uuid }))
             .firstNotNullOfOrNull { plan ->
-                val offset = ChronoUnit.DAYS.between(planDateFor(plan.createdAt, 0, zone), date)
+                val offset = ChronoUnit.DAYS.between(plan.dateOf(0, zone), date)
                 val span = maxOf(plan.preferences.planLengthDays, (plan.days.maxOfOrNull { it.dayIndex } ?: -1) + 1)
                 if (offset in 0 until span) PlanDayTarget(plan.uuid, offset.toInt()) else null
             }

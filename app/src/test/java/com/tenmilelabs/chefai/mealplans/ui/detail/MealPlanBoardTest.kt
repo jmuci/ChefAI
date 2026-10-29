@@ -12,6 +12,7 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
 import org.junit.Test
+import java.time.LocalDate
 import java.util.UUID
 
 class MealPlanBoardTest {
@@ -153,14 +154,22 @@ class MealPlanBoardTest {
     }
 
     @Test
-    fun `mealPlanDateFor treats createdAt as day zero`() {
-        // 2024-01-01T00:00:00Z, well clear of any timezone rolling it to a different calendar day.
-        val createdAt = 1_704_110_400_000L
+    fun `mealPlanDateFor treats createdAt as day zero when the plan has no start date`() {
+        // 2024-01-01T12:00:00Z, well clear of any timezone rolling it to a different calendar day.
+        val plan = twoFullDays().copy(createdAt = 1_704_110_400_000L)
 
-        val day0 = mealPlanDateFor(createdAt, 0)
-        val day2 = mealPlanDateFor(createdAt, 2)
+        val day0 = mealPlanDateFor(plan, 0)
+        val day2 = mealPlanDateFor(plan, 2)
 
         assertThat(day2).isEqualTo(day0.plusDays(2))
+    }
+
+    @Test
+    fun `mealPlanDateFor anchors on the start date when the plan has one`() {
+        val plan = twoFullDays().copy(startDate = LocalDate.of(2026, 11, 5))
+
+        assertThat(mealPlanDateFor(plan, 0)).isEqualTo(LocalDate.of(2026, 11, 5))
+        assertThat(mealPlanDateFor(plan, 1)).isEqualTo(LocalDate.of(2026, 11, 6))
     }
 
     // --- Helpers ---

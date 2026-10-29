@@ -4,11 +4,17 @@ import com.tenmilelabs.chefai.mealplans.domain.model.DietaryRestriction
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
+import java.time.LocalDate
 
 data class CreateMealPlanUiState(
     val currentStep: Int = 0,
     val totalSteps: Int = 3,
     // Step 1: Basics
+    /**
+     * Day 0 of the new plan. `null` only until the default — the day after the last planned meal,
+     * see `defaultMealPlanStartDate` — has been read from the user's existing plans.
+     */
+    val startDate: LocalDate? = null,
     val planLengthDays: Int = 5,
     val mealType: MealType = MealType.DINNER,
     val servingsPerMeal: Int = 2,
@@ -27,6 +33,7 @@ data class CreateMealPlanUiState(
 )
 
 sealed interface WizardAction {
+    data class SetStartDate(val date: LocalDate) : WizardAction
     data class SetPlanLength(val days: Int) : WizardAction
     data class SetMealType(val type: MealType) : WizardAction
     data class SetServings(val count: Int) : WizardAction

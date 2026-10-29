@@ -43,4 +43,9 @@ data class MealPlanEntity(
      * why the household cache tables can't be an FK target here.
      */
     val householdId: UUID? = null,
+    /**
+     * The calendar date day 0 lands on, as [java.time.LocalDate.toEpochDay]. Null for plans written
+     * before the wizard asked for one (DB v13) — those keep [createdAt]'s date as day 0.
+     */
+    val startEpochDay: Long? = null,
 ) : SyncableEntity

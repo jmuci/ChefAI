@@ -28,6 +28,7 @@ import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncCreatorDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDayDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncGroceryListItem
+import java.time.LocalDate
 import java.util.UUID
 
 // --- Push direction: Room entities → DTO ---
@@ -233,7 +234,8 @@ fun MealPlanEntity.toSyncDto(days: List<MealPlanDayEntity>): SyncMealPlanDto = S
     createdAt = createdAt,
     updatedAt = updatedAt,
     deletedAt = deletedAt,
-    days = days.map { it.toSyncDto() }
+    days = days.map { it.toSyncDto() },
+    startDate = startEpochDay?.let { LocalDate.ofEpochDay(it).toString() },
 )
 
 fun MealPlanDayEntity.toSyncDto(): SyncMealPlanDayDto = SyncMealPlanDayDto(
@@ -258,7 +260,8 @@ fun SyncMealPlanDto.toMealPlanEntity(): MealPlanEntity = MealPlanEntity(
     createdAt = createdAt,
     updatedAt = updatedAt,
     deletedAt = deletedAt,
-    syncState = SyncState.SYNCED
+    syncState = SyncState.SYNCED,
+    startEpochDay = startDate?.let { runCatching { LocalDate.parse(it).toEpochDay() }.getOrNull() },
 )
 
 fun SyncMealPlanDayDto.toMealPlanDayEntity(mealPlanId: UUID): MealPlanDayEntity = MealPlanDayEntity(

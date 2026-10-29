@@ -151,8 +151,8 @@ private fun MealPlanDetailContent(
                         key = { _, meal -> "meal-${meal.dayId}-${meal.slot}" },
                     ) { index, meal ->
                         if (index > 0) RowRule()
-                        val date = remember(meal.dayIndex, state.mealPlan.createdAt) {
-                            mealPlanDateFor(state.mealPlan.createdAt, meal.dayIndex)
+                        val date = remember(meal.dayIndex, state.mealPlan.startDate, state.mealPlan.createdAt) {
+                            mealPlanDateFor(state.mealPlan, meal.dayIndex)
                         }
                         MealPlanMealRow(
                             recipe = meal.recipe,
@@ -197,13 +197,12 @@ private fun LocalDate.shortDayName(): String =
     dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()).uppercase()
 
 /**
- * "Aug 11 – 15" — the plan's day range, derived from [MealPlan.createdAt] treated as day zero (the
- * domain model carries no per-day date). Exposed so the app shell's header — which owns the
+ * "Aug 11 – 15" — the plan's day range, from its start date (see [mealPlanDateFor]). Exposed so the app shell's header — which owns the
  * meal-plan-detail top bar — can build the same subtitle it shows next to the plan title.
  */
 fun mealPlanDateRangeLabel(mealPlan: MealPlan): String {
-    val start = mealPlanDateFor(mealPlan.createdAt, 0)
-    val end = mealPlanDateFor(mealPlan.createdAt, (mealPlan.preferences.planLengthDays - 1).coerceAtLeast(0))
+    val start = mealPlanDateFor(mealPlan, 0)
+    val end = mealPlanDateFor(mealPlan, (mealPlan.preferences.planLengthDays - 1).coerceAtLeast(0))
     val formatter = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
     return if (start.month == end.month) {
         "${formatter.format(start)} – ${end.dayOfMonth}"

@@ -107,6 +107,27 @@ class SyncMapperTest {
     // --- Push direction tests (Entity -> DTO) ---
 
     @Test
+    fun `meal plan start date travels as an ISO date and parses back`() {
+        val entity = com.tenmilelabs.chefai.core.data.local.room.MealPlanEntity(
+            uuid = UUID.randomUUID(),
+            userId = UUID.randomUUID(),
+            name = "Plan",
+            status = "READY",
+            preferencesJson = "{}",
+            createdAt = 1L,
+            updatedAt = 1L,
+            deletedAt = null,
+            startEpochDay = java.time.LocalDate.of(2026, 10, 29).toEpochDay(),
+        )
+
+        val dto = entity.toSyncDto(days = emptyList())
+
+        assertThat(dto.startDate).isEqualTo("2026-10-29")
+        assertThat(dto.toMealPlanEntity().startEpochDay).isEqualTo(entity.startEpochDay)
+        assertThat(dto.copy(startDate = null).toMealPlanEntity().startEpochDay).isNull()
+    }
+
+    @Test
     fun `toSyncDto maps RecipeEntity fields correctly`() {
         val dto = recipeEntity.toSyncDto(stepEntities, ingredientEntities, tagCrossRefs, labelCrossRefs)
 

@@ -54,7 +54,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         TagEntity::class,
         UserEntity::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = true
 )
 @TypeConverters(UuidConverters::class)
@@ -395,5 +395,16 @@ val MIGRATION_11_12 = object : Migration(11, 12) {
             WHERE lunchCookedAt IS NOT NULL AND lunchRecipeId IS NOT NULL
             """.trimIndent()
         )
+    }
+}
+
+/**
+ * v12 → v13: `meal_plans.startEpochDay`, the date the wizard's "Which day does the meal plan
+ * start?" picked. Nullable with no backfill — existing plans keep `createdAt`'s date as day 0
+ * (ADR-015 Decision 2), which is exactly what they showed before, so nothing moves on upgrade.
+ */
+val MIGRATION_12_13 = object : Migration(12, 13) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `meal_plans` ADD COLUMN `startEpochDay` INTEGER")
     }
 }

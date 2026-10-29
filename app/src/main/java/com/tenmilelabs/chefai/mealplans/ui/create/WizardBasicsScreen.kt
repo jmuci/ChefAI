@@ -20,6 +20,7 @@ import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.mealplans.ui.create.components.DayLengthSelector
 import com.tenmilelabs.chefai.mealplans.ui.create.components.MealTypeSelector
 import com.tenmilelabs.chefai.mealplans.ui.create.components.ServingsSelector
+import com.tenmilelabs.chefai.mealplans.ui.create.components.StartDateSelector
 import com.tenmilelabs.chefai.mealplans.ui.create.components.WizardHeader
 
 @Composable
@@ -63,6 +64,11 @@ private fun WizardBasicsContent(
                 .padding(horizontal = 16.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(32.dp),
         ) {
+            StartDateSelector(
+                startDate = uiState.startDate,
+                onStartDateSelected = { onAction(WizardAction.SetStartDate(it)) },
+            )
+
             DayLengthSelector(
                 selectedDays = uiState.planLengthDays,
                 onDaysSelected = { onAction(WizardAction.SetPlanLength(it)) },
@@ -93,7 +99,7 @@ private fun WizardBasicsContent(
 private fun WizardBasicsPreview() {
     ChefAITheme {
         WizardBasicsContent(
-            uiState = CreateMealPlanUiState(),
+            uiState = CreateMealPlanUiState(startDate = java.time.LocalDate.of(2026, 10, 29)),
             onAction = {},
             onNext = {},
             onBack = {},

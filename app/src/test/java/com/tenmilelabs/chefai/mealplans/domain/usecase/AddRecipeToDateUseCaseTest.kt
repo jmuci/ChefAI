@@ -50,6 +50,15 @@ class AddRecipeToDateUseCaseTest {
     }
 
     @Test
+    fun `a plan's span starts on its start date, not its creation date`() {
+        val plan = plan(createdOn = monday, lengthDays = 3).copy(startDate = monday.plusDays(7))
+
+        assertThat(AddRecipeToDateUseCase.findTarget(listOf(plan), userId, monday.plusDays(1), zone)).isNull()
+        assertThat(AddRecipeToDateUseCase.findTarget(listOf(plan), userId, monday.plusDays(8), zone))
+            .isEqualTo(PlanDayTarget(plan.uuid, dayIndex = 1))
+    }
+
+    @Test
     fun `days stored past the nominal length still count as the plan's span`() {
         val plan = plan(createdOn = monday, lengthDays = 3, days = listOf(day(5)))
 
@@ -114,6 +123,7 @@ class AddRecipeToDateUseCaseTest {
         assertThat(created.days.single().lunchRecipeId).isNull()
         // The point of anchoring: the week view must project it back onto the date it was added for.
         assertThat(planDateFor(created.createdAt, 0, zone)).isEqualTo(date)
+        assertThat(created.startDate).isEqualTo(date)
     }
 
     @Test

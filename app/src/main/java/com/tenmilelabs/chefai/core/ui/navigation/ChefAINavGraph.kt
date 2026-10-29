@@ -242,6 +242,11 @@ fun ChefAINavGraph(
                     nullable = true
                     defaultValue = null
                 },
+                navArgument(AppDestinationArgs.WEEK_START_ARG) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
             ),
         ) {
             composable(ScreenBaseRoutes.MEAL_PLAN_WIZARD_BASICS) { entry ->
@@ -703,8 +708,11 @@ fun ChefAINavGraph(
                     )
                 }
                 AppDestinations.MEAL_PLANS.route -> {
+                    val weekViewModel: MealPlansViewModel? = navController.currentBackStackEntry?.let { hiltViewModel(it) }
                     FloatingActionButton(
-                        onClick = { navActions.navigateToMealPlanWizard() },
+                        onClick = {
+                            navActions.navigateToMealPlanWizard(weekStart = weekViewModel?.browsedWeekStart())
+                        },
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
                     ) {
                         Icon(

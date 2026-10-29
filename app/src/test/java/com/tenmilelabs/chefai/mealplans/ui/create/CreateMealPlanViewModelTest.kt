@@ -104,6 +104,7 @@ class CreateMealPlanViewModelTest {
     /** Midday, so "yesterday" and "today" never straddle a DST shift or midnight. */
     private val now = java.time.ZonedDateTime.of(2026, 10, 25, 12, 0, 0, 0, java.time.ZoneOffset.UTC)
     private val clock = java.time.Clock.fixed(now.toInstant(), java.time.ZoneOffset.UTC)
+    private val today = now.toLocalDate()
 
     // --- Default state ---
 
@@ -528,6 +529,79 @@ class CreateMealPlanViewModelTest {
         assertThat(repository.statelessGenerationRequestedIds).isEmpty()
     }
 
+    // --- Start date ---
+
+    @Test
+    fun `start date defaults to today when nothing is planned`() = runTest {
+        assertThat(viewModel.uiState.value.startDate).isEqualTo(today)
+    }
+
+    @Test
+    fun `start date defaults to the day after the last planned meal`() = runTest {
+        // Given meals planned today and tomorrow
+        repository.emitPlans(existingPlan(name = "Plan", createdAt = now, lengthDays = 2, plannedDays = 2))
+
+        // When the wizard opens
+        val vm = createViewModel()
+
+        // Then it defaults to the day after tomorrow
+        assertThat(vm.uiState.value.startDate).isEqualTo(today.plusDays(2))
+    }
+
+    @Test
+    fun `opened from the week view, the start date defaults within that week`() = runTest {
+        // Given an empty week two weeks out, and a meal tomorrow
+        repository.emitPlans(existingPlan(name = "Plan", createdAt = now, lengthDays = 2, plannedDays = 2))
+        val browsedWeek = today.plusDays(14)
+
+        // When the wizard opens from that week
+        val vm = createViewModel(
+            savedStateHandle = androidx.lifecycle.SavedStateHandle(
+                mapOf(com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.WEEK_START_ARG to browsedWeek.toString())
+            ),
+        )
+
+        // Then it defaults to that week's first day, ignoring meals outside it
+        assertThat(vm.uiState.value.startDate).isEqualTo(browsedWeek)
+    }
+
+    @Test
+    fun `SetStartDate overrides the default`() = runTest {
+        viewModel.onAction(WizardAction.SetStartDate(today.plusDays(5)))
+
+        assertThat(viewModel.uiState.value.startDate).isEqualTo(today.plusDays(5))
+    }
+
+    @Test
+    fun `SaveMealPlan persists the chosen start date`() = runTest {
+        viewModel.onAction(WizardAction.SetStartDate(today.plusDays(3)))
+
+        viewModel.uiEvents.test {
+            viewModel.onAction(WizardAction.SaveMealPlan)
+            awaitItem()
+        }
+
+        val saved = repository.observeMealPlansForUser(testUserId).first().single()
+        assertThat(saved.startDate).isEqualTo(today.plusDays(3))
+    }
+
+    @Test
+    fun `SaveMealPlan checks overlap from the chosen start date`() = runTest {
+        // Given a 3-day plan covering today through the day after tomorrow
+        repository.emitPlans(existingPlan(name = "Current", createdAt = now, lengthDays = 3))
+
+        // When the new plan starts the day after it ends
+        viewModel.onAction(WizardAction.SetStartDate(today.plusDays(3)))
+
+        viewModel.uiEvents.test {
+            viewModel.onAction(WizardAction.SaveMealPlan)
+
+            // Then there is no overlap to report
+            val event = awaitItem() as CreateMealPlanEvent.MealPlanSavedAsDraft
+            assertThat(event.overlappingPlanName).isNull()
+        }
+    }
+
     // --- Overlap notice ---
 
     @Test
@@ -558,7 +632,12 @@ class CreateMealPlanViewModelTest {
         }
     }
 
-    private fun existingPlan(name: String, createdAt: java.time.ZonedDateTime, lengthDays: Int): MealPlan {
+    private fun existingPlan(
+        name: String,
+        createdAt: java.time.ZonedDateTime,
+        lengthDays: Int,
+        plannedDays: Int = 0,
+    ): MealPlan {
         val millis = createdAt.toInstant().toEpochMilli()
         return MealPlan(
             uuid = UUID.randomUUID(),
@@ -578,7 +657,14 @@ class CreateMealPlanViewModelTest {
             status = MealPlanStatus.READY,
             createdAt = millis,
             updatedAt = millis,
-            days = emptyList(),
+            days = (0 until plannedDays).map { index ->
+                MealPlanDay(
+                    uuid = UUID.randomUUID(),
+                    dayIndex = index,
+                    dinnerRecipeId = UUID.randomUUID(),
+                    lunchRecipeId = null,
+                )
+            },
         )
     }
 
