@@ -1,0 +1,45 @@
+# Smoke: a fresh, anonymous install can reach every bottom-nav tab.
+#
+# Run against an installed debug build (./gradlew :app:installDebug):
+#   maestro test .maestro/smoke
+#
+# Anchors are picked to be offline-safe: Home's content is server-driven, so its check is the
+# tab's selected state only (which sits on the tab container, not its label — hence
+# `containsChild`); the other tabs assert client-side copy (Search's static catalog,
+# the empty Recipes collection a cleared install starts with, the Meal Plans week view's FAB).
+appId: com.tenmilelabs.chefai
+tags:
+  - smoke
+---
+- launchApp:
+    clearState: true
+
+# Home is the start destination.
+- extendedWaitUntil:
+    visible:
+      selected: true
+      containsChild: "Home"
+    timeout: 15000
+
+- tapOn: "Search"
+- assertVisible:
+    selected: true
+    containsChild: "Search"
+- assertVisible: "Search by Meal"
+
+- tapOn: "Recipes"
+- assertVisible:
+    selected: true
+    containsChild: "Recipes"
+- assertVisible: "No recipes in your collection"
+
+- tapOn: "Meal Plans"
+- assertVisible:
+    selected: true
+    containsChild: "Meal Plans"
+- assertVisible: "Create meal plan"
+
+- tapOn: "Home"
+- assertVisible:
+    selected: true
+    containsChild: "Home"
