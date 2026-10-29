@@ -28,6 +28,7 @@ internal object ScreenBaseRoutes {
     const val RECIPE_DETAILS = "recipe_details_screen"
     const val CREATE_RECIPE = "create_recipe_screen"
     const val RECIPE_EDITOR = "recipe_editor_screen"
+    const val RECIPE_PICKER = "recipe_picker_screen"
     const val IMPORT_RECIPE = "import_recipe_screen"
     const val IMPORT_RECIPE_BROWSER = "import_recipe_browser_screen"
     const val SETTINGS = "settings_screen"
@@ -119,6 +120,7 @@ enum class AppDestinations(
             "?${RECIPE_ID_ARG}={${RECIPE_ID_ARG}}" +
             "&${DRAFT_ID_ARG}={${DRAFT_ID_ARG}}"
     ),
+    RECIPE_PICKER(R.string.app_dest_title_recipe_picker, ScreenBaseRoutes.RECIPE_PICKER),
     IMPORT_RECIPE(
         R.string.app_dest_title_import_recipe,
         "${ScreenBaseRoutes.IMPORT_RECIPE}?${PREFILL_URL_ARG}={${PREFILL_URL_ARG}}"
@@ -171,6 +173,11 @@ class NavigationActions(private val navController: NavHostController) {
 
     fun navigateToCreateRecipe() {
         navController.navigate(ScreenBaseRoutes.RECIPE_EDITOR)
+    }
+
+    /** Opens the picker that finishes a Meal Plans "+ Add meal"; see [com.tenmilelabs.chefai.mealplans.ui.AddMealRequest]. */
+    fun navigateToRecipePicker() {
+        navController.navigate(ScreenBaseRoutes.RECIPE_PICKER)
     }
 
     fun navigateToEditRecipe(recipeId: UUID) {

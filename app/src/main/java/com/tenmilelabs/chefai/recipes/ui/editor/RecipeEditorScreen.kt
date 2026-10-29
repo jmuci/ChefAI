@@ -89,6 +89,8 @@ fun RecipeEditorScreen(
     viewModel: RecipeEditorViewModel = hiltViewModel(),
     /** Leaves the editor after a delete — past the (now deleted) recipe's details screen, too. */
     onRecipeDeleted: () -> Unit = onNavigateBack,
+    /** Leaves the editor after a save; defaults to a plain [onNavigateBack]. */
+    onRecipeSaved: (EditorEffect.RecipeSaved) -> Unit = { onNavigateBack() },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showUnsavedDialog by remember { mutableStateOf(false) }
@@ -100,7 +102,7 @@ fun RecipeEditorScreen(
     LaunchedEffect(Unit) {
         viewModel.effects.collect { effect ->
             when (effect) {
-                EditorEffect.RecipeSaved -> onNavigateBack()
+                is EditorEffect.RecipeSaved -> onRecipeSaved(effect)
                 EditorEffect.RecipeDeleted -> onRecipeDeleted()
                 is EditorEffect.ShowError -> {
                     snackbarHostState.showSnackbar(

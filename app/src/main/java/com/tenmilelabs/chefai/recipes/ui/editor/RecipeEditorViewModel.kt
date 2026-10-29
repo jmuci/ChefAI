@@ -415,7 +415,7 @@ class RecipeEditorViewModel @Inject constructor(
                 }
 
                 _state.update { it.copy(isSaving = false) }
-                _effects.send(EditorEffect.RecipeSaved)
+                _effects.send(EditorEffect.RecipeSaved(recipe.uuid, isNew = mode is EditorMode.Create))
             } catch (e: Exception) {
                 Timber.e(e, "Failed to save recipe")
                 _state.update {

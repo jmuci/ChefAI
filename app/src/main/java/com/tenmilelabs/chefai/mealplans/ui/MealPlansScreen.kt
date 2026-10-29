@@ -15,15 +15,20 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatBlockButton
@@ -37,6 +42,7 @@ import com.tenmilelabs.chefai.mealplans.domain.week.MealPlanWeek
 import com.tenmilelabs.chefai.mealplans.domain.week.PlannedWeekMeal
 import com.tenmilelabs.chefai.mealplans.domain.week.WeekDay
 import com.tenmilelabs.chefai.mealplans.domain.summary.MealPlanSummary
+import com.tenmilelabs.chefai.mealplans.ui.components.AddMealSheet
 import com.tenmilelabs.chefai.mealplans.ui.components.MealPlanHeroCard
 import com.tenmilelabs.chefai.mealplans.ui.components.WeekDayRow
 import com.tenmilelabs.chefai.mealplans.ui.components.WeekNavigator
@@ -58,7 +64,9 @@ private val FabClearance = 88.dp
  */
 @Composable
 fun MealPlansScreen(
-    onCreateMealPlan: () -> Unit = {},
+    snackbarHostState: SnackbarHostState,
+    onSearchRecipe: () -> Unit = {},
+    onNewRecipe: () -> Unit = {},
     onMealClick: (PlannedWeekMeal) -> Unit = {},
     onShoppingListClick: (UUID) -> Unit = {},
     onPlanClick: (UUID) -> Unit = {},
@@ -68,6 +76,33 @@ fun MealPlansScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState by viewModel.listState.collectAsStateWithLifecycle()
     val viewMode by viewModel.viewMode.collectAsStateWithLifecycle()
+    val addMealDate by viewModel.addMealDate.collectAsStateWithLifecycle()
+
+    val context = LocalContext.current
+    LaunchedEffect(viewModel, snackbarHostState) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is MealPlansEvent.ShowMessage ->
+                    snackbarHostState.showSnackbar(context.getString(event.messageRes))
+            }
+        }
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onTabResumed() }
+
+    addMealDate?.let { date ->
+        AddMealSheet(
+            date = date,
+            onSearchRecipe = { slot ->
+                viewModel.onAddMealSourceChosen(slot)
+                onSearchRecipe()
+            },
+            onNewRecipe = { slot ->
+                viewModel.onAddMealSourceChosen(slot)
+                onNewRecipe()
+            },
+            onDismiss = viewModel::onAddMealDismissed,
+        )
+    }
 
     MealPlansContent(
         uiState = uiState,
@@ -77,9 +112,7 @@ fun MealPlansScreen(
         onPreviousWeek = viewModel::onPreviousWeek,
         onNextWeek = viewModel::onNextWeek,
         onMealClick = onMealClick,
-        // "+ Add meal" has no picker yet, so it routes to the wizard — which is also the only
-        // remaining way into plan creation now that the plan list is gone. ADR-015 Consequences.
-        onAddMeal = { onCreateMealPlan() },
+        onAddMeal = viewModel::onAddMeal,
         onGenerateGroceryList = onShoppingListClick,
         modifier = modifier,
     )

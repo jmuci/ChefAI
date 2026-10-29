@@ -8,6 +8,7 @@
     <string name="app_dest_title_register">Register</string>
     <string name="app_dest_title_search">Search</string>
     <string name="app_dest_title_recipe_editor">Recipe Editor</string>
+    <string name="app_dest_title_recipe_picker">Pick a Recipe</string>
     <string name="app_dest_title_import_recipe">Import Recipe</string>
     <string name="app_dest_title_import_recipe_browser">Import Recipe</string>
     <string name="app_dest_title_settings">Settings</string>
@@ -321,6 +322,13 @@
     <string name="meal_plans_previous_week">Previous week</string>
     <string name="meal_plans_next_week">Next week</string>
     <string name="meal_plans_add_meal">+ Add meal</string>
+    <!-- "+ Add meal" bottom sheet. %1$s = the date being filled, e.g. "Thu, Oct 29". -->
+    <string name="meal_plans_add_meal_sheet_title">Add a meal · %1$s</string>
+    <string name="meal_plans_add_meal_search">Search for a Recipe</string>
+    <string name="meal_plans_add_meal_new">Add a New Recipe</string>
+    <string name="meal_plans_add_meal_failed">Couldn’t add that meal. Try again.</string>
+    <string name="recipe_picker_tab_mine">My recipes</string>
+    <string name="recipe_picker_tab_discover">Discover</string>
     <string name="meal_plans_grocery_list_label">Shopping list</string>
     <!-- Snackbar after creating a plan whose dates overlap an existing one. %1$s = that plan's name. -->
     <string name="meal_plan_overlap_notice">Overlaps “%1$s” — both plans show in your week</string>

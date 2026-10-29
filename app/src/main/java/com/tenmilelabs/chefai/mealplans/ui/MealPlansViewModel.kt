@@ -1,7 +1,10 @@
 package com.tenmilelabs.chefai.mealplans.ui
 
+import androidx.annotation.StringRes
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
@@ -10,11 +13,13 @@ import com.tenmilelabs.chefai.core.util.WhileUiSubscribed
 import com.tenmilelabs.chefai.household.domain.model.Household
 import com.tenmilelabs.chefai.household.domain.repository.HouseholdRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
+import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.repository.ShoppingListRepository
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.ShoppingListBuilder
 import com.tenmilelabs.chefai.mealplans.domain.summary.MealPlanSummary
 import com.tenmilelabs.chefai.mealplans.domain.summary.MealPlanSummaryBuilder
+import com.tenmilelabs.chefai.mealplans.domain.usecase.AddRecipeToDateUseCase
 import com.tenmilelabs.chefai.mealplans.domain.week.DAYS_IN_WEEK
 import com.tenmilelabs.chefai.mealplans.domain.week.MealPlanWeek
 import com.tenmilelabs.chefai.mealplans.domain.week.MealPlanWeekProjector
@@ -22,16 +27,22 @@ import com.tenmilelabs.chefai.mealplans.domain.week.weekStartFor
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import timber.log.Timber
 import java.time.Clock
 import java.time.LocalDate
 import java.util.UUID
@@ -49,6 +60,11 @@ sealed interface MealPlanListUiState {
         val plans: List<MealPlanSummary>,
         val today: LocalDate,
     ) : MealPlanListUiState
+}
+
+/** One-shot messages for the tab; the screen turns them into snackbars. */
+sealed interface MealPlansEvent {
+    data class ShowMessage(@StringRes val messageRes: Int) : MealPlansEvent
 }
 
 sealed interface MealPlansUiState {
@@ -76,12 +92,14 @@ sealed interface MealPlansUiState {
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class MealPlansViewModel @Inject constructor(
-    mealPlanRepository: MealPlanRepository,
+    private val mealPlanRepository: MealPlanRepository,
     recipesRepository: RecipesRepository,
     shoppingListRepository: ShoppingListRepository,
     householdRepository: HouseholdRepository,
     userPreferencesRepository: UserPreferencesRepository,
-    sessionManager: SessionManager,
+    private val sessionManager: SessionManager,
+    private val addRecipeToDate: AddRecipeToDateUseCase,
+    private val savedStateHandle: SavedStateHandle,
     private val clock: Clock,
 ) : ViewModel() {
 
@@ -202,6 +220,95 @@ class MealPlansViewModel @Inject constructor(
 
     fun onViewModeChange(mode: MealPlansViewMode) {
         _viewMode.value = mode
+    }
+
+    // --- "+ Add meal": bind a recipe to a calendar date ---
+
+    private val _addMealDate = MutableStateFlow<LocalDate?>(null)
+
+    /** The date whose "Add meal" sheet is open, or `null` while it is closed. */
+    val addMealDate: StateFlow<LocalDate?> = _addMealDate
+
+    private val _events = Channel<MealPlansEvent>(Channel.BUFFERED)
+    val events: Flow<MealPlansEvent> = _events.receiveAsFlow()
+
+    init {
+        // The picker / editor lands its result on this tab's back-stack entry, whose
+        // SavedStateHandle this is — so the hand-off survives the trip through other screens
+        // (and process death) without any screen holding a reference to this ViewModel.
+        viewModelScope.launch {
+            savedStateHandle.getStateFlow<String?>(AddMealRequest.KEY_RECIPE, null)
+                .filterNotNull()
+                .collect { raw ->
+                    val date = pendingDate()
+                    val slot = pendingSlot()
+                    clearAddMealRequest()
+                    val recipeId = runCatching { UUID.fromString(raw) }.getOrNull()
+                    if (date != null && slot != null && recipeId != null) {
+                        assignRecipe(date, slot, recipeId)
+                    }
+                }
+        }
+    }
+
+    fun onAddMeal(date: LocalDate) {
+        _addMealDate.value = date
+    }
+
+    fun onAddMealDismissed() {
+        _addMealDate.value = null
+    }
+
+    /**
+     * The user chose [slot] and a way to find the recipe; remembers where it must land and closes
+     * the sheet. The caller then navigates to the picker or the editor.
+     */
+    fun onAddMealSourceChosen(slot: MealSlot) {
+        val date = _addMealDate.value ?: return
+        savedStateHandle[AddMealRequest.KEY_DATE] = date.toString()
+        savedStateHandle[AddMealRequest.KEY_SLOT] = slot.name
+        savedStateHandle[AddMealRequest.KEY_RECIPE] = null
+        _addMealDate.value = null
+    }
+
+    /**
+     * Called when the tab is back on screen. A request still waiting at that point with no recipe
+     * delivered means the user backed out of the picker or editor, so it is dropped — otherwise
+     * the next recipe saved anywhere would be dropped onto a date nobody is thinking about.
+     */
+    fun onTabResumed() {
+        if (savedStateHandle.get<String>(AddMealRequest.KEY_RECIPE) == null) clearAddMealRequest()
+    }
+
+    private fun pendingDate(): LocalDate? =
+        savedStateHandle.get<String>(AddMealRequest.KEY_DATE)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+
+    private fun pendingSlot(): MealSlot? =
+        savedStateHandle.get<String>(AddMealRequest.KEY_SLOT)?.let { name -> MealSlot.entries.firstOrNull { it.name == name } }
+
+    private fun clearAddMealRequest() {
+        savedStateHandle[AddMealRequest.KEY_DATE] = null
+        savedStateHandle[AddMealRequest.KEY_SLOT] = null
+        savedStateHandle[AddMealRequest.KEY_RECIPE] = null
+    }
+
+    private suspend fun assignRecipe(date: LocalDate, slot: MealSlot, recipeId: UUID) {
+        val userId = sessionManager.getCurrentUserId()
+        val added = try {
+            userId != null && addRecipeToDate(
+                userId = userId,
+                plans = mealPlanRepository.observeMealPlansForUser(userId).first(),
+                date = date,
+                slot = slot,
+                recipeId = recipeId,
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to add recipe $recipeId to $date")
+            false
+        }
+        if (!added) _events.send(MealPlansEvent.ShowMessage(R.string.meal_plans_add_meal_failed))
     }
 
     private fun today(): LocalDate = LocalDate.now(clock)

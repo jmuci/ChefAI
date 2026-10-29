@@ -273,3 +273,23 @@ The grocery summary counts every meal shown and says when they come from several
 multi-plan week (Decision 6 unchanged). The wizard now warns, non-blockingly, when a new plan's dates
 overlap an existing one (`MealPlanOverlap`, a snackbar after creation). Still no schema change: plans
 remain anchored on `createdAt` (Decision 2), so "Schedule this plan" stays a no-op.
+
+## Amendment — "+ Add meal" opens a sheet (supersedes the "does not open a picker" consequence)
+
+An empty day's "+ Add meal" opens a bottom sheet (`AddMealSheet`): a Lunch/Dinner choice, then
+**Search for a Recipe** (`RecipePickerScreen` — "My recipes" and "Discover" tabs reusing the
+Recipes and Search screens) or **Add a New Recipe** (the importer, whose manual fallback reaches
+the editor). Either path ends by delivering a recipe id to the Meal Plans tab's back-stack entry
+(`AddMealRequest`); `MealPlansViewModel` then calls `AddRecipeToDateUseCase`.
+
+Binding a recipe to a date reuses Decision 2's anchor rather than adding a column:
+- a **READY plan of the user's own** whose span covers the date (oldest first) gets the recipe via
+  `assignRecipeToSlot`;
+- otherwise a new **one-day plan** named "Added meals" is created with `createdAt` at local noon of
+  that date, so `planDateFor` projects it straight back onto the row it was added from.
+
+Draft/generating plans are never written into (generation replaces their days wholesale). Known
+costs: every uncovered date becomes its own one-day plan (the plan list fills with them until
+`startDate` lands), `planLengthDays = 1` is outside the wizard's 3/5/7 and is not yet confirmed
+against backend validation, and shopping lists stay per-plan, so a week of such meals has no single
+list to open (Decision 6's disabled button).

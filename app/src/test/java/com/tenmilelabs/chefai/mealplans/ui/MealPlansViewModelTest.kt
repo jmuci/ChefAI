@@ -1,7 +1,9 @@
 package com.tenmilelabs.chefai.mealplans.ui
 
+import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.core.data.repository.FakeUserPreferencesRepository
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
@@ -16,14 +18,18 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
+import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.PlannedIngredient
+import com.tenmilelabs.chefai.mealplans.domain.usecase.AddRecipeToDateUseCase
+import com.tenmilelabs.chefai.mealplans.domain.week.planDateFor
 import com.tenmilelabs.chefai.mealplans.domain.week.weekStartFor
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
@@ -67,9 +73,11 @@ class MealPlansViewModelTest {
     private lateinit var householdRepository: FakeHouseholdRepository
     private lateinit var sessionManager: SessionManager
     private lateinit var viewModel: MealPlansViewModel
+    private lateinit var savedStateHandle: SavedStateHandle
 
     @Before
     fun setup() {
+        savedStateHandle = SavedStateHandle()
         repository = FakeMealPlanRepository()
         recipesRepository = FakeRecipesRepository()
         shoppingListRepository = FakeShoppingListRepository()
@@ -87,8 +95,89 @@ class MealPlansViewModelTest {
         householdRepository = householdRepository,
         userPreferencesRepository = preferences,
         sessionManager = sessionManager,
+        addRecipeToDate = AddRecipeToDateUseCase(repository, clock),
+        savedStateHandle = savedStateHandle,
         clock = clock,
     )
+
+    // --- "+ Add meal" ---
+
+    @Test
+    fun `add meal opens the sheet for that date and dismiss closes it`() = runTest {
+        viewModel.onAddMeal(weekStart)
+        assertThat(viewModel.addMealDate.value).isEqualTo(weekStart)
+
+        viewModel.onAddMealDismissed()
+        assertThat(viewModel.addMealDate.value).isNull()
+    }
+
+    @Test
+    fun `choosing a source closes the sheet and remembers the date and slot`() = runTest {
+        viewModel.onAddMeal(weekStart.plusDays(2))
+
+        viewModel.onAddMealSourceChosen(MealSlot.LUNCH)
+
+        assertThat(viewModel.addMealDate.value).isNull()
+        assertThat(savedStateHandle.get<String>(AddMealRequest.KEY_DATE))
+            .isEqualTo(weekStart.plusDays(2).toString())
+        assertThat(savedStateHandle.get<String>(AddMealRequest.KEY_SLOT)).isEqualTo("LUNCH")
+    }
+
+    @Test
+    fun `a recipe delivered after choosing a source lands on that date and slot`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        val recipeId = UUID.randomUUID()
+        val target = weekStart.plusDays(2)
+        repository.emitPlans()
+
+        viewModel.onAddMeal(target)
+        viewModel.onAddMealSourceChosen(MealSlot.LUNCH)
+        savedStateHandle[AddMealRequest.KEY_RECIPE] = recipeId.toString()
+
+        val plan = repository.observeMealPlansForUser(userId).first().single()
+        val placed = plan.days.single()
+        assertThat(placed.lunchRecipeId).isEqualTo(recipeId)
+        assertThat(placed.dinnerRecipeId).isNull()
+        assertThat(planDateFor(plan.createdAt, placed.dayIndex, ZoneOffset.UTC)).isEqualTo(target)
+        // Consumed: nothing is left to fire on the next recipe saved elsewhere.
+        assertThat(savedStateHandle.get<String>(AddMealRequest.KEY_DATE)).isNull()
+        assertThat(savedStateHandle.get<String>(AddMealRequest.KEY_RECIPE)).isNull()
+    }
+
+    @Test
+    fun `a recipe delivered with no pending request is ignored`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        repository.emitPlans()
+
+        savedStateHandle[AddMealRequest.KEY_RECIPE] = UUID.randomUUID().toString()
+
+        assertThat(repository.observeMealPlansForUser(userId).first()).isEmpty()
+    }
+
+    @Test
+    fun `returning to the tab with nothing delivered drops the pending request`() = runTest {
+        viewModel.onAddMeal(weekStart)
+        viewModel.onAddMealSourceChosen(MealSlot.DINNER)
+
+        viewModel.onTabResumed()
+
+        assertThat(savedStateHandle.get<String>(AddMealRequest.KEY_DATE)).isNull()
+        assertThat(savedStateHandle.get<String>(AddMealRequest.KEY_SLOT)).isNull()
+    }
+
+    @Test
+    fun `a failed write reports a message instead of failing silently`() = runTest {
+        repository.emitPlans()
+        repository.shouldThrowOnCreate = true
+
+        viewModel.events.test {
+            viewModel.onAddMeal(weekStart.plusDays(1))
+            viewModel.onAddMealSourceChosen(MealSlot.DINNER)
+            savedStateHandle[AddMealRequest.KEY_RECIPE] = UUID.randomUUID().toString()
+
+            assertThat(awaitItem()).isEqualTo(MealPlansEvent.ShowMessage(R.string.meal_plans_add_meal_failed))
+        }
+    }
 
     // --- The week ---
 
