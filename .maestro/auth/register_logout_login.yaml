@@ -1,0 +1,58 @@
+# Auth: register a fresh account, log out, then log back in with it.
+#
+# Needs a backend: the debug build talks to http://10.0.2.2:8080 (the host's localhost), so run
+# the Chef.ai backend locally first. The flow registers its own throwaway account, so it needs no
+# seed users — the username is suffixed with a timestamp to stay unique across runs.
+appId: com.tenmilelabs.chefai
+tags:
+  - auth
+  - backend
+env:
+  PASSWORD: maestro1234
+---
+- evalScript: ${output.username = 'maestro' + Date.now()}
+- launchApp:
+    clearState: true
+
+# Register.
+- tapOn: "Open profile menu"
+- tapOn: "Log in / Register"
+- tapOn: "Create Account"
+- tapOn: "Username"
+- inputText: ${output.username}
+- tapOn: "Email"
+- inputText: ${output.username + '@example.com'}
+- tapOn: "Password"
+- inputText: ${PASSWORD}
+- tapOn: "Confirm Password"
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    text: "Create Account"
+    index: 1 # The screen title shares the button's text.
+
+# Registering lands back in the app, signed in.
+- extendedWaitUntil:
+    visible: "Open profile menu"
+    timeout: 15000
+- tapOn: "Open profile menu"
+- assertVisible: ${output.username}
+
+# Log out.
+- tapOn: "Logout"
+- tapOn: "Open profile menu"
+- assertVisible: "Guest"
+
+# Log back in.
+- tapOn: "Log in / Register"
+- tapOn: "Email"
+- inputText: ${output.username + '@example.com'}
+- tapOn: "Password"
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn: "Log In"
+- extendedWaitUntil:
+    visible: "Open profile menu"
+    timeout: 15000
+- tapOn: "Open profile menu"
+- assertVisible: ${output.username}

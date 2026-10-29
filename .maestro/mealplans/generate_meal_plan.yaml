@@ -1,0 +1,40 @@
+# Meal plans: an anonymous user walks the wizard and gets a filled 5-day plan.
+#
+# Needs a backend with enough public recipes (the default "Include public recipes" source; the
+# debug build talks to http://10.0.2.2:8080). The days are filled server-side, falling back to the
+# on-device generator, so the checks are structural — a title, five meals, a shopping list —
+# rather than particular recipes.
+appId: com.tenmilelabs.chefai
+tags:
+  - mealplans
+  - backend
+---
+- launchApp:
+    clearState: true
+
+- tapOn: "Meal Plans"
+- tapOn: "Create meal plan"
+
+# Step 1: the basics.
+- assertVisible: "STEP 1 OF 3 · THE BASICS"
+- tapOn: "5"
+- tapOn: "Dinners only"
+- tapOn: "Next"
+
+# Step 2: preferences — keep the defaults.
+- assertVisible: "STEP 2 OF 3 · PREFERENCES"
+- tapOn: "Next"
+
+# Step 3: final touches — keep the defaults.
+- assertVisible: "STEP 3 OF 3 · FINAL TOUCHES"
+- tapOn: "Create Plan"
+
+# The plan's detail screen, filled.
+- extendedWaitUntil:
+    visible: "5-day meal plan"
+    timeout: 30000
+- assertVisible: "Nothing cooked yet — pick a day to start"
+- assertVisible:
+    text: ".* · Serves .*"
+    index: 4 # A fifth meal row: one dinner per day.
+- assertVisible: "Shopping list · .* items"

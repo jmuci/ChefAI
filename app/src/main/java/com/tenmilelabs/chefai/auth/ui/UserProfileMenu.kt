@@ -37,6 +37,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
@@ -401,11 +403,15 @@ private fun ProfileAvatar(
 ) {
     val authenticated = session as? UserSession.Authenticated
     val avatarUrl = authenticated?.user?.avatarUrl.orEmpty()
+    val openMenuLabel = stringResource(R.string.profile_menu_open)
 
     Box(
         modifier = modifier
             .size(MenuMetrics.AvatarSize)
             .clip(CircleShape)
+            // The button names its action in every state. Signed in, the initials or photo alone
+            // left it unlabelled for screen readers (and UI tests), so the children stay silent.
+            .semantics { contentDescription = openMenuLabel }
             .flatClickable(onClick = onClick, role = Role.Button),
         contentAlignment = Alignment.Center,
     ) {
@@ -417,7 +423,7 @@ private fun ProfileAvatar(
                     .build(),
                 placeholder = painterResource(R.drawable.ic_img_placeholder),
                 error = painterResource(R.drawable.ic_img_error),
-                contentDescription = stringResource(R.string.user_profile_avatar_description),
+                contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -435,7 +441,7 @@ private fun ProfileAvatar(
             ) {
                 Icon(
                     painter = painterResource(ChefAIIcons.CircleUserRound),
-                    contentDescription = stringResource(R.string.profile_menu_open),
+                    contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(MenuMetrics.AvatarIconSize),
                 )
