@@ -97,7 +97,8 @@ data class LanguagePrompt(
  */
 sealed interface EditorEffect {
     data object NavigateBack : EditorEffect
-    data object RecipeSaved : EditorEffect
+    /** @property isNew true when this save created the recipe rather than editing an existing one. */
+    data class RecipeSaved(val recipeId: UUID, val isNew: Boolean) : EditorEffect
     data object RecipeDeleted : EditorEffect
     data class ShowError(val message: String) : EditorEffect
 }

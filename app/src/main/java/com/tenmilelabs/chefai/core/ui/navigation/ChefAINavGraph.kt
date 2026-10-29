@@ -59,6 +59,7 @@ import com.tenmilelabs.chefai.home.ui.HomeScreen
 import com.tenmilelabs.chefai.home.ui.homeDateSubtitle
 import com.tenmilelabs.chefai.household.ui.AcceptInviteScreen
 import com.tenmilelabs.chefai.household.ui.HouseholdScreen
+import com.tenmilelabs.chefai.mealplans.ui.AddMealRequest
 import com.tenmilelabs.chefai.mealplans.ui.MealPlansScreen
 import com.tenmilelabs.chefai.mealplans.ui.MealPlansUiState
 import com.tenmilelabs.chefai.mealplans.ui.MealPlansViewModel
@@ -68,6 +69,7 @@ import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailScreen
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailUiState
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailViewModel
 import com.tenmilelabs.chefai.mealplans.ui.detail.mealPlanDetailSubtitle
+import com.tenmilelabs.chefai.mealplans.ui.picker.RecipePickerScreen
 import com.tenmilelabs.chefai.mealplans.ui.create.CreateMealPlanEvent
 import com.tenmilelabs.chefai.mealplans.ui.create.CreateMealPlanViewModel
 import com.tenmilelabs.chefai.mealplans.ui.create.WizardAdvancedScreen
@@ -177,7 +179,11 @@ fun ChefAINavGraph(
         }
         composable(route = AppDestinations.MEAL_PLANS.route) {
             MealPlansScreen(
-                onCreateMealPlan = { navActions.navigateToMealPlanWizard() },
+                snackbarHostState = snackbarHostState,
+                onSearchRecipe = { navActions.navigateToRecipePicker() },
+                // The importer, not the bare editor: it covers both "paste a URL" and "type it in"
+                // (its manual-entry fallback), and either way ends in the editor's create mode.
+                onNewRecipe = { navActions.navigateToImportRecipe() },
                 // The week view's rows are meals, not plans, so a tap opens the recipe on the
                 // plan-scoped route — which carries the day and slot the cooked toggle acts on.
                 onMealClick = { meal ->
@@ -187,6 +193,12 @@ fun ChefAINavGraph(
                     navActions.navigateToMealPlanShoppingList(planId)
                 },
                 onPlanClick = { planId -> navActions.navigateToMealPlanDetail(planId) },
+            )
+        }
+        composable(route = AppDestinations.RECIPE_PICKER.route) {
+            RecipePickerScreen(
+                snackbarHostState = snackbarHostState,
+                onRecipePicked = { recipeId -> navController.finishAddMeal(recipeId) },
             )
         }
         composable(route = AppDestinations.MEAL_PLAN_DETAIL.route) { backStackEntry ->
@@ -319,6 +331,12 @@ fun ChefAINavGraph(
             RecipeEditorScreen(
                 onNavigateBack = { navController.popBackStack() },
                 snackbarHostState = snackbarHostState,
+                onRecipeSaved = { saved ->
+                    // A recipe created on the way from "+ Add meal" goes straight onto that date.
+                    if (!saved.isNew || !navController.finishAddMeal(saved.recipeId)) {
+                        navController.popBackStack()
+                    }
+                },
                 onRecipeDeleted = {
                     navController.popBackStack()
                     // Edit mode is only reachable from a recipe details screen; landing back on it
@@ -659,6 +677,7 @@ fun ChefAINavGraph(
             val hideNav = currentRoute == AppDestinations.LOGIN.route ||
                 currentRoute == AppDestinations.REGISTER.route ||
                 currentRoute == AppDestinations.IMPORT_RECIPE.route ||
+                currentRoute == AppDestinations.RECIPE_PICKER.route ||
                 currentRoute == AppDestinations.ACCEPT_INVITE.route ||
                 currentRoute in wizardRoutes
             if (!hideNav && !isExpanded) {
@@ -700,6 +719,7 @@ fun ChefAINavGraph(
         val hideNav = currentRoute == AppDestinations.LOGIN.route ||
             currentRoute == AppDestinations.REGISTER.route ||
             currentRoute == AppDestinations.IMPORT_RECIPE.route ||
+            currentRoute == AppDestinations.RECIPE_PICKER.route ||
             currentRoute == AppDestinations.ACCEPT_INVITE.route ||
             currentRoute in wizardRoutes
 
@@ -750,3 +770,17 @@ private val recipeDetailRoutes = setOf(
     AppDestinations.SEARCH_RECIPE_DETAIL.route,
     AppDestinations.MEAL_PLAN_RECIPE_DETAIL.route,
 )
+
+/**
+ * Finishes a Meal Plans "+ Add meal" by handing [recipeId] to the tab and popping back to it.
+ *
+ * @return `false` when the tab has no request waiting (the editor was opened some other way, or
+ *   the user backed out earlier), in which case nothing was changed and the caller navigates as
+ *   it normally would.
+ */
+private fun NavController.finishAddMeal(recipeId: UUID): Boolean {
+    val tab = runCatching { getBackStackEntry(AppDestinations.MEAL_PLANS.route) }.getOrNull()
+    if (!AddMealRequest.deliver(tab, recipeId)) return false
+    popBackStack(AppDestinations.MEAL_PLANS.route, inclusive = false)
+    return true
+}
