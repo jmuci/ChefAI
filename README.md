@@ -75,6 +75,43 @@ Utils:
 * [Timber](https://github.com/JakeWharton/timber)
 * [SLF4J](http://www.slf4j.org/) and [Logback](https://logback.qos.ch/) for Ktor logging
 
+## UI Tests (Maestro)
+
+End-to-end UI flows live in [`.maestro/`](.maestro/) and run with [Maestro](https://maestro.mobile.dev)
+(open-source, free to run locally and on your own CI).
+
+| Flow | What it checks | Needs backend |
+|------|----------------|---------------|
+| `smoke/anonymous_tab_navigation.yaml` | A fresh, anonymous install can reach every bottom-nav tab | No |
+| `auth/register_logout_login.yaml` | Registers a throwaway account, logs out, logs back in | Yes |
+| `recipes/save_recipe_from_search.yaml` | Saves a search result and finds it in the Recipes tab | Yes |
+| `mealplans/generate_meal_plan.yaml` | Walks the wizard and gets a filled 5-day plan | Yes |
+
+**Setup**
+
+1. Install the Maestro CLI:
+   ```bash
+   curl -fsSL "https://get.maestro.mobile.dev" | bash
+   ```
+2. Start an emulator (or connect a device) and install the debug build:
+   ```bash
+   ./gradlew :app:installDebug
+   ```
+3. For the flows tagged `backend`, run the [backend](https://github.com/jmuci/Chef.ai_Backend) locally on
+   port 8080 — the debug build talks to `http://10.0.2.2:8080`, the host's localhost seen from the
+   emulator. Search and meal-plan generation need public recipes in its database.
+
+**Running**
+
+```bash
+maestro test .maestro                          # every flow
+maestro test --exclude-tags backend .maestro   # only the flows that work offline
+maestro test .maestro/smoke                    # one folder
+```
+
+Every flow starts from `clearState`, so it wipes the app's local data on the device it runs on.
+`maestro studio` opens an interactive inspector that helps when writing new flows.
+
 ## Backend Test End Points
 
 You can use the enpoints hosted in this repo to test the backend:

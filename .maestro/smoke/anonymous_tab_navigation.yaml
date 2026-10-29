@@ -1,7 +1,7 @@
 # Smoke: a fresh, anonymous install can reach every bottom-nav tab.
 #
 # Run against an installed debug build (./gradlew :app:installDebug):
-#   maestro test .maestro/smoke
+#   maestro test .maestro/smoke  (or the whole suite: maestro test .maestro)
 #
 # Anchors are picked to be offline-safe: Home's content is server-driven, so its check is the
 # tab's selected state only (which sits on the tab container, not its label — hence
