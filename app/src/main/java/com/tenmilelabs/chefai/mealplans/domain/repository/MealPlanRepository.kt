@@ -4,6 +4,7 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
 import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
+import com.tenmilelabs.chefai.mealplans.domain.usecase.MealRef
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
@@ -72,4 +73,13 @@ interface MealPlanRepository {
      * @return `false` if [planId] has no local row.
      */
     suspend fun appendRecipeAsNewDay(planId: UUID, slot: MealSlot, recipeId: UUID): Boolean
+
+    /**
+     * Drag-and-drop: moves the outstanding meal at [from] to where [to] sits, shifting the ones
+     * between. Cooked meals stay pinned (see [com.tenmilelabs.chefai.mealplans.domain.usecase.MealPlanReorder]).
+     * Dirties the plan so the change syncs.
+     *
+     * @return `false` if nothing changed — unknown plan, unknown or cooked meal, or [from] == [to].
+     */
+    suspend fun moveMeal(planId: UUID, from: MealRef, to: MealRef): Boolean
 }

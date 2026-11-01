@@ -15,6 +15,8 @@ import com.tenmilelabs.chefai.household.domain.repository.HouseholdRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
+import com.tenmilelabs.chefai.mealplans.domain.usecase.MealRef
+import com.tenmilelabs.chefai.mealplans.domain.week.PlannedWeekMeal
 import com.tenmilelabs.chefai.mealplans.domain.repository.ShoppingListRepository
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.ShoppingListBuilder
 import com.tenmilelabs.chefai.mealplans.domain.summary.MealPlanSummary
@@ -264,6 +266,28 @@ class MealPlansViewModel @Inject constructor(
 
     fun onAddMeal(date: LocalDate) {
         _addMealDate.value = date
+    }
+
+    /**
+     * Drag-and-drop in the week view: moves [from] to where [to] sits. Only meals of the same plan
+     * can be exchanged — a cross-plan drop has no defined meaning, so it is ignored.
+     */
+    fun onMoveMeal(from: PlannedWeekMeal, to: PlannedWeekMeal) {
+        if (from.planId != to.planId) return
+        viewModelScope.launch {
+            try {
+                mealPlanRepository.moveMeal(
+                    from.planId,
+                    MealRef(from.dayId, from.slot),
+                    MealRef(to.dayId, to.slot),
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "onMoveMeal: failed for plan ${from.planId}")
+                _events.send(MealPlansEvent.ShowMessage(R.string.meal_plans_move_failed))
+            }
+        }
     }
 
     fun onAddMealDismissed() {

@@ -20,6 +20,8 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
 import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
+import com.tenmilelabs.chefai.mealplans.domain.usecase.MealPlanReorder
+import com.tenmilelabs.chefai.mealplans.domain.usecase.MealRef
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -252,5 +254,28 @@ class DefaultMealPlanRepository @Inject constructor(
         }
         syncScheduler.requestMutationSync()
         return true
+    }
+
+    override suspend fun moveMeal(planId: UUID, from: MealRef, to: MealRef): Boolean {
+        val existing = mealPlanDao.getMealPlanById(planId) ?: return false
+        var moved = false
+        transactionRunner {
+            val days = mealPlanDao.getDaysForMealPlan(planId)
+            val changed = MealPlanReorder.move(days.map { it.toDomain() }, from, to)
+            if (changed != null) {
+                val byId = days.associateBy { it.uuid }
+                mealPlanDao.upsertDays(
+                    changed.mapNotNull { day ->
+                        byId[day.uuid]?.copy(lunchRecipeId = day.lunchRecipeId, dinnerRecipeId = day.dinnerRecipeId)
+                    }
+                )
+                mealPlanDao.upsertMealPlan(
+                    existing.copy(syncState = SyncState.PENDING, updatedAt = System.currentTimeMillis())
+                )
+                moved = true
+            }
+        }
+        if (moved) syncScheduler.requestMutationSync()
+        return moved
     }
 }

@@ -45,6 +45,7 @@ import com.tenmilelabs.chefai.mealplans.domain.summary.MealPlanSummary
 import com.tenmilelabs.chefai.mealplans.ui.components.AddMealSheet
 import com.tenmilelabs.chefai.mealplans.ui.components.MealPlanHeroCard
 import com.tenmilelabs.chefai.mealplans.ui.components.WeekDayRow
+import com.tenmilelabs.chefai.mealplans.ui.components.rememberWeekMealDragState
 import com.tenmilelabs.chefai.mealplans.ui.components.WeekNavigator
 import java.time.LocalDate
 import java.util.UUID
@@ -113,6 +114,7 @@ fun MealPlansScreen(
         onNextWeek = viewModel::onNextWeek,
         onMealClick = onMealClick,
         onAddMeal = viewModel::onAddMeal,
+        onMoveMeal = viewModel::onMoveMeal,
         onGenerateGroceryList = onShoppingListClick,
         modifier = modifier,
     )
@@ -128,6 +130,7 @@ private fun MealPlansContent(
     onNextWeek: () -> Unit,
     onMealClick: (PlannedWeekMeal) -> Unit,
     onAddMeal: (LocalDate) -> Unit,
+    onMoveMeal: (PlannedWeekMeal, PlannedWeekMeal) -> Unit,
     onGenerateGroceryList: (UUID) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -156,6 +159,7 @@ private fun MealPlansContent(
             onNextWeek = onNextWeek,
             onMealClick = onMealClick,
             onAddMeal = onAddMeal,
+            onMoveMeal = onMoveMeal,
             onGenerateGroceryList = onGenerateGroceryList,
             modifier = modifier,
         )
@@ -230,9 +234,11 @@ private fun WeekContent(
     onNextWeek: () -> Unit,
     onMealClick: (PlannedWeekMeal) -> Unit,
     onAddMeal: (LocalDate) -> Unit,
+    onMoveMeal: (PlannedWeekMeal, PlannedWeekMeal) -> Unit,
     onGenerateGroceryList: (UUID) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val dragState = rememberWeekMealDragState()
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -257,6 +263,8 @@ private fun WeekContent(
                 isToday = day.date == uiState.today,
                 onMealClick = onMealClick,
                 onAddMeal = onAddMeal,
+                dragState = dragState,
+                onMoveMeal = onMoveMeal,
             )
         }
         SectionRule()
@@ -348,6 +356,7 @@ private fun MealPlansPreview() {
             onNextWeek = {},
             onMealClick = {},
             onAddMeal = {},
+            onMoveMeal = { _, _ -> },
             onGenerateGroceryList = {},
             listState = MealPlanListUiState.Loading,
             viewMode = MealPlansViewMode.WEEK,
@@ -376,6 +385,7 @@ private fun MealPlansEmptyWeekPreview() {
             onNextWeek = {},
             onMealClick = {},
             onAddMeal = {},
+            onMoveMeal = { _, _ -> },
             onGenerateGroceryList = {},
             listState = MealPlanListUiState.Loading,
             viewMode = MealPlansViewMode.WEEK,

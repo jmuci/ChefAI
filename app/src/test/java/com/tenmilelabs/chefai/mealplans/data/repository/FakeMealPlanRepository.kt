@@ -9,6 +9,8 @@ import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import com.tenmilelabs.chefai.mealplans.domain.usecase.MealPlanReorder
+import com.tenmilelabs.chefai.mealplans.domain.usecase.MealRef
 import java.util.UUID
 
 class FakeMealPlanRepository : MealPlanRepository {
@@ -150,6 +152,15 @@ class FakeMealPlanRepository : MealPlanRepository {
                 preferences = it.preferences.copy(planLengthDays = newIndex + 1),
                 days = it.days + day,
             )
+        }
+        return true
+    }
+
+    override suspend fun moveMeal(planId: UUID, from: MealRef, to: MealRef): Boolean {
+        val plan = plans.value.firstOrNull { it.uuid == planId } ?: return false
+        val changed = MealPlanReorder.move(plan.days, from, to)?.associateBy { it.uuid } ?: return false
+        plans.value = plans.value.map {
+            if (it.uuid != planId) it else it.copy(days = it.days.map { d -> changed[d.uuid] ?: d })
         }
         return true
     }

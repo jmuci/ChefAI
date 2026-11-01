@@ -16,7 +16,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +34,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -103,6 +108,7 @@ fun MealPlanDetailScreen(
             state = state,
             onMealClick = onMealClick,
             onToggleCooked = viewModel::onToggleCooked,
+            onMoveMeal = viewModel::onMoveMeal,
             onGenerate = viewModel::onGenerate,
             onShoppingListClick = onShoppingListClick,
             modifier = modifier,
@@ -115,6 +121,7 @@ private fun MealPlanDetailContent(
     state: MealPlanDetailUiState.Success,
     onMealClick: (PlannedMeal) -> Unit,
     onToggleCooked: (PlannedMeal) -> Unit,
+    onMoveMeal: (from: PlannedMeal, to: PlannedMeal) -> Unit,
     onGenerate: () -> Unit,
     onShoppingListClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -125,8 +132,13 @@ private fun MealPlanDetailContent(
     var preferencesExpanded by rememberSaveable { mutableStateOf(preferencesInitiallyExpanded) }
     val isGenerating = state.isGenerating || state.mealPlan.status == MealPlanStatus.GENERATING
 
+    val listState = rememberLazyListState()
+    var draggedKey by remember { mutableStateOf<String?>(null) }
+    var dragOffset by remember { mutableStateOf(0f) }
+
     Column(modifier = modifier.fillMaxSize()) {
         LazyColumn(
+            state = listState,
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp),
         ) {
@@ -154,6 +166,45 @@ private fun MealPlanDetailContent(
                         val date = remember(meal.dayIndex, state.mealPlan.startDate, state.mealPlan.createdAt) {
                             mealPlanDateFor(state.mealPlan, meal.dayIndex)
                         }
+                        val mealKey = "meal-${meal.dayId}-${meal.slot}"
+                        val isDragged = draggedKey == mealKey
+                        // Cooked meals are pinned in place (see MealPlanReorder), so only outstanding
+                        // rows pick up the long-press drag.
+                        val dragModifier = if (meal.isCooked) {
+                            Modifier
+                        } else {
+                            Modifier.pointerInput(mealKey, state.meals) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        draggedKey = mealKey
+                                        dragOffset = 0f
+                                    },
+                                    onDrag = { change, amount ->
+                                        change.consume()
+                                        dragOffset += amount.y
+                                    },
+                                    onDragEnd = {
+                                        val target = listState.layoutInfo.visibleItemsInfo
+                                            .firstOrNull { it.key == mealKey }
+                                            ?.let { dragged ->
+                                                val center = dragged.offset + dragged.size / 2f + dragOffset
+                                                listState.layoutInfo.visibleItemsInfo.firstOrNull {
+                                                    it.key != mealKey &&
+                                                        center >= it.offset && center < it.offset + it.size
+                                                }?.key
+                                            }
+                                            ?.let { key -> state.meals.firstOrNull { "meal-${it.dayId}-${it.slot}" == key } }
+                                        draggedKey = null
+                                        dragOffset = 0f
+                                        if (target != null) onMoveMeal(meal, target)
+                                    },
+                                    onDragCancel = {
+                                        draggedKey = null
+                                        dragOffset = 0f
+                                    },
+                                )
+                            }
+                        }
                         MealPlanMealRow(
                             recipe = meal.recipe,
                             dayAbbreviation = date.shortDayName(),
@@ -163,7 +214,15 @@ private fun MealPlanDetailContent(
                             slotLabel = if (state.showsSlotLabels) meal.slot.label else null,
                             onClick = { onMealClick(meal) },
                             onToggleCooked = { onToggleCooked(meal) },
-                            modifier = Modifier.padding(horizontal = 16.dp),
+                            modifier = Modifier
+                                .then(dragModifier)
+                                .zIndex(if (isDragged) 1f else 0f)
+                                .graphicsLayer {
+                                    translationY = if (isDragged) dragOffset else 0f
+                                    shadowElevation = if (isDragged) 8.dp.toPx() else 0f
+                                }
+                                .background(MaterialTheme.colorScheme.background)
+                                .padding(horizontal = 16.dp),
                         )
                     }
                     item(key = "rule-bottom") { SectionRule() }
@@ -482,6 +541,7 @@ private fun MealPlanDetailLightPreview() {
             state = previewState(),
             onMealClick = {},
             onToggleCooked = {},
+            onMoveMeal = { _, _ -> },
             onGenerate = {},
             onShoppingListClick = {},
         )
@@ -496,6 +556,7 @@ private fun MealPlanDetailDarkPreview() {
             state = previewState(),
             onMealClick = {},
             onToggleCooked = {},
+            onMoveMeal = { _, _ -> },
             onGenerate = {},
             onShoppingListClick = {},
         )
@@ -510,6 +571,7 @@ private fun MealPlanDetailEmptyPreview() {
             state = previewState().copy(board = MealPlanBoard(meals = emptyList())),
             onMealClick = {},
             onToggleCooked = {},
+            onMoveMeal = { _, _ -> },
             onGenerate = {},
             onShoppingListClick = {},
         )
@@ -524,6 +586,7 @@ private fun MealPlanDetailPreferencesLightPreview() {
             state = previewState(),
             onMealClick = {},
             onToggleCooked = {},
+            onMoveMeal = { _, _ -> },
             onGenerate = {},
             onShoppingListClick = {},
             preferencesInitiallyExpanded = true,
@@ -539,6 +602,7 @@ private fun MealPlanDetailPreferencesDarkPreview() {
             state = previewState(),
             onMealClick = {},
             onToggleCooked = {},
+            onMoveMeal = { _, _ -> },
             onGenerate = {},
             onShoppingListClick = {},
             preferencesInitiallyExpanded = true,
