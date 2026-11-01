@@ -17,6 +17,7 @@ class StatusBannerControllerTest {
         assertThat(shown.message).isEqualTo(R.string.status_banner_offline)
         assertThat(shown.tone).isEqualTo(StatusBannerTone.WARNING)
         assertThat(shown.displayDuration).isEqualTo(5.minutes)
+        assertThat(shown.placement).isEqualTo(StatusBannerPlacement.BOTTOM)
     }
 
     @Test

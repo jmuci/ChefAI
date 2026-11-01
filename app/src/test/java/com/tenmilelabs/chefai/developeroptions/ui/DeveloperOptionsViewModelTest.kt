@@ -35,24 +35,27 @@ class DeveloperOptionsViewModelTest {
     )
 
     @Test
-    fun `starts on the local environment and shows its URL`() = runTest {
+    fun `starts on the remote environment by default and shows its URL`() = runTest {
         val viewModel = viewModel(FakeApiEnvironmentRepository())
 
         viewModel.uiState.test {
             val state = awaitItem()
-            assertThat(state.isRemote).isFalse()
-            assertThat(state.activeBaseUrl).isEqualTo("http://10.0.2.2:8080")
+            assertThat(state.isRemote).isTrue()
+            assertThat(state.activeBaseUrl).isEqualTo("https://api.example.com")
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
     fun `turning remote on stores it and shows the remote URL`() = runTest {
-        val repository = FakeApiEnvironmentRepository()
+        val repository = FakeApiEnvironmentRepository(ApiEnvironment.LOCAL)
         val viewModel = viewModel(repository)
 
         viewModel.uiState.test {
-            assertThat(awaitItem().isRemote).isFalse()
+            // Seeded with the (remote) default before the repository flow is collected.
+            var latest = awaitItem()
+            if (latest.isRemote) latest = awaitItem()
+            assertThat(latest.isRemote).isFalse()
 
             viewModel.onAction(DeveloperOptionsAction.UseRemoteEnvironmentChanged(useRemote = true))
 

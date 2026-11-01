@@ -12,8 +12,12 @@ enum class ApiEnvironment {
     REMOTE;
 
     companion object {
-        /** What a debug build starts on — unchanged from before this setting existed. */
-        val DEFAULT: ApiEnvironment = LOCAL
+        /**
+         * What a debug build starts on: the deployed backend, so a fresh install works without a
+         * local server running. [ApiBaseUrls.effective] still drops to [LOCAL] when the build has
+         * no remote configured.
+         */
+        val DEFAULT: ApiEnvironment = REMOTE
 
         /** Stored by [name], so a missing or unknown value falls back to [DEFAULT]. */
         fun fromName(name: String?): ApiEnvironment =

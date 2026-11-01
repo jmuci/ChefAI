@@ -22,6 +22,15 @@ enum class StatusBannerTone {
     ERROR,
 }
 
+/** Where a [StatusBanner] appears. */
+enum class StatusBannerPlacement {
+    /** Drops down from the top edge of the screen, over the content. */
+    TOP,
+
+    /** Surfaces from behind the bottom nav (or from the bottom edge where there is none). */
+    BOTTOM,
+}
+
 /**
  * One message for the app-wide [StatusBanner].
  *
@@ -32,6 +41,7 @@ data class StatusBannerMessage(
     @param:StringRes val message: Int,
     val tone: StatusBannerTone,
     val displayDuration: Duration = DefaultDisplayDuration,
+    val placement: StatusBannerPlacement = StatusBannerPlacement.BOTTOM,
     val id: Long,
 ) {
     companion object {
@@ -41,7 +51,8 @@ data class StatusBannerMessage(
 
 /**
  * App-wide holder for the single [StatusBanner] message. Any ViewModel injects it and calls [show];
- * the banner itself is hosted once, above the bottom nav, in `ChefAINavGraph`.
+ * `ChefAINavGraph` hosts one banner per [StatusBannerPlacement] — above the bottom nav, and over
+ * the top of the screen — and each draws only the messages placed there.
  *
  * Deliberately owns no coroutine scope: the auto-hide countdown runs in the banner's own
  * composition (keyed on [StatusBannerMessage.id]) and calls [dismiss] when it elapses. A newer
@@ -60,8 +71,9 @@ class StatusBannerController @Inject constructor() {
         @StringRes message: Int,
         tone: StatusBannerTone,
         displayDuration: Duration = StatusBannerMessage.DefaultDisplayDuration,
+        placement: StatusBannerPlacement = StatusBannerPlacement.BOTTOM,
     ) {
-        _message.value = StatusBannerMessage(message, tone, displayDuration, id = nextId++)
+        _message.value = StatusBannerMessage(message, tone, displayDuration, placement, id = nextId++)
     }
 
     /**
