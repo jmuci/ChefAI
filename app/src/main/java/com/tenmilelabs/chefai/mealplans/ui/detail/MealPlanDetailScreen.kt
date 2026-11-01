@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
@@ -27,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -35,7 +35,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -65,7 +69,11 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
+import com.tenmilelabs.chefai.mealplans.ui.components.DraggedElevation
+import com.tenmilelabs.chefai.mealplans.ui.components.DropTargetAlpha
+import com.tenmilelabs.chefai.mealplans.ui.components.MealDragHandle
 import com.tenmilelabs.chefai.mealplans.ui.components.MealPlanMealRow
+import com.tenmilelabs.chefai.mealplans.ui.components.reorderDrag
 import com.tenmilelabs.chefai.mealplans.ui.detail.print.printMealPlan
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -134,7 +142,22 @@ private fun MealPlanDetailContent(
 
     val listState = rememberLazyListState()
     var draggedKey by remember { mutableStateOf<String?>(null) }
-    var dragOffset by remember { mutableStateOf(0f) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    var targetKey by remember { mutableStateOf<String?>(null) }
+    val haptics = LocalHapticFeedback.current
+    // Cooked meals are pinned (see MealPlanReorder): they neither move nor take a drop.
+    val outstanding = state.meals.filterNot { it.isCooked }
+    val outstandingByKey = outstanding.associateBy { it.dragKey() }
+
+    /** The outstanding row under the dragged row's centre, or `null` (incl. over its own slot). */
+    fun resolveTarget(mealKey: String): String? {
+        val items = listState.layoutInfo.visibleItemsInfo
+        val dragged = items.firstOrNull { it.key == mealKey } ?: return null
+        val center = dragged.offset + dragged.size / 2f + dragOffset
+        return items.firstOrNull {
+            it.key != mealKey && it.key in outstandingByKey && center >= it.offset && center < it.offset + it.size
+        }?.key as? String
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         LazyColumn(
@@ -160,50 +183,69 @@ private fun MealPlanDetailContent(
                     item(key = "rule-top") { SectionRule() }
                     itemsIndexed(
                         items = state.meals,
-                        key = { _, meal -> "meal-${meal.dayId}-${meal.slot}" },
+                        key = { _, meal -> meal.dragKey() },
                     ) { index, meal ->
                         if (index > 0) RowRule()
                         val date = remember(meal.dayIndex, state.mealPlan.startDate, state.mealPlan.createdAt) {
                             mealPlanDateFor(state.mealPlan, meal.dayIndex)
                         }
-                        val mealKey = "meal-${meal.dayId}-${meal.slot}"
+                        val mealKey = meal.dragKey()
                         val isDragged = draggedKey == mealKey
-                        // Cooked meals are pinned in place (see MealPlanReorder), so only outstanding
-                        // rows pick up the long-press drag.
+                        val isTarget = targetKey == mealKey
+                        val onDragStart = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            draggedKey = mealKey
+                            dragOffset = 0f
+                            targetKey = null
+                        }
+                        val onDrag = { deltaY: Float ->
+                            dragOffset += deltaY
+                            val next = resolveTarget(mealKey)
+                            if (next != targetKey) {
+                                targetKey = next
+                                if (next != null) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                        }
+                        val onDragEnd = {
+                            val target = targetKey?.let(outstandingByKey::get)
+                            draggedKey = null
+                            dragOffset = 0f
+                            targetKey = null
+                            if (target != null) onMoveMeal(meal, target)
+                        }
+                        val onDragCancel = {
+                            draggedKey = null
+                            dragOffset = 0f
+                            targetKey = null
+                        }
                         val dragModifier = if (meal.isCooked) {
                             Modifier
                         } else {
-                            Modifier.pointerInput(mealKey, state.meals) {
-                                detectDragGesturesAfterLongPress(
-                                    onDragStart = {
-                                        draggedKey = mealKey
-                                        dragOffset = 0f
-                                    },
-                                    onDrag = { change, amount ->
-                                        change.consume()
-                                        dragOffset += amount.y
-                                    },
-                                    onDragEnd = {
-                                        val target = listState.layoutInfo.visibleItemsInfo
-                                            .firstOrNull { it.key == mealKey }
-                                            ?.let { dragged ->
-                                                val center = dragged.offset + dragged.size / 2f + dragOffset
-                                                listState.layoutInfo.visibleItemsInfo.firstOrNull {
-                                                    it.key != mealKey &&
-                                                        center >= it.offset && center < it.offset + it.size
-                                                }?.key
-                                            }
-                                            ?.let { key -> state.meals.firstOrNull { "meal-${it.dayId}-${it.slot}" == key } }
-                                        draggedKey = null
-                                        dragOffset = 0f
-                                        if (target != null) onMoveMeal(meal, target)
-                                    },
-                                    onDragCancel = {
-                                        draggedKey = null
-                                        dragOffset = 0f
-                                    },
+                            val position = outstanding.indexOf(meal)
+                            val previous = outstanding.getOrNull(position - 1)
+                            val next = outstanding.getOrNull(position + 1)
+                            val moveEarlier = stringResource(R.string.meal_plan_move_earlier)
+                            val moveLater = stringResource(R.string.meal_plan_move_later)
+                            Modifier
+                                .reorderDrag(
+                                    key = mealKey,
+                                    afterLongPress = true,
+                                    onStart = onDragStart,
+                                    onDrag = onDrag,
+                                    onEnd = onDragEnd,
+                                    onCancel = onDragCancel,
                                 )
-                            }
+                                // A drag is unreachable from TalkBack; these are its alternative.
+                                .semantics {
+                                    customActions = listOfNotNull(
+                                        previous?.let {
+                                            CustomAccessibilityAction(moveEarlier) { onMoveMeal(meal, it); true }
+                                        },
+                                        next?.let {
+                                            CustomAccessibilityAction(moveLater) { onMoveMeal(meal, it); true }
+                                        },
+                                    )
+                                }
                         }
                         MealPlanMealRow(
                             recipe = meal.recipe,
@@ -214,15 +256,39 @@ private fun MealPlanDetailContent(
                             slotLabel = if (state.showsSlotLabels) meal.slot.label else null,
                             onClick = { onMealClick(meal) },
                             onToggleCooked = { onToggleCooked(meal) },
+                            dragHandle = if (meal.isCooked) {
+                                null
+                            } else {
+                                {
+                                    MealDragHandle(
+                                        modifier = Modifier.reorderDrag(
+                                            key = mealKey,
+                                            afterLongPress = false,
+                                            onStart = onDragStart,
+                                            onDrag = onDrag,
+                                            onEnd = onDragEnd,
+                                            onCancel = onDragCancel,
+                                        ),
+                                    )
+                                }
+                            },
                             modifier = Modifier
                                 .then(dragModifier)
                                 .zIndex(if (isDragged) 1f else 0f)
                                 .graphicsLayer {
                                     translationY = if (isDragged) dragOffset else 0f
-                                    shadowElevation = if (isDragged) 8.dp.toPx() else 0f
+                                    shadowElevation = if (isDragged) DraggedElevation.toPx() else 0f
                                 }
-                                .background(MaterialTheme.colorScheme.background)
-                                .padding(horizontal = 16.dp),
+                                .background(
+                                    if (isTarget) {
+                                        MaterialTheme.colorScheme.primary.copy(alpha = DropTargetAlpha)
+                                    } else {
+                                        MaterialTheme.colorScheme.background
+                                    },
+                                )
+                                // The trailing grip brings its own 48dp target, so the end inset shrinks
+                                // to keep the icon on the 16dp content edge.
+                                .padding(start = 16.dp, end = if (meal.isCooked) 16.dp else 2.dp),
                         )
                     }
                     item(key = "rule-bottom") { SectionRule() }
@@ -251,6 +317,9 @@ private fun MealPlanDetailContent(
         }
     }
 }
+
+/** Stable across reorders: a (day, slot) position, not the recipe that currently fills it. */
+private fun PlannedMeal.dragKey(): String = "meal-$dayId-$slot"
 
 private fun LocalDate.shortDayName(): String =
     dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()).uppercase()
