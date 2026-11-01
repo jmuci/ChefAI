@@ -99,6 +99,19 @@ internal object ModernistPalette {
      */
     val NavShade = Color(0x14201E1D)
 
+    /**
+     * Status banner fills — the **only hues outside the mono ramp**, on purpose: an app-wide
+     * error/warning banner has to read as "something went wrong" at a glance, which the deep
+     * accent step that stands in for `colorScheme.error` cannot do on its own. Used by
+     * `core/ui/banner/StatusBanner` and nowhere else.
+     *
+     * Red takes [Ground]-colored text (5.6:1); the yellow is too light for that and takes
+     * [Neutral900] (10.6:1). Shared by light and dark — a saturated fill reads the same on either
+     * ground.
+     */
+    val BannerErrorRed = Color(0xFFC62828)
+    val BannerWarningYellow = Color(0xFFF2C230)
+
     // ── Dark — PROVISIONAL ────────────────────────────────────────────────────────────────────
     // TODO(dark): none of the values below were designed. The handoff ships a light palette only
     //  and says explicitly: build light exactly, keep dark compiling, do not invent a dark palette.

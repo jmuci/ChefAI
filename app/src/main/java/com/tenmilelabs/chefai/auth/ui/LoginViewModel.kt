@@ -8,6 +8,9 @@ import com.tenmilelabs.chefai.auth.data.local.SecurePreferencesInterface
 import com.tenmilelabs.chefai.auth.data.network.AuthHttpException
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
+import com.tenmilelabs.chefai.core.data.sync.ConnectivityObserver
+import com.tenmilelabs.chefai.core.ui.banner.StatusBannerController
+import com.tenmilelabs.chefai.core.ui.banner.StatusBannerTone
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,9 +21,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.io.IOException
-import java.net.ConnectException
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
 import javax.inject.Inject
 
 /**
@@ -61,7 +61,9 @@ sealed interface LoginUiEvent {
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val sessionManager: SessionManager,
-    private val securePreferences: SecurePreferencesInterface
+    private val securePreferences: SecurePreferencesInterface,
+    private val statusBanner: StatusBannerController,
+    private val connectivity: ConnectivityObserver,
 ) : ViewModel() {
 
     private val testAccounts: List<EmailSuggestion> = if (BuildConfig.DEBUG) {
@@ -179,35 +181,11 @@ class LoginViewModel @Inject constructor(
 
     private suspend fun handleLoginError(exception: Throwable) {
         when (exception) {
-            // Network connectivity errors - show snackbar
-            is UnknownHostException -> {
-                _uiEvent.emit(
-                    LoginUiEvent.ShowSnackbar(
-                        R.string.error_network_unavailable
-                    )
-                )
-            }
-            is ConnectException -> {
-                _uiEvent.emit(
-                    LoginUiEvent.ShowSnackbar(
-                        R.string.error_network_unavailable
-                    )
-                )
-            }
-            is SocketTimeoutException -> {
-                _uiEvent.emit(
-                    LoginUiEvent.ShowSnackbar(
-                        R.string.error_connection_timeout
-                    )
-                )
-            }
-            is IOException -> {
-                _uiEvent.emit(
-                    LoginUiEvent.ShowSnackbar(
-                        R.string.error_network_error
-                    )
-                )
-            }
+            // Couldn't reach the backend at all (no route, refused, timed out, …). Whether that's
+            // the phone or the server is what the user needs to know, so ask the connectivity
+            // monitor rather than guessing from the exception type: an UnknownHostException, for
+            // one, is what both a dead Wi-Fi and a DNS outage on our side look like.
+            is IOException -> reportUnreachableBackend()
             // HTTP errors - might need field-specific or general error
             is AuthHttpException -> {
                 when (exception.statusCode) {
@@ -227,14 +205,7 @@ class LoginViewModel @Inject constructor(
                             )
                         }
                     }
-                    500, 502, 503 -> {
-                        // Server errors - show as snackbar
-                        _uiEvent.emit(
-                            LoginUiEvent.ShowSnackbar(
-                                R.string.error_server_error
-                            )
-                        )
-                    }
+                    500, 502, 503 -> reportUnreachableBackend()
                     else -> {
                         // Other HTTP errors
                         _uiEvent.emit(
@@ -253,6 +224,15 @@ class LoginViewModel @Inject constructor(
                     )
                 )
             }
+        }
+    }
+
+    /** Banner, not snackbar: the yellow "offline" warning when the phone has no network, else red. */
+    private fun reportUnreachableBackend() {
+        if (connectivity.isOnline.value) {
+            statusBanner.show(R.string.status_banner_server_error, StatusBannerTone.ERROR)
+        } else {
+            statusBanner.show(R.string.status_banner_offline, StatusBannerTone.WARNING)
         }
     }
 

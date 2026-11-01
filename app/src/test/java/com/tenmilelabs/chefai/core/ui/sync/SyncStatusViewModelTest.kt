@@ -1,12 +1,10 @@
 package com.tenmilelabs.chefai.core.ui.sync
 
-import com.tenmilelabs.chefai.core.data.sync.ConnectivityObserver
+import com.tenmilelabs.chefai.core.data.sync.FakeConnectivityObserver
 import com.tenmilelabs.chefai.core.data.sync.SyncStatus
 import com.tenmilelabs.chefai.core.data.sync.SyncStatusHolder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -117,17 +115,5 @@ class SyncStatusViewModelTest {
 
         fakeConnectivity.setOnline(true)
         assertEquals(SyncDisplayStatus.Error("Connection lost"), viewModel.displayStatus.first())
-    }
-}
-
-/**
- * Fake [ConnectivityObserver] that exposes a mutable [isOnline] flow for tests.
- */
-private class FakeConnectivityObserver : ConnectivityObserver {
-    private val _isOnline = MutableStateFlow(true)
-    override val isOnline: StateFlow<Boolean> get() = _isOnline
-
-    fun setOnline(online: Boolean) {
-        _isOnline.value = online
     }
 }

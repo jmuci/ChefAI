@@ -100,6 +100,12 @@ data class ChefColors(
      * [Color.Transparent] in dark, where shadows read as noise and tone does the work.
      */
     val navShade: Color,
+    /** The error [com.tenmilelabs.chefai.core.ui.banner.StatusBanner]'s fill, and the text on it. */
+    val bannerError: Color,
+    val onBannerError: Color,
+    /** The warning [com.tenmilelabs.chefai.core.ui.banner.StatusBanner]'s fill, and the text on it. */
+    val bannerWarning: Color,
+    val onBannerWarning: Color,
     val sectionRuleWidth: Dp,
     val rowRuleWidth: Dp,
     val cornerRadius: Dp,
@@ -141,6 +147,10 @@ internal val LightChefColors = ChefColors(
     navIndicator = ModernistPalette.Accent100,
     navActiveContent = ModernistPalette.Accent700,
     navShade = ModernistPalette.NavShade,
+    bannerError = ModernistPalette.BannerErrorRed,
+    onBannerError = ModernistPalette.Ground,
+    bannerWarning = ModernistPalette.BannerWarningYellow,
+    onBannerWarning = ModernistPalette.Neutral900,
     sectionRuleWidth = ChefRuleWidths.Section,
     rowRuleWidth = ChefRuleWidths.Row,
     cornerRadius = ChefRuleWidths.CornerRadius,
@@ -211,6 +221,11 @@ internal val DarkChefColors = ChefColors(
     navIndicator = ModernistPalette.Accent800,
     navActiveContent = ModernistPalette.Accent300,
     navShade = Color.Transparent,
+    // Theme-invariant: saturated fills read the same on either ground. See ModernistPalette.
+    bannerError = ModernistPalette.BannerErrorRed,
+    onBannerError = ModernistPalette.Ground,
+    bannerWarning = ModernistPalette.BannerWarningYellow,
+    onBannerWarning = ModernistPalette.Neutral900,
     // Theme-invariant: a rule is the same weight on any ground. Only its color changes.
     sectionRuleWidth = ChefRuleWidths.Section,
     rowRuleWidth = ChefRuleWidths.Row,
