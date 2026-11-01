@@ -6,8 +6,12 @@ import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Scaffold
 import com.tenmilelabs.chefai.core.ui.banner.StatusBanner
+import com.tenmilelabs.chefai.core.ui.banner.StatusBannerPlacement
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
@@ -513,242 +517,253 @@ fun ChefAINavGraph(
         }
     }
 
-    Scaffold(
-        modifier,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            // Don't show the generic Back bar on login, register, the wizard's own-header
-            // screens, accept-invite, the import/editor screens, or a recipe's details —
-            // accept-invite draws its own close (X) header (screen 12's "you came *to* this screen
-            // and will leave without a trail" shape rather than Back), the import and editor
-            // screens do the same (Close X, plus the editor's Draft tag), and recipe details (05)
-            // draws its back arrow overlaid on its full-bleed hero image instead, which a generic
-            // bar above it would duplicate.
-            if (currentRoute != AppDestinations.LOGIN.route &&
-                currentRoute != AppDestinations.REGISTER.route &&
-                currentRoute != AppDestinations.ACCEPT_INVITE.route &&
-                currentRoute !in recipeDetailRoutes &&
-                currentRoute !in ownHeaderRoutes &&
-                currentRoute !in wizardRoutes
-            ) {
-                val navigation = if (!isTopLevelDestination) {
-                    ChefAINavigation.Back {
-                        // Route through the system back dispatcher rather than
-                        // popping directly, so screens with their own BackHandler
-                        // (e.g. RecipeEditorScreen's unsaved-changes check) get a
-                        // chance to intercept before the back stack is popped.
-                        backPressedDispatcher?.onBackPressed()
-                            ?: navController.popBackStack()
+    Box(modifier) {
+        Scaffold(
+            Modifier.fillMaxSize(),
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            topBar = {
+                // Don't show the generic Back bar on login, register, the wizard's own-header
+                // screens, accept-invite, the import/editor screens, or a recipe's details —
+                // accept-invite draws its own close (X) header (screen 12's "you came *to* this screen
+                // and will leave without a trail" shape rather than Back), the import and editor
+                // screens do the same (Close X, plus the editor's Draft tag), and recipe details (05)
+                // draws its back arrow overlaid on its full-bleed hero image instead, which a generic
+                // bar above it would duplicate.
+                if (currentRoute != AppDestinations.LOGIN.route &&
+                    currentRoute != AppDestinations.REGISTER.route &&
+                    currentRoute != AppDestinations.ACCEPT_INVITE.route &&
+                    currentRoute !in recipeDetailRoutes &&
+                    currentRoute !in ownHeaderRoutes &&
+                    currentRoute !in wizardRoutes
+                ) {
+                    val navigation = if (!isTopLevelDestination) {
+                        ChefAINavigation.Back {
+                            // Route through the system back dispatcher rather than
+                            // popping directly, so screens with their own BackHandler
+                            // (e.g. RecipeEditorScreen's unsaved-changes check) get a
+                            // chance to intercept before the back stack is popped.
+                            backPressedDispatcher?.onBackPressed()
+                                ?: navController.popBackStack()
+                        }
+                    } else {
+                        ChefAINavigation.None
                     }
-                } else {
-                    ChefAINavigation.None
-                }
-                val profileMenu: @Composable () -> Unit = {
-                    UserProfileMenu(
-                        // Detail screens (meal plan, shopping list, household) are keyed by id, not
-                        // by session, so they would keep rendering the departed account's data
-                        // for the new guest. Clear the whole back stack down to Home.
-                        onLogout = { navActions.navigateToHome() },
-                        onLogin = { navActions.navigateToLogin() },
-                        onSettings = { navActions.navigateToSettings() },
-                        onHousehold = { navActions.navigateToHousehold() },
-                    )
-                }
-                val trailingActions: @Composable RowScope.() -> Unit = {
-                    // Sync status indicator (hidden when idle)
-                    SyncStatusIndicator()
-                    // User profile menu on the right side
-                    profileMenu()
-                }
+                    val profileMenu: @Composable () -> Unit = {
+                        UserProfileMenu(
+                            // Detail screens (meal plan, shopping list, household) are keyed by id, not
+                            // by session, so they would keep rendering the departed account's data
+                            // for the new guest. Clear the whole back stack down to Home.
+                            onLogout = { navActions.navigateToHome() },
+                            onLogin = { navActions.navigateToLogin() },
+                            onSettings = { navActions.navigateToSettings() },
+                            onHousehold = { navActions.navigateToHousehold() },
+                        )
+                    }
+                    val trailingActions: @Composable RowScope.() -> Unit = {
+                        // Sync status indicator (hidden when idle)
+                        SyncStatusIndicator()
+                        // User profile menu on the right side
+                        profileMenu()
+                    }
 
+                    when (currentRoute) {
+                        AppDestinations.HOME.route -> {
+                            // "ChefAI" wordmark + today's date (01) — the one other screen using
+                            // ChefAITopAppBarWithSubtitle, alongside meal-plan detail below. The app
+                            // name, not titleRes ("Home"): the design shows the wordmark here, not a
+                            // screen title.
+                            ChefAITopAppBarWithSubtitle(
+                                title = stringResource(R.string.app_name),
+                                subtitle = homeDateSubtitle(),
+                                navigation = navigation,
+                                // Home is the paneled screen: the header continues the page its
+                                // panels sit on rather than the plain ground.
+                                containerColor = MaterialTheme.chefColors.panelGround,
+                                actions = trailingActions,
+                            )
+                        }
+                        AppDestinations.MEAL_PLANS.route -> {
+                            // The Week / Plans toggle lives in the header, so the tab's view model is
+                            // hoisted here the same way the plan detail's is.
+                            navController.currentBackStackEntry?.let { entry ->
+                                val weekViewModel: MealPlansViewModel = hiltViewModel(entry)
+                                val viewMode by weekViewModel.viewMode.collectAsStateWithLifecycle()
+                                ChefAITopAppBar(
+                                    title = stringResource(titleRes),
+                                    navigation = navigation,
+                                    actions = {
+                                        MealPlansViewToggle(
+                                            mode = viewMode,
+                                            onModeChange = weekViewModel::onViewModeChange,
+                                        )
+                                        trailingActions()
+                                    },
+                                )
+                            }
+                        }
+                        AppDestinations.MEAL_PLAN_DETAIL.route -> {
+                            // The plan's name/date-range/sharing subtitle (16) needs the same state the
+                            // print action already reads here, so both come from one hoisted view model.
+                            navController.currentBackStackEntry?.let { entry ->
+                                val detailViewModel: MealPlanDetailViewModel = hiltViewModel(entry)
+                                val detailState by detailViewModel.uiState.collectAsStateWithLifecycle()
+                                val success = detailState as? MealPlanDetailUiState.Success
+                                var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
+                                if (showDeleteConfirm) {
+                                    DeleteMealPlanDialog(
+                                        onConfirm = {
+                                            showDeleteConfirm = false
+                                            detailViewModel.onDeleteConfirmed()
+                                        },
+                                        onDismiss = { showDeleteConfirm = false },
+                                    )
+                                }
+                                ChefAITopAppBarWithSubtitle(
+                                    title = success?.mealPlan?.name ?: stringResource(titleRes),
+                                    subtitle = success?.let {
+                                        mealPlanDetailSubtitle(it.mealPlan, it.ownerDisplayName)
+                                    }.orEmpty(),
+                                    navigation = navigation,
+                                    actions = {
+                                        if ((success?.totalCount ?: 0) > 0) {
+                                            IconButton(onClick = { detailViewModel.onPrintClick() }) {
+                                                Icon(
+                                                    painter = painterResource(ChefAIIcons.Printer),
+                                                    contentDescription = stringResource(R.string.meal_plan_print),
+                                                )
+                                            }
+                                        }
+                                        // Replaces the sync indicator here: deleting a plan is the
+                                        // action this screen needs, and the sync state is not.
+                                        if (success != null) {
+                                            IconButton(onClick = { showDeleteConfirm = true }) {
+                                                Icon(
+                                                    painter = painterResource(ChefAIIcons.Trash),
+                                                    contentDescription = stringResource(R.string.meal_plan_delete),
+                                                )
+                                            }
+                                        }
+                                        profileMenu()
+                                    },
+                                )
+                            }
+                        }
+                        AppDestinations.MEAL_PLAN_SHOPPING_LIST.route -> {
+                            navController.currentBackStackEntry?.let { entry ->
+                                val listViewModel: ShoppingListViewModel = hiltViewModel(entry)
+                                val listState by listViewModel.uiState.collectAsStateWithLifecycle()
+                                val checkedCount = (listState as? ShoppingListUiState.Success)
+                                    ?.list?.checkedCount ?: 0
+                                ChefAITopAppBar(
+                                    title = stringResource(titleRes),
+                                    navigation = navigation,
+                                    actions = {
+                                        if (checkedCount > 0) {
+                                            FlatButton(
+                                                text = stringResource(R.string.shopping_list_uncheck_all),
+                                                onClick = { listViewModel.onUncheckAll() },
+                                                variant = FlatButtonVariant.Ghost,
+                                            )
+                                        }
+                                        trailingActions()
+                                    },
+                                )
+                            }
+                        }
+                        else -> {
+                            ChefAITopAppBar(
+                                title = stringResource(titleRes),
+                                navigation = navigation,
+                                containerColor = if (currentRoute in paneledRoutes) {
+                                    MaterialTheme.chefColors.panelGround
+                                } else {
+                                    MaterialTheme.colorScheme.background
+                                },
+                                actions = trailingActions,
+                            )
+                        }
+                    }
+                }
+            },
+            bottomBar = {
+                val hideNav = currentRoute == AppDestinations.LOGIN.route ||
+                    currentRoute == AppDestinations.REGISTER.route ||
+                    currentRoute == AppDestinations.IMPORT_RECIPE.route ||
+                    currentRoute == AppDestinations.RECIPE_PICKER.route ||
+                    currentRoute == AppDestinations.ACCEPT_INVITE.route ||
+                    currentRoute in wizardRoutes
+                val showBottomNav = !hideNav && !isExpanded
+                // The status banner rides on top of the bottom nav, in the same slot, so it surfaces
+                // from behind the bar and the Scaffold pads the content clear of both.
+                Column {
+                    StatusBanner(
+                        placement = StatusBannerPlacement.BOTTOM,
+                        insetForNavigationBar = !showBottomNav,
+                    )
+                    if (showBottomNav) {
+                        BottomNavigationBar(navController)
+                    }
+                }
+            },
+            floatingActionButton = {
                 when (currentRoute) {
-                    AppDestinations.HOME.route -> {
-                        // "ChefAI" wordmark + today's date (01) — the one other screen using
-                        // ChefAITopAppBarWithSubtitle, alongside meal-plan detail below. The app
-                        // name, not titleRes ("Home"): the design shows the wordmark here, not a
-                        // screen title.
-                        ChefAITopAppBarWithSubtitle(
-                            title = stringResource(R.string.app_name),
-                            subtitle = homeDateSubtitle(),
-                            navigation = navigation,
-                            // Home is the paneled screen: the header continues the page its
-                            // panels sit on rather than the plain ground.
-                            containerColor = MaterialTheme.chefColors.panelGround,
-                            actions = trailingActions,
+                    AppDestinations.RECIPES.route -> {
+                        FloatingActionButtonMenu(
+                            expanded = isFabMenuExpanded,
+                            onExpandedChange = {
+                                isFabMenuExpanded = !isFabMenuExpanded
+                            },
+                            onCreateRecipeClick = {
+                                isFabMenuExpanded = false
+                                navActions.navigateToCreateRecipe()
+                            },
+                            onImportRecipeClick = {
+                                isFabMenuExpanded = false
+                                navActions.navigateToImportRecipe()
+                            }
                         )
                     }
                     AppDestinations.MEAL_PLANS.route -> {
-                        // The Week / Plans toggle lives in the header, so the tab's view model is
-                        // hoisted here the same way the plan detail's is.
-                        navController.currentBackStackEntry?.let { entry ->
-                            val weekViewModel: MealPlansViewModel = hiltViewModel(entry)
-                            val viewMode by weekViewModel.viewMode.collectAsStateWithLifecycle()
-                            ChefAITopAppBar(
-                                title = stringResource(titleRes),
-                                navigation = navigation,
-                                actions = {
-                                    MealPlansViewToggle(
-                                        mode = viewMode,
-                                        onModeChange = weekViewModel::onViewModeChange,
-                                    )
-                                    trailingActions()
-                                },
-                            )
-                        }
-                    }
-                    AppDestinations.MEAL_PLAN_DETAIL.route -> {
-                        // The plan's name/date-range/sharing subtitle (16) needs the same state the
-                        // print action already reads here, so both come from one hoisted view model.
-                        navController.currentBackStackEntry?.let { entry ->
-                            val detailViewModel: MealPlanDetailViewModel = hiltViewModel(entry)
-                            val detailState by detailViewModel.uiState.collectAsStateWithLifecycle()
-                            val success = detailState as? MealPlanDetailUiState.Success
-                            var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
-                            if (showDeleteConfirm) {
-                                DeleteMealPlanDialog(
-                                    onConfirm = {
-                                        showDeleteConfirm = false
-                                        detailViewModel.onDeleteConfirmed()
-                                    },
-                                    onDismiss = { showDeleteConfirm = false },
-                                )
-                            }
-                            ChefAITopAppBarWithSubtitle(
-                                title = success?.mealPlan?.name ?: stringResource(titleRes),
-                                subtitle = success?.let {
-                                    mealPlanDetailSubtitle(it.mealPlan, it.ownerDisplayName)
-                                }.orEmpty(),
-                                navigation = navigation,
-                                actions = {
-                                    if ((success?.totalCount ?: 0) > 0) {
-                                        IconButton(onClick = { detailViewModel.onPrintClick() }) {
-                                            Icon(
-                                                painter = painterResource(ChefAIIcons.Printer),
-                                                contentDescription = stringResource(R.string.meal_plan_print),
-                                            )
-                                        }
-                                    }
-                                    // Replaces the sync indicator here: deleting a plan is the
-                                    // action this screen needs, and the sync state is not.
-                                    if (success != null) {
-                                        IconButton(onClick = { showDeleteConfirm = true }) {
-                                            Icon(
-                                                painter = painterResource(ChefAIIcons.Trash),
-                                                contentDescription = stringResource(R.string.meal_plan_delete),
-                                            )
-                                        }
-                                    }
-                                    profileMenu()
-                                },
-                            )
-                        }
-                    }
-                    AppDestinations.MEAL_PLAN_SHOPPING_LIST.route -> {
-                        navController.currentBackStackEntry?.let { entry ->
-                            val listViewModel: ShoppingListViewModel = hiltViewModel(entry)
-                            val listState by listViewModel.uiState.collectAsStateWithLifecycle()
-                            val checkedCount = (listState as? ShoppingListUiState.Success)
-                                ?.list?.checkedCount ?: 0
-                            ChefAITopAppBar(
-                                title = stringResource(titleRes),
-                                navigation = navigation,
-                                actions = {
-                                    if (checkedCount > 0) {
-                                        FlatButton(
-                                            text = stringResource(R.string.shopping_list_uncheck_all),
-                                            onClick = { listViewModel.onUncheckAll() },
-                                            variant = FlatButtonVariant.Ghost,
-                                        )
-                                    }
-                                    trailingActions()
-                                },
-                            )
-                        }
-                    }
-                    else -> {
-                        ChefAITopAppBar(
-                            title = stringResource(titleRes),
-                            navigation = navigation,
-                            containerColor = if (currentRoute in paneledRoutes) {
-                                MaterialTheme.chefColors.panelGround
-                            } else {
-                                MaterialTheme.colorScheme.background
+                        val weekViewModel: MealPlansViewModel? = navController.currentBackStackEntry?.let { hiltViewModel(it) }
+                        FloatingActionButton(
+                            onClick = {
+                                navActions.navigateToMealPlanWizard(weekStart = weekViewModel?.browsedWeekStart())
                             },
-                            actions = trailingActions,
-                        )
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Create meal plan",
+                            )
+                        }
                     }
                 }
             }
-        },
-        bottomBar = {
+        ) { innerPadding ->
             val hideNav = currentRoute == AppDestinations.LOGIN.route ||
                 currentRoute == AppDestinations.REGISTER.route ||
                 currentRoute == AppDestinations.IMPORT_RECIPE.route ||
                 currentRoute == AppDestinations.RECIPE_PICKER.route ||
                 currentRoute == AppDestinations.ACCEPT_INVITE.route ||
                 currentRoute in wizardRoutes
-            val showBottomNav = !hideNav && !isExpanded
-            // The status banner rides on top of the bottom nav, in the same slot, so it surfaces
-            // from behind the bar and the Scaffold pads the content clear of both.
-            Column {
-                StatusBanner(insetForNavigationBar = !showBottomNav)
-                if (showBottomNav) {
-                    BottomNavigationBar(navController)
-                }
-            }
-        },
-        floatingActionButton = {
-            when (currentRoute) {
-                AppDestinations.RECIPES.route -> {
-                    FloatingActionButtonMenu(
-                        expanded = isFabMenuExpanded,
-                        onExpandedChange = {
-                            isFabMenuExpanded = !isFabMenuExpanded
-                        },
-                        onCreateRecipeClick = {
-                            isFabMenuExpanded = false
-                            navActions.navigateToCreateRecipe()
-                        },
-                        onImportRecipeClick = {
-                            isFabMenuExpanded = false
-                            navActions.navigateToImportRecipe()
-                        }
-                    )
-                }
-                AppDestinations.MEAL_PLANS.route -> {
-                    val weekViewModel: MealPlansViewModel? = navController.currentBackStackEntry?.let { hiltViewModel(it) }
-                    FloatingActionButton(
-                        onClick = {
-                            navActions.navigateToMealPlanWizard(weekStart = weekViewModel?.browsedWeekStart())
-                        },
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Create meal plan",
-                        )
-                    }
-                }
-            }
-        }
-    ) { innerPadding ->
-        val hideNav = currentRoute == AppDestinations.LOGIN.route ||
-            currentRoute == AppDestinations.REGISTER.route ||
-            currentRoute == AppDestinations.IMPORT_RECIPE.route ||
-            currentRoute == AppDestinations.RECIPE_PICKER.route ||
-            currentRoute == AppDestinations.ACCEPT_INVITE.route ||
-            currentRoute in wizardRoutes
 
-        Row(modifier = Modifier.padding(innerPadding)) {
-            if (isExpanded && !hideNav) {
-                NavigationRailBar(navController)
+            Row(modifier = Modifier.padding(innerPadding)) {
+                if (isExpanded && !hideNav) {
+                    NavigationRailBar(navController)
+                }
+                NavHost(
+                    navController = navController,
+                    graph = graph,
+                    modifier = Modifier.weight(1f)
+                )
             }
-            NavHost(
-                navController = navController,
-                graph = graph,
-                modifier = Modifier.weight(1f)
-            )
         }
+
+        // Outside the Scaffold, so it can drop down over the top bar and fill in behind the status bar.
+        StatusBanner(
+            placement = StatusBannerPlacement.TOP,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
     }
 
 }

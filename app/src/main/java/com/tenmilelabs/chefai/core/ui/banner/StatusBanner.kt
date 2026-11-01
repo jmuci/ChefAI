@@ -4,6 +4,8 @@ import android.content.res.Configuration.UI_MODE_NIGHT_YES
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -61,22 +64,28 @@ class StatusBannerViewModel @Inject constructor(
 }
 
 /**
- * The app-wide status banner: a full-width strip that surfaces from behind the bottom nav (it
- * grows upward from the nav's top edge, so it reads as sliding out from under it) and hides itself
- * after [StatusBannerMessage.displayDuration], or on tap of its close button.
+ * The app-wide status banner: a full-width strip that hides itself after
+ * [StatusBannerMessage.displayDuration], or on tap of its close button. It draws only the
+ * messages whose [StatusBannerMessage.placement] matches [placement]:
  *
- * Host it once, directly above the bottom nav. Where no nav is drawn below it (login, wizards, the
- * expanded-width rail layout), pass [insetForNavigationBar] so it clears the system nav bar itself.
+ * - [StatusBannerPlacement.BOTTOM] — host it directly above the bottom nav. It grows upward from
+ *   the nav's top edge, so it reads as sliding out from under it. Where no nav is drawn below it
+ *   (login, wizards, the expanded-width rail layout), pass [insetForNavigationBar] so it clears the
+ *   system nav bar itself.
+ * - [StatusBannerPlacement.TOP] — host it as an overlay pinned to the top of the screen. It drops
+ *   down over the content and fills in behind the status bar.
  */
 @Composable
 fun StatusBanner(
-    insetForNavigationBar: Boolean,
+    placement: StatusBannerPlacement,
     modifier: Modifier = Modifier,
+    insetForNavigationBar: Boolean = false,
     viewModel: StatusBannerViewModel = hiltViewModel(),
 ) {
     val message by viewModel.message.collectAsStateWithLifecycle()
     StatusBannerContent(
-        message = message,
+        allMessages = message,
+        placement = placement,
         insetForNavigationBar = insetForNavigationBar,
         onDismiss = viewModel::dismiss,
         modifier = modifier,
@@ -86,12 +95,15 @@ fun StatusBanner(
 /** Stateless content, hoisted out of [StatusBanner] so it's previewable without Hilt. */
 @Composable
 internal fun StatusBannerContent(
-    message: StatusBannerMessage?,
+    allMessages: StatusBannerMessage?,
+    placement: StatusBannerPlacement,
     insetForNavigationBar: Boolean,
     onDismiss: (id: Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val currentOnDismiss by rememberUpdatedState(onDismiss)
+    // The other placement's host owns that message — including its countdown.
+    val message = allMessages?.takeIf { it.placement == placement }
 
     // Keyed on the id, not the message, so re-showing the same text restarts the countdown.
     LaunchedEffect(message?.id) {
@@ -108,15 +120,26 @@ internal fun StatusBannerContent(
     AnimatedVisibility(
         visible = message != null,
         modifier = modifier.fillMaxWidth(),
-        // Grow from the top edge with the content pinned to it: the banner's top appears at the
-        // nav's seam and rises, its lower part still "behind" the nav until fully revealed.
-        enter = expandVertically(expandFrom = Alignment.Top),
-        exit = shrinkVertically(shrinkTowards = Alignment.Top),
+        enter = when (placement) {
+            // Slides down from above the screen's top edge, over the content.
+            StatusBannerPlacement.TOP -> slideInVertically { fullHeight -> -fullHeight }
+            // Grow from the top edge with the content pinned to it: the banner's top appears at
+            // the nav's seam and rises, its lower part still "behind" the nav until fully revealed.
+            StatusBannerPlacement.BOTTOM -> expandVertically(expandFrom = Alignment.Top)
+        },
+        exit = when (placement) {
+            StatusBannerPlacement.TOP -> slideOutVertically { fullHeight -> -fullHeight }
+            StatusBannerPlacement.BOTTOM -> shrinkVertically(shrinkTowards = Alignment.Top)
+        },
     ) {
         lastShown.value?.let { shown ->
             StatusBannerStrip(
                 message = shown,
-                insetForNavigationBar = insetForNavigationBar,
+                insets = when {
+                    placement == StatusBannerPlacement.TOP -> WindowInsets.statusBars
+                    insetForNavigationBar -> WindowInsets.navigationBars
+                    else -> null
+                },
                 onDismiss = { currentOnDismiss(shown.id) },
             )
         }
@@ -128,7 +151,8 @@ private class LastShown(var value: StatusBannerMessage? = null)
 @Composable
 private fun StatusBannerStrip(
     message: StatusBannerMessage,
-    insetForNavigationBar: Boolean,
+    /** System bars the strip's fill extends behind, padding its content clear of them. */
+    insets: WindowInsets?,
     onDismiss: () -> Unit,
 ) {
     val (container, content) = message.tone.colors()
@@ -136,9 +160,7 @@ private fun StatusBannerStrip(
         modifier = Modifier
             .fillMaxWidth()
             .background(container)
-            .then(
-                if (insetForNavigationBar) Modifier.windowInsetsPadding(WindowInsets.navigationBars) else Modifier
-            ),
+            .then(if (insets != null) Modifier.windowInsetsPadding(insets) else Modifier),
     ) {
         Row(
             modifier = Modifier
@@ -189,7 +211,7 @@ private fun StatusBannerPreview() {
         Column {
             StatusBannerTone.entries.forEachIndexed { index, tone ->
                 StatusBannerContent(
-                    message = StatusBannerMessage(
+                    allMessages = StatusBannerMessage(
                         message = when (tone) {
                             StatusBannerTone.WARNING -> R.string.status_banner_offline
                             else -> R.string.status_banner_server_error
@@ -197,6 +219,7 @@ private fun StatusBannerPreview() {
                         tone = tone,
                         id = index.toLong(),
                     ),
+                    placement = StatusBannerPlacement.BOTTOM,
                     insetForNavigationBar = false,
                     onDismiss = {},
                 )

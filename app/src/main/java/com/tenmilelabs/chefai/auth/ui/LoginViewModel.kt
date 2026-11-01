@@ -10,6 +10,7 @@ import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.core.data.sync.ConnectivityObserver
 import com.tenmilelabs.chefai.core.ui.banner.StatusBannerController
+import com.tenmilelabs.chefai.core.ui.banner.StatusBannerPlacement
 import com.tenmilelabs.chefai.core.ui.banner.StatusBannerTone
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -22,6 +23,10 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.io.IOException
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.seconds
+
+/** How long a login error banner stays up. */
+internal val LOGIN_BANNER_DURATION = 5.seconds
 
 /**
  * A suggestion shown in the email field's autocomplete dropdown.
@@ -227,13 +232,22 @@ class LoginViewModel @Inject constructor(
         }
     }
 
-    /** Banner, not snackbar: the yellow "offline" warning when the phone has no network, else red. */
+    /**
+     * Banner, not snackbar: the yellow "offline" warning when the phone has no network, else red.
+     * Login has no bottom nav to surface from, so it drops down from the top and leaves quickly.
+     */
     private fun reportUnreachableBackend() {
-        if (connectivity.isOnline.value) {
-            statusBanner.show(R.string.status_banner_server_error, StatusBannerTone.ERROR)
+        val (message, tone) = if (connectivity.isOnline.value) {
+            R.string.status_banner_server_error to StatusBannerTone.ERROR
         } else {
-            statusBanner.show(R.string.status_banner_offline, StatusBannerTone.WARNING)
+            R.string.status_banner_offline to StatusBannerTone.WARNING
         }
+        statusBanner.show(
+            message = message,
+            tone = tone,
+            displayDuration = LOGIN_BANNER_DURATION,
+            placement = StatusBannerPlacement.TOP,
+        )
     }
 
     fun onCreateAccountClick() {

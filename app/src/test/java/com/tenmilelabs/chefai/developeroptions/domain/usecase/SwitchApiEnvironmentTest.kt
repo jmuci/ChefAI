@@ -18,7 +18,7 @@ class SwitchApiEnvironmentTest {
     @get:Rule
     val mainCoroutineRule = MainCoroutineRule()
 
-    private val repository = FakeApiEnvironmentRepository()
+    private val repository = FakeApiEnvironmentRepository(ApiEnvironment.LOCAL)
 
     // Lazy: the rule only installs its Main dispatcher once the test starts, after field init.
     private val sessionManager by lazy {

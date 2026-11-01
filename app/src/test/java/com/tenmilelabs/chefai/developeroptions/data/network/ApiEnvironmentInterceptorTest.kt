@@ -58,7 +58,7 @@ class ApiEnvironmentInterceptorTest {
 
     @Test
     fun `the plugin sends requests to whichever environment is chosen at request time`() = runTest {
-        val repository = FakeApiEnvironmentRepository()
+        val repository = FakeApiEnvironmentRepository(ApiEnvironment.LOCAL)
         val seen = mutableListOf<String>()
         val client = HttpClient(MockEngine { request ->
             seen += request.url.toString()

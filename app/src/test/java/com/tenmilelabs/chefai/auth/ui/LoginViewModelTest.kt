@@ -25,6 +25,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.sync.FakeConnectivityObserver
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import com.tenmilelabs.chefai.core.ui.banner.StatusBannerController
+import com.tenmilelabs.chefai.core.ui.banner.StatusBannerPlacement
 import com.tenmilelabs.chefai.core.ui.banner.StatusBannerTone
 import com.tenmilelabs.chefai.household.domain.repository.FakeHouseholdRepository
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
@@ -42,6 +43,7 @@ import org.junit.Before
 import org.junit.Test
 import java.io.IOException
 import java.net.UnknownHostException
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Unit tests for LoginViewModel.
@@ -501,6 +503,9 @@ class LoginViewModelTest {
         val banner = requireNotNull(statusBanner.message.value)
         assertThat(banner.message).isEqualTo(R.string.status_banner_server_error)
         assertThat(banner.tone).isEqualTo(StatusBannerTone.ERROR)
+        // Login has no bottom nav: it drops from the top and leaves after 5 seconds.
+        assertThat(banner.placement).isEqualTo(StatusBannerPlacement.TOP)
+        assertThat(banner.displayDuration).isEqualTo(5.seconds)
     }
 
     @Test
