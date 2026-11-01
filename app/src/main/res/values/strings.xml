@@ -204,6 +204,9 @@
     <string name="error_connection_timeout">Connection timeout. Please try again.</string>
     <string name="error_network_error">Network error. Please check your connection.</string>
     <string name="error_server_error">Server error. Please try again later.</string>
+    <string name="status_banner_server_error">Server error. Try again.</string>
+    <string name="status_banner_offline">You are offline</string>
+    <string name="status_banner_dismiss">Dismiss</string>
     <string name="error_login_failed">Login failed. Please try again.</string>
     <string name="error_registration_failed">Registration failed. Please try again.</string>
     <string name="error_loading_home">Error Loading Home Screen</string>

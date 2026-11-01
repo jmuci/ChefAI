@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Scaffold
+import com.tenmilelabs.chefai.core.ui.banner.StatusBanner
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
@@ -685,8 +687,14 @@ fun ChefAINavGraph(
                 currentRoute == AppDestinations.RECIPE_PICKER.route ||
                 currentRoute == AppDestinations.ACCEPT_INVITE.route ||
                 currentRoute in wizardRoutes
-            if (!hideNav && !isExpanded) {
-                BottomNavigationBar(navController)
+            val showBottomNav = !hideNav && !isExpanded
+            // The status banner rides on top of the bottom nav, in the same slot, so it surfaces
+            // from behind the bar and the Scaffold pads the content clear of both.
+            Column {
+                StatusBanner(insetForNavigationBar = !showBottomNav)
+                if (showBottomNav) {
+                    BottomNavigationBar(navController)
+                }
             }
         },
         floatingActionButton = {

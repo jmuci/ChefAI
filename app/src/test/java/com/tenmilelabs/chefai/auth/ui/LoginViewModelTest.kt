@@ -22,7 +22,10 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeBookmarkedRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeMealPlanDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
+import com.tenmilelabs.chefai.core.data.sync.FakeConnectivityObserver
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
+import com.tenmilelabs.chefai.core.ui.banner.StatusBannerController
+import com.tenmilelabs.chefai.core.ui.banner.StatusBannerTone
 import com.tenmilelabs.chefai.household.domain.repository.FakeHouseholdRepository
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import io.mockk.mockk
@@ -37,6 +40,8 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import java.io.IOException
+import java.net.UnknownHostException
 
 /**
  * Unit tests for LoginViewModel.
@@ -49,6 +54,8 @@ class LoginViewModelTest {
     private lateinit var fakeSecurePreferences: FakeSecurePreferences
     private lateinit var fakeAuthNetworkDataSource: FakeAuthNetworkDataSource
     private lateinit var testScope: TestScope
+    private val statusBanner = StatusBannerController()
+    private val fakeConnectivity = FakeConnectivityObserver()
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
@@ -87,7 +94,7 @@ class LoginViewModelTest {
             uuidGenerator = { UuidV7Generator.newId() }
         }
 
-        viewModel = LoginViewModel(sessionManager, fakeSecurePreferences)
+        viewModel = LoginViewModel(sessionManager, fakeSecurePreferences, statusBanner, fakeConnectivity)
     }
 
     @After
@@ -354,7 +361,7 @@ class LoginViewModelTest {
         advanceUntilIdle()
 
         // When: Creating new ViewModel with authenticated session
-        val newViewModel = LoginViewModel(sessionManager, fakeSecurePreferences)
+        val newViewModel = LoginViewModel(sessionManager, fakeSecurePreferences, statusBanner, fakeConnectivity)
 
         // Then: ViewModel should have triggered navigation
         newViewModel.uiEvents.test {
@@ -371,7 +378,7 @@ class LoginViewModelTest {
         fakeSecurePreferences.saveLastLoginEmail("saved@example.com")
 
         // When: Creating a new ViewModel
-        val newViewModel = LoginViewModel(sessionManager, fakeSecurePreferences)
+        val newViewModel = LoginViewModel(sessionManager, fakeSecurePreferences, statusBanner, fakeConnectivity)
         advanceUntilIdle()
 
         // Then: Email field is prefilled
@@ -416,7 +423,7 @@ class LoginViewModelTest {
     fun `on email change shows matching suggestions`() = testScope.runTest {
         // Given: A saved login email stored in preferences
         fakeSecurePreferences.saveLastLoginEmail("user@example.com")
-        val vm = LoginViewModel(sessionManager, fakeSecurePreferences)
+        val vm = LoginViewModel(sessionManager, fakeSecurePreferences, statusBanner, fakeConnectivity)
         advanceUntilIdle() // let init coroutine run so savedEmail is set
 
         // When: User types a prefix that matches the saved email
@@ -476,5 +483,71 @@ class LoginViewModelTest {
 
         // Then: Suggestions are cleared
         assertThat(viewModel.uiState.value.emailSuggestions).isEmpty()
+    }
+
+    @Test
+    fun `unreachable backend while online shows the red server error banner`() = testScope.runTest {
+        // Given: the phone is online but the backend can't be reached
+        fakeAuthNetworkDataSource.shouldThrowError = true
+        fakeAuthNetworkDataSource.errorToThrow = UnknownHostException("api.pocket-chef.app")
+        viewModel.onEmailChange("test@example.com")
+        viewModel.onPasswordChange("password123")
+
+        // When
+        viewModel.onLoginClick()
+        advanceUntilIdle()
+
+        // Then
+        val banner = requireNotNull(statusBanner.message.value)
+        assertThat(banner.message).isEqualTo(R.string.status_banner_server_error)
+        assertThat(banner.tone).isEqualTo(StatusBannerTone.ERROR)
+    }
+
+    @Test
+    fun `network failure while offline shows the yellow offline warning banner`() = testScope.runTest {
+        // Given: the phone has no network
+        fakeConnectivity.setOnline(false)
+        fakeAuthNetworkDataSource.shouldThrowError = true
+        fakeAuthNetworkDataSource.errorToThrow = IOException("no route to host")
+        viewModel.onEmailChange("test@example.com")
+        viewModel.onPasswordChange("password123")
+
+        // When
+        viewModel.onLoginClick()
+        advanceUntilIdle()
+
+        // Then
+        val banner = requireNotNull(statusBanner.message.value)
+        assertThat(banner.message).isEqualTo(R.string.status_banner_offline)
+        assertThat(banner.tone).isEqualTo(StatusBannerTone.WARNING)
+    }
+
+    @Test
+    fun `a 503 shows the red server error banner rather than a snackbar`() = testScope.runTest {
+        fakeAuthNetworkDataSource.shouldThrowError = true
+        fakeAuthNetworkDataSource.errorToThrow = AuthHttpException(message = "Unavailable", statusCode = 503)
+        viewModel.onEmailChange("test@example.com")
+        viewModel.onPasswordChange("password123")
+
+        viewModel.uiEvents.test {
+            viewModel.onLoginClick()
+            advanceUntilIdle()
+            expectNoEvents()
+        }
+
+        assertThat(statusBanner.message.value?.tone).isEqualTo(StatusBannerTone.ERROR)
+    }
+
+    @Test
+    fun `credential errors raise no banner`() = testScope.runTest {
+        fakeAuthNetworkDataSource.shouldThrowError = true
+        fakeAuthNetworkDataSource.errorToThrow = AuthHttpException(message = "Unauthorized", statusCode = 401)
+        viewModel.onEmailChange("test@example.com")
+        viewModel.onPasswordChange("password123")
+
+        viewModel.onLoginClick()
+        advanceUntilIdle()
+
+        assertThat(statusBanner.message.value).isNull()
     }
 }
