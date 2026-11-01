@@ -37,6 +37,7 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.UUID
 import java.util.concurrent.CancellationException
+import com.tenmilelabs.chefai.mealplans.domain.usecase.MealRef
 import javax.inject.Inject
 
 sealed interface MealPlanDetailUiState {
@@ -146,6 +147,23 @@ class MealPlanDetailViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = MealPlanDetailUiState.Loading,
         )
+
+    /** Drag-and-drop: moves [from] to [to]'s place. Cooked meals are pinned, so the repository ignores them. */
+    fun onMoveMeal(from: PlannedMeal, to: PlannedMeal) {
+        viewModelScope.launch {
+            try {
+                mealPlanRepository.moveMeal(
+                    mealPlanId,
+                    MealRef(from.dayId, from.slot),
+                    MealRef(to.dayId, to.slot),
+                )
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "onMoveMeal: failed for plan $mealPlanId")
+                _events.emit(MealPlanDetailEvent.ShowError("Couldn't move this meal"))
+            }
+        }
+    }
 
     /** Flips a single planned meal between cooked and outstanding. */
     fun onToggleCooked(meal: PlannedMeal) {

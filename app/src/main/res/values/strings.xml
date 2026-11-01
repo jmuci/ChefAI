@@ -308,6 +308,7 @@
     <string name="meal_plan_shared_by">Shared by %1$s</string>
 
     <!-- Meal Plans week view (screen 06) -->
+    <string name="meal_plans_move_failed">Couldn\'t move this meal</string>
     <string name="meal_plans_view_label">Meal plans view</string>
     <string name="meal_plans_view_week">Week</string>
     <string name="meal_plans_view_plans">Plans</string>

@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.mealplans.ui.components
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,8 +14,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -48,6 +55,8 @@ fun WeekDayRow(
     onMealClick: (PlannedWeekMeal) -> Unit,
     onAddMeal: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
+    dragState: WeekMealDragState? = null,
+    onMoveMeal: (from: PlannedWeekMeal, to: PlannedWeekMeal) -> Unit = { _, _ -> },
 ) {
     Row(
         modifier = modifier
@@ -69,6 +78,8 @@ fun WeekDayRow(
                         showSlotLabel = day.meals.size > 1,
                         showPlanName = meal.slot in sharedSlots,
                         onClick = { onMealClick(meal) },
+                        dragState = dragState,
+                        onMoveMeal = onMoveMeal,
                     )
                 }
             }
@@ -125,11 +136,49 @@ private fun MealLine(
     showSlotLabel: Boolean,
     showPlanName: Boolean,
     onClick: () -> Unit,
+    dragState: WeekMealDragState? = null,
+    onMoveMeal: (from: PlannedWeekMeal, to: PlannedWeekMeal) -> Unit = { _, _ -> },
 ) {
     val recipe = meal.recipe
+    // Cooked meals are pinned (see MealPlanReorder), so only outstanding ones pick up the drag.
+    val draggable = dragState != null && !meal.isCooked
+    val isDragged = dragState?.isDragged(meal) == true
+    if (dragState != null) {
+        DisposableEffect(meal.planId, meal.dayId, meal.slot) { onDispose { dragState.forget(meal) } }
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                if (dragState == null) {
+                    Modifier
+                } else {
+                    Modifier.onGloballyPositioned { dragState.reportBounds(meal, it.boundsInRoot()) }
+                },
+            )
+            .then(
+                if (draggable && dragState != null) {
+                    Modifier.pointerInput(meal.planId, meal.dayId, meal.slot) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { dragState.start(meal) },
+                            onDrag = { change, amount ->
+                                change.consume()
+                                dragState.drag(amount.y)
+                            },
+                            onDragEnd = { dragState.drop()?.let { onMoveMeal(meal, it) } },
+                            onDragCancel = dragState::cancel,
+                        )
+                    }
+                } else {
+                    Modifier
+                },
+            )
+            .zIndex(if (isDragged) 1f else 0f)
+            .graphicsLayer {
+                translationY = if (isDragged) dragState?.offsetY ?: 0f else 0f
+                shadowElevation = if (isDragged) 8.dp.toPx() else 0f
+            }
+            .background(MaterialTheme.colorScheme.background)
             .flatClickable(onClick = onClick),
     ) {
         Text(
