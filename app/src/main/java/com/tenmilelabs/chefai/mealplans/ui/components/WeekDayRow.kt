@@ -2,7 +2,6 @@ package com.tenmilelabs.chefai.mealplans.ui.components
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,10 +14,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.zIndex
@@ -143,10 +147,28 @@ private fun MealLine(
     // Cooked meals are pinned (see MealPlanReorder), so only outstanding ones pick up the drag.
     val draggable = dragState != null && !meal.isCooked
     val isDragged = dragState?.isDragged(meal) == true
+    val isTarget = dragState?.isTarget(meal) == true
+    val haptics = LocalHapticFeedback.current
     if (dragState != null) {
+        SideEffect { dragState.register(meal) }
         DisposableEffect(meal.planId, meal.dayId, meal.slot) { onDispose { dragState.forget(meal) } }
     }
-    Column(
+    val dragKey = Triple(meal.planId, meal.dayId, meal.slot)
+    val onDragStart: () -> Unit = {
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        dragState?.start(meal)
+    }
+    val onDrag = { deltaY: Float ->
+        if (dragState?.drag(deltaY) == true && dragState.target != null) {
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        }
+    }
+    val onDragEnd: () -> Unit = { dragState?.drop()?.let { onMoveMeal(meal, it) } }
+    val onDragCancel: () -> Unit = { dragState?.cancel() }
+    val moveEarlier = stringResource(R.string.meal_plan_move_earlier)
+    val moveLater = stringResource(R.string.meal_plan_move_later)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .then(
@@ -158,17 +180,27 @@ private fun MealLine(
             )
             .then(
                 if (draggable && dragState != null) {
-                    Modifier.pointerInput(meal.planId, meal.dayId, meal.slot) {
-                        detectDragGesturesAfterLongPress(
-                            onDragStart = { dragState.start(meal) },
-                            onDrag = { change, amount ->
-                                change.consume()
-                                dragState.drag(amount.y)
-                            },
-                            onDragEnd = { dragState.drop()?.let { onMoveMeal(meal, it) } },
-                            onDragCancel = dragState::cancel,
+                    Modifier
+                        .reorderDrag(
+                            key = dragKey,
+                            afterLongPress = true,
+                            onStart = onDragStart,
+                            onDrag = onDrag,
+                            onEnd = onDragEnd,
+                            onCancel = onDragCancel,
                         )
-                    }
+                        .semantics {
+                            // Neighbours are resolved when the action runs: bounds are laid-out
+                            // positions, not snapshot state, so they are not known at composition.
+                            customActions = listOf(
+                                CustomAccessibilityAction(moveEarlier) {
+                                    dragState.neighbour(meal, -1)?.let { onMoveMeal(meal, it) } != null
+                                },
+                                CustomAccessibilityAction(moveLater) {
+                                    dragState.neighbour(meal, 1)?.let { onMoveMeal(meal, it) } != null
+                                },
+                            )
+                        }
                 } else {
                     Modifier
                 },
@@ -176,34 +208,54 @@ private fun MealLine(
             .zIndex(if (isDragged) 1f else 0f)
             .graphicsLayer {
                 translationY = if (isDragged) dragState?.offsetY ?: 0f else 0f
-                shadowElevation = if (isDragged) 8.dp.toPx() else 0f
+                shadowElevation = if (isDragged) DraggedElevation.toPx() else 0f
             }
-            .background(MaterialTheme.colorScheme.background)
+            .background(
+                if (isTarget) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = DropTargetAlpha)
+                } else {
+                    MaterialTheme.colorScheme.background
+                },
+            )
             .flatClickable(onClick = onClick),
     ) {
-        Text(
-            text = recipe?.title ?: stringResource(R.string.meal_plan_recipe_unavailable),
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.ExtraBold,
-            // A cooked meal drops to muted ink, the same demotion the detail screen gives its
-            // "Cooked this week" section. Not a strikethrough: it still happened.
-            color = if (meal.isCooked) {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-                MaterialTheme.colorScheme.onBackground
-            },
-        )
-        val meta = buildMeta(
-            meal = meal,
-            recipe = recipe,
-            showSlotLabel = showSlotLabel,
-            showPlanName = showPlanName,
-        )
-        if (meta.isNotEmpty()) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = meta,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = recipe?.title ?: stringResource(R.string.meal_plan_recipe_unavailable),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.ExtraBold,
+                // A cooked meal drops to muted ink, the same demotion the detail screen gives its
+                // "Cooked this week" section. Not a strikethrough: it still happened.
+                color = if (meal.isCooked) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onBackground
+                },
+            )
+            val meta = buildMeta(
+                meal = meal,
+                recipe = recipe,
+                showSlotLabel = showSlotLabel,
+                showPlanName = showPlanName,
+            )
+            if (meta.isNotEmpty()) {
+                Text(
+                    text = meta,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (draggable) {
+            MealDragHandle(
+                modifier = Modifier.reorderDrag(
+                    key = dragKey,
+                    afterLongPress = false,
+                    onStart = onDragStart,
+                    onDrag = onDrag,
+                    onEnd = onDragEnd,
+                    onCancel = onDragCancel,
+                ),
             )
         }
     }
@@ -238,6 +290,12 @@ private fun buildMeta(
 private val DateColumnWidth = 44.dp
 private val RowMinHeight = 56.dp
 private val LinkHitTarget = 44.dp
+
+/** The lifted row: M3's dragged state raises a component to elevation level 4 (8dp). */
+internal val DraggedElevation = 8.dp
+
+/** Tint on the meal a drag would land on — M3's 8% hover/drop-target state layer. */
+internal const val DropTargetAlpha = 0.08f
 
 @Preview(name = "Week day rows — light")
 @Preview(name = "Week day rows — dark", uiMode = Configuration.UI_MODE_NIGHT_YES)

@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -265,6 +266,9 @@ private fun WeekContent(
                 onAddMeal = onAddMeal,
                 dragState = dragState,
                 onMoveMeal = onMoveMeal,
+                // zIndex only orders siblings, so the day holding the lifted meal must itself rise
+                // above the days after it, or the dragged row slides under their backgrounds.
+                modifier = Modifier.zIndex(if (day.meals.any(dragState::isDragged)) 1f else 0f),
             )
         }
         SectionRule()

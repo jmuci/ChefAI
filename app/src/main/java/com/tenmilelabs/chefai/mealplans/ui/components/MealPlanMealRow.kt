@@ -48,6 +48,8 @@ private const val COOKED_ALPHA = 0.5f
  *   once the meal is done.
  * @param slotLabel "Lunch"/"Dinner", or `null` for a plan with a single meal per day, where the
  *   label would be the same on every row and only adds noise.
+ * @param dragHandle trailing reorder grip ([MealDragHandle]), or `null` for a row that cannot move
+ *   (a cooked meal is pinned in place).
  */
 @Composable
 fun MealPlanMealRow(
@@ -60,6 +62,7 @@ fun MealPlanMealRow(
     onToggleCooked: () -> Unit,
     modifier: Modifier = Modifier,
     slotLabel: String? = null,
+    dragHandle: (@Composable () -> Unit)? = null,
 ) {
     val dayColor = if (isToday) {
         MaterialTheme.chefColors.accentText
@@ -133,6 +136,8 @@ fun MealPlanMealRow(
                 }
             }
         }
+
+        dragHandle?.invoke()
     }
 }
 
@@ -170,6 +175,7 @@ private fun MealPlanMealRowToCookPreview() {
             isCooked = false,
             onClick = {},
             onToggleCooked = {},
+            dragHandle = { MealDragHandle() },
             modifier = Modifier.padding(horizontal = 16.dp),
         )
     }
@@ -188,6 +194,7 @@ private fun MealPlanMealRowTodayPreview() {
             slotLabel = MealSlot.DINNER.label,
             onClick = {},
             onToggleCooked = {},
+            dragHandle = { MealDragHandle() },
             modifier = Modifier.padding(horizontal = 16.dp),
         )
     }
@@ -239,6 +246,7 @@ private fun MealPlanMealRowMissingPreview() {
             isCooked = false,
             onClick = {},
             onToggleCooked = {},
+            dragHandle = { MealDragHandle() },
             modifier = Modifier.padding(horizontal = 16.dp),
         )
     }
