@@ -1,6 +1,9 @@
 package com.tenmilelabs.chefai.mealplans.domain.usecase
 
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.collections.data.repository.FakeCollectionsRepository
+import com.tenmilelabs.chefai.collections.domain.model.RecipeBookmark
+import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.testutil.recipePreview1
 import com.tenmilelabs.chefai.core.testutil.recipePreview2
 import com.tenmilelabs.chefai.core.testutil.recipePreview3
@@ -25,13 +28,15 @@ class LocalMealPlanGeneratorTest {
 
     private lateinit var recipesRepository: FakeRecipesRepository
     private lateinit var mealPlanRepository: FakeMealPlanRepository
+    private lateinit var collectionsRepository: FakeCollectionsRepository
     private lateinit var generator: LocalMealPlanGenerator
 
     @Before
     fun setup() {
         recipesRepository = FakeRecipesRepository()
         mealPlanRepository = FakeMealPlanRepository()
-        generator = LocalMealPlanGenerator(recipesRepository, mealPlanRepository)
+        collectionsRepository = FakeCollectionsRepository()
+        generator = LocalMealPlanGenerator(recipesRepository, mealPlanRepository, collectionsRepository)
     }
 
     @Test
@@ -117,6 +122,49 @@ class LocalMealPlanGeneratorTest {
         val saved = mealPlanRepository.observeMealPlan(plan.uuid).first()!!
         assertThat(saved.days.all { it.lunchCookedAt == null && it.dinnerCookedAt == null }).isTrue()
     }
+
+    @Test
+    fun `go-to bookmarks are scheduled first`() = runTest {
+        val goTo = mainCourse("Go-to")
+        val others = (1..10).map { mainCourse("Recipe $it") }
+        recipesRepository.setRecipePreviewsToEmit(others + goTo)
+        collectionsRepository.setBookmarks(
+            listOf(
+                RecipeBookmark(goTo.uuid, isGoTo = true),
+                // Bookmarked but not go-to: dealt like any other recipe.
+                RecipeBookmark(others.first().uuid),
+            )
+        )
+        val plan = plan(planLengthDays = 7)
+        mealPlanRepository.createMealPlan(plan)
+
+        generator(plan)
+
+        val dinners = requireNotNull(mealPlanRepository.observeMealPlan(plan.uuid).first())
+            .days.sortedBy { it.dayIndex }.map { it.dinnerRecipeId }
+        assertThat(dinners.first()).isEqualTo(goTo.uuid)
+        assertThat(dinners.count { it == goTo.uuid })
+            .isEqualTo(MealPlanScheduler.GO_TO_SERVINGS_PER_WEEK)
+    }
+
+    @Test
+    fun `without go-to bookmarks the plan still fills from every recipe`() = runTest {
+        val recipes = (1..3).map { mainCourse("Recipe $it") }
+        recipesRepository.setRecipePreviewsToEmit(recipes)
+        collectionsRepository.setBookmarkedIds(recipes.map { it.uuid }.toSet())
+        val plan = plan(planLengthDays = 3)
+        mealPlanRepository.createMealPlan(plan)
+
+        generator(plan)
+
+        val saved = requireNotNull(mealPlanRepository.observeMealPlan(plan.uuid).first())
+        assertThat(saved.days.mapNotNull { it.dinnerRecipeId }.toSet())
+            .isEqualTo(recipes.map { it.uuid }.toSet())
+    }
+
+    /** A fixture recipe with no tags or labels, so neither the dessert rule nor a filter drops it. */
+    private fun mainCourse(title: String): RecipePreview =
+        recipePreview2.copy(uuid = UUID.randomUUID(), title = title, tags = emptyList(), labels = emptyList())
 
     private fun plan(
         planLengthDays: Int = 5,
