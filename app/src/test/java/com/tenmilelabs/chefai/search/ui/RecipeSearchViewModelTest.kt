@@ -7,6 +7,7 @@ import coil3.ImageLoader
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.collections.data.repository.FakeCollectionsRepository
+import com.tenmilelabs.chefai.collections.domain.model.BookmarkUpdate
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.testutil.FakeSyncScheduler
@@ -312,7 +313,7 @@ class RecipeSearchViewModelTest {
     }
 
     @Test
-    fun `bookmarked recipe ids from CollectionsRepository are reflected in Results`() = testScope.runTest {
+    fun `bookmarks from CollectionsRepository are reflected in Results`() = testScope.runTest {
         val recipe = preview()
         searchRepository.outcomeToReturn = RecipeSearchOutcome(listOf(recipe), false, RecipeSearchSource.REMOTE)
         collectionsRepository.setBookmarkedIds(setOf(recipe.uuid))
@@ -326,7 +327,7 @@ class RecipeSearchViewModelTest {
 
             assertThat(awaitItem()).isEqualTo(SearchUiState.Searching)
             val results = awaitItem() as SearchUiState.Results
-            assertThat(results.bookmarkedRecipeIds).contains(recipe.uuid)
+            assertThat(results.bookmarks.keys).contains(recipe.uuid)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -340,7 +341,7 @@ class RecipeSearchViewModelTest {
 
             turbineScope {
                 val events = viewModel.uiEvents.testIn(backgroundScope)
-                viewModel.onSaveToCollection(recipeId)
+                viewModel.onBookmarkUpdate(recipeId, BookmarkUpdate.Bookmark)
                 runCurrent()
 
                 val event = events.awaitItem() as SearchUiEvent.ShowSnackbar
@@ -357,7 +358,7 @@ class RecipeSearchViewModelTest {
 
             turbineScope {
                 val events = viewModel.uiEvents.testIn(backgroundScope)
-                viewModel.onSaveToCollection(recipeId)
+                viewModel.onBookmarkUpdate(recipeId, BookmarkUpdate.Bookmark)
                 runCurrent()
 
                 val event = events.awaitItem() as SearchUiEvent.ShowSnackbar
@@ -372,7 +373,7 @@ class RecipeSearchViewModelTest {
 
         turbineScope {
             val events = viewModel.uiEvents.testIn(backgroundScope)
-            viewModel.onSaveToCollection(recipeId)
+            viewModel.onBookmarkUpdate(recipeId, BookmarkUpdate.Bookmark)
             runCurrent()
 
             val event = events.awaitItem() as SearchUiEvent.ShowSnackbar
@@ -389,7 +390,7 @@ class RecipeSearchViewModelTest {
 
             turbineScope {
                 val events = viewModel.uiEvents.testIn(backgroundScope)
-                viewModel.onSaveToCollection(recipeId)
+                viewModel.onBookmarkUpdate(recipeId, BookmarkUpdate.Bookmark)
                 runCurrent()
 
                 val event = events.awaitItem() as SearchUiEvent.ShowSnackbar
@@ -406,12 +407,81 @@ class RecipeSearchViewModelTest {
 
         turbineScope {
             val events = viewModel.uiEvents.testIn(backgroundScope)
-            viewModel.onSaveToCollection(recipeId) // must not throw
+            viewModel.onBookmarkUpdate(recipeId, BookmarkUpdate.Bookmark) // must not throw
             runCurrent()
 
             val event = events.awaitItem() as SearchUiEvent.ShowSnackbar
             assertThat(event.messageRes).isEqualTo(R.string.search_recipe_not_yet_synced)
         }
+    }
+
+    @Test
+    fun `starring a recipe absent from Room fetches it first, then stars it and confirms`() =
+        testScope.runTest {
+            val recipeId = UUID.randomUUID()
+            recipesRepository.emitRecipe(recipeId, null) // Room: not found
+            recipesRepository.setRemoteRecipe(recipeId, recipe1)
+
+            turbineScope {
+                val events = viewModel.uiEvents.testIn(backgroundScope)
+                viewModel.onBookmarkUpdate(recipeId, BookmarkUpdate.Star)
+                runCurrent()
+
+                val event = events.awaitItem() as SearchUiEvent.ShowSnackbar
+                assertThat(event.messageRes).isEqualTo(R.string.search_starred_in_collection)
+            }
+            assertThat(collectionsRepository.updates).containsExactly(recipeId to BookmarkUpdate.Star)
+        }
+
+    @Test
+    fun `starring a recipe that cannot be fetched does not touch the collection`() = testScope.runTest {
+        val recipeId = UUID.randomUUID()
+        recipesRepository.emitRecipe(recipeId, null) // Room: not found
+        recipesRepository.fetchOutcomeWhenNotFoundRemotely = RecipeFetchResult.NotAvailable
+
+        turbineScope {
+            val events = viewModel.uiEvents.testIn(backgroundScope)
+            viewModel.onBookmarkUpdate(recipeId, BookmarkUpdate.Star)
+            runCurrent()
+
+            val event = events.awaitItem() as SearchUiEvent.ShowSnackbar
+            assertThat(event.messageRes).isEqualTo(R.string.search_recipe_unavailable)
+        }
+        assertThat(collectionsRepository.updates).isEmpty()
+    }
+
+    @Test
+    fun `removing a bookmark skips the fetch and confirms the removal`() = testScope.runTest {
+        val recipeId = UUID.randomUUID()
+        collectionsRepository.setBookmarkedIds(setOf(recipeId))
+        // Would fail the update if it were consulted — Remove must not need the recipe locally.
+        recipesRepository.emitRecipe(recipeId, null)
+        recipesRepository.fetchOutcomeWhenNotFoundRemotely = RecipeFetchResult.NetworkError
+
+        turbineScope {
+            val events = viewModel.uiEvents.testIn(backgroundScope)
+            viewModel.onBookmarkUpdate(recipeId, BookmarkUpdate.Remove)
+            runCurrent()
+
+            val event = events.awaitItem() as SearchUiEvent.ShowSnackbar
+            assertThat(event.messageRes).isEqualTo(R.string.search_removed_from_collection)
+        }
+        assertThat(collectionsRepository.updates).containsExactly(recipeId to BookmarkUpdate.Remove)
+    }
+
+    @Test
+    fun `toggling go-to applies it without a snackbar`() = testScope.runTest {
+        val recipeId = UUID.randomUUID()
+        collectionsRepository.setBookmarkedIds(setOf(recipeId))
+
+        turbineScope {
+            val events = viewModel.uiEvents.testIn(backgroundScope)
+            viewModel.onBookmarkUpdate(recipeId, BookmarkUpdate.SetGoTo(true))
+            runCurrent()
+
+            events.expectNoEvents()
+        }
+        assertThat(collectionsRepository.updates).containsExactly(recipeId to BookmarkUpdate.SetGoTo(true))
     }
 
     @Test

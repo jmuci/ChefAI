@@ -11,6 +11,7 @@ import com.tenmilelabs.chefai.core.data.local.room.RecipeStepEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.ShoppingListCheckEntity
 import com.tenmilelabs.chefai.core.data.local.room.IngredientEntity
+import com.tenmilelabs.chefai.core.data.local.room.BookmarkedRecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeAllergenDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeBookmarkedRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeMealPlanDao
@@ -719,6 +720,94 @@ class SyncOrchestratorTest {
 
         val bookmarked = bookmarkedRecipeDao.observeBookmarkedRecipeIds(userId).first()
         assertThat(bookmarked).containsExactly(recipeId1)
+    }
+
+    @Test
+    fun `push carries a bookmark's star and go-to marks`() = runTest(testDispatcher) {
+        val userId = requireNotNull(sessionManager.getCurrentUserId()) { "test session should have a user" }
+        recipeDao.upsertRecipe(createDirtyRecipe(uuid = recipeId1, syncState = SyncState.SYNCED))
+        bookmarkedRecipeDao.upsert(
+            BookmarkedRecipeEntity(
+                userId = userId, recipeId = recipeId1, updatedAt = 1000L, deletedAt = null,
+                isStarred = true, isGoTo = true,
+            )
+        )
+
+        syncOrchestrator.sync()
+
+        val pushed = syncNetworkDataSource.capturedPushRequests.single().bookmarkedRecipes.single()
+        assertThat(pushed.starred).isTrue()
+        assertThat(pushed.goTo).isTrue()
+    }
+
+    @Test
+    fun `pull keeps local star and go-to marks when the server omits them`() = runTest(testDispatcher) {
+        recipeDao.upsertRecipe(createDirtyRecipe(uuid = recipeId1, syncState = SyncState.SYNCED))
+        val userId = UuidV7Generator.newId()
+        bookmarkedRecipeDao.upsert(
+            BookmarkedRecipeEntity(
+                userId = userId, recipeId = recipeId1, updatedAt = 1000L, deletedAt = null,
+                syncState = SyncState.SYNCED, isStarred = true, isGoTo = true,
+            )
+        )
+        syncNetworkDataSource.pullResponses.addLast(
+            SyncPullResponse(
+                recipes = emptyList(),
+                serverTimestamp = 5000L,
+                hasMore = false,
+                bookmarkedRecipes = listOf(
+                    // A backend that doesn't store the marks yet sends neither field.
+                    SyncBookmarkPullDto(
+                        userId = userId.toString(),
+                        recipeId = recipeId1.toString(),
+                        updatedAt = 5000L,
+                        deletedAt = null,
+                    )
+                ),
+            )
+        )
+
+        syncOrchestrator.sync()
+
+        val row = requireNotNull(bookmarkedRecipeDao.getLive(userId, recipeId1))
+        assertThat(row.isStarred).isTrue()
+        assertThat(row.isGoTo).isTrue()
+        assertThat(row.updatedAt).isEqualTo(5000L)
+    }
+
+    @Test
+    fun `pull applies star and go-to marks the server sends`() = runTest(testDispatcher) {
+        recipeDao.upsertRecipe(createDirtyRecipe(uuid = recipeId1, syncState = SyncState.SYNCED))
+        val userId = UuidV7Generator.newId()
+        bookmarkedRecipeDao.upsert(
+            BookmarkedRecipeEntity(
+                userId = userId, recipeId = recipeId1, updatedAt = 1000L, deletedAt = null,
+                syncState = SyncState.SYNCED, isStarred = true, isGoTo = false,
+            )
+        )
+        syncNetworkDataSource.pullResponses.addLast(
+            SyncPullResponse(
+                recipes = emptyList(),
+                serverTimestamp = 5000L,
+                hasMore = false,
+                bookmarkedRecipes = listOf(
+                    SyncBookmarkPullDto(
+                        userId = userId.toString(),
+                        recipeId = recipeId1.toString(),
+                        updatedAt = 5000L,
+                        deletedAt = null,
+                        starred = false,
+                        goTo = true,
+                    )
+                ),
+            )
+        )
+
+        syncOrchestrator.sync()
+
+        val row = requireNotNull(bookmarkedRecipeDao.getLive(userId, recipeId1))
+        assertThat(row.isStarred).isFalse()
+        assertThat(row.isGoTo).isTrue()
     }
 
     @Test

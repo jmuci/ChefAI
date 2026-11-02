@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -28,7 +27,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -39,8 +37,9 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.collections.domain.model.BookmarkUpdate
+import com.tenmilelabs.chefai.collections.domain.model.RecipeBookmark
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
-import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
 import com.tenmilelabs.chefai.core.ui.preview.RecipePreviewProvider
 import com.tenmilelabs.chefai.core.ui.recipeImageModel
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
@@ -54,11 +53,13 @@ private val ThumbnailHeight = 60.dp
 /**
  * @param modifier Merged with this row's own padding/dividers so a caller's modifier is
  * never silently dropped.
- * @param isInCollection Whether [recipe] is already saved — shows a filled bookmark instead of an
- * outline. Only rendered when [onSaveToCollection] is non-null.
- * @param onSaveToCollection When non-null, shows a bookmark button that invokes this with the
- * recipe UUID. Left null (the default) at this card's three existing call sites, which don't want
- * inline save — introduced for search results, where saving without opening the recipe matters.
+ * @param bookmark [recipe]'s bookmark, or `null` when it isn't bookmarked — drives the bookmark
+ * glyph and, once bookmarked, the go-to toggle beside it. Only read when [onBookmarkUpdate] is
+ * non-null.
+ * @param onBookmarkUpdate When non-null, shows the [BookmarkMenu] button (and, for a bookmarked
+ * recipe, the [GoToToggleButton]); every change is handed here. Left null (the default) where a
+ * row doesn't want inline saving — introduced for search results, where saving without opening the
+ * recipe matters.
  * @param showDivider Whether to draw the 1dp row rule under the row. On by default for the ruled
  * lists; off inside a panel (Home, Search results), where rows separate by spacing instead — and
  * where the press tint sinks to `chefColors.panelGround` rather than lifting to neutral-100.
@@ -67,8 +68,8 @@ private val ThumbnailHeight = 60.dp
 fun RecipeListCard(
     recipe: RecipePreview,
     modifier: Modifier = Modifier,
-    isInCollection: Boolean = false,
-    onSaveToCollection: ((UUID) -> Unit)? = null,
+    bookmark: RecipeBookmark? = null,
+    onBookmarkUpdate: ((BookmarkUpdate) -> Unit)? = null,
     showDivider: Boolean = true,
     navigateToDetail: (UUID) -> Unit = {}
 ) {
@@ -130,31 +131,15 @@ fun RecipeListCard(
                 )
             }
 
-            if (onSaveToCollection != null) {
-                IconButton(
-                    onClick = { onSaveToCollection(recipe.uuid) },
-                    modifier = Modifier.testTag("SaveToCollectionButton"),
-                ) {
-                    Icon(
-                        painter = painterResource(
-                            if (isInCollection) ChefAIIcons.BookmarkFilled else ChefAIIcons.Bookmark,
-                        ),
-                        // Names the state, not just the action: the filled/outline glyph is the
-                        // only other signal, and a screen reader cannot see it.
-                        contentDescription = stringResource(
-                            if (isInCollection) R.string.remove_from_collection_content_description
-                            else R.string.save_to_collection_content_description
-                        ),
-                        // Accent as an icon directly on the ground needs the AA-safe step, not the
-                        // brand fill — see ChefColors.accentText.
-                        tint = if (isInCollection) {
-                            MaterialTheme.chefColors.accentText
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        modifier = Modifier.size(18.dp),
+            if (onBookmarkUpdate != null) {
+                if (bookmark != null) {
+                    GoToToggleButton(
+                        isGoTo = bookmark.isGoTo,
+                        onToggle = { onBookmarkUpdate(BookmarkUpdate.SetGoTo(!bookmark.isGoTo)) },
+                        size = 32.dp,
                     )
                 }
+                BookmarkMenu(bookmark = bookmark, onUpdate = onBookmarkUpdate)
             }
         }
 
@@ -207,7 +192,39 @@ private fun RecipeListCardBookmarkablePreview(
 ) {
     ChefAITheme {
         Surface {
-            RecipeListCard(recipe = recipe, isInCollection = true, onSaveToCollection = {})
+            RecipeListCard(recipe = recipe, bookmark = RecipeBookmark(recipe.uuid), onBookmarkUpdate = {})
+        }
+    }
+}
+
+@Preview(name = "RecipeListCard — starred go-to, Light")
+@Composable
+private fun RecipeListCardStarredGoToPreview(
+    @PreviewParameter(RecipePreviewProvider::class) recipe: RecipePreview
+) {
+    ChefAITheme {
+        Surface {
+            RecipeListCard(
+                recipe = recipe,
+                bookmark = RecipeBookmark(recipe.uuid, isStarred = true, isGoTo = true),
+                onBookmarkUpdate = {},
+            )
+        }
+    }
+}
+
+@Preview(name = "RecipeListCard — starred go-to, Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun RecipeListCardStarredGoToDarkPreview(
+    @PreviewParameter(RecipePreviewProvider::class) recipe: RecipePreview
+) {
+    ChefAITheme(darkTheme = true) {
+        Surface {
+            RecipeListCard(
+                recipe = recipe,
+                bookmark = RecipeBookmark(recipe.uuid, isStarred = true, isGoTo = true),
+                onBookmarkUpdate = {},
+            )
         }
     }
 }

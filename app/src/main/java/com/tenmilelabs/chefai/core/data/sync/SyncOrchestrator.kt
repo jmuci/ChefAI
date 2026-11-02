@@ -192,7 +192,9 @@ class SyncOrchestrator @Inject constructor(
         userId = userId.toString(),
         recipeId = recipeId.toString(),
         updatedAt = updatedAt,
-        deletedAt = deletedAt
+        deletedAt = deletedAt,
+        starred = isStarred,
+        goTo = isGoTo,
     )
 
     private suspend fun buildSyncRecipeDto(recipe: RecipeEntity): SyncRecipeDto {
@@ -626,13 +628,18 @@ class SyncOrchestrator @Inject constructor(
                 Timber.w("applyPulledBookmark: bookmark references unknown recipe %s, skipping", recipeId)
                 return
             }
+            // A backend that doesn't store star/go-to yet omits them; read back this device's
+            // marks so a pull doesn't wipe them (the same fallback recipes use for `language`).
+            val existing = bookmarkedRecipeDao.get(userId, recipeId)
             bookmarkedRecipeDao.upsert(
                 BookmarkedRecipeEntity(
                     userId = userId,
                     recipeId = recipeId,
                     updatedAt = dto.updatedAt,
                     deletedAt = null,
-                    syncState = SyncState.SYNCED
+                    syncState = SyncState.SYNCED,
+                    isStarred = dto.starred ?: existing?.isStarred ?: false,
+                    isGoTo = dto.goTo ?: existing?.isGoTo ?: false,
                 )
             )
         }

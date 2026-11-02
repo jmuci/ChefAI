@@ -21,6 +21,28 @@ class FakeBookmarkedRecipeDao : BookmarkedRecipeDao {
             map.values.filter { it.userId == userId && it.deletedAt == null }.map { it.recipeId }
         }
 
+    override fun observeLiveBookmarks(userId: UUID): Flow<List<BookmarkedRecipeEntity>> =
+        storeFlow.map { map -> map.values.filter { it.userId == userId && it.deletedAt == null } }
+
+    override suspend fun getLive(userId: UUID, recipeId: UUID): BookmarkedRecipeEntity? =
+        store[userId to recipeId]?.takeIf { it.deletedAt == null }
+
+    override suspend fun get(userId: UUID, recipeId: UUID): BookmarkedRecipeEntity? = store[userId to recipeId]
+
+    override suspend fun setStarred(userId: UUID, recipeId: UUID, starred: Boolean, ts: Long): Int =
+        updateLive(userId, recipeId) { it.copy(isStarred = starred, updatedAt = ts, syncState = SyncState.PENDING) }
+
+    override suspend fun setGoTo(userId: UUID, recipeId: UUID, goTo: Boolean, ts: Long): Int =
+        updateLive(userId, recipeId) { it.copy(isGoTo = goTo, updatedAt = ts, syncState = SyncState.PENDING) }
+
+    private fun updateLive(userId: UUID, recipeId: UUID, change: (BookmarkedRecipeEntity) -> BookmarkedRecipeEntity): Int {
+        val key = userId to recipeId
+        val existing = store[key]?.takeIf { it.deletedAt == null } ?: return 0
+        store[key] = change(existing)
+        notifyChange()
+        return 1
+    }
+
     override suspend fun upsert(entity: BookmarkedRecipeEntity) {
         store[entity.userId to entity.recipeId] = entity
         notifyChange()
@@ -29,7 +51,9 @@ class FakeBookmarkedRecipeDao : BookmarkedRecipeDao {
     override suspend fun softDelete(userId: UUID, recipeId: UUID, ts: Long) {
         val key = userId to recipeId
         store[key]?.let {
-            store[key] = it.copy(deletedAt = ts, syncState = SyncState.DELETED, updatedAt = ts)
+            store[key] = it.copy(
+                deletedAt = ts, syncState = SyncState.DELETED, updatedAt = ts, isStarred = false, isGoTo = false,
+            )
         }
         notifyChange()
     }

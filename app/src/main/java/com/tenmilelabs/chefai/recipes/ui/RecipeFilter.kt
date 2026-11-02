@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.recipes.ui
 
 import androidx.annotation.StringRes
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.collections.domain.model.RecipeBookmark
 import com.tenmilelabs.chefai.core.domain.model.QUICK_EASY_MAX_TOTAL_MINUTES
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import java.util.UUID
@@ -40,13 +41,32 @@ enum class RecipeFilter(
         R.string.no_cooked_recipes_title,
         R.string.no_cooked_recipes_subtitle,
     ),
+
+    /** Starred bookmarks — the user's favourites. Reads `bookmarks` on [matches]. */
+    STARRED(
+        R.string.recipe_filter_starred,
+        R.string.no_starred_recipes_title,
+        R.string.no_starred_recipes_subtitle,
+    ),
+
+    /** Go-to bookmarks — the recipes the meal planner should favour. Reads `bookmarks` on [matches]. */
+    GO_TO(
+        R.string.recipe_filter_go_to,
+        R.string.no_go_to_recipes_title,
+        R.string.no_go_to_recipes_subtitle,
+    ),
     ;
 
     /**
      * Whether [recipe] belongs under this filter. [cookedRecipeIds] is the set of recipes the user
-     * has ever cooked; only [COOKED_BEFORE] reads it.
+     * has ever cooked; only [COOKED_BEFORE] reads it. [bookmarks] is the user's bookmarks keyed by
+     * recipe id; only [STARRED] and [GO_TO] read it.
      */
-    fun matches(recipe: RecipePreview, cookedRecipeIds: Set<UUID> = emptySet()): Boolean = when (this) {
+    fun matches(
+        recipe: RecipePreview,
+        cookedRecipeIds: Set<UUID> = emptySet(),
+        bookmarks: Map<UUID, RecipeBookmark> = emptyMap(),
+    ): Boolean = when (this) {
         ALL -> true
         QUICK_EASY -> {
             val total = recipe.prepTimeMinutes + recipe.cookTimeMinutes
@@ -55,6 +75,8 @@ enum class RecipeFilter(
         DESSERT -> (recipe.tags.map { it.displayName } + recipe.labels.map { it.displayName })
             .any { it.contains(DESSERT_KEYWORD, ignoreCase = true) }
         COOKED_BEFORE -> recipe.uuid in cookedRecipeIds
+        STARRED -> bookmarks[recipe.uuid]?.isStarred == true
+        GO_TO -> bookmarks[recipe.uuid]?.isGoTo == true
     }
 
     private companion object {

@@ -22,6 +22,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.collections.domain.model.RecipeBookmark
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.ui.components.Panel
 import com.tenmilelabs.chefai.core.ui.components.PanelMetrics
@@ -78,7 +79,7 @@ fun HomeScreen(
         is HomeUiState.Success -> HomeContent(
             components = state.components,
             recipes = state.recipes,
-            bookmarkedRecipeIds = state.bookmarkedRecipeIds,
+            bookmarks = state.bookmarks,
             onAction = viewModel::onAction,
         )
     }
@@ -96,7 +97,7 @@ fun HomeScreen(
 fun HomeContent(
     components: List<ComponentModel>,
     recipes: Map<String, RecipePreview>,
-    bookmarkedRecipeIds: Set<UUID> = emptySet(),
+    bookmarks: Map<UUID, RecipeBookmark> = emptyMap(),
     onAction: (HomeAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -133,7 +134,7 @@ fun HomeContent(
                     ComponentRenderer(
                         component = component,
                         recipes = recipes,
-                        bookmarkedRecipeIds = bookmarkedRecipeIds,
+                        bookmarks = bookmarks,
                         onAction = onAction,
                     )
                 }

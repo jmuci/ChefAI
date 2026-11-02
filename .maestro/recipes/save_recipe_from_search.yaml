@@ -25,11 +25,13 @@ env:
     visible: ".*RESULTS?"
     timeout: 15000
 
-# Bookmark the first result straight from its card; the button's label flips once saved.
+# Bookmark the first result straight from its card: the button opens the bookmark menu, and its
+# label flips once saved.
 - tapOn:
     text: "Save to collection"
     index: 0
-- assertVisible: "Remove from collection"
+- tapOn: "Bookmark"
+- assertVisible: "Saved to collection"
 
 - tapOn: "Recipes"
 - assertNotVisible: "No recipes in your collection"

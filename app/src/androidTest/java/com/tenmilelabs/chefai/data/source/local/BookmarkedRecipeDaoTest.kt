@@ -12,6 +12,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import junit.framework.TestCase.assertEquals
 import junit.framework.TestCase.assertNotNull
+import junit.framework.TestCase.assertNull
 import junit.framework.TestCase.assertTrue
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -61,12 +62,16 @@ class BookmarkedRecipeDaoTest {
         updatedAt: Long = 0L,
         deletedAt: Long? = null,
         syncState: SyncState = SyncState.PENDING,
+        isStarred: Boolean = false,
+        isGoTo: Boolean = false,
     ) = BookmarkedRecipeEntity(
         userId = userId,
         recipeId = recipeId,
         updatedAt = updatedAt,
         deletedAt = deletedAt,
         syncState = syncState,
+        isStarred = isStarred,
+        isGoTo = isGoTo,
     )
 
     @Before
@@ -175,6 +180,57 @@ class BookmarkedRecipeDaoTest {
         val dirty = database.bookmarkedRecipeDao().getAllDirty().single()
         assertEquals(SyncState.PENDING, dirty.syncState)
         assertEquals(userB.uuid, dirty.userId)
+    }
+
+    @Test
+    fun setStarredAndSetGoTo_updateALiveBookmarkAndMarkItPending() = runTest {
+        val dao = database.bookmarkedRecipeDao()
+        dao.upsert(bookmark(userA.uuid, recipe.uuid, syncState = SyncState.SYNCED))
+
+        assertEquals(1, dao.setStarred(userA.uuid, recipe.uuid, starred = true, ts = 10L))
+        assertEquals(1, dao.setGoTo(userA.uuid, recipe.uuid, goTo = true, ts = 20L))
+
+        val row = requireNotNull(dao.getLive(userA.uuid, recipe.uuid))
+        assertTrue(row.isStarred)
+        assertTrue(row.isGoTo)
+        assertEquals(20L, row.updatedAt)
+        assertEquals(SyncState.PENDING, row.syncState)
+    }
+
+    @Test
+    fun setStarredAndSetGoTo_leaveASoftDeletedOrMissingBookmarkAlone() = runTest {
+        val dao = database.bookmarkedRecipeDao()
+        dao.upsert(bookmark(userA.uuid, recipe.uuid, deletedAt = 5L, syncState = SyncState.DELETED))
+
+        assertEquals(0, dao.setStarred(userA.uuid, recipe.uuid, starred = true, ts = 10L))
+        assertEquals(0, dao.setGoTo(userB.uuid, recipe.uuid, goTo = true, ts = 10L))
+        assertNull(dao.getLive(userA.uuid, recipe.uuid))
+        assertEquals(false, dao.get(userA.uuid, recipe.uuid)?.isStarred)
+    }
+
+    @Test
+    fun softDelete_clearsTheStarAndGoToMarks() = runTest {
+        val dao = database.bookmarkedRecipeDao()
+        dao.upsert(bookmark(userA.uuid, recipe.uuid, isStarred = true, isGoTo = true))
+
+        dao.softDelete(userA.uuid, recipe.uuid, ts = 50L)
+
+        val row = requireNotNull(dao.get(userA.uuid, recipe.uuid))
+        assertEquals(false, row.isStarred)
+        assertEquals(false, row.isGoTo)
+        assertTrue(dao.observeLiveBookmarks(userA.uuid).first().isEmpty())
+    }
+
+    @Test
+    fun reassignUserAndMarkPending_carriesTheStarAndGoToMarks() = runTest {
+        val dao = database.bookmarkedRecipeDao()
+        dao.upsert(bookmark(userA.uuid, recipe.uuid, isStarred = true, isGoTo = true))
+
+        dao.reassignUserAndMarkPending(oldUserId = userA.uuid, newUserId = userB.uuid, updatedAt = 777L)
+
+        val row = dao.observeLiveBookmarks(userB.uuid).first().single()
+        assertTrue(row.isStarred)
+        assertTrue(row.isGoTo)
     }
 
     @Test

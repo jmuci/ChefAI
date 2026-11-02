@@ -9,6 +9,9 @@ import coil3.request.ImageRequest
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
+import com.tenmilelabs.chefai.collections.domain.model.BookmarkUpdate
+import com.tenmilelabs.chefai.collections.domain.model.RecipeBookmark
+import com.tenmilelabs.chefai.collections.domain.model.createsBookmark
 import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
@@ -66,7 +69,8 @@ sealed interface SearchUiState {
     data object Searching : SearchUiState
     data class Results(
         val items: List<RecipePreview>,
-        val bookmarkedRecipeIds: Set<UUID> = emptySet(),
+        /** The user's bookmarks keyed by recipe id; a result missing from it isn't bookmarked. */
+        val bookmarks: Map<UUID, RecipeBookmark> = emptyMap(),
         /** True when [items] came from the on-device fallback, not the server — see [RecipeSearchSource]. */
         val isOffline: Boolean,
         /** The server has more pages for this query; scrolling to the end should request one. */
@@ -118,12 +122,12 @@ class RecipeSearchViewModel @Inject constructor(
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
 
-    private val _bookmarkedIds: Flow<Set<UUID>> = sessionManager.userSession
+    private val _bookmarks: Flow<Map<UUID, RecipeBookmark>> = sessionManager.userSession
         .flatMapLatest { session ->
             when (session) {
-                is UserSession.Loading -> flowOf(emptySet())
-                is UserSession.Anonymous -> collectionsRepository.observeBookmarkedRecipeIds(session.localUserId)
-                is UserSession.Authenticated -> collectionsRepository.observeBookmarkedRecipeIds(session.user.uuid)
+                is UserSession.Loading -> flowOf(emptyMap())
+                is UserSession.Anonymous -> collectionsRepository.observeBookmarks(session.localUserId)
+                is UserSession.Authenticated -> collectionsRepository.observeBookmarks(session.user.uuid)
             }
         }
 
@@ -154,8 +158,8 @@ class RecipeSearchViewModel @Inject constructor(
             }
         }
 
-    val uiState: StateFlow<SearchUiState> = combine(_searchResult, _bookmarkedIds) { result, bookmarkedIds ->
-        if (result is SearchUiState.Results) result.copy(bookmarkedRecipeIds = bookmarkedIds) else result
+    val uiState: StateFlow<SearchUiState> = combine(_searchResult, _bookmarks) { result, bookmarks ->
+        if (result is SearchUiState.Results) result.copy(bookmarks = bookmarks) else result
     }.stateIn(
         scope = viewModelScope,
         started = WhileUiSubscribed,
@@ -267,7 +271,7 @@ class RecipeSearchViewModel @Inject constructor(
 
     /**
      * [RecipeDetailsScreen] reads only from Room, but a search result may be a recipe this
-     * device hasn't pulled yet (see [onSaveToCollection]'s doc for why that's real, not just
+     * device hasn't pulled yet (see [onBookmarkUpdate]'s doc for why that's real, not just
      * theoretical) — and for an anonymous session, [SyncScheduler.requestImmediateSync] can
      * never fix that (`SyncWorker` skips anonymous sessions entirely). [RecipesRepository.getOrFetchRecipe]
      * closes that gap: Room first, then a one-off anonymous-capable fetch (ChefAI#186).
@@ -295,30 +299,34 @@ class RecipeSearchViewModel @Inject constructor(
      * recipe made public since the device's last pull is missing locally — but search is what
      * makes a not-yet-synced recipe's UUID reachable at all, which nothing else in the app could
      * do before. [BookmarkedRecipeEntity] enforces its FK to [RecipeEntity] at runtime (Room emits
-     * `PRAGMA foreign_keys = ON`), so this must be real, not just documented intent.
+     * `PRAGMA foreign_keys = ON`), so this must be real, not just documented intent. Only the
+     * updates that can create a bookmark row ([createsBookmark]) need it; un-starring, removing or
+     * toggling go-to act on a bookmark that already exists, so the recipe is local by definition.
      */
-    fun onSaveToCollection(recipeId: UUID) {
+    fun onBookmarkUpdate(recipeId: UUID, update: BookmarkUpdate) {
         val userId = when (val session = sessionManager.userSession.value) {
             is UserSession.Anonymous -> session.localUserId
             is UserSession.Authenticated -> session.user.uuid
             is UserSession.Loading -> return
         }
         viewModelScope.launch {
-            when (recipesRepository.getOrFetchRecipe(recipeId)) {
-                RecipeFetchResult.NotAvailable -> {
-                    _uiEvent.send(SearchUiEvent.ShowSnackbar(R.string.search_recipe_unavailable))
-                    return@launch
+            if (update.createsBookmark) {
+                when (recipesRepository.getOrFetchRecipe(recipeId)) {
+                    RecipeFetchResult.NotAvailable -> {
+                        _uiEvent.send(SearchUiEvent.ShowSnackbar(R.string.search_recipe_unavailable))
+                        return@launch
+                    }
+                    RecipeFetchResult.NetworkError -> {
+                        syncScheduler.requestImmediateSync()
+                        _uiEvent.send(SearchUiEvent.ShowSnackbar(R.string.search_recipe_not_yet_synced))
+                        return@launch
+                    }
+                    is RecipeFetchResult.Found -> Unit // fall through to bookmarking below
                 }
-                RecipeFetchResult.NetworkError -> {
-                    syncScheduler.requestImmediateSync()
-                    _uiEvent.send(SearchUiEvent.ShowSnackbar(R.string.search_recipe_not_yet_synced))
-                    return@launch
-                }
-                is RecipeFetchResult.Found -> Unit // fall through to bookmarking below
             }
             try {
-                collectionsRepository.addBookmark(userId, recipeId)
-                _uiEvent.send(SearchUiEvent.ShowSnackbar(R.string.search_added_to_collection))
+                collectionsRepository.update(userId, recipeId, update)
+                update.snackbarMessage()?.let { _uiEvent.send(SearchUiEvent.ShowSnackbar(it)) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: SQLiteConstraintException) {
@@ -335,4 +343,12 @@ class RecipeSearchViewModel @Inject constructor(
             imageLoader.enqueue(ImageRequest.Builder(appContext).data(model).build())
         }
     }
+}
+
+/** Confirms a bookmark change made from a result row; the go-to toggle and un-starring show for themselves. */
+private fun BookmarkUpdate.snackbarMessage(): Int? = when (this) {
+    BookmarkUpdate.Bookmark -> R.string.search_added_to_collection
+    BookmarkUpdate.Star -> R.string.search_starred_in_collection
+    BookmarkUpdate.Remove -> R.string.search_removed_from_collection
+    BookmarkUpdate.Unstar, is BookmarkUpdate.SetGoTo -> null
 }

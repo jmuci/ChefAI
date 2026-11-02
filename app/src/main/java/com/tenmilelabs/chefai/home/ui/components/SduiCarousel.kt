@@ -13,6 +13,7 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.tenmilelabs.chefai.collections.domain.model.RecipeBookmark
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.ui.preview.PreviewData
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
@@ -33,7 +34,7 @@ fun SduiCarousel(
     carousel: ComponentModel.Carousel,
     recipes: Map<String, RecipePreview>,
     onAction: (HomeAction) -> Unit,
-    bookmarkedRecipeIds: Set<UUID> = emptySet(),
+    bookmarks: Map<UUID, RecipeBookmark> = emptyMap(),
     modifier: Modifier = Modifier,
 ) {
     if (carousel.rendersAsList) {
@@ -45,7 +46,7 @@ fun SduiCarousel(
                     ComponentRenderer(
                         component = item,
                         recipes = recipes,
-                        bookmarkedRecipeIds = bookmarkedRecipeIds,
+                        bookmarks = bookmarks,
                         onAction = onAction,
                     )
                 }
@@ -66,7 +67,7 @@ fun SduiCarousel(
                 ComponentRenderer(
                     component = item,
                     recipes = recipes,
-                    bookmarkedRecipeIds = bookmarkedRecipeIds,
+                    bookmarks = bookmarks,
                     onAction = onAction,
                     isCarouselItem = true,
                 )

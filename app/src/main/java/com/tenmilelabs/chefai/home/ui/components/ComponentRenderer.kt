@@ -11,6 +11,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.tenmilelabs.chefai.collections.domain.model.BookmarkUpdate
+import com.tenmilelabs.chefai.collections.domain.model.RecipeBookmark
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.ui.components.LargeCard
 import com.tenmilelabs.chefai.core.ui.components.RecipeListCard
@@ -39,7 +41,7 @@ fun ComponentRenderer(
     component: ComponentModel,
     recipes: Map<String, RecipePreview>,
     onAction: (HomeAction) -> Unit,
-    bookmarkedRecipeIds: Set<UUID> = emptySet(),
+    bookmarks: Map<UUID, RecipeBookmark> = emptyMap(),
     modifier: Modifier = Modifier,
     isCarouselItem: Boolean = false,
 ) {
@@ -54,7 +56,7 @@ fun ComponentRenderer(
             SduiCarousel(
                 carousel = component,
                 recipes = recipes,
-                bookmarkedRecipeIds = bookmarkedRecipeIds,
+                bookmarks = bookmarks,
                 onAction = onAction,
                 modifier = modifier,
             )
@@ -63,9 +65,9 @@ fun ComponentRenderer(
             val recipe = component.recipeId?.let { recipes[it] } ?: return
             LargeCard(
                 recipe = recipe,
-                isInCollection = recipe.uuid in bookmarkedRecipeIds,
+                isInCollection = recipe.uuid in bookmarks,
                 onClick = { onAction(HomeAction.CardClicked(it.toString())) },
-                onSaveToCollection = { onAction(HomeAction.BookmarkToggled(it)) },
+                onSaveToCollection = { onAction(HomeAction.BookmarkUpdated(it, toggleBookmarkUpdate(it in bookmarks))) },
                 modifier = if (isCarouselItem) {
                     modifier.width(300.dp).height(220.dp)
                 } else {
@@ -80,9 +82,9 @@ fun ComponentRenderer(
             val recipe = component.recipeId?.let { recipes[it] } ?: return
             LargeCard(
                 recipe = recipe,
-                isInCollection = recipe.uuid in bookmarkedRecipeIds,
+                isInCollection = recipe.uuid in bookmarks,
                 onClick = { onAction(HomeAction.CardClicked(it.toString())) },
-                onSaveToCollection = { onAction(HomeAction.BookmarkToggled(it)) },
+                onSaveToCollection = { onAction(HomeAction.BookmarkUpdated(it, toggleBookmarkUpdate(it in bookmarks))) },
                 modifier = modifier.size(180.dp),
             )
         }
@@ -92,6 +94,8 @@ fun ComponentRenderer(
                 recipe = recipe,
                 // Home rows sit inside a panel and separate by spacing, not a rule.
                 showDivider = false,
+                bookmark = bookmarks[recipe.uuid],
+                onBookmarkUpdate = { onAction(HomeAction.BookmarkUpdated(recipe.uuid, it)) },
                 // An all-list-card carousel stacks vertically (SduiCarousel.rendersAsList); a
                 // list card mixed into a horizontal carousel needs a bounded width, or its
                 // weighted text column measures to zero under the LazyRow.
@@ -123,3 +127,7 @@ private fun ComponentRendererHeroPreview() {
         }
     }
 }
+
+/** [LargeCard]'s save button is a plain toggle with no menu — it isn't drawn in the design yet. */
+private fun toggleBookmarkUpdate(isBookmarked: Boolean): BookmarkUpdate =
+    if (isBookmarked) BookmarkUpdate.Remove else BookmarkUpdate.Bookmark
