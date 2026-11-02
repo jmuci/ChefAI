@@ -2,10 +2,14 @@ package com.tenmilelabs.chefai.core.di
 
 import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
 import com.tenmilelabs.chefai.auth.data.local.SecurePreferencesInterface
+import com.tenmilelabs.chefai.auth.data.network.AccountApiService
+import com.tenmilelabs.chefai.auth.data.network.AccountNetworkDataSource
 import com.tenmilelabs.chefai.auth.data.network.AuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
+import com.tenmilelabs.chefai.auth.data.repository.DefaultAccountRepository
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.TokenProvider
+import com.tenmilelabs.chefai.auth.domain.repository.AccountRepository
 import com.tenmilelabs.chefai.collections.data.repository.DefaultCollectionsRepository
 import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.data.repository.DataStoreUserPreferencesRepository
@@ -140,6 +144,17 @@ abstract class TestRepositoryModule {
     @Binds
     @Singleton
     abstract fun bindCollectionsRepository(repository: DefaultCollectionsRepository): CollectionsRepository
+
+    /**
+     * Binds account deletion (same as production; never reached, no test deletes an account).
+     */
+    @Binds
+    @Singleton
+    abstract fun bindAccountNetworkDataSource(accountApiService: AccountApiService): AccountNetworkDataSource
+
+    @Binds
+    @Singleton
+    abstract fun bindAccountRepository(repository: DefaultAccountRepository): AccountRepository
 
     /**
      * Binds the cook-history repository (same as production).
