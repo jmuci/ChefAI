@@ -171,6 +171,67 @@ class DefaultMealPlanRepositoryTest {
         assertThat(days.single { it.dayIndex == 5 }.lunchRecipeId).isEqualTo(recipeId)
     }
 
+    // --- assignRecipeToSlotWithoutRepeats ---
+
+    @Test
+    fun `assignRecipeToSlotWithoutRepeats swaps the displaced recipe into the slot that held the pick`() = runTest {
+        val picked = UUID.randomUUID()
+        val displaced = UUID.randomUUID()
+        val plan = plan(
+            days = listOf(
+                day(dayIndex = 0, dinnerRecipeId = displaced),
+                day(dayIndex = 1, dinnerRecipeId = picked),
+            ),
+        )
+        repository.createMealPlan(plan)
+
+        repository.assignRecipeToSlotWithoutRepeats(plan.uuid, 0, MealSlot.DINNER, picked)
+
+        val days = repository.observeMealPlan(plan.uuid).first()!!.days.sortedBy { it.dayIndex }
+        assertThat(days[0].dinnerRecipeId).isEqualTo(picked)
+        assertThat(days[1].dinnerRecipeId).isEqualTo(displaced)
+    }
+
+    @Test
+    fun `assignRecipeToSlotWithoutRepeats leaves no repeat when the pick was on the same day`() = runTest {
+        val picked = UUID.randomUUID()
+        val displaced = UUID.randomUUID()
+        val plan = plan(days = listOf(day(dayIndex = 0, dinnerRecipeId = displaced, lunchRecipeId = picked)))
+        repository.createMealPlan(plan)
+
+        repository.assignRecipeToSlotWithoutRepeats(plan.uuid, 0, MealSlot.DINNER, picked)
+
+        val updated = repository.observeMealPlan(plan.uuid).first()!!.days.single()
+        assertThat(updated.dinnerRecipeId).isEqualTo(picked)
+        assertThat(updated.lunchRecipeId).isEqualTo(displaced)
+    }
+
+    @Test
+    fun `assignRecipeToSlotWithoutRepeats does not touch a cooked slot that holds the pick`() = runTest {
+        val picked = UUID.randomUUID()
+        val plan = plan(days = listOf(day(dayIndex = 0), day(dayIndex = 1, dinnerRecipeId = picked)))
+        repository.createMealPlan(plan)
+        repository.setMealCooked(plan.days[1].uuid, MealSlot.DINNER, cooked = true)
+
+        repository.assignRecipeToSlotWithoutRepeats(plan.uuid, 0, MealSlot.DINNER, picked)
+
+        val days = repository.observeMealPlan(plan.uuid).first()!!.days.sortedBy { it.dayIndex }
+        assertThat(days[1].dinnerRecipeId).isEqualTo(picked)
+        assertThat(days[1].dinnerCookedAt).isNotNull()
+    }
+
+    @Test
+    fun `assignRecipeToSlotWithoutRepeats behaves like assignRecipeToSlot when the pick is not elsewhere`() = runTest {
+        val plan = planWithOneDay()
+        repository.createMealPlan(plan)
+        val picked = UUID.randomUUID()
+
+        val ok = repository.assignRecipeToSlotWithoutRepeats(plan.uuid, 0, MealSlot.DINNER, picked)
+
+        assertThat(ok).isTrue()
+        assertThat(repository.observeMealPlan(plan.uuid).first()!!.days.single().dinnerRecipeId).isEqualTo(picked)
+    }
+
     @Test
     fun `assignRecipeToSlot returns false for an unknown plan`() = runTest {
         assertThat(repository.assignRecipeToSlot(UUID.randomUUID(), 0, MealSlot.DINNER, UUID.randomUUID()))

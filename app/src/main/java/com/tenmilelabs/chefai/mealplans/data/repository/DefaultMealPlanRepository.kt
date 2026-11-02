@@ -230,6 +230,68 @@ class DefaultMealPlanRepository @Inject constructor(
         return true
     }
 
+    override suspend fun assignRecipeToSlotWithoutRepeats(
+        planId: UUID,
+        dayIndex: Int,
+        slot: MealSlot,
+        recipeId: UUID,
+    ): Boolean {
+        val existing = mealPlanDao.getMealPlanById(planId) ?: return false
+        transactionRunner {
+            val days = mealPlanDao.getDaysForMealPlan(planId)
+            val target = days.firstOrNull { it.dayIndex == dayIndex }
+                ?: MealPlanDayEntity(
+                    uuid = UUID.randomUUID(),
+                    mealPlanId = planId,
+                    dayIndex = dayIndex,
+                    dinnerRecipeId = null,
+                    lunchRecipeId = null,
+                )
+            val displaced = when (slot) {
+                MealSlot.LUNCH -> target.lunchRecipeId
+                MealSlot.DINNER -> target.dinnerRecipeId
+            }
+            val changed = linkedMapOf(target.uuid to target.withRecipe(slot, recipeId))
+
+            if (displaced != null && displaced != recipeId) {
+                // The first uncooked slot elsewhere that holds the picked recipe takes the displaced one.
+                val duplicate = days.sortedBy { it.dayIndex }.firstNotNullOfOrNull { day ->
+                    val current = changed[day.uuid] ?: day
+                    MealSlot.entries.firstOrNull { other ->
+                        val isTarget = day.uuid == target.uuid && other == slot
+                        !isTarget && current.recipeIn(other) == recipeId && current.cookedAtIn(other) == null
+                    }?.let { current to it }
+                }
+                if (duplicate != null) {
+                    val (day, duplicateSlot) = duplicate
+                    changed[day.uuid] = day.withRecipe(duplicateSlot, displaced)
+                }
+            }
+
+            mealPlanDao.upsertDays(changed.values.toList())
+            mealPlanDao.upsertMealPlan(
+                existing.copy(syncState = SyncState.PENDING, updatedAt = System.currentTimeMillis())
+            )
+        }
+        syncScheduler.requestMutationSync()
+        return true
+    }
+
+    private fun MealPlanDayEntity.recipeIn(slot: MealSlot): UUID? = when (slot) {
+        MealSlot.LUNCH -> lunchRecipeId
+        MealSlot.DINNER -> dinnerRecipeId
+    }
+
+    private fun MealPlanDayEntity.cookedAtIn(slot: MealSlot): Long? = when (slot) {
+        MealSlot.LUNCH -> lunchCookedAt
+        MealSlot.DINNER -> dinnerCookedAt
+    }
+
+    private fun MealPlanDayEntity.withRecipe(slot: MealSlot, recipeId: UUID): MealPlanDayEntity = when (slot) {
+        MealSlot.LUNCH -> copy(lunchRecipeId = recipeId, lunchCookedAt = null)
+        MealSlot.DINNER -> copy(dinnerRecipeId = recipeId, dinnerCookedAt = null)
+    }
+
     override suspend fun appendRecipeAsNewDay(planId: UUID, slot: MealSlot, recipeId: UUID): Boolean {
         val existing = mealPlanDao.getMealPlanById(planId) ?: return false
         transactionRunner {
