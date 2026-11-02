@@ -13,7 +13,6 @@ import com.tenmilelabs.chefai.core.util.WhileUiSubscribed
 import com.tenmilelabs.chefai.household.domain.model.Household
 import com.tenmilelabs.chefai.household.domain.repository.HouseholdRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
-import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.usecase.MealRef
 import com.tenmilelabs.chefai.mealplans.domain.week.PlannedWeekMeal
@@ -21,7 +20,6 @@ import com.tenmilelabs.chefai.mealplans.domain.repository.ShoppingListRepository
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.ShoppingListBuilder
 import com.tenmilelabs.chefai.mealplans.domain.summary.MealPlanSummary
 import com.tenmilelabs.chefai.mealplans.domain.summary.MealPlanSummaryBuilder
-import com.tenmilelabs.chefai.mealplans.domain.usecase.AddRecipeToDateUseCase
 import com.tenmilelabs.chefai.mealplans.domain.week.DAYS_IN_WEEK
 import com.tenmilelabs.chefai.mealplans.domain.week.MealPlanWeek
 import com.tenmilelabs.chefai.mealplans.domain.week.MealPlanWeekProjector
@@ -38,7 +36,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -102,7 +99,6 @@ class MealPlansViewModel @Inject constructor(
     householdRepository: HouseholdRepository,
     userPreferencesRepository: UserPreferencesRepository,
     private val sessionManager: SessionManager,
-    private val addRecipeToDate: AddRecipeToDateUseCase,
     private val clock: Clock,
 ) : ViewModel() {
 
@@ -236,7 +232,7 @@ class MealPlansViewModel @Inject constructor(
         _viewMode.value = mode
     }
 
-    // --- "+ Add meal": bind a recipe to a calendar date ---
+    // --- "+ Add meal": pick a recipe for a date; the nav layer opens the wizard with it ---
 
     private val _addMealDate = MutableStateFlow<LocalDate?>(null)
 
@@ -320,34 +316,6 @@ class MealPlansViewModel @Inject constructor(
     fun onAddMealDismissed() {
         _addMealDate.value = null
         _addMealQuery.value = ""
-    }
-
-    /**
-     * Puts [recipeId] on [date]'s [slot] and closes the sheet — both for a recipe picked in the
-     * sheet and for one created via "Add a New Recipe" (delivered through [AddMealRequest]).
-     */
-    fun onRecipeChosen(date: LocalDate, slot: MealSlot, recipeId: UUID) {
-        onAddMealDismissed()
-        viewModelScope.launch { assignRecipe(date, slot, recipeId) }
-    }
-
-    private suspend fun assignRecipe(date: LocalDate, slot: MealSlot, recipeId: UUID) {
-        val userId = sessionManager.getCurrentUserId()
-        val added = try {
-            userId != null && addRecipeToDate(
-                userId = userId,
-                plans = mealPlanRepository.observeMealPlansForUser(userId).first(),
-                date = date,
-                slot = slot,
-                recipeId = recipeId,
-            )
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to add recipe $recipeId to $date")
-            false
-        }
-        if (!added) _events.send(MealPlansEvent.ShowMessage(R.string.meal_plans_add_meal_failed))
     }
 
     private fun today(): LocalDate = LocalDate.now(clock)

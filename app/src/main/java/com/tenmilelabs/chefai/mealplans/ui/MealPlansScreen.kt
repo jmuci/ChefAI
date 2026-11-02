@@ -49,8 +49,6 @@ import com.tenmilelabs.chefai.mealplans.ui.components.MealPlanHeroCard
 import com.tenmilelabs.chefai.mealplans.ui.components.WeekDayRow
 import com.tenmilelabs.chefai.mealplans.ui.components.rememberWeekMealDragState
 import com.tenmilelabs.chefai.mealplans.ui.components.WeekNavigator
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 import java.time.LocalDate
 import java.util.UUID
 
@@ -70,8 +68,8 @@ private val FabClearance = 88.dp
 @Composable
 fun MealPlansScreen(
     snackbarHostState: SnackbarHostState,
+    onRecipeForDate: (LocalDate, MealSlot, UUID) -> Unit = { _, _, _ -> },
     onNewRecipe: (LocalDate, MealSlot) -> Unit = { _, _ -> },
-    addMealResults: Flow<AddMealRequest.Delivered> = emptyFlow(),
     onTabResumed: () -> Unit = {},
     onMealClick: (PlannedWeekMeal) -> Unit = {},
     onShoppingListClick: (UUID) -> Unit = {},
@@ -95,10 +93,6 @@ fun MealPlansScreen(
             }
         }
     }
-    // A recipe created via "Add a New Recipe" comes back through the nav entry; see AddMealRequest.
-    LaunchedEffect(viewModel, addMealResults) {
-        addMealResults.collect { viewModel.onRecipeChosen(it.date, it.slot, it.recipeId) }
-    }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { onTabResumed() }
 
     addMealDate?.let { date ->
@@ -107,7 +101,10 @@ fun MealPlansScreen(
             query = addMealQuery,
             recipes = addMealRecipes,
             onQueryChange = viewModel::onAddMealQueryChange,
-            onRecipePicked = { slot, recipeId -> viewModel.onRecipeChosen(date, slot, recipeId) },
+            onRecipePicked = { slot, recipeId ->
+                viewModel.onAddMealDismissed()
+                onRecipeForDate(date, slot, recipeId)
+            },
             onNewRecipe = { slot ->
                 viewModel.onAddMealDismissed()
                 onNewRecipe(date, slot)

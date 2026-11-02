@@ -188,14 +188,18 @@ fun ChefAINavGraph(
             val tabHandle = backStackEntry.savedStateHandle
             MealPlansScreen(
                 snackbarHostState = snackbarHostState,
+                // A recipe picked for a date seeds a new plan rather than becoming a one-meal plan:
+                // the wizard starts on that date with the recipe on its first day.
+                onRecipeForDate = { date, slot, recipeId ->
+                    navActions.navigateToMealPlanWizard(includeRecipeId = recipeId, includeSlot = slot, startDate = date)
+                },
                 // The importer, not the bare editor: it covers both "paste a URL" and "type it in"
                 // (its manual-entry fallback), and either way ends in the editor's create mode.
                 onNewRecipe = { date, slot ->
                     AddMealRequest.begin(tabHandle, date, slot)
                     navActions.navigateToImportRecipe()
                 },
-                addMealResults = remember(tabHandle) { AddMealRequest.results(tabHandle) },
-                onTabResumed = { AddMealRequest.dropIfUndelivered(tabHandle) },
+                onTabResumed = { AddMealRequest.cancel(tabHandle) },
                 // The week view's rows are meals, not plans, so a tap opens the recipe on the
                 // plan-scoped route — which carries the day and slot the cooked toggle acts on.
                 onMealClick = { meal ->
@@ -249,6 +253,16 @@ fun ChefAINavGraph(
                     defaultValue = null
                 },
                 navArgument(AppDestinationArgs.WEEK_START_ARG) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument(AppDestinationArgs.START_DATE_ARG) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument(AppDestinationArgs.MEAL_PLAN_SLOT_ARG) {
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null
@@ -343,8 +357,8 @@ fun ChefAINavGraph(
                 onNavigateBack = { navController.popBackStack() },
                 snackbarHostState = snackbarHostState,
                 onRecipeSaved = { saved ->
-                    // A recipe created on the way from "+ Add meal" goes straight onto that date.
-                    if (!saved.isNew || !navController.finishAddMeal(saved.recipeId)) {
+                    // A recipe created on the way from "+ Add meal" seeds a plan starting that date.
+                    if (!saved.isNew || !navController.finishAddMeal(navActions, saved.recipeId)) {
                         navController.popBackStack()
                     }
                 },
@@ -801,15 +815,18 @@ private val recipeDetailRoutes = setOf(
 )
 
 /**
- * Finishes a Meal Plans "+ Add meal" by handing [recipeId] to the tab and popping back to it.
+ * Finishes a Meal Plans "+ Add meal → Add a New Recipe": pops back to the tab, then opens the
+ * meal-plan wizard starting on the requested date with [recipeId] on its first day — the same
+ * place a saved recipe picked in the sheet goes.
  *
  * @return `false` when the tab has no request waiting (the editor was opened some other way, or
  *   the user backed out earlier), in which case nothing was changed and the caller navigates as
  *   it normally would.
  */
-private fun NavController.finishAddMeal(recipeId: UUID): Boolean {
-    val tab = runCatching { getBackStackEntry(AppDestinations.MEAL_PLANS.route) }.getOrNull()
-    if (!AddMealRequest.deliver(tab?.savedStateHandle, recipeId)) return false
+private fun NavController.finishAddMeal(navActions: NavigationActions, recipeId: UUID): Boolean {
+    val tab = runCatching { getBackStackEntry(AppDestinations.MEAL_PLANS.route) }.getOrNull() ?: return false
+    val request = AddMealRequest.take(tab.savedStateHandle) ?: return false
     popBackStack(AppDestinations.MEAL_PLANS.route, inclusive = false)
+    navActions.navigateToMealPlanWizard(includeRecipeId = recipeId, includeSlot = request.slot, startDate = request.date)
     return true
 }

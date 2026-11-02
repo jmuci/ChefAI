@@ -303,6 +303,20 @@ costs: every uncovered date becomes its own one-day plan (the plan list fills wi
 against backend validation, and shopping lists stay per-plan, so a week of such meals has no single
 list to open (Decision 6's disabled button).
 
+**Revised again (Nov 2026) — a pick seeds a plan instead of becoming one.** The "Added meals"
+one-day plans described above are gone, along with `AddRecipeToDateUseCase`. Picking a saved recipe
+in the sheet, or saving one made via "Add a New Recipe", now opens the meal-plan wizard with three
+nav args: the recipe (`recipeUuid`), its slot (`mealPlanSlot`) and the tapped date (`startDate`). The
+wizard pre-selects that date as the start, still editable, in place of `defaultMealPlanStartDate`,
+and places the recipe on day 0 of the generated plan, overwriting whatever generation put there. A
+lunch pick defaults the plan to "Dinners + Lunches". If the user switches it back to dinners only,
+the recipe moves to day 0's dinner, since that plan has no lunch slot. `AddMealRequest` now only
+carries date and slot through the importer and editor; `finishAddMeal` consumes it (`take`), pops
+back to the tab, then opens the wizard. Because the result is a regular plan of the user's chosen
+length, the known costs listed above (a stream of one-day plans, `planLengthDays = 1`, no single
+shopping list) no longer apply. The trade-off: "+ Add meal" can no longer add one meal to a plan
+that already covers that day. The new plan overlaps it, and the wizard's overlap notice says so.
+
 ## Amendment — Decision 2 superseded (plans have a start date)
 
 The wizard's Basics step now opens with "Which day does the meal plan start?", so day 0 is a date

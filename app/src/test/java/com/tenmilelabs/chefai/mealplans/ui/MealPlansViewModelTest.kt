@@ -18,13 +18,10 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
-import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.PlannedIngredient
-import com.tenmilelabs.chefai.mealplans.domain.usecase.AddRecipeToDateUseCase
-import com.tenmilelabs.chefai.mealplans.domain.week.planDateFor
 import com.tenmilelabs.chefai.mealplans.domain.week.weekStartFor
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
 import kotlinx.coroutines.CoroutineScope
@@ -96,7 +93,6 @@ class MealPlansViewModelTest {
         householdRepository = householdRepository,
         userPreferencesRepository = preferences,
         sessionManager = sessionManager,
-        addRecipeToDate = AddRecipeToDateUseCase(repository, clock),
         clock = clock,
     )
 
@@ -109,36 +105,6 @@ class MealPlansViewModelTest {
 
         viewModel.onAddMealDismissed()
         assertThat(viewModel.addMealDate.value).isNull()
-    }
-
-    @Test
-    fun `a chosen recipe closes the sheet and lands on that date and slot`() = runTest {
-        val userId = sessionManager.getCurrentUserId()!!
-        val recipeId = UUID.randomUUID()
-        val target = weekStart.plusDays(2)
-        repository.emitPlans()
-        viewModel.onAddMeal(target)
-
-        viewModel.onRecipeChosen(target, MealSlot.LUNCH, recipeId)
-
-        assertThat(viewModel.addMealDate.value).isNull()
-        val plan = repository.observeMealPlansForUser(userId).first().single()
-        val placed = plan.days.single()
-        assertThat(placed.lunchRecipeId).isEqualTo(recipeId)
-        assertThat(placed.dinnerRecipeId).isNull()
-        assertThat(planDateFor(plan.createdAt, placed.dayIndex, ZoneOffset.UTC)).isEqualTo(target)
-    }
-
-    @Test
-    fun `a failed write reports a message instead of failing silently`() = runTest {
-        repository.emitPlans()
-        repository.shouldThrowOnCreate = true
-
-        viewModel.events.test {
-            viewModel.onRecipeChosen(weekStart.plusDays(1), MealSlot.DINNER, UUID.randomUUID())
-
-            assertThat(awaitItem()).isEqualTo(MealPlansEvent.ShowMessage(R.string.meal_plans_add_meal_failed))
-        }
     }
 
     @Test
