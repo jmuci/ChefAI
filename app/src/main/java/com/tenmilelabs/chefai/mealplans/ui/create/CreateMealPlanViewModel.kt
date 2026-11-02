@@ -12,6 +12,7 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
 import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
+import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.usecase.GenerateMealPlanUseCase
@@ -57,7 +58,26 @@ class CreateMealPlanViewModel @Inject constructor(
     private val browsedWeekStart: LocalDate? = savedStateHandle.get<String>(AppDestinationArgs.WEEK_START_ARG)
         ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
 
-    private val _uiState = MutableStateFlow(CreateMealPlanUiState())
+    /** Start date the caller asked for ("+ Add meal" on a day); replaces the computed default. */
+    private val requestedStartDate: LocalDate? = savedStateHandle.get<String>(AppDestinationArgs.START_DATE_ARG)
+        ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+
+    /** Which meal of the first day [includedRecipeId] fills. */
+    private val includedSlot: MealSlot = savedStateHandle.get<String>(AppDestinationArgs.MEAL_PLAN_SLOT_ARG)
+        ?.let { name -> MealSlot.entries.firstOrNull { it.name == name } }
+        ?: MealSlot.DINNER
+
+    private val _uiState = MutableStateFlow(
+        CreateMealPlanUiState(
+            startDate = requestedStartDate,
+            // A lunch the user already chose only fits a plan that has lunches.
+            mealType = if (includedRecipeId != null && includedSlot == MealSlot.LUNCH) {
+                MealType.DINNER_AND_LUNCH
+            } else {
+                MealType.DINNER
+            },
+        )
+    )
     val uiState: StateFlow<CreateMealPlanUiState> = _uiState.asStateFlow()
 
     // Buffered Channel: generation takes seconds, and an event emitted into a rendezvous
@@ -206,10 +226,12 @@ class CreateMealPlanViewModel @Inject constructor(
                 false
             }
 
-            // Assigned after generation, which replaces the plan's days wholesale.
+            // Assigned after generation, which replaces the plan's days wholesale. A dinners-only
+            // plan has no lunch slot, so a lunch pick moves to dinner if the user changed the type.
+            val slot = if (state.mealType == MealType.DINNER) MealSlot.DINNER else includedSlot
             val includedRecipeAssigned = includedRecipeId?.let { recipeId ->
                 try {
-                    mealPlanRepository.assignRecipeToSlot(mealPlanId, 0, MealSlot.DINNER, recipeId)
+                    mealPlanRepository.assignRecipeToSlot(mealPlanId, 0, slot, recipeId)
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e
                     Timber.e(e, "Failed to include recipe $recipeId in plan $mealPlanId")

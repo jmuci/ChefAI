@@ -353,7 +353,6 @@
     <string name="meal_plans_add_meal_no_saved">No saved recipes yet. Add a new recipe to plan it here.</string>
     <string name="meal_plans_add_meal_no_match">No saved recipes match “%1$s”.</string>
     <string name="meal_plans_add_meal_new">Add a New Recipe</string>
-    <string name="meal_plans_add_meal_failed">Couldn’t add that meal. Try again.</string>
     <string name="meal_plans_grocery_list_label">Shopping list</string>
     <!-- Snackbar after creating a plan whose dates overlap an existing one. %1$s = that plan's name. -->
     <string name="meal_plan_overlap_notice">Overlaps “%1$s” — both plans show in your week</string>

@@ -45,11 +45,14 @@ internal object ScreenBaseRoutes {
     const val MEAL_PLAN_WIZARD = "meal_plan_wizard"
 
     /**
-     * Wizard graph route; the optional recipe arg pre-includes that recipe in the generated plan,
-     * and the optional week start narrows the default start date to the week the user was viewing.
+     * Wizard graph route; the optional recipe arg pre-includes that recipe in the generated plan
+     * (on day 0, in the optional slot), the optional start date fixes day 0, and the optional week
+     * start narrows the default start date to the week the user was viewing.
      */
     const val MEAL_PLAN_WIZARD_GRAPH = "$MEAL_PLAN_WIZARD?${AppDestinationArgs.RECIPE_ID_ARG}={${AppDestinationArgs.RECIPE_ID_ARG}}" +
-        "&${AppDestinationArgs.WEEK_START_ARG}={${AppDestinationArgs.WEEK_START_ARG}}"
+        "&${AppDestinationArgs.WEEK_START_ARG}={${AppDestinationArgs.WEEK_START_ARG}}" +
+        "&${AppDestinationArgs.START_DATE_ARG}={${AppDestinationArgs.START_DATE_ARG}}" +
+        "&${AppDestinationArgs.MEAL_PLAN_SLOT_ARG}={${AppDestinationArgs.MEAL_PLAN_SLOT_ARG}}"
     const val MEAL_PLAN_WIZARD_BASICS = "meal_plan_wizard_basics"
     const val MEAL_PLAN_WIZARD_PREFERENCES = "meal_plan_wizard_preferences"
     const val MEAL_PLAN_WIZARD_ADVANCED = "meal_plan_wizard_advanced"
@@ -65,6 +68,9 @@ object AppDestinationArgs {
     /** ISO date (`2026-10-26`) of the first day of the week the meal-plan wizard was opened from. */
     const val WEEK_START_ARG = "weekStart"
 
+    /** ISO date the meal-plan wizard's new plan starts on, when the caller already knows it. */
+    const val START_DATE_ARG = "startDate"
+
     /**
      * Id of the [com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay] a recipe was opened
      * from, plus [MEAL_PLAN_SLOT_ARG]. Present only on [ScreenBaseRoutes.MEAL_PLAN_RECIPE_DETAIL] —
@@ -73,7 +79,10 @@ object AppDestinationArgs {
      */
     const val MEAL_PLAN_DAY_ID_ARG = "mealPlanDayId"
 
-    /** [com.tenmilelabs.chefai.mealplans.domain.model.MealSlot] name paired with [MEAL_PLAN_DAY_ID_ARG]. */
+    /**
+     * [com.tenmilelabs.chefai.mealplans.domain.model.MealSlot] name paired with [MEAL_PLAN_DAY_ID_ARG];
+     * on the meal-plan wizard, the slot its included recipe fills on the first day.
+     */
     const val MEAL_PLAN_SLOT_ARG = "mealPlanSlot"
 
     /**
@@ -312,13 +321,23 @@ class NavigationActions(private val navController: NavHostController) {
     }
 
     /**
+     * @param includeRecipeId a recipe the new plan must contain, on its first day.
+     * @param includeSlot which meal of the first day [includeRecipeId] fills; dinner when `null`.
      * @param weekStart first day of the week the week view is showing, when opened from there — the
      *   wizard then defaults its start date within that week.
+     * @param startDate the day the plan starts on, pre-selected in the wizard (still editable).
      */
-    fun navigateToMealPlanWizard(includeRecipeId: UUID? = null, weekStart: LocalDate? = null) {
+    fun navigateToMealPlanWizard(
+        includeRecipeId: UUID? = null,
+        includeSlot: MealSlot? = null,
+        weekStart: LocalDate? = null,
+        startDate: LocalDate? = null,
+    ) {
         val args = listOfNotNull(
             includeRecipeId?.let { "${AppDestinationArgs.RECIPE_ID_ARG}=$it" },
+            includeSlot?.let { "${AppDestinationArgs.MEAL_PLAN_SLOT_ARG}=${it.name}" },
             weekStart?.let { "${AppDestinationArgs.WEEK_START_ARG}=$it" },
+            startDate?.let { "${AppDestinationArgs.START_DATE_ARG}=$it" },
         )
         navController.navigate(
             if (args.isEmpty()) {

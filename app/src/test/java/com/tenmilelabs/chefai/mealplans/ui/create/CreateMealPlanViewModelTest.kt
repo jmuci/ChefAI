@@ -18,6 +18,8 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
+import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
+import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
@@ -234,9 +236,17 @@ class CreateMealPlanViewModelTest {
 
     // --- Included recipe ---
 
-    private fun wizardFor(recipeId: UUID) = createViewModel(
+    private fun wizardFor(
+        recipeId: UUID,
+        slot: MealSlot? = null,
+        startDate: java.time.LocalDate? = null,
+    ) = createViewModel(
         savedStateHandle = androidx.lifecycle.SavedStateHandle(
-            mapOf(com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.RECIPE_ID_ARG to recipeId.toString())
+            listOfNotNull(
+                AppDestinationArgs.RECIPE_ID_ARG to recipeId.toString(),
+                slot?.let { AppDestinationArgs.MEAL_PLAN_SLOT_ARG to it.name },
+                startDate?.let { AppDestinationArgs.START_DATE_ARG to it.toString() },
+            ).toMap()
         )
     )
 
@@ -272,6 +282,50 @@ class CreateMealPlanViewModelTest {
             val event = awaitItem()
             assertThat(event).isInstanceOf(CreateMealPlanEvent.MealPlanReady::class.java)
             assertThat(savedPlanDays(event).single().dinnerRecipeId).isEqualTo(recipeId)
+        }
+    }
+
+    @Test
+    fun `a recipe picked for a date starts the plan on that date, ahead of the default`() = runTest {
+        val picked = today.plusDays(4)
+        // Meals today and tomorrow would otherwise default the start to the day after.
+        repository.emitPlans(existingPlan(name = "Plan", createdAt = now, lengthDays = 2, plannedDays = 2))
+
+        val wizard = wizardFor(UUID.randomUUID(), MealSlot.DINNER, startDate = picked)
+
+        assertThat(wizard.uiState.value.startDate).isEqualTo(picked)
+        wizard.uiEvents.test {
+            wizard.onAction(WizardAction.SaveMealPlan)
+            val id = (awaitItem() as CreateMealPlanEvent.MealPlanReady).mealPlanId
+            assertThat(repository.observeMealPlan(id).first()?.startDate).isEqualTo(picked)
+        }
+    }
+
+    @Test
+    fun `a lunch pick defaults the plan to lunches and dinners and fills day 1 lunch`() = runTest {
+        val recipeId = UUID.randomUUID()
+        val wizard = wizardFor(recipeId, MealSlot.LUNCH)
+
+        assertThat(wizard.uiState.value.mealType).isEqualTo(MealType.DINNER_AND_LUNCH)
+        wizard.uiEvents.test {
+            wizard.onAction(WizardAction.SaveMealPlan)
+            val first = savedPlanDays(awaitItem()).single { it.dayIndex == 0 }
+            assertThat(first.lunchRecipeId).isEqualTo(recipeId)
+            assertThat(first.dinnerRecipeId).isNull()
+        }
+    }
+
+    @Test
+    fun `a lunch pick moves to dinner when the user switches the plan to dinners only`() = runTest {
+        val recipeId = UUID.randomUUID()
+        val wizard = wizardFor(recipeId, MealSlot.LUNCH)
+        wizard.onAction(WizardAction.SetMealType(MealType.DINNER))
+
+        wizard.uiEvents.test {
+            wizard.onAction(WizardAction.SaveMealPlan)
+            val first = savedPlanDays(awaitItem()).single { it.dayIndex == 0 }
+            assertThat(first.dinnerRecipeId).isEqualTo(recipeId)
+            assertThat(first.lunchRecipeId).isNull()
         }
     }
 

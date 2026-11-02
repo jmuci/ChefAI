@@ -1,9 +1,9 @@
-# Meal plans: an anonymous user saves a recipe, then puts it on a day from the week view's
-# "+ Add meal" sheet by searching their saved recipes inside the sheet.
+# Meal plans: an anonymous user saves a recipe, then picks it from the week view's "+ Add meal"
+# sheet, which opens the meal-plan wizard seeded with that recipe and starting on that day.
 #
 # Needs a backend with at least one public recipe matching the query (saving it goes through
-# Search; the debug build talks to http://10.0.2.2:8080). The sheet itself searches only saved
-# recipes, on-device, so the check is structural: the week goes from no meals to one.
+# Search). The sheet itself searches only saved recipes, on-device, so the check is structural:
+# the week goes from no meals to at least one once the wizard has created the plan.
 appId: com.tenmilelabs.chefai
 tags:
   - mealplans
@@ -33,11 +33,17 @@ env:
     text: "+ Add meal"
     index: 0
 
-# The sheet lists the saved recipe before anything is typed; picking it closes the sheet.
+# The sheet lists the saved recipe before anything is typed; picking it opens the wizard.
 - assertVisible: "Search your saved recipes"
-- assertVisible: "Add a New Recipe"
 - tapOn:
     text: ".* · Serves .*"
     index: 0
-- assertNotVisible: "Search your saved recipes"
-- assertVisible: "1 meal planned.*"
+- assertVisible: "Which day does the meal plan start?"
+- tapOn: "Next"
+- tapOn: "Next"
+- tapOn: "Create.*"
+- extendedWaitUntil:
+    notVisible: "Which day does the meal plan start?"
+    timeout: 20000
+- back
+- assertNotVisible: "0 meals planned.*"
