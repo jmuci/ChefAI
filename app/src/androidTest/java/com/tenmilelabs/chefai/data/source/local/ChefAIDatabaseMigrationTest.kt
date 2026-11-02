@@ -4,6 +4,7 @@ import androidx.room.testing.MigrationTestHelper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
+import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_13_14
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_1_2
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_2_3
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_3_4
@@ -598,14 +599,40 @@ class ChefAIDatabaseMigrationTest {
     }
 
     @Test
-    fun migrateAll1To13_succeeds() {
+    fun migrate13To14_keepsExistingBookmarksAsPlainOnes() {
+        val userId = UUID.randomUUID()
+        val recipeId = UUID.randomUUID()
+
+        helper.createDatabase(TEST_DB, 13).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO bookmarked_recipes (userId, recipeId, updatedAt, deletedAt, syncState)
+                VALUES (?, ?, 1, NULL, 'SYNCED')
+                """.trimIndent(),
+                arrayOf(userId.toBlob(), recipeId.toBlob())
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 14, true, MIGRATION_13_14)
+
+        db.query("SELECT isStarred, isGoTo, syncState FROM bookmarked_recipes").use { cursor ->
+            assertTrue("the pre-existing bookmark should survive the migration", cursor.moveToFirst())
+            assertEquals(0, cursor.getInt(0))
+            assertEquals(0, cursor.getInt(1))
+            // Adding the columns isn't a user edit, so the row is not re-pushed.
+            assertEquals("SYNCED", cursor.getString(2))
+        }
+    }
+
+    @Test
+    fun migrateAll1To14_succeeds() {
         helper.createDatabase(TEST_DB, 1).close()
 
         helper.runMigrationsAndValidate(
-            TEST_DB, 13, true,
+            TEST_DB, 14, true,
             MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
             MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
-            MIGRATION_12_13,
+            MIGRATION_12_13, MIGRATION_13_14,
         )
     }
 }

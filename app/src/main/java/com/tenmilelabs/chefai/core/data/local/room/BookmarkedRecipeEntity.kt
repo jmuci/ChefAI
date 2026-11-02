@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.core.data.local.room
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -34,5 +35,14 @@ data class BookmarkedRecipeEntity(
     val recipeId: UUID,
     override val updatedAt: Long,
     override val deletedAt: Long?,
-    override val syncState: SyncState = SyncState.PENDING
+    override val syncState: SyncState = SyncState.PENDING,
+    /**
+     * A star is a higher tier of bookmark. Living on the bookmark row makes "every starred recipe
+     * is bookmarked" structural, and [BookmarkedRecipeDao.softDelete] clears it with the bookmark.
+     */
+    @ColumnInfo(defaultValue = "0")
+    val isStarred: Boolean = false,
+    /** A go-to recipe — one the meal planner should favour. Same lifecycle as [isStarred]. */
+    @ColumnInfo(defaultValue = "0")
+    val isGoTo: Boolean = false,
 ) : SyncableCrossRef

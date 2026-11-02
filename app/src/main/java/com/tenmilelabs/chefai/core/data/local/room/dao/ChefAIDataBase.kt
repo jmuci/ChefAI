@@ -54,7 +54,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         TagEntity::class,
         UserEntity::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = true
 )
 @TypeConverters(UuidConverters::class)
@@ -406,5 +406,16 @@ val MIGRATION_11_12 = object : Migration(11, 12) {
 val MIGRATION_12_13 = object : Migration(12, 13) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE `meal_plans` ADD COLUMN `startEpochDay` INTEGER")
+    }
+}
+
+/**
+ * v13 → v14: `bookmarked_recipes.isStarred` / `isGoTo`, the star and go-to marks on a bookmark.
+ * Both default to 0, so every existing bookmark stays a plain one.
+ */
+val MIGRATION_13_14 = object : Migration(13, 14) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `bookmarked_recipes` ADD COLUMN `isStarred` INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE `bookmarked_recipes` ADD COLUMN `isGoTo` INTEGER NOT NULL DEFAULT 0")
     }
 }

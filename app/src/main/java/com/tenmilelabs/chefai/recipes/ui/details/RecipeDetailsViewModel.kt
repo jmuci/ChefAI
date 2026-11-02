@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
+import com.tenmilelabs.chefai.collections.domain.model.BookmarkUpdate
+import com.tenmilelabs.chefai.collections.domain.model.RecipeBookmark
 import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.domain.model.Recipe
 import com.tenmilelabs.chefai.core.domain.repository.UserPreferencesRepository
@@ -40,7 +42,8 @@ import javax.inject.Inject
 data class RecipesDetailsUiState(
     val recipe: Recipe? = null,
     val isLoading: Boolean = false,
-    val isBookmarked: Boolean = false,
+    /** The recipe's bookmark (with its star and go-to marks), or `null` when it isn't bookmarked. */
+    val bookmark: RecipeBookmark? = null,
     val userMessage: Int? = null,
     val showDeleteConfirmation: Boolean = false,
     val isDeleting: Boolean = false,
@@ -58,7 +61,9 @@ data class RecipesDetailsUiState(
     val servings: ServingsUiState = ServingsUiState.DEFAULT,
     /** The units the ingredient list is read in — a display choice, never written to the recipe. */
     val measurementSystem: MeasurementSystem = MeasurementSystem.DEFAULT,
-)
+) {
+    val isBookmarked: Boolean get() = bookmark != null
+}
 
 /** What the portions stepper renders: the chosen count and the counts it may be moved between. */
 data class ServingsUiState(
@@ -108,7 +113,8 @@ data class ServingsUiState(
  */
 sealed interface RecipeDetailsAction {
     data object EditClicked : RecipeDetailsAction
-    data object ToggleBookmark : RecipeDetailsAction
+    /** A bookmark-menu choice or a go-to toggle — see [BookmarkUpdate]. */
+    data class UpdateBookmark(val update: BookmarkUpdate) : RecipeDetailsAction
     data object DeleteClicked : RecipeDetailsAction
     data object ConfirmDelete : RecipeDetailsAction
     data object DismissDeleteDialog : RecipeDetailsAction
@@ -163,7 +169,7 @@ private data class CombinedState(
     val isLoading: Boolean,
     val recipeAsync: Async<Recipe>,
     val userMessage: Int?,
-    val isBookmarked: Boolean,
+    val bookmark: RecipeBookmark?,
     val deleteUi: DeleteUiState,
 )
 
@@ -227,14 +233,14 @@ class RecipeDetailsViewModel @Inject constructor(
         }
         .catch { emit(Async.Error(R.string.loading_recipe_details_error)) }
 
-    private val _isBookmarked: Flow<Boolean> = sessionManager.userSession
+    private val _bookmark: Flow<RecipeBookmark?> = sessionManager.userSession
         .flatMapLatest { session ->
             val userId = when (session) {
-                is UserSession.Loading -> return@flatMapLatest flowOf(false)
+                is UserSession.Loading -> return@flatMapLatest flowOf(null)
                 is UserSession.Anonymous -> session.localUserId
                 is UserSession.Authenticated -> session.user.uuid
             }
-            collectionsRepository.observeBookmarkedRecipeIds(userId).map { ids -> recipeUuid in ids }
+            collectionsRepository.observeBookmarks(userId).map { bookmarks -> bookmarks[recipeUuid] }
         }
 
     /** Current user's id regardless of session type, so ownership can be checked reactively. */
@@ -277,9 +283,9 @@ class RecipeDetailsViewModel @Inject constructor(
     }.stateIn(viewModelScope, WhileUiSubscribed, null)
 
     private val _combinedState = combine(
-        _isLoading, _recipeAsync, _userMessage, _isBookmarked, _deleteUi
-    ) { isLoading, recipeAsync, userMessage, isBookmarked, deleteUi ->
-        CombinedState(isLoading, recipeAsync, userMessage, isBookmarked, deleteUi)
+        _isLoading, _recipeAsync, _userMessage, _bookmark, _deleteUi
+    ) { isLoading, recipeAsync, userMessage, bookmark, deleteUi ->
+        CombinedState(isLoading, recipeAsync, userMessage, bookmark, deleteUi)
     }
 
     val uiState: StateFlow<RecipesDetailsUiState> = combine(
@@ -312,7 +318,7 @@ class RecipeDetailsViewModel @Inject constructor(
                 RecipesDetailsUiState(
                     recipe = recipe,
                     isLoading = combined.isLoading,
-                    isBookmarked = combined.isBookmarked,
+                    bookmark = combined.bookmark,
                     userMessage = combined.userMessage,
                     showDeleteConfirmation = combined.deleteUi.showConfirmation,
                     isDeleting = combined.deleteUi.isDeleting,
@@ -348,14 +354,10 @@ class RecipeDetailsViewModel @Inject constructor(
         savedStateHandle[SELECTED_SERVINGS_KEY] = servings
     }
 
-    fun toggleBookmark() {
+    fun onBookmarkUpdate(update: BookmarkUpdate) {
         val userId = sessionManager.getCurrentUserId() ?: return
         viewModelScope.launch {
-            if (uiState.value.isBookmarked) {
-                collectionsRepository.removeBookmark(userId, recipeUuid)
-            } else {
-                collectionsRepository.addBookmark(userId, recipeUuid)
-            }
+            collectionsRepository.update(userId, recipeUuid, update)
         }
     }
 

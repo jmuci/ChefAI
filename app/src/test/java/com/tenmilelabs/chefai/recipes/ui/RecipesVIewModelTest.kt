@@ -6,6 +6,7 @@ import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.collections.data.repository.FakeCollectionsRepository
+import com.tenmilelabs.chefai.collections.domain.model.RecipeBookmark
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import com.tenmilelabs.chefai.core.data.sync.SyncStatusHolder
 import com.tenmilelabs.chefai.core.testutil.TEST_DOMAIN_RECIPE_PREVIEWS_LIST
@@ -449,6 +450,30 @@ class RecipesViewModelTest {
             val filtered = awaitItem()
             assertThat(filtered.selectedFilter).isEqualTo(RecipeFilter.COOKED_BEFORE)
             assertThat(filtered.items.map { it.uuid }).containsExactly(recipeId2)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `selecting STARRED and GO_TO narrows items by bookmark marks`() = runTest {
+        recipesRepository.setRecipePreviewsToEmit(TEST_DOMAIN_RECIPE_PREVIEWS_LIST)
+        collectionsRepository.setBookmarks(
+            listOf(
+                RecipeBookmark(recipeId1, isStarred = true),
+                RecipeBookmark(recipeId2, isGoTo = true),
+                RecipeBookmark(recipeId3),
+            )
+        )
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().items).hasSize(3)
+
+            viewModel.onFilterSelected(RecipeFilter.STARRED)
+            assertThat(awaitItem().items.map { it.uuid }).containsExactly(recipeId1)
+
+            viewModel.onFilterSelected(RecipeFilter.GO_TO)
+            assertThat(awaitItem().items.map { it.uuid }).containsExactly(recipeId2)
 
             cancelAndIgnoreRemainingEvents()
         }

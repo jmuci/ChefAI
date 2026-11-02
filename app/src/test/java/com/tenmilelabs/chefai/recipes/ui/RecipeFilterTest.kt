@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.recipes.ui
 
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.collections.domain.model.RecipeBookmark
 import com.tenmilelabs.chefai.core.domain.model.Label
 import com.tenmilelabs.chefai.core.domain.model.QUICK_EASY_MAX_TOTAL_MINUTES
 import com.tenmilelabs.chefai.core.domain.model.Tag
@@ -87,5 +88,24 @@ class RecipeFilterTest {
     @Test
     fun `other filters ignore the cooked set`() {
         assertThat(RecipeFilter.ALL.matches(plain, emptySet())).isTrue()
+    }
+
+    @Test
+    fun `STARRED matches only starred bookmarks`() {
+        val starred = mapOf(plain.uuid to RecipeBookmark(plain.uuid, isStarred = true))
+        val bookmarkedOnly = mapOf(plain.uuid to RecipeBookmark(plain.uuid))
+
+        assertThat(RecipeFilter.STARRED.matches(plain, bookmarks = starred)).isTrue()
+        assertThat(RecipeFilter.STARRED.matches(plain, bookmarks = bookmarkedOnly)).isFalse()
+        assertThat(RecipeFilter.STARRED.matches(plain)).isFalse()
+    }
+
+    @Test
+    fun `GO_TO matches only go-to bookmarks, starred or not`() {
+        val goTo = mapOf(plain.uuid to RecipeBookmark(plain.uuid, isGoTo = true))
+        val starredOnly = mapOf(plain.uuid to RecipeBookmark(plain.uuid, isStarred = true))
+
+        assertThat(RecipeFilter.GO_TO.matches(plain, bookmarks = goTo)).isTrue()
+        assertThat(RecipeFilter.GO_TO.matches(plain, bookmarks = starredOnly)).isFalse()
     }
 }

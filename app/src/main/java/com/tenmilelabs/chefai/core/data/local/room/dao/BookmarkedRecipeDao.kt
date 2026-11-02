@@ -15,11 +15,37 @@ interface BookmarkedRecipeDao {
     @Query("SELECT recipeId FROM bookmarked_recipes WHERE userId = :userId AND deletedAt IS NULL")
     fun observeBookmarkedRecipeIds(userId: UUID): Flow<List<UUID>>
 
+    @Query("SELECT * FROM bookmarked_recipes WHERE userId = :userId AND deletedAt IS NULL")
+    fun observeLiveBookmarks(userId: UUID): Flow<List<BookmarkedRecipeEntity>>
+
+    @Query("SELECT * FROM bookmarked_recipes WHERE userId = :userId AND recipeId = :recipeId AND deletedAt IS NULL")
+    suspend fun getLive(userId: UUID, recipeId: UUID): BookmarkedRecipeEntity?
+
+    /** Any row for the pair, live or soft-deleted — sync pull reads the local flags off it. */
+    @Query("SELECT * FROM bookmarked_recipes WHERE userId = :userId AND recipeId = :recipeId")
+    suspend fun get(userId: UUID, recipeId: UUID): BookmarkedRecipeEntity?
+
+    /** Stars or unstars a live bookmark; a soft-deleted or missing row is left alone. */
+    @Query(
+        "UPDATE bookmarked_recipes SET isStarred = :starred, updatedAt = :ts, syncState = 'PENDING' " +
+        "WHERE userId = :userId AND recipeId = :recipeId AND deletedAt IS NULL"
+    )
+    suspend fun setStarred(userId: UUID, recipeId: UUID, starred: Boolean, ts: Long): Int
+
+    /** Marks or unmarks a live bookmark as go-to; a soft-deleted or missing row is left alone. */
+    @Query(
+        "UPDATE bookmarked_recipes SET isGoTo = :goTo, updatedAt = :ts, syncState = 'PENDING' " +
+        "WHERE userId = :userId AND recipeId = :recipeId AND deletedAt IS NULL"
+    )
+    suspend fun setGoTo(userId: UUID, recipeId: UUID, goTo: Boolean, ts: Long): Int
+
     @Upsert
     suspend fun upsert(entity: BookmarkedRecipeEntity)
 
+    /** Removing a bookmark takes its star and go-to mark with it — both only exist on a bookmark. */
     @Query(
-        "UPDATE bookmarked_recipes SET deletedAt = :ts, syncState = 'DELETED', updatedAt = :ts " +
+        "UPDATE bookmarked_recipes SET deletedAt = :ts, syncState = 'DELETED', updatedAt = :ts, " +
+        "isStarred = 0, isGoTo = 0 " +
         "WHERE userId = :userId AND recipeId = :recipeId"
     )
     suspend fun softDelete(userId: UUID, recipeId: UUID, ts: Long)
@@ -55,8 +81,8 @@ interface BookmarkedRecipeDao {
     }
 
     @Query(
-        "INSERT OR REPLACE INTO bookmarked_recipes (userId, recipeId, updatedAt, deletedAt, syncState) " +
-        "SELECT :newUserId, recipeId, :updatedAt, NULL, 'PENDING' FROM bookmarked_recipes " +
+        "INSERT OR REPLACE INTO bookmarked_recipes (userId, recipeId, updatedAt, deletedAt, syncState, isStarred, isGoTo) " +
+        "SELECT :newUserId, recipeId, :updatedAt, NULL, 'PENDING', isStarred, isGoTo FROM bookmarked_recipes " +
         "WHERE userId = :oldUserId AND deletedAt IS NULL"
     )
     suspend fun copyLiveBookmarksToUser(oldUserId: UUID, newUserId: UUID, updatedAt: Long)

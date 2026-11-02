@@ -15,7 +15,11 @@ data class SyncBookmarkPushDto(
     val userId: String,
     val recipeId: String,
     val updatedAt: Long,
-    val deletedAt: Long?
+    val deletedAt: Long?,
+    /** The bookmark's star. Ignored by a backend that doesn't store it yet (it ignores unknown keys). */
+    val starred: Boolean = false,
+    /** The bookmark's go-to mark; same backend caveat as [starred]. */
+    val goTo: Boolean = false,
 )
 
 @Serializable
@@ -211,7 +215,11 @@ data class SyncBookmarkPullDto(
     val userId: String,
     val recipeId: String,
     val updatedAt: Long,
-    val deletedAt: Long?
+    val deletedAt: Long?,
+    /** `null` when the backend doesn't send it (not stored server-side yet) — keep the local value. */
+    val starred: Boolean? = null,
+    /** `null` when the backend doesn't send it — keep the local value, as for [starred]. */
+    val goTo: Boolean? = null,
 )
 
 // --- Meal Plan Sync DTOs ---

@@ -8,6 +8,7 @@ import coil3.request.ImageRequest
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
+import com.tenmilelabs.chefai.collections.domain.model.RecipeBookmark
 import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.ui.recipeImageModel
@@ -40,7 +41,8 @@ sealed interface HomeUiState {
         val components: List<ComponentModel>,
         /** Recipe data keyed by UUID string, resolved from Room for each card in [components]. */
         val recipes: Map<String, RecipePreview>,
-        val bookmarkedRecipeIds: Set<UUID> = emptySet(),
+        /** The user's bookmarks keyed by recipe id; a recipe missing from it isn't bookmarked. */
+        val bookmarks: Map<UUID, RecipeBookmark> = emptyMap(),
         ) : HomeUiState
     data class Error(val message: Int) : HomeUiState
 }
@@ -67,11 +69,11 @@ class HomeViewModel @Inject constructor(
     // Follows the session rather than reading the user id once: on a cold start the session is
     // still Loading when Home is built, and it changes again on login/logout.
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val _bookmarkedIds = sessionManager.userSession.flatMapLatest { session ->
+    private val _bookmarks = sessionManager.userSession.flatMapLatest { session ->
         when (session) {
-            is UserSession.Loading -> flowOf(emptySet())
-            is UserSession.Anonymous -> collectionsRepository.observeBookmarkedRecipeIds(session.localUserId)
-            is UserSession.Authenticated -> collectionsRepository.observeBookmarkedRecipeIds(session.user.uuid)
+            is UserSession.Loading -> flowOf(emptyMap())
+            is UserSession.Anonymous -> collectionsRepository.observeBookmarks(session.localUserId)
+            is UserSession.Authenticated -> collectionsRepository.observeBookmarks(session.user.uuid)
         }
     }
 
@@ -81,11 +83,11 @@ class HomeViewModel @Inject constructor(
             val filtered = layout.components.filterNot { it is ComponentModel.Unknown }
             val recipeIds = extractRecipeIds(filtered)
             if (recipeIds.isEmpty()) {
-                _bookmarkedIds.map { bookmarkedIds ->
+                _bookmarks.map { bookmarks ->
                     HomeUiState.Success(
                         components = filtered,
                         recipes = emptyMap(),
-                        bookmarkedRecipeIds = bookmarkedIds,
+                        bookmarks = bookmarks,
                     )
                 }
             } else {
@@ -94,11 +96,11 @@ class HomeViewModel @Inject constructor(
                         prefetchImages(list)
                         list.associateBy { it.uuid.toString() }
                     }
-                combine(recipesFlow, _bookmarkedIds) { recipesMap, bookmarkedIds ->
+                combine(recipesFlow, _bookmarks) { recipesMap, bookmarks ->
                     HomeUiState.Success(
                         components = filtered,
                         recipes = recipesMap,
-                        bookmarkedRecipeIds = bookmarkedIds,
+                        bookmarks = bookmarks,
                     ) as HomeUiState
                 }
             }
@@ -133,16 +135,10 @@ class HomeViewModel @Inject constructor(
                 // TODO: Handle deep-link / section action navigation
                 Timber.d("Section action clicked: ${action.actionUrl}")
             }
-            is HomeAction.BookmarkToggled -> {
+            is HomeAction.BookmarkUpdated -> {
                 val userId = sessionManager.getCurrentUserId() ?: return
-                val currentBookmarks =
-                    (uiState.value as? HomeUiState.Success)?.bookmarkedRecipeIds ?: emptySet()
                 viewModelScope.launch {
-                    if (action.recipeId in currentBookmarks) {
-                        collectionsRepository.removeBookmark(userId, action.recipeId)
-                    } else {
-                        collectionsRepository.addBookmark(userId, action.recipeId)
-                    }
+                    collectionsRepository.update(userId, action.recipeId, action.update)
                 }
             }
         }

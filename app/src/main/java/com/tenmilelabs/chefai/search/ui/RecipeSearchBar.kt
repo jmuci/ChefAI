@@ -38,6 +38,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.collections.domain.model.BookmarkUpdate
 import com.tenmilelabs.chefai.core.ui.components.PanelMetrics
 import com.tenmilelabs.chefai.core.ui.components.RecipeListCard
 import com.tenmilelabs.chefai.core.ui.components.panelSegment
@@ -171,7 +172,7 @@ fun RecipeSearchBar(
                 .fillMaxWidth()
                 .weight(1f),
             onRecipeClick = viewModel::onRecipeClick,
-            onSaveToCollection = viewModel::onSaveToCollection,
+            onBookmarkUpdate = viewModel::onBookmarkUpdate,
             onLoadMore = viewModel::onLoadMore,
         )
     }
@@ -181,7 +182,7 @@ fun RecipeSearchBar(
 private fun ColumnScope.SearchResultsContent(
     uiState: SearchUiState,
     onRecipeClick: (UUID) -> Unit,
-    onSaveToCollection: (UUID) -> Unit,
+    onBookmarkUpdate: (UUID, BookmarkUpdate) -> Unit,
     onLoadMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -260,8 +261,8 @@ private fun ColumnScope.SearchResultsContent(
                 itemsIndexed(items = uiState.items, key = { _, recipe -> recipe.uuid }) { index, recipe ->
                     RecipeListCard(
                         recipe = recipe,
-                        isInCollection = recipe.uuid in uiState.bookmarkedRecipeIds,
-                        onSaveToCollection = onSaveToCollection,
+                        bookmark = uiState.bookmarks[recipe.uuid],
+                        onBookmarkUpdate = { onBookmarkUpdate(recipe.uuid, it) },
                         showDivider = false,
                         navigateToDetail = onRecipeClick,
                         modifier = Modifier

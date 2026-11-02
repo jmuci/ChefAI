@@ -9,7 +9,7 @@ import java.util.UUID
 
 /**
  * Maps a search result directly to the domain model — no Room write, no sidecar upsert. Room is
- * only consulted reactively, on tap or bookmark (see `RecipeSearchViewModel.onSaveToCollection`).
+ * only consulted reactively, on tap or bookmark (see `RecipeSearchViewModel.onBookmarkUpdate`).
  * [RecipePreview.localImagePath] is always null here: a search result was never cached on this
  * device, so `recipeImageModel()` falls back to the remote thumbnail, exactly as intended.
  */

@@ -55,15 +55,22 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.collections.domain.model.BookmarkUpdate
+import com.tenmilelabs.chefai.collections.domain.model.RecipeBookmark
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.Recipe
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.units.IngredientAmountFormatter
 import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
+import com.tenmilelabs.chefai.core.ui.components.BookmarkMenu
 import com.tenmilelabs.chefai.core.ui.components.CookedToggleButton
+import com.tenmilelabs.chefai.core.ui.components.GoToToggleButton
 import com.tenmilelabs.chefai.core.ui.components.InfoChip
 import com.tenmilelabs.chefai.core.ui.components.InfoChipType
 import com.tenmilelabs.chefai.core.ui.components.RecipePrivacyBadge
+import com.tenmilelabs.chefai.core.ui.components.bookmarkContentDescriptionRes
+import com.tenmilelabs.chefai.core.ui.components.bookmarkIconRes
+import com.tenmilelabs.chefai.core.ui.components.bookmarkTint
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatBlockButton
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatCheckbox
 import com.tenmilelabs.chefai.core.ui.components.flat.RuledGroup
@@ -129,7 +136,7 @@ fun RecipeDetailsScreen(
                 onAction = { action ->
                     when (action) {
                         RecipeDetailsAction.EditClicked -> onEditClick?.invoke(viewModel.recipeUuid)
-                        RecipeDetailsAction.ToggleBookmark -> viewModel.toggleBookmark()
+                        is RecipeDetailsAction.UpdateBookmark -> viewModel.onBookmarkUpdate(action.update)
                         RecipeDetailsAction.DeleteClicked -> viewModel.onDeleteClick()
                         RecipeDetailsAction.ConfirmDelete -> viewModel.confirmDelete()
                         RecipeDetailsAction.DismissDeleteDialog -> viewModel.dismissDeleteDialog()
@@ -150,7 +157,7 @@ fun RecipeDetailsScreen(
                     }
                 },
                 servings = uiState.servings,
-                isBookmarked = uiState.isBookmarked,
+                bookmark = uiState.bookmark,
                 canEdit = onEditClick != null && uiState.canEdit,
                 // Deleting navigates away, so the button is only offered when there is somewhere to
                 // go — and even then, only for a recipe the user owns (uiState.canDelete).
@@ -220,7 +227,7 @@ fun RecipeDetailsContent(
     onAction: (RecipeDetailsAction) -> Unit = {},
     servings: ServingsUiState = ServingsUiState.forRecipeServings(recipe.servings),
     measurementSystem: MeasurementSystem = MeasurementSystem.DEFAULT,
-    isBookmarked: Boolean = false,
+    bookmark: RecipeBookmark? = null,
     canEdit: Boolean = false,
     canDelete: Boolean = false,
     showDeleteConfirmation: Boolean = false,
@@ -277,7 +284,7 @@ fun RecipeDetailsContent(
         ) {
             RecipeHero(
                 recipe = recipe,
-                isBookmarked = isBookmarked,
+                bookmark = bookmark,
                 showCookedToggle = showCookedToggle,
                 isCooked = isCooked,
                 canDelete = canDelete,
@@ -388,7 +395,7 @@ private val ScreenHorizontalPadding = 16.dp
 @Composable
 private fun RecipeHero(
     recipe: Recipe,
-    isBookmarked: Boolean,
+    bookmark: RecipeBookmark?,
     showCookedToggle: Boolean,
     isCooked: Boolean,
     canDelete: Boolean,
@@ -418,6 +425,9 @@ private fun RecipeHero(
         Row(
             modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
+            // The go-to toggle pads itself out to a 48dp touch target around its 40dp square;
+            // centring keeps that square level with the 40dp buttons beside it.
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             if (showCookedToggle) {
                 CookedToggleButton(
@@ -435,14 +445,28 @@ private fun RecipeHero(
                     testTag = "DeleteRecipeButton",
                 )
             }
-            HeroOverlayIconButton(
-                icon = if (isBookmarked) ChefAIIcons.BookmarkFilled else ChefAIIcons.Bookmark,
-                contentDescription = stringResource(
-                    if (isBookmarked) R.string.remove_from_collection_content_description
-                    else R.string.save_to_collection_content_description
-                ),
-                onClick = { onAction(RecipeDetailsAction.ToggleBookmark) },
-                tint = if (isBookmarked) MaterialTheme.chefColors.accentText else MaterialTheme.colorScheme.onBackground,
+            if (bookmark != null) {
+                // Go-to only exists on a bookmark, so it appears once the recipe is saved.
+                GoToToggleButton(
+                    isGoTo = bookmark.isGoTo,
+                    onToggle = {
+                        onAction(RecipeDetailsAction.UpdateBookmark(BookmarkUpdate.SetGoTo(!bookmark.isGoTo)))
+                    },
+                    size = HeroOverlayButtonSize,
+                )
+            }
+            BookmarkMenu(
+                bookmark = bookmark,
+                onUpdate = { onAction(RecipeDetailsAction.UpdateBookmark(it)) },
+                anchor = { openMenu ->
+                    HeroOverlayIconButton(
+                        icon = bookmarkIconRes(bookmark),
+                        contentDescription = stringResource(bookmarkContentDescriptionRes(bookmark)),
+                        onClick = openMenu,
+                        tint = bookmarkTint(bookmark, idle = MaterialTheme.colorScheme.onBackground),
+                        testTag = "SaveToCollectionButton",
+                    )
+                },
             )
         }
     }
@@ -774,7 +798,7 @@ private fun HeroOverlayIconButtonPlain(
 @Composable
 fun RecipeDetailsFullScreenPreview() {
     ChefAITheme {
-        RecipeDetailsContent(recipe = RecipeData.recipe, isBookmarked = false)
+        RecipeDetailsContent(recipe = RecipeData.recipe, bookmark = null)
     }
 }
 
@@ -783,7 +807,10 @@ fun RecipeDetailsFullScreenPreview() {
 @Composable
 fun RecipeDetailsBookmarkedPreview() {
     ChefAITheme {
-        RecipeDetailsContent(recipe = RecipeData.recipe, isBookmarked = true)
+        RecipeDetailsContent(
+            recipe = RecipeData.recipe,
+            bookmark = RecipeBookmark(RecipeData.recipe.uuid, isStarred = true, isGoTo = true),
+        )
     }
 }
 
@@ -862,7 +889,6 @@ fun RecipeDetailsPrivatePreview() {
     ChefAITheme {
         RecipeDetailsContent(
             recipe = RecipeData.recipe.copy(privacy = RecipePrivacy.PRIVATE),
-            isBookmarked = false,
         )
     }
 }

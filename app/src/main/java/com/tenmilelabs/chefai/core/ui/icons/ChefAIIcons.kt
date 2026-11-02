@@ -50,11 +50,14 @@ object ChefAIIcons {
     @DrawableRes val Plus: Int = R.drawable.ic_lucide_plus
     @DrawableRes val Printer: Int = R.drawable.ic_lucide_printer
     @DrawableRes val Search: Int = R.drawable.ic_lucide_search
+    @DrawableRes val Repeat: Int = R.drawable.ic_lucide_repeat
     @DrawableRes val Settings: Int = R.drawable.ic_lucide_settings
     @DrawableRes val ShoppingCart: Int = R.drawable.ic_lucide_shopping_cart
     @DrawableRes val Sparkles: Int = R.drawable.ic_lucide_sparkles
     @DrawableRes val SquarePen: Int = R.drawable.ic_lucide_square_pen
     @DrawableRes val Timer: Int = R.drawable.ic_lucide_timer
+    @DrawableRes val Star: Int = R.drawable.ic_lucide_star
+    @DrawableRes val StarFilled: Int = R.drawable.ic_lucide_star_filled
     @DrawableRes val Trash: Int = R.drawable.ic_lucide_trash
     @DrawableRes val UserMinus: Int = R.drawable.ic_lucide_user_minus
     @DrawableRes val Users: Int = R.drawable.ic_lucide_users

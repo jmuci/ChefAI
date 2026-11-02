@@ -5,6 +5,8 @@ import coil3.ImageLoader
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.collections.data.repository.FakeCollectionsRepository
+import com.tenmilelabs.chefai.collections.domain.model.BookmarkUpdate
+import com.tenmilelabs.chefai.collections.domain.model.RecipeBookmark
 import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
 import com.tenmilelabs.chefai.core.testutil.TEST_DOMAIN_RECIPE_PREVIEWS_LIST
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
@@ -14,6 +16,7 @@ import com.tenmilelabs.chefai.home.data.repository.FakeHomeLayoutRepository
 import com.tenmilelabs.chefai.home.data.repository.FakeRecipesRepository
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
@@ -215,9 +218,9 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `bookmarkedRecipeIds reflects repository state`() = runTest {
+    fun `bookmarks reflect repository state`() = runTest {
         val targetId = TEST_DOMAIN_RECIPE_PREVIEWS_LIST.first().uuid
-        collectionsRepository.setBookmarkedIds(setOf(targetId))
+        collectionsRepository.setBookmarks(listOf(RecipeBookmark(targetId, isStarred = true, isGoTo = true)))
 
         // Header-only layout — no recipe IDs → _bookmarkedIds.map branch fires immediately
         homeLayoutRepository.emit(
@@ -232,9 +235,23 @@ class HomeViewModelTest {
                 if (it is HomeUiState.Loading) awaitItem() else it
             }
             assertThat(state).isInstanceOf(HomeUiState.Success::class.java)
-            assertThat((state as HomeUiState.Success).bookmarkedRecipeIds).contains(targetId)
+            assertThat((state as HomeUiState.Success).bookmarks[targetId])
+                .isEqualTo(RecipeBookmark(targetId, isStarred = true, isGoTo = true))
 
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun `BookmarkUpdated applies the update to the repository`() = runTest {
+        val targetId = TEST_DOMAIN_RECIPE_PREVIEWS_LIST.first().uuid
+
+        viewModel.onAction(HomeAction.BookmarkUpdated(targetId, BookmarkUpdate.Star))
+        viewModel.onAction(HomeAction.BookmarkUpdated(targetId, BookmarkUpdate.SetGoTo(true)))
+        advanceUntilIdle()
+
+        assertThat(collectionsRepository.updates)
+            .containsExactly(targetId to BookmarkUpdate.Star, targetId to BookmarkUpdate.SetGoTo(true))
+            .inOrder()
     }
 }

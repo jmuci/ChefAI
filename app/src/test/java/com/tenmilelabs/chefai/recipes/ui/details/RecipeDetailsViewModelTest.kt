@@ -6,6 +6,8 @@ import app.cash.turbine.turbineScope
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.collections.data.repository.FakeCollectionsRepository
+import com.tenmilelabs.chefai.collections.domain.model.BookmarkUpdate
+import com.tenmilelabs.chefai.collections.domain.model.RecipeBookmark
 import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
 import com.tenmilelabs.chefai.core.testutil.recipe1
 import com.tenmilelabs.chefai.core.testutil.recipeId1
@@ -255,7 +257,7 @@ class RecipeDetailsViewModelTest {
     }
 
     @Test
-    fun `toggleBookmark - adds bookmark when not bookmarked`() = runTest {
+    fun `Bookmark update - bookmarks the recipe`() = runTest {
         val userId = sessionManager.getCurrentUserId()!!
         initializeViewModel()
 
@@ -264,15 +266,49 @@ class RecipeDetailsViewModelTest {
             recipesRepository.emitRecipe(recipeId1, recipe1)
             assertThat(awaitItem().isBookmarked).isFalse()
 
-            viewModel.toggleBookmark()
-            assertThat(awaitItem().isBookmarked).isTrue()
+            viewModel.onBookmarkUpdate(BookmarkUpdate.Bookmark)
+            assertThat(awaitItem().bookmark).isEqualTo(RecipeBookmark(recipeId1))
 
             cancelAndConsumeRemainingEvents()
         }
     }
 
     @Test
-    fun `toggleBookmark - removes bookmark when already bookmarked`() = runTest {
+    fun `Star update - bookmarks and stars an unbookmarked recipe`() = runTest {
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+            assertThat(awaitItem().bookmark).isNull()
+
+            viewModel.onBookmarkUpdate(BookmarkUpdate.Star)
+            assertThat(awaitItem().bookmark).isEqualTo(RecipeBookmark(recipeId1, isStarred = true))
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `SetGoTo update - marks a bookmarked recipe as go-to`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        collectionsRepository.addBookmark(userId, recipeId1)
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            assertThat(awaitItem().isLoading).isTrue()
+            recipesRepository.emitRecipe(recipeId1, recipe1)
+            assertThat(awaitItem().bookmark?.isGoTo).isFalse()
+
+            viewModel.onBookmarkUpdate(BookmarkUpdate.SetGoTo(true))
+            assertThat(awaitItem().bookmark).isEqualTo(RecipeBookmark(recipeId1, isGoTo = true))
+
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `Remove update - removes an existing bookmark`() = runTest {
         val userId = sessionManager.getCurrentUserId()!!
         collectionsRepository.addBookmark(userId, recipeId1)
         initializeViewModel()
@@ -282,7 +318,7 @@ class RecipeDetailsViewModelTest {
             recipesRepository.emitRecipe(recipeId1, recipe1)
             assertThat(awaitItem().isBookmarked).isTrue()
 
-            viewModel.toggleBookmark()
+            viewModel.onBookmarkUpdate(BookmarkUpdate.Remove)
             assertThat(awaitItem().isBookmarked).isFalse()
 
             cancelAndConsumeRemainingEvents()

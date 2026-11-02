@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
+import com.tenmilelabs.chefai.collections.domain.model.RecipeBookmark
 import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import com.tenmilelabs.chefai.core.data.sync.SyncStatus
@@ -15,6 +16,7 @@ import com.tenmilelabs.chefai.core.util.WhileUiSubscribed
 import com.tenmilelabs.chefai.recipes.domain.repository.CookHistoryRepository
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.util.UUID
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -49,6 +51,12 @@ sealed interface RecipesUiEvent {
     data class ShowSnackbar(val message: Int) : RecipesUiEvent
 }
 
+/** The collection's recipes with the bookmarks they came from, which carry the star/go-to marks. */
+private data class BookmarkedCollection(
+    val recipes: List<RecipePreview>,
+    val bookmarks: Map<UUID, RecipeBookmark>,
+)
+
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class RecipesViewModel @Inject constructor(
@@ -73,14 +81,15 @@ class RecipesViewModel @Inject constructor(
         .flatMapLatest { session ->
             when (session) {
                 is UserSession.Loading -> emptyFlow()
-                is UserSession.Anonymous -> collectionsRepository.observeBookmarkedRecipeIds(session.localUserId)
-                is UserSession.Authenticated -> collectionsRepository.observeBookmarkedRecipeIds(session.user.uuid)
-            }.flatMapLatest { bookmarkedIds ->
-                recipesRepository.getRecipePreviewsByIds(bookmarkedIds.toList())
+                is UserSession.Anonymous -> collectionsRepository.observeBookmarks(session.localUserId)
+                is UserSession.Authenticated -> collectionsRepository.observeBookmarks(session.user.uuid)
+            }.flatMapLatest { bookmarks ->
+                recipesRepository.getRecipePreviewsByIds(bookmarks.keys.toList())
+                    .map { recipes -> BookmarkedCollection(recipes, bookmarks) }
             }
         }
         .map { Async.Success(it) }
-        .catch<Async<List<RecipePreview>>> { e ->
+        .catch<Async<BookmarkedCollection>> { e ->
             if (e is CancellationException) throw e
             // Emitted here rather than from the combine below: that transform re-runs on every
             // emission of *any* of its sources, so raising the snackbar from it repeated the same
@@ -111,7 +120,9 @@ class RecipesViewModel @Inject constructor(
             }
             is Async.Success -> {
                 RecipesUiState(
-                    items = recipesAsync.data.filter { selectedFilter.matches(it, cookedRecipeIds) },
+                    items = recipesAsync.data.recipes.filter {
+                        selectedFilter.matches(it, cookedRecipeIds, recipesAsync.data.bookmarks)
+                    },
                     selectedFilter = selectedFilter,
                     isLoading = isLoading,
                     isRefreshing = isRefreshing,
