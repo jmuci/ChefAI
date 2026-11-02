@@ -449,6 +449,27 @@ class SessionManagerTest {
     }
 
     @Test
+    fun `endDeletedAccountSession wipes the database, clears auth and returns to the same anonymous id`() = testScope.runTest {
+        // Given: an anonymous session that then signed in
+        sessionManager.loadSession()
+        val anonymousId = (sessionManager.userSession.first() as UserSession.Anonymous).localUserId
+        sessionManager.login("test@example.com", "password123")
+        val cancelsBefore = fakeSyncManager.cancelAllCount
+
+        // When: the account was deleted server-side
+        sessionManager.endDeletedAccountSession()
+
+        // Then: nothing of the account is left, and the device is anonymous again
+        coVerify(exactly = 1) { mockDatabase.clearAllTables() }
+        assertThat(fakeSyncManager.cancelAllCount).isEqualTo(cancelsBefore + 1)
+        assertThat(fakeSecurePreferences.getAccessToken().first()).isNull()
+        assertThat(fakeSecurePreferences.getRefreshToken().first()).isNull()
+        val session = sessionManager.userSession.first() as UserSession.Anonymous
+        assertThat(session.localUserId).isEqualTo(anonymousId)
+        assertThat(fakeUserDao.getUserById(anonymousId)).isNotNull()
+    }
+
+    @Test
     fun `logout reuses same anonymous UUID from previous session`() = testScope.runTest {
         // Given: Anonymous session
         sessionManager.loadSession()

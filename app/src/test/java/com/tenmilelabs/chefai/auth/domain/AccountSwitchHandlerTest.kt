@@ -49,6 +49,14 @@ class AccountSwitchHandlerTest {
     }
 
     @Test
+    fun `clearAllLocalData wipes every table and every cached image`() = runTest {
+        handler.clearAllLocalData()
+
+        coVerify(exactly = 1) { database.clearAllTables() }
+        coVerify(exactly = 1) { recipeImageStore.deleteAll() }
+    }
+
+    @Test
     fun `first authenticated login keeps database and stores user id`() = runTest {
         val userId = UuidV7Generator.newId()
 

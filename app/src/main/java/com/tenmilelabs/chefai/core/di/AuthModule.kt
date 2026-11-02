@@ -1,9 +1,13 @@
 package com.tenmilelabs.chefai.core.di
 
+import com.tenmilelabs.chefai.auth.data.network.AccountApiService
+import com.tenmilelabs.chefai.auth.data.network.AccountNetworkDataSource
 import com.tenmilelabs.chefai.auth.data.network.AuthApiService
+import com.tenmilelabs.chefai.auth.data.repository.DefaultAccountRepository
 import com.tenmilelabs.chefai.auth.data.network.AuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.TokenProvider
+import com.tenmilelabs.chefai.auth.domain.repository.AccountRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -35,4 +39,14 @@ abstract class AuthModule {
     abstract fun bindAuthNetworkDataSource(
         authApiService: AuthApiService
     ): AuthNetworkDataSource
+
+    @Binds
+    @Singleton
+    abstract fun bindAccountNetworkDataSource(
+        accountApiService: AccountApiService
+    ): AccountNetworkDataSource
+
+    @Binds
+    @Singleton
+    abstract fun bindAccountRepository(repository: DefaultAccountRepository): AccountRepository
 }
