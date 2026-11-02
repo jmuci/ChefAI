@@ -1,12 +1,12 @@
 package com.tenmilelabs.chefai.mealplans.ui
 
 import androidx.annotation.StringRes
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
+import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.domain.repository.UserPreferencesRepository
 import com.tenmilelabs.chefai.core.util.WhileUiSubscribed
@@ -35,8 +35,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
@@ -95,13 +96,13 @@ sealed interface MealPlansUiState {
 @HiltViewModel
 class MealPlansViewModel @Inject constructor(
     private val mealPlanRepository: MealPlanRepository,
-    recipesRepository: RecipesRepository,
+    private val recipesRepository: RecipesRepository,
+    private val collectionsRepository: CollectionsRepository,
     shoppingListRepository: ShoppingListRepository,
     householdRepository: HouseholdRepository,
     userPreferencesRepository: UserPreferencesRepository,
     private val sessionManager: SessionManager,
     private val addRecipeToDate: AddRecipeToDateUseCase,
-    private val savedStateHandle: SavedStateHandle,
     private val clock: Clock,
 ) : ViewModel() {
 
@@ -242,30 +243,56 @@ class MealPlansViewModel @Inject constructor(
     /** The date whose "Add meal" sheet is open, or `null` while it is closed. */
     val addMealDate: StateFlow<LocalDate?> = _addMealDate
 
+    private val _addMealQuery = MutableStateFlow("")
+
+    /** What the user has typed into the sheet's search field. */
+    val addMealQuery: StateFlow<String> = _addMealQuery
+
+    /**
+     * The user's saved recipes matching [addMealQuery], by title — every saved recipe while the
+     * query is blank. The same set the Recipes tab shows (bookmarks), never the public catalog.
+     * Queried only while the sheet is open; empty otherwise.
+     */
+    val addMealRecipes: StateFlow<List<RecipePreview>> = _addMealDate
+        .map { it != null }
+        .distinctUntilChanged()
+        .flatMapLatest { open -> if (open) savedRecipes() else flowOf(emptyList()) }
+        .combine(_addMealQuery) { recipes, query ->
+            val needle = query.trim()
+            if (needle.isEmpty()) recipes else recipes.filter { it.title.contains(needle, ignoreCase = true) }
+        }
+        .catch { e ->
+            if (e is CancellationException) throw e
+            Timber.e(e, "addMealRecipes: failed to load saved recipes")
+            emit(emptyList())
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = WhileUiSubscribed,
+            initialValue = emptyList(),
+        )
+
     private val _events = Channel<MealPlansEvent>(Channel.BUFFERED)
     val events: Flow<MealPlansEvent> = _events.receiveAsFlow()
 
-    init {
-        // The picker / editor lands its result on this tab's back-stack entry, whose
-        // SavedStateHandle this is — so the hand-off survives the trip through other screens
-        // (and process death) without any screen holding a reference to this ViewModel.
-        viewModelScope.launch {
-            savedStateHandle.getStateFlow<String?>(AddMealRequest.KEY_RECIPE, null)
-                .filterNotNull()
-                .collect { raw ->
-                    val date = pendingDate()
-                    val slot = pendingSlot()
-                    clearAddMealRequest()
-                    val recipeId = runCatching { UUID.fromString(raw) }.getOrNull()
-                    if (date != null && slot != null && recipeId != null) {
-                        assignRecipe(date, slot, recipeId)
-                    }
-                }
+    private fun savedRecipes(): Flow<List<RecipePreview>> = sessionManager.userSession
+        .flatMapLatest { session ->
+            when (session) {
+                is UserSession.Loading -> emptyFlow()
+                is UserSession.Anonymous -> collectionsRepository.observeBookmarkedRecipeIds(session.localUserId)
+                is UserSession.Authenticated -> collectionsRepository.observeBookmarkedRecipeIds(session.user.uuid)
+            }
         }
-    }
+        .flatMapLatest { ids -> recipesRepository.getRecipePreviewsByIds(ids.toList()) }
+        .map { recipes -> recipes.sortedBy { it.title.lowercase() } }
 
     fun onAddMeal(date: LocalDate) {
+        _addMealQuery.value = ""
         _addMealDate.value = date
+    }
+
+    fun onAddMealQueryChange(query: String) {
+        _addMealQuery.value = query
     }
 
     /**
@@ -292,39 +319,16 @@ class MealPlansViewModel @Inject constructor(
 
     fun onAddMealDismissed() {
         _addMealDate.value = null
+        _addMealQuery.value = ""
     }
 
     /**
-     * The user chose [slot] and a way to find the recipe; remembers where it must land and closes
-     * the sheet. The caller then navigates to the picker or the editor.
+     * Puts [recipeId] on [date]'s [slot] and closes the sheet — both for a recipe picked in the
+     * sheet and for one created via "Add a New Recipe" (delivered through [AddMealRequest]).
      */
-    fun onAddMealSourceChosen(slot: MealSlot) {
-        val date = _addMealDate.value ?: return
-        savedStateHandle[AddMealRequest.KEY_DATE] = date.toString()
-        savedStateHandle[AddMealRequest.KEY_SLOT] = slot.name
-        savedStateHandle[AddMealRequest.KEY_RECIPE] = null
-        _addMealDate.value = null
-    }
-
-    /**
-     * Called when the tab is back on screen. A request still waiting at that point with no recipe
-     * delivered means the user backed out of the picker or editor, so it is dropped — otherwise
-     * the next recipe saved anywhere would be dropped onto a date nobody is thinking about.
-     */
-    fun onTabResumed() {
-        if (savedStateHandle.get<String>(AddMealRequest.KEY_RECIPE) == null) clearAddMealRequest()
-    }
-
-    private fun pendingDate(): LocalDate? =
-        savedStateHandle.get<String>(AddMealRequest.KEY_DATE)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-
-    private fun pendingSlot(): MealSlot? =
-        savedStateHandle.get<String>(AddMealRequest.KEY_SLOT)?.let { name -> MealSlot.entries.firstOrNull { it.name == name } }
-
-    private fun clearAddMealRequest() {
-        savedStateHandle[AddMealRequest.KEY_DATE] = null
-        savedStateHandle[AddMealRequest.KEY_SLOT] = null
-        savedStateHandle[AddMealRequest.KEY_RECIPE] = null
+    fun onRecipeChosen(date: LocalDate, slot: MealSlot, recipeId: UUID) {
+        onAddMealDismissed()
+        viewModelScope.launch { assignRecipe(date, slot, recipeId) }
     }
 
     private suspend fun assignRecipe(date: LocalDate, slot: MealSlot, recipeId: UUID) {

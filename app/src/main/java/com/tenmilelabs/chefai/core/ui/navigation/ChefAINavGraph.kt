@@ -75,7 +75,6 @@ import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailScreen
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailUiState
 import com.tenmilelabs.chefai.mealplans.ui.detail.MealPlanDetailViewModel
 import com.tenmilelabs.chefai.mealplans.ui.detail.mealPlanDetailSubtitle
-import com.tenmilelabs.chefai.mealplans.ui.picker.RecipePickerScreen
 import com.tenmilelabs.chefai.mealplans.ui.create.CreateMealPlanEvent
 import com.tenmilelabs.chefai.mealplans.ui.create.CreateMealPlanViewModel
 import com.tenmilelabs.chefai.mealplans.ui.create.WizardAdvancedScreen
@@ -183,13 +182,20 @@ fun ChefAINavGraph(
                 }
             )
         }
-        composable(route = AppDestinations.MEAL_PLANS.route) {
+        composable(route = AppDestinations.MEAL_PLANS.route) { backStackEntry ->
+            // The add-meal hand-off lives in *this entry's* handle, not the ViewModel's — the two
+            // are different instances. See AddMealRequest.
+            val tabHandle = backStackEntry.savedStateHandle
             MealPlansScreen(
                 snackbarHostState = snackbarHostState,
-                onSearchRecipe = { navActions.navigateToRecipePicker() },
                 // The importer, not the bare editor: it covers both "paste a URL" and "type it in"
                 // (its manual-entry fallback), and either way ends in the editor's create mode.
-                onNewRecipe = { navActions.navigateToImportRecipe() },
+                onNewRecipe = { date, slot ->
+                    AddMealRequest.begin(tabHandle, date, slot)
+                    navActions.navigateToImportRecipe()
+                },
+                addMealResults = remember(tabHandle) { AddMealRequest.results(tabHandle) },
+                onTabResumed = { AddMealRequest.dropIfUndelivered(tabHandle) },
                 // The week view's rows are meals, not plans, so a tap opens the recipe on the
                 // plan-scoped route — which carries the day and slot the cooked toggle acts on.
                 onMealClick = { meal ->
@@ -199,12 +205,6 @@ fun ChefAINavGraph(
                     navActions.navigateToMealPlanShoppingList(planId)
                 },
                 onPlanClick = { planId -> navActions.navigateToMealPlanDetail(planId) },
-            )
-        }
-        composable(route = AppDestinations.RECIPE_PICKER.route) {
-            RecipePickerScreen(
-                snackbarHostState = snackbarHostState,
-                onRecipePicked = { recipeId -> navController.finishAddMeal(recipeId) },
             )
         }
         composable(route = AppDestinations.MEAL_PLAN_DETAIL.route) { backStackEntry ->
@@ -689,7 +689,6 @@ fun ChefAINavGraph(
                 val hideNav = currentRoute == AppDestinations.LOGIN.route ||
                     currentRoute == AppDestinations.REGISTER.route ||
                     currentRoute == AppDestinations.IMPORT_RECIPE.route ||
-                    currentRoute == AppDestinations.RECIPE_PICKER.route ||
                     currentRoute == AppDestinations.ACCEPT_INVITE.route ||
                     currentRoute in wizardRoutes
                 val showBottomNav = !hideNav && !isExpanded
@@ -743,7 +742,6 @@ fun ChefAINavGraph(
             val hideNav = currentRoute == AppDestinations.LOGIN.route ||
                 currentRoute == AppDestinations.REGISTER.route ||
                 currentRoute == AppDestinations.IMPORT_RECIPE.route ||
-                currentRoute == AppDestinations.RECIPE_PICKER.route ||
                 currentRoute == AppDestinations.ACCEPT_INVITE.route ||
                 currentRoute in wizardRoutes
 
@@ -811,7 +809,7 @@ private val recipeDetailRoutes = setOf(
  */
 private fun NavController.finishAddMeal(recipeId: UUID): Boolean {
     val tab = runCatching { getBackStackEntry(AppDestinations.MEAL_PLANS.route) }.getOrNull()
-    if (!AddMealRequest.deliver(tab, recipeId)) return false
+    if (!AddMealRequest.deliver(tab?.savedStateHandle, recipeId)) return false
     popBackStack(AppDestinations.MEAL_PLANS.route, inclusive = false)
     return true
 }
