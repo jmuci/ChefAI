@@ -82,4 +82,18 @@ class AccountSwitchHandler @Inject constructor(
         securePreferences.setCurrentUserId(newUserId)
         return outcome
     }
+
+    /**
+     * Wipes every table and every cached recipe image — used after the signed-in account was
+     * deleted server-side, so nothing of it stays on the device. That includes other creators'
+     * cached recipes and unsaved import drafts: they can be re-fetched or redone, and a full wipe
+     * can't miss a table the way a per-user delete could.
+     *
+     * Blocking: Room's `clearAllTables` refuses the main thread, so call this off it.
+     */
+    suspend fun clearAllLocalData() {
+        Timber.i("Clearing all local data after account deletion")
+        database.clearAllTables()
+        recipeImageStore.deleteAll()
+    }
 }

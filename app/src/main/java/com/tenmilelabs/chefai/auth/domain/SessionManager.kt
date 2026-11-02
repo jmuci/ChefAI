@@ -483,6 +483,28 @@ class SessionManager @Inject constructor(
     }
 
     /**
+     * Ends the session of an account that was just deleted server-side: the same steps as
+     * [logout], plus a full wipe of the local database and image cache
+     * ([AccountSwitchHandler.clearAllLocalData]), then a fresh anonymous session. The anonymous
+     * localUserId is kept, as on logout; [enterAnonymousSession] recreates its user row.
+     *
+     * Unlike [logout] this doesn't swallow a failed wipe: the caller should know the device still
+     * holds the deleted account's data. The session still ends up anonymous either way, since
+     * the credentials are dead server-side regardless.
+     */
+    suspend fun endDeletedAccountSession() {
+        Timber.d("Ending session for deleted account: ${getCurrentUser()?.uuid}")
+        householdRefreshJob?.cancel()
+        syncSchedulerProvider.get().cancelAllSync()
+        securePreferences.clearAuthData()
+        try {
+            accountSwitchHandler.clearAllLocalData()
+        } finally {
+            enterAnonymousSession()
+        }
+    }
+
+    /**
      * Refreshes the access token using the refresh token.
      *
      * Serialized, because there is more than one caller — `SyncWorker` on a 401 and

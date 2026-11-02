@@ -464,6 +464,39 @@
     <string name="settings_recipe_language_title">Recipe language</string>
     <string name="settings_recipe_language_subtitle">Assumed for recipes you write yourself, and suggested first when an imported recipe\'s language can\'t be told from the page.</string>
     <string name="settings_recipe_language_footnote">Imports in other languages still work. You\'ll be asked to confirm whenever a recipe\'s language is only a guess.</string>
+
+    <!-- Settings: delete account. Copy kept in step with chefai-web's DeleteAccountSection. -->
+    <string name="settings_delete_account_title">Delete account</string>
+    <string name="settings_delete_account_subtitle">Permanently deletes your account and what\'s in it, on every device.</string>
+    <string name="settings_delete_account_button">Delete account</string>
+    <string name="settings_delete_account_preview_failed">Couldn\'t check what would be deleted. Try again.</string>
+    <string name="delete_account_dialog_title">Delete your account?</string>
+    <string name="delete_account_irreversible">This can\'t be undone.</string>
+    <plurals name="delete_account_private_recipes">
+        <item quantity="one">Your %1$d recipe that only you can see will be deleted.</item>
+        <item quantity="other">Your %1$d recipes that only you can see will be deleted.</item>
+    </plurals>
+    <string name="delete_account_private_recipes_none">Your private recipes will be deleted.</string>
+    <string name="delete_account_personal_data">Your meal plans, saved recipes and preferences will be deleted.</string>
+    <string name="delete_account_household">You own your household. Ownership will pass to the member who has been in it longest, or the household will be deleted if you\'re its only member.</string>
+    <string name="delete_account_signed_out">You\'ll be signed out everywhere.</string>
+    <plurals name="delete_account_public_recipes_question">
+        <item quantity="one">You\'ve published %1$d recipe. What should happen to it?</item>
+        <item quantity="other">You\'ve published %1$d recipes. What should happen to them?</item>
+    </plurals>
+    <string name="delete_account_public_recipes_delete">Delete my public recipes</string>
+    <string name="delete_account_public_recipes_anonymize">Keep them, credited to \u201cDeleted user\u201d</string>
+    <string name="delete_account_password_label">Enter your password to confirm</string>
+    <string name="delete_account_confirm_button">Delete my account</string>
+    <string name="delete_account_confirm_button_loading">Deleting\u2026</string>
+    <string name="delete_account_error_choice_missing">Choose what happens to your public recipes.</string>
+    <string name="delete_account_error_public_recipes_changed">You have public recipes. Choose what happens to them.</string>
+    <string name="delete_account_error_wrong_password">That password isn\'t right.</string>
+    <string name="delete_account_error_conflict">Your account changed while it was being deleted. Try again.</string>
+    <string name="delete_account_error_rate_limited">Too many attempts. Wait a minute and try again.</string>
+    <string name="delete_account_error_session_expired">Your session has expired. Sign in again, then try again.</string>
+    <string name="delete_account_error_generic">Couldn\'t delete your account. Try again.</string>
+    <string name="delete_account_done">Your account has been deleted.</string>
     <!-- Each language's name in its own language, so these are deliberately not translated. -->
     <string name="recipe_language_en" translatable="false">English</string>
     <string name="recipe_language_es" translatable="false">Español</string>

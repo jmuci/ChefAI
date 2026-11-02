@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.core.data.sync
 
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.auth.domain.model.DeletedUser
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.MealPlanDayEntity
@@ -485,6 +486,63 @@ class SyncOrchestratorTest {
         assertThat(existingCreator.email).isEqualTo("jane@example.com")
         assertThat(existingCreator.avatarUrl).isEqualTo("https://example.com/avatar.jpg")
         assertThat(existingCreator.syncState).isEqualTo(SyncState.SYNCED)
+    }
+
+    @Test
+    fun `pull reassigns an anonymized recipe to the deleted-user account and keeps its bookmark`() = runTest(testDispatcher) {
+        // Given: a SYNCED public recipe by another creator, bookmarked on this device
+        val viewerId = requireNotNull(sessionManager.getCurrentUserId())
+        recipeDao.upsertRecipe(createDirtyRecipe(uuid = recipeId1, title = "Alice's Stew", syncState = SyncState.SYNCED))
+        bookmarkedRecipeDao.upsert(
+            BookmarkedRecipeEntity(userId = viewerId, recipeId = recipeId1, updatedAt = 1000L, deletedAt = null, syncState = SyncState.SYNCED)
+        )
+
+        // When: its author deletes their account and keeps it (ANONYMIZE) — sync-protocol.md §
+        // Deleted Accounts: same content, creatorId moved, the deleted-user account in creators
+        val deletedUserId = UUID.fromString(DeletedUser.ID)
+        val anonymized = createSyncRecipeDto(uuid = recipeId1, title = "Alice's Stew", updatedAt = 5000L)
+            .copy(creatorId = DeletedUser.ID)
+        syncNetworkDataSource.pullResponses.addLast(
+            SyncPullResponse(
+                recipes = listOf(anonymized),
+                serverTimestamp = 5000L,
+                hasMore = false,
+                creators = listOf(
+                    SyncCreatorDto(
+                        uuid = DeletedUser.ID,
+                        displayName = DeletedUser.DISPLAY_NAME,
+                        email = "",
+                        avatarUrl = "",
+                        updatedAt = 5000L,
+                        deletedAt = null,
+                    )
+                ),
+            )
+        )
+        syncOrchestrator.sync()
+
+        // Then: the recipe is updated in place, still live, still bookmarked
+        val recipe = requireNotNull(recipeDao.getRecipeById(recipeId1))
+        assertThat(recipe.creatorId).isEqualTo(deletedUserId)
+        assertThat(recipe.title).isEqualTo("Alice's Stew")
+        assertThat(recipe.deletedAt).isNull()
+        assertThat(userDao.getUserById(deletedUserId)?.displayName).isEqualTo(DeletedUser.DISPLAY_NAME)
+        assertThat(bookmarkedRecipeDao.getLive(viewerId, recipeId1)).isNotNull()
+    }
+
+    @Test
+    fun `pull applies a recipe its deleted author chose to delete as an ordinary tombstone`() = runTest(testDispatcher) {
+        recipeDao.upsertRecipe(createDirtyRecipe(uuid = recipeId1, syncState = SyncState.SYNCED))
+        val tombstone = createSyncRecipeDto(uuid = recipeId1, title = "", updatedAt = 5000L, deletedAt = 5000L)
+            .copy(creatorId = DeletedUser.ID, steps = emptyList(), ingredients = emptyList(), tagIds = emptyList(), labelIds = emptyList())
+        syncNetworkDataSource.pullResponses.addLast(
+            SyncPullResponse(recipes = listOf(tombstone), serverTimestamp = 5000L, hasMore = false)
+        )
+
+        val result = syncOrchestrator.sync()
+
+        assertThat(result.pullResult.deleted).isEqualTo(1)
+        assertThat(recipeDao.getRecipeById(recipeId1)?.deletedAt).isEqualTo(5000L)
     }
 
     @Test

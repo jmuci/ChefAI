@@ -406,6 +406,8 @@ fun ChefAINavGraph(
                 } else {
                     null
                 },
+                // Same destination as signing out from the profile menu.
+                onAccountDeleted = { navActions.navigateToHome() },
             )
         }
         if (BuildConfig.DEBUG) {
