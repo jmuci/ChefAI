@@ -1,10 +1,10 @@
 package com.tenmilelabs.chefai.mealplans.ui
 
-import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.collections.data.repository.FakeCollectionsRepository
 import com.tenmilelabs.chefai.core.data.repository.FakeUserPreferencesRepository
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.domain.model.WeekStart
@@ -72,12 +72,12 @@ class MealPlansViewModelTest {
     private lateinit var shoppingListRepository: FakeShoppingListRepository
     private lateinit var householdRepository: FakeHouseholdRepository
     private lateinit var sessionManager: SessionManager
+    private lateinit var collectionsRepository: FakeCollectionsRepository
     private lateinit var viewModel: MealPlansViewModel
-    private lateinit var savedStateHandle: SavedStateHandle
 
     @Before
     fun setup() {
-        savedStateHandle = SavedStateHandle()
+        collectionsRepository = FakeCollectionsRepository()
         repository = FakeMealPlanRepository()
         recipesRepository = FakeRecipesRepository()
         shoppingListRepository = FakeShoppingListRepository()
@@ -91,12 +91,12 @@ class MealPlansViewModelTest {
     ) = MealPlansViewModel(
         mealPlanRepository = repository,
         recipesRepository = recipesRepository,
+        collectionsRepository = collectionsRepository,
         shoppingListRepository = shoppingListRepository,
         householdRepository = householdRepository,
         userPreferencesRepository = preferences,
         sessionManager = sessionManager,
         addRecipeToDate = AddRecipeToDateUseCase(repository, clock),
-        savedStateHandle = savedStateHandle,
         clock = clock,
     )
 
@@ -112,57 +112,21 @@ class MealPlansViewModelTest {
     }
 
     @Test
-    fun `choosing a source closes the sheet and remembers the date and slot`() = runTest {
-        viewModel.onAddMeal(weekStart.plusDays(2))
-
-        viewModel.onAddMealSourceChosen(MealSlot.LUNCH)
-
-        assertThat(viewModel.addMealDate.value).isNull()
-        assertThat(savedStateHandle.get<String>(AddMealRequest.KEY_DATE))
-            .isEqualTo(weekStart.plusDays(2).toString())
-        assertThat(savedStateHandle.get<String>(AddMealRequest.KEY_SLOT)).isEqualTo("LUNCH")
-    }
-
-    @Test
-    fun `a recipe delivered after choosing a source lands on that date and slot`() = runTest {
+    fun `a chosen recipe closes the sheet and lands on that date and slot`() = runTest {
         val userId = sessionManager.getCurrentUserId()!!
         val recipeId = UUID.randomUUID()
         val target = weekStart.plusDays(2)
         repository.emitPlans()
-
         viewModel.onAddMeal(target)
-        viewModel.onAddMealSourceChosen(MealSlot.LUNCH)
-        savedStateHandle[AddMealRequest.KEY_RECIPE] = recipeId.toString()
 
+        viewModel.onRecipeChosen(target, MealSlot.LUNCH, recipeId)
+
+        assertThat(viewModel.addMealDate.value).isNull()
         val plan = repository.observeMealPlansForUser(userId).first().single()
         val placed = plan.days.single()
         assertThat(placed.lunchRecipeId).isEqualTo(recipeId)
         assertThat(placed.dinnerRecipeId).isNull()
         assertThat(planDateFor(plan.createdAt, placed.dayIndex, ZoneOffset.UTC)).isEqualTo(target)
-        // Consumed: nothing is left to fire on the next recipe saved elsewhere.
-        assertThat(savedStateHandle.get<String>(AddMealRequest.KEY_DATE)).isNull()
-        assertThat(savedStateHandle.get<String>(AddMealRequest.KEY_RECIPE)).isNull()
-    }
-
-    @Test
-    fun `a recipe delivered with no pending request is ignored`() = runTest {
-        val userId = sessionManager.getCurrentUserId()!!
-        repository.emitPlans()
-
-        savedStateHandle[AddMealRequest.KEY_RECIPE] = UUID.randomUUID().toString()
-
-        assertThat(repository.observeMealPlansForUser(userId).first()).isEmpty()
-    }
-
-    @Test
-    fun `returning to the tab with nothing delivered drops the pending request`() = runTest {
-        viewModel.onAddMeal(weekStart)
-        viewModel.onAddMealSourceChosen(MealSlot.DINNER)
-
-        viewModel.onTabResumed()
-
-        assertThat(savedStateHandle.get<String>(AddMealRequest.KEY_DATE)).isNull()
-        assertThat(savedStateHandle.get<String>(AddMealRequest.KEY_SLOT)).isNull()
     }
 
     @Test
@@ -171,12 +135,56 @@ class MealPlansViewModelTest {
         repository.shouldThrowOnCreate = true
 
         viewModel.events.test {
-            viewModel.onAddMeal(weekStart.plusDays(1))
-            viewModel.onAddMealSourceChosen(MealSlot.DINNER)
-            savedStateHandle[AddMealRequest.KEY_RECIPE] = UUID.randomUUID().toString()
+            viewModel.onRecipeChosen(weekStart.plusDays(1), MealSlot.DINNER, UUID.randomUUID())
 
             assertThat(awaitItem()).isEqualTo(MealPlansEvent.ShowMessage(R.string.meal_plans_add_meal_failed))
         }
+    }
+
+    @Test
+    fun `the sheet lists every saved recipe by title and nothing unsaved`() = runTest {
+        val tofu = preview("Tofu Veggie Bowl")
+        val pizza = preview("margherita pizza")
+        val unsaved = preview("Chivito sandwich")
+        recipesRepository.setRecipePreviewsToEmit(listOf(tofu, pizza, unsaved))
+        collectionsRepository.setBookmarkedIds(setOf(tofu.uuid, pizza.uuid))
+
+        viewModel.addMealRecipes.test {
+            assertThat(awaitItem()).isEmpty()
+
+            viewModel.onAddMeal(weekStart)
+
+            assertThat(awaitItem()).containsExactly(pizza, tofu).inOrder()
+        }
+    }
+
+    @Test
+    fun `typing filters saved recipes by title ignoring case`() = runTest {
+        val tofu = preview("Tofu Veggie Bowl")
+        val pizza = preview("Margherita Pizza")
+        recipesRepository.setRecipePreviewsToEmit(listOf(tofu, pizza))
+        collectionsRepository.setBookmarkedIds(setOf(tofu.uuid, pizza.uuid))
+
+        viewModel.addMealRecipes.test {
+            skipItems(1)
+            viewModel.onAddMeal(weekStart)
+            assertThat(awaitItem()).hasSize(2)
+
+            viewModel.onAddMealQueryChange("  VEGGIE ")
+
+            assertThat(awaitItem()).containsExactly(tofu)
+        }
+    }
+
+    @Test
+    fun `reopening the sheet starts from an empty query`() = runTest {
+        viewModel.onAddMeal(weekStart)
+        viewModel.onAddMealQueryChange("tofu")
+
+        viewModel.onAddMealDismissed()
+        viewModel.onAddMeal(weekStart.plusDays(1))
+
+        assertThat(viewModel.addMealQuery.value).isEmpty()
     }
 
     // --- The week ---

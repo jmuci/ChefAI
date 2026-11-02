@@ -282,6 +282,15 @@ Recipes and Search screens) or **Add a New Recipe** (the importer, whose manual 
 the editor). Either path ends by delivering a recipe id to the Meal Plans tab's back-stack entry
 (`AddMealRequest`); `MealPlansViewModel` then calls `AddRecipeToDateUseCase`.
 
+**Revised (Nov 2026):** the separate picker screen is gone. The sheet opens at a fixed ~80% of the
+screen (deliberately past M3's 50% initial cap, so results fit above the keyboard) and searches the
+user's **saved** (bookmarked) recipes in place — all of them before anything is typed, filtered by
+title as the user types; no public catalog. A pick calls `MealPlansViewModel.onRecipeChosen`
+directly. Only "Add a New Recipe" still uses `AddMealRequest`, and it now reads and writes the tab
+entry's `NavBackStackEntry.savedStateHandle` from the nav graph: that handle is backed by
+Navigation's own internal ViewModel, not `MealPlansViewModel`'s Hilt-injected handle, so the
+original version (which wrote the request into the ViewModel's handle) never delivered anything.
+
 Binding a recipe to a date reuses Decision 2's anchor rather than adding a column:
 - a **READY plan of the user's own** whose span covers the date (oldest first) gets the recipe via
   `assignRecipeToSlot`;
