@@ -226,12 +226,13 @@ class CreateMealPlanViewModel @Inject constructor(
                 false
             }
 
-            // Assigned after generation, which replaces the plan's days wholesale. A dinners-only
+            // Assigned after generation, which replaces the plan's days wholesale and knows nothing of this
+            // recipe, so it may have dealt it elsewhere too — hence no repeats. A dinners-only
             // plan has no lunch slot, so a lunch pick moves to dinner if the user changed the type.
             val slot = if (state.mealType == MealType.DINNER) MealSlot.DINNER else includedSlot
             val includedRecipeAssigned = includedRecipeId?.let { recipeId ->
                 try {
-                    mealPlanRepository.assignRecipeToSlot(mealPlanId, 0, slot, recipeId)
+                    mealPlanRepository.assignRecipeToSlotWithoutRepeats(mealPlanId, 0, slot, recipeId)
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e
                     Timber.e(e, "Failed to include recipe $recipeId in plan $mealPlanId")

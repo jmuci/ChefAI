@@ -137,6 +137,13 @@ class FakeMealPlanRepository : MealPlanRepository {
         return true
     }
 
+    override suspend fun assignRecipeToSlotWithoutRepeats(
+        planId: UUID,
+        dayIndex: Int,
+        slot: MealSlot,
+        recipeId: UUID,
+    ): Boolean = assignRecipeToSlot(planId, dayIndex, slot, recipeId)
+
     override suspend fun appendRecipeAsNewDay(planId: UUID, slot: MealSlot, recipeId: UUID): Boolean {
         if (shouldThrowOnAssign) throw RuntimeException("Fake assign error")
         val plan = plans.value.firstOrNull { it.uuid == planId } ?: return false
