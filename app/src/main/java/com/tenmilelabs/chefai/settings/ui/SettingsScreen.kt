@@ -49,6 +49,7 @@ import com.tenmilelabs.chefai.core.domain.model.WeekStart
 import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
 import com.tenmilelabs.chefai.core.ui.language.labelRes
 import com.tenmilelabs.chefai.core.ui.components.AppVersionText
+import com.tenmilelabs.chefai.core.ui.components.flat.DISABLED_ALPHA
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatBlockButton
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatButtonVariant
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatField
@@ -274,7 +275,12 @@ private fun DeleteAccountDialog(
                             R.string.delete_account_confirm_button
                         },
                     ),
-                    color = MaterialTheme.colorScheme.error,
+                    // An explicit color overrides TextButton's disabled tint, so dim it by hand
+                    // while there's no password — but not mid-request, where "Deleting…" is
+                    // the progress indicator.
+                    color = MaterialTheme.colorScheme.error.copy(
+                        alpha = if (state.canSubmit || state.isSubmitting) 1f else DISABLED_ALPHA,
+                    ),
                 )
             }
         },
