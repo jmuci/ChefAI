@@ -4,6 +4,7 @@ import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.AuthToken
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
+import com.tenmilelabs.chefai.collections.data.repository.FakeCollectionsRepository
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncExecutor
 import com.tenmilelabs.chefai.core.domain.model.User
 import com.tenmilelabs.chefai.core.testutil.recipePreview1
@@ -48,7 +49,7 @@ class GenerateMealPlanUseCaseTest {
             mealPlanRepository = mealPlanRepository,
             sessionManager = sessionManager,
             syncExecutor = syncExecutor,
-            localMealPlanGenerator = LocalMealPlanGenerator(recipesRepository, mealPlanRepository),
+            localMealPlanGenerator = LocalMealPlanGenerator(recipesRepository, mealPlanRepository, FakeCollectionsRepository()),
         )
     }
 

@@ -18,7 +18,9 @@ import kotlin.random.Random
  *
  * This is a deliberately simple stand-in for the backend generator: it drops desserts, filters the
  * rest against the preferences that are checkable on-device, then deals them out round-robin so a
- * short collection repeats as late as possible.
+ * short collection repeats as late as possible. The user's go-to recipes that pass those filters are
+ * dealt first and may come back up to [GO_TO_SERVINGS_PER_WEEK] times a week, whatever the variety
+ * preference — eating them often is what the mark means.
  */
 object MealPlanScheduler {
 
@@ -55,6 +57,9 @@ object MealPlanScheduler {
     /**
      * Deals [candidates] into one [MealPlanDay] per planned day.
      *
+     * @param goToRecipeIds the user's go-to recipes. Those among the eligible [candidates] fill the
+     *   earliest slots, each up to [goToServingsPerRecipe] times; the rest of the week is dealt
+     *   from the other recipes as usual. Empty leaves the schedule exactly as it would be without.
      * @param newDayId supplies the id for each generated day — a UUIDv7 factory in production.
      * @param random seeds the shuffle; inject a fixed seed to make a schedule reproducible.
      * @return one day per [MealPlanPreferences.planLengthDays], or an empty list if [candidates]
@@ -63,6 +68,7 @@ object MealPlanScheduler {
     fun schedule(
         preferences: MealPlanPreferences,
         candidates: List<RecipePreview>,
+        goToRecipeIds: Set<UUID> = emptySet(),
         newDayId: () -> UUID,
         random: Random = Random.Default,
     ): List<MealPlanDay> {
@@ -71,15 +77,38 @@ object MealPlanScheduler {
         val meals = candidates.filterNot { it.isDessert() }
         if (meals.isEmpty()) return emptyList()
 
-        val pool = orderPool(eligible(preferences, meals), preferences.varietyPreference, random)
+        val (goTo, others) = eligible(preferences, meals).partition { it.uuid in goToRecipeIds }
+        // Go-to recipes skip the variety cut in [orderPool]: repeating them is the point of the mark.
+        // Each round keeps the same order, so consecutive picks differ whenever there are two or more.
+        val goToIds = goTo.shuffled(random).map { it.uuid }
+        val goToPicks = List(goToServingsPerRecipe(preferences.planLengthDays)) { goToIds }
+            .flatten()
+            .toMutableList()
+        // When every eligible recipe is a go-to, they also fill whatever their allowance leaves.
+        val pool = orderPool(others.ifEmpty { goTo }, preferences.varietyPreference, random)
         val includeLunch = preferences.mealType == MealType.DINNER_AND_LUNCH
 
+        // The first go-to pick not already on today's table, if any are left.
+        fun nextGoTo(today: Set<UUID>): UUID? {
+            val index = goToPicks.indexOfFirst { it !in today }
+            return if (index < 0) null else goToPicks.removeAt(index)
+        }
+
         // One cursor across the whole week so lunches and dinners draw from the same rotation and a
-        // recipe is not served twice on the same day.
+        // recipe is not served twice on the same day — unless the pool holds nothing else.
         var cursor = 0
-        fun next(): UUID = pool[cursor++ % pool.size].uuid
+        fun nextFromPool(today: Set<UUID>): UUID {
+            val start = cursor
+            var id: UUID
+            do {
+                id = pool[cursor++ % pool.size].uuid
+            } while (id in today && cursor - start < pool.size)
+            return id
+        }
 
         return (0 until preferences.planLengthDays).map { dayIndex ->
+            val today = mutableSetOf<UUID>()
+            fun next(): UUID = (nextGoTo(today) ?: nextFromPool(today)).also { today += it }
             MealPlanDay(
                 uuid = newDayId(),
                 dayIndex = dayIndex,
@@ -140,6 +169,15 @@ object MealPlanScheduler {
         }
     }
 
+    /** How many times one go-to recipe may appear in a plan: [GO_TO_SERVINGS_PER_WEEK], pro rata. */
+    private fun goToServingsPerRecipe(planLengthDays: Int): Int =
+        ((planLengthDays * GO_TO_SERVINGS_PER_WEEK + DAYS_PER_WEEK - 1) / DAYS_PER_WEEK).coerceAtLeast(1)
+
     /** How many distinct recipes [VarietyPreference.LOW] rotates through. */
     private const val LOW_VARIETY_POOL_SIZE = 3
+
+    /** How often a go-to recipe may come back within a week. */
+    const val GO_TO_SERVINGS_PER_WEEK = 2
+
+    private const val DAYS_PER_WEEK = 7
 }

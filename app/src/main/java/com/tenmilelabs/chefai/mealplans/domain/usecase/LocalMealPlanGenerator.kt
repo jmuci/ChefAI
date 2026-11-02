@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.mealplans.domain.usecase
 
+import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
@@ -20,10 +21,14 @@ import javax.inject.Inject
  *
  * A server-generated schedule for the same plan overwrites these days on the next pull, so this is
  * a stop-gap rather than a competing source of truth.
+ *
+ * The user's go-to bookmarks are scheduled first — see [MealPlanScheduler.schedule]. Only those
+ * among the candidates count, so a go-to public recipe plays no part in a `COLLECTION_ONLY` plan.
  */
 class LocalMealPlanGenerator @Inject constructor(
     private val recipesRepository: RecipesRepository,
     private val mealPlanRepository: MealPlanRepository,
+    private val collectionsRepository: CollectionsRepository,
 ) {
 
     /**
@@ -39,10 +44,15 @@ class LocalMealPlanGenerator @Inject constructor(
             RecipeSource.INCLUDE_PUBLIC ->
                 recipesRepository.getRecipesPreviewStream().first()
         }
+        val goToRecipeIds = collectionsRepository.observeBookmarks(plan.userId).first()
+            .values
+            .filter { it.isGoTo }
+            .mapTo(mutableSetOf()) { it.recipeId }
 
         val days = MealPlanScheduler.schedule(
             preferences = plan.preferences,
             candidates = candidates,
+            goToRecipeIds = goToRecipeIds,
             newDayId = UuidV7Generator::newId,
         )
 

@@ -253,6 +253,127 @@ class MealPlanSchedulerTest {
         assertThat(high.mapNotNull { it.dinnerRecipeId }.toSet().size).isGreaterThan(3)
     }
 
+    // --- Go-to recipes ---
+
+    @Test
+    fun `go-to recipes fill the earliest slots`() {
+        val goTo = listOf(recipe("Go-to A"), recipe("Go-to B"))
+
+        val days = schedule(
+            preferences(planLengthDays = 7),
+            pool(10) + goTo,
+            goToRecipeIds = goTo.ids(),
+        )
+
+        val dinners = days.mapNotNull { it.dinnerRecipeId }
+        assertThat(dinners.take(4).toSet()).isEqualTo(goTo.ids())
+        assertThat(dinners.drop(4)).containsNoneIn(goTo.ids())
+    }
+
+    @Test
+    fun `a go-to recipe repeats even when high variety would not repeat anything`() {
+        val goTo = recipe("Go-to")
+
+        val days = schedule(
+            preferences(planLengthDays = 7, varietyPreference = VarietyPreference.HIGH),
+            pool(10) + goTo,
+            goToRecipeIds = setOf(goTo.uuid),
+        )
+
+        val dinners = days.mapNotNull { it.dinnerRecipeId }
+        assertThat(dinners.count { it == goTo.uuid }).isEqualTo(MealPlanScheduler.GO_TO_SERVINGS_PER_WEEK)
+        val others = dinners.filterNot { it == goTo.uuid }
+        assertThat(others.toSet()).hasSize(others.size)
+    }
+
+    @Test
+    fun `the go-to allowance scales with the plan length`() {
+        val goTo = recipe("Go-to")
+
+        val days = schedule(preferences(planLengthDays = 14), pool(20) + goTo, setOf(goTo.uuid))
+
+        assertThat(days.count { it.dinnerRecipeId == goTo.uuid })
+            .isEqualTo(2 * MealPlanScheduler.GO_TO_SERVINGS_PER_WEEK)
+    }
+
+    @Test
+    fun `a go-to recipe is never served twice on the same day`() {
+        val goTo = recipe("Go-to")
+
+        val days = schedule(
+            preferences(planLengthDays = 7, mealType = MealType.DINNER_AND_LUNCH),
+            pool(5) + goTo,
+            goToRecipeIds = setOf(goTo.uuid),
+        )
+
+        assertThat(days.all { it.lunchRecipeId != it.dinnerRecipeId }).isTrue()
+        assertThat(days.count { it.lunchRecipeId == goTo.uuid || it.dinnerRecipeId == goTo.uuid })
+            .isEqualTo(MealPlanScheduler.GO_TO_SERVINGS_PER_WEEK)
+    }
+
+    @Test
+    fun `when every eligible recipe is a go-to they fill the whole plan`() {
+        val goTo = listOf(recipe("Go-to A"), recipe("Go-to B"))
+
+        val days = schedule(
+            preferences(planLengthDays = 7, mealType = MealType.DINNER_AND_LUNCH),
+            goTo,
+            goToRecipeIds = goTo.ids(),
+        )
+
+        assertThat(days).hasSize(7)
+        assertThat(days.all { it.lunchRecipeId != null && it.dinnerRecipeId != null }).isTrue()
+        assertThat(days.all { it.lunchRecipeId != it.dinnerRecipeId }).isTrue()
+    }
+
+    @Test
+    fun `a go-to recipe over the prep-time limit is not preferred`() {
+        val slowGoTo = recipe("Slow go-to", prepTimeMinutes = 90)
+
+        val days = schedule(
+            preferences(planLengthDays = 5, maxPrepTimeMinutes = 20),
+            pool(5) + slowGoTo,
+            goToRecipeIds = setOf(slowGoTo.uuid),
+        )
+
+        assertThat(days.mapNotNull { it.dinnerRecipeId }).doesNotContain(slowGoTo.uuid)
+    }
+
+    @Test
+    fun `a go-to recipe that misses a dietary restriction is not preferred`() {
+        val steak = recipe("Steak", tags = listOf("Beef"))
+        val vegan = (1..5).map { recipe("Vegan $it", tags = listOf("Vegan")) }
+
+        val days = schedule(
+            preferences(planLengthDays = 5, dietaryRestrictions = setOf(DietaryRestriction.VEGAN)),
+            vegan + steak,
+            goToRecipeIds = setOf(steak.uuid),
+        )
+
+        assertThat(days.mapNotNull { it.dinnerRecipeId }).doesNotContain(steak.uuid)
+    }
+
+    @Test
+    fun `a go-to dessert is still never scheduled`() {
+        val cake = recipe("Cake", tags = listOf("Dessert"))
+
+        val days = schedule(preferences(planLengthDays = 5), pool(5) + cake, setOf(cake.uuid))
+
+        assertThat(days.mapNotNull { it.dinnerRecipeId }).doesNotContain(cake.uuid)
+    }
+
+    @Test
+    fun `go-to ids absent from the candidates leave the schedule unchanged`() {
+        val candidates = pool(10)
+        val preferences = preferences(planLengthDays = 7, mealType = MealType.DINNER_AND_LUNCH)
+
+        val withoutGoTo = schedule(preferences, candidates)
+        val withUnknownGoTo = schedule(preferences, candidates, setOf(UUID.randomUUID()))
+
+        assertThat(withUnknownGoTo.map { it.lunchRecipeId to it.dinnerRecipeId })
+            .isEqualTo(withoutGoTo.map { it.lunchRecipeId to it.dinnerRecipeId })
+    }
+
     // --- Determinism ---
 
     @Test
@@ -270,10 +391,12 @@ class MealPlanSchedulerTest {
     private fun schedule(
         preferences: MealPlanPreferences,
         candidates: List<RecipePreview>,
+        goToRecipeIds: Set<UUID> = emptySet(),
         seed: Int = 42,
     ) = MealPlanScheduler.schedule(
         preferences = preferences,
         candidates = candidates,
+        goToRecipeIds = goToRecipeIds,
         newDayId = UUID::randomUUID,
         random = Random(seed),
     )
@@ -295,6 +418,8 @@ class MealPlanSchedulerTest {
         leftoverFriendly = false,
         varietyPreference = varietyPreference,
     )
+
+    private fun List<RecipePreview>.ids() = map { it.uuid }.toSet()
 
     private fun pool(size: Int) = (1..size).map { recipe("Recipe $it") }
 
