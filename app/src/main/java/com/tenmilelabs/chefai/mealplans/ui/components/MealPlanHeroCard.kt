@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -44,17 +45,16 @@ import java.util.UUID
 
 /**
  * One plan in the plans list: a photo from one of its recipes, a title, a few of the recipes, and
- * when it runs.
+ * the dates it runs.
  *
- * @param onScheduleClick the calendar button beside the schedule line. A no-op at the call site for
- *   now — picking a date for a plan lands in a follow-up.
+ * @param onDeleteClick the trash button beside the dates. The caller confirms before deleting.
  */
 @Composable
 fun MealPlanHeroCard(
     summary: MealPlanSummary,
     today: LocalDate,
     onClick: () -> Unit,
-    onScheduleClick: () -> Unit,
+    onDeleteClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -121,12 +121,13 @@ fun MealPlanHeroCard(
                 Box(
                     modifier = Modifier
                         .size(44.dp)
-                        .flatClickable(onClick = onScheduleClick),
+                        .flatClickable(onClick = onDeleteClick)
+                        .testTag("MealPlanCardDelete"),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        painter = painterResource(ChefAIIcons.Calendar),
-                        contentDescription = stringResource(R.string.meal_plans_card_schedule),
+                        painter = painterResource(ChefAIIcons.Trash),
+                        contentDescription = stringResource(R.string.meal_plan_delete),
                         tint = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.size(20.dp),
                     )
@@ -162,27 +163,41 @@ private fun MealPlanSummary.displayTitle(): String = when {
 }
 
 /**
- * When the plan runs — or, for one whose last day has passed, when it was last cooked, since a
- * schedule that is over tells the reader nothing. A past plan nobody cooked from keeps its range.
+ * The dates the plan runs. A plan whose last day has passed also says when it was last cooked from,
+ * if ever.
  */
 @Composable
 private fun MealPlanSummary.scheduleLabel(today: LocalDate): String {
+    val range = stringResource(R.string.meal_plans_card_scheduled, formatRange(startDate, endDate, today))
     val lastCooked = lastCookedOn
     return if (isPast(today) && lastCooked != null) {
-        stringResource(R.string.meal_plans_card_last_cooked, formatDay(lastCooked))
+        stringResource(
+            R.string.meal_plans_card_scheduled_last_cooked,
+            range,
+            formatDay(lastCooked, today),
+        )
     } else {
-        stringResource(R.string.meal_plans_card_scheduled, formatRange(startDate, endDate))
+        range
     }
 }
 
-private fun formatDay(date: LocalDate): String =
-    DateTimeFormatter.ofPattern("MMM d", Locale.getDefault()).format(date)
+/** "Aug 11", or "Aug 11, 2025" outside the current year (or whenever [withYear]). */
+private fun formatDay(date: LocalDate, today: LocalDate, withYear: Boolean = false): String {
+    val pattern = if (withYear || date.year != today.year) "MMM d, yyyy" else "MMM d"
+    return DateTimeFormatter.ofPattern(pattern, Locale.getDefault()).format(date)
+}
 
-/** "Aug 11 – 17" within a month, "Aug 28 – Sep 3" across one. */
-private fun formatRange(start: LocalDate, end: LocalDate): String {
-    if (start == end) return formatDay(start)
-    val tail = if (start.month == end.month) end.dayOfMonth.toString() else formatDay(end)
-    return "${formatDay(start)} – $tail"
+/**
+ * "Aug 11 – 17" within a month, "Aug 28 – Sep 3" across one. The year shows only when the plan is
+ * not in the current one: "Dec 29, 2025 – Jan 4, 2026" across a new year.
+ */
+private fun formatRange(start: LocalDate, end: LocalDate, today: LocalDate): String {
+    if (start == end) return formatDay(start, today)
+    if (start.year != end.year) return "${formatDay(start, today, withYear = true)} – ${formatDay(end, today, withYear = true)}"
+    val monthDay = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
+    val tail = if (start.month == end.month) end.dayOfMonth.toString() else monthDay.format(end)
+    val range = "${monthDay.format(start)} – $tail"
+    return if (start.year == today.year) range else "$range, ${start.year}"
 }
 
 private fun previewSummary(
@@ -219,13 +234,13 @@ private fun MealPlanHeroCardPreview() {
                 summary = previewSummary(null, today),
                 today = today,
                 onClick = {},
-                onScheduleClick = {},
+                onDeleteClick = {},
             )
             MealPlanHeroCard(
                 summary = previewSummary("Birthday week", today.minusDays(30), today.minusDays(27)),
                 today = today,
                 onClick = {},
-                onScheduleClick = {},
+                onDeleteClick = {},
             )
         }
     }
