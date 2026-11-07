@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import java.util.UUID
 
-/** In-memory [SavedMealPlanRepository] that records [saveFromMealPlan] calls. */
+/** In-memory [SavedMealPlanRepository]: records [saveFromMealPlan] calls, newest first, deletes drop the row. */
 class FakeSavedMealPlanRepository : SavedMealPlanRepository {
 
     data class SaveCall(
@@ -27,12 +27,18 @@ class FakeSavedMealPlanRepository : SavedMealPlanRepository {
 
     val saveCalls: MutableList<SaveCall> = mutableListOf()
     val deletedIds: MutableList<UUID> = mutableListOf()
+    var shouldThrowOnDelete: Boolean = false
 
     /** When set, [saveFromMealPlan] fails with it, like a plan that has no days. */
     var saveFailure: Throwable? = null
 
+    /** Replaces every saved plan, as if Room had emitted a new list. */
+    fun emitPlans(vararg savedPlans: SavedMealPlan) {
+        plans.value = savedPlans.toList()
+    }
+
     override fun observeSavedPlans(userId: UUID): Flow<List<SavedMealPlan>> =
-        plans.map { list -> list.filter { it.userId == userId } }
+        plans.map { list -> list.filter { it.userId == userId }.sortedByDescending { it.createdAt } }
 
     override suspend fun getSavedPlan(uuid: UUID): SavedMealPlan? = plans.value.firstOrNull { it.uuid == uuid }
 
@@ -71,6 +77,7 @@ class FakeSavedMealPlanRepository : SavedMealPlanRepository {
     }
 
     override suspend fun delete(uuid: UUID) {
+        if (shouldThrowOnDelete) throw RuntimeException("Fake delete error")
         deletedIds += uuid
         plans.value = plans.value.filterNot { it.uuid == uuid }
     }

@@ -12,6 +12,7 @@ import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import com.tenmilelabs.chefai.household.domain.repository.FakeHouseholdRepository
 import com.tenmilelabs.chefai.mealplans.data.repository.FakeMealPlanRepository
+import com.tenmilelabs.chefai.mealplans.data.repository.FakeSavedMealPlanRepository
 import com.tenmilelabs.chefai.mealplans.data.repository.FakeShoppingListRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.DietaryRestriction
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
@@ -20,6 +21,8 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
+import com.tenmilelabs.chefai.mealplans.domain.model.SavedMealPlan
+import com.tenmilelabs.chefai.mealplans.domain.model.SavedMealPlanDay
 import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.PlannedIngredient
 import com.tenmilelabs.chefai.mealplans.domain.week.weekStartFor
@@ -65,6 +68,7 @@ class MealPlansViewModelTest {
     )
 
     private lateinit var repository: FakeMealPlanRepository
+    private lateinit var savedRepository: FakeSavedMealPlanRepository
     private lateinit var recipesRepository: FakeRecipesRepository
     private lateinit var shoppingListRepository: FakeShoppingListRepository
     private lateinit var householdRepository: FakeHouseholdRepository
@@ -76,6 +80,7 @@ class MealPlansViewModelTest {
     fun setup() {
         collectionsRepository = FakeCollectionsRepository()
         repository = FakeMealPlanRepository()
+        savedRepository = FakeSavedMealPlanRepository()
         recipesRepository = FakeRecipesRepository()
         shoppingListRepository = FakeShoppingListRepository()
         householdRepository = FakeHouseholdRepository()
@@ -87,6 +92,7 @@ class MealPlansViewModelTest {
         preferences: FakeUserPreferencesRepository = FakeUserPreferencesRepository(),
     ) = MealPlansViewModel(
         mealPlanRepository = repository,
+        savedMealPlanRepository = savedRepository,
         recipesRepository = recipesRepository,
         collectionsRepository = collectionsRepository,
         shoppingListRepository = shoppingListRepository,
@@ -304,6 +310,150 @@ class MealPlansViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    // --- Scheduled / Saved tabs ---
+
+    @Test
+    fun `with no saved plans there are no tabs and Scheduled is selected`() = runTest {
+        viewModel.listState.test {
+            val state = awaitSuccessItem()
+            assertThat(state.savedPlans).isEmpty()
+            assertThat(state.selectedTab).isEqualTo(PlanListTab.SCHEDULED)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `selecting Saved with nothing saved still shows Scheduled`() = runTest {
+        viewModel.onPlanListTabSelected(PlanListTab.SAVED)
+
+        viewModel.listState.test {
+            assertThat(awaitSuccessItem().selectedTab).isEqualTo(PlanListTab.SCHEDULED)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `saved plans appear with their recipes and tab selection sticks`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        val tofu = preview("Tofu Bowl")
+        recipesRepository.setRecipePreviewsToEmit(listOf(tofu))
+        val saved = makeSaved(userId, dinner = tofu.uuid)
+        savedRepository.emitPlans(saved)
+
+        viewModel.listState.test {
+            var state = awaitSuccessItem()
+            while (state.savedPlans.isEmpty() || state.savedPlans.single().recipeTitles.isEmpty()) {
+                state = awaitSuccessItem()
+            }
+            assertThat(state.savedPlans.single().id).isEqualTo(saved.uuid)
+            assertThat(state.savedPlans.single().recipeTitles).containsExactly("Tofu Bowl")
+            assertThat(state.selectedTab).isEqualTo(PlanListTab.SCHEDULED)
+
+            viewModel.onPlanListTabSelected(PlanListTab.SAVED)
+
+            state = awaitSuccessItem()
+            while (state.selectedTab != PlanListTab.SAVED) state = awaitSuccessItem()
+            assertThat(state.savedPlans).hasSize(1)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `deleting the last saved plan falls back to Scheduled`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        val saved = makeSaved(userId)
+        savedRepository.emitPlans(saved)
+        viewModel.onPlanListTabSelected(PlanListTab.SAVED)
+
+        viewModel.listState.test {
+            var state = awaitSuccessItem()
+            while (state.selectedTab != PlanListTab.SAVED) state = awaitSuccessItem()
+
+            viewModel.onDeleteSavedPlanRequested(saved.uuid)
+            viewModel.onDeleteSavedPlanConfirmed()
+
+            while (state.savedPlans.isNotEmpty()) state = awaitSuccessItem()
+            assertThat(state.selectedTab).isEqualTo(PlanListTab.SCHEDULED)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `deleting a saved plan asks first, then deletes it and says so`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        val saved = makeSaved(userId)
+        savedRepository.emitPlans(saved)
+
+        viewModel.events.test {
+            viewModel.onDeleteSavedPlanRequested(saved.uuid)
+            assertThat(viewModel.pendingDeleteSavedPlanId.value).isEqualTo(saved.uuid)
+
+            viewModel.onDeleteSavedPlanConfirmed()
+
+            assertThat(awaitItem()).isEqualTo(MealPlansEvent.ShowMessage(R.string.saved_plan_deleted))
+            assertThat(viewModel.pendingDeleteSavedPlanId.value).isNull()
+            assertThat(savedRepository.deletedIds).containsExactly(saved.uuid)
+        }
+    }
+
+    @Test
+    fun `dismissing the saved plan confirmation keeps it`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        val saved = makeSaved(userId)
+        savedRepository.emitPlans(saved)
+
+        viewModel.onDeleteSavedPlanRequested(saved.uuid)
+        viewModel.onDeleteSavedPlanDismissed()
+        viewModel.onDeleteSavedPlanConfirmed()
+
+        assertThat(viewModel.pendingDeleteSavedPlanId.value).isNull()
+        assertThat(savedRepository.deletedIds).isEmpty()
+    }
+
+    @Test
+    fun `a failed saved plan delete reports an error`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        val saved = makeSaved(userId)
+        savedRepository.emitPlans(saved)
+        savedRepository.shouldThrowOnDelete = true
+
+        viewModel.events.test {
+            viewModel.onDeleteSavedPlanRequested(saved.uuid)
+            viewModel.onDeleteSavedPlanConfirmed()
+
+            assertThat(awaitItem()).isEqualTo(MealPlansEvent.ShowMessage(R.string.saved_plan_delete_failed))
+        }
+    }
+
+    @Test
+    fun `asking to repeat a saved plan records its id until dismissed`() = runTest {
+        val id = UUID.randomUUID()
+
+        viewModel.onRepeatSavedPlanRequested(id)
+        assertThat(viewModel.pendingRepeatSavedPlanId.value).isEqualTo(id)
+
+        viewModel.onRepeatSavedPlanDismissed()
+        assertThat(viewModel.pendingRepeatSavedPlanId.value).isNull()
+    }
+
+    private suspend fun app.cash.turbine.ReceiveTurbine<MealPlanListUiState>.awaitSuccessItem(): MealPlanListUiState.Success {
+        var item = awaitItem()
+        while (item !is MealPlanListUiState.Success) item = awaitItem()
+        return item
+    }
+
+    private fun makeSaved(userId: UUID, dinner: UUID? = null) = SavedMealPlan(
+        uuid = UUID.randomUUID(),
+        userId = userId,
+        title = "Easy weeknights",
+        heroImagePath = null,
+        preferences = makePlan(userId, weekStart, listOf(day(0))).preferences,
+        days = listOf(SavedMealPlanDay(dayIndex = 0, lunchRecipeId = null, dinnerRecipeId = dinner)),
+        sourceMealPlanId = null,
+        createdAt = 1_000L,
+        updatedAt = 1_000L,
+    )
 
     // --- Deleting from the plans list ---
 
