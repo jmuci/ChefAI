@@ -46,6 +46,7 @@ import com.tenmilelabs.chefai.mealplans.domain.week.WeekDay
 import com.tenmilelabs.chefai.mealplans.domain.summary.MealPlanSummary
 import com.tenmilelabs.chefai.mealplans.ui.components.AddMealSheet
 import com.tenmilelabs.chefai.mealplans.ui.components.MealPlanHeroCard
+import com.tenmilelabs.chefai.mealplans.ui.detail.DeleteMealPlanDialog
 import com.tenmilelabs.chefai.mealplans.ui.components.WeekDayRow
 import com.tenmilelabs.chefai.mealplans.ui.components.rememberWeekMealDragState
 import com.tenmilelabs.chefai.mealplans.ui.components.WeekNavigator
@@ -83,6 +84,7 @@ fun MealPlansScreen(
     val addMealDate by viewModel.addMealDate.collectAsStateWithLifecycle()
     val addMealQuery by viewModel.addMealQuery.collectAsStateWithLifecycle()
     val addMealRecipes by viewModel.addMealRecipes.collectAsStateWithLifecycle()
+    val pendingDeletePlanId by viewModel.pendingDeletePlanId.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     LaunchedEffect(viewModel, snackbarHostState) {
@@ -113,11 +115,19 @@ fun MealPlansScreen(
         )
     }
 
+    if (pendingDeletePlanId != null) {
+        DeleteMealPlanDialog(
+            onConfirm = viewModel::onDeletePlanConfirmed,
+            onDismiss = viewModel::onDeletePlanDismissed,
+        )
+    }
+
     MealPlansContent(
         uiState = uiState,
         listState = listState,
         viewMode = viewMode,
         onPlanClick = onPlanClick,
+        onDeletePlan = viewModel::onDeletePlanRequested,
         onPreviousWeek = viewModel::onPreviousWeek,
         onNextWeek = viewModel::onNextWeek,
         onMealClick = onMealClick,
@@ -134,6 +144,7 @@ private fun MealPlansContent(
     listState: MealPlanListUiState,
     viewMode: MealPlansViewMode,
     onPlanClick: (UUID) -> Unit,
+    onDeletePlan: (UUID) -> Unit,
     onPreviousWeek: () -> Unit,
     onNextWeek: () -> Unit,
     onMealClick: (PlannedWeekMeal) -> Unit,
@@ -146,6 +157,7 @@ private fun MealPlansContent(
         PlanListContent(
             listState = listState,
             onPlanClick = onPlanClick,
+            onDeletePlan = onDeletePlan,
             modifier = modifier,
         )
         return
@@ -178,6 +190,7 @@ private fun MealPlansContent(
 private fun PlanListContent(
     listState: MealPlanListUiState,
     onPlanClick: (UUID) -> Unit,
+    onDeletePlan: (UUID) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (listState) {
@@ -202,6 +215,7 @@ private fun PlanListContent(
                 plans = listState.plans,
                 today = listState.today,
                 onPlanClick = onPlanClick,
+                onDeletePlan = onDeletePlan,
                 modifier = modifier,
             )
         }
@@ -213,6 +227,7 @@ private fun PlanList(
     plans: List<MealPlanSummary>,
     today: LocalDate,
     onPlanClick: (UUID) -> Unit,
+    onDeletePlan: (UUID) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -227,9 +242,7 @@ private fun PlanList(
                 summary = summary,
                 today = today,
                 onClick = { onPlanClick(summary.planId) },
-                // Picking a date for a plan is a follow-up; the button is here so the card's
-                // shape is final.
-                onScheduleClick = {},
+                onDeleteClick = { onDeletePlan(summary.planId) },
             )
         }
     }
@@ -372,6 +385,7 @@ private fun MealPlansPreview() {
             listState = MealPlanListUiState.Loading,
             viewMode = MealPlansViewMode.WEEK,
             onPlanClick = {},
+            onDeletePlan = {},
         )
     }
 }
@@ -401,6 +415,7 @@ private fun MealPlansEmptyWeekPreview() {
             listState = MealPlanListUiState.Loading,
             viewMode = MealPlansViewMode.WEEK,
             onPlanClick = {},
+            onDeletePlan = {},
         )
     }
 }

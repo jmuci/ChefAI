@@ -333,8 +333,8 @@
     <string name="meal_plans_untitled">Meal plan</string>
     <string name="meal_plans_card_meta">%1$s · %2$s</string>
     <string name="meal_plans_card_scheduled">Scheduled %1$s</string>
-    <string name="meal_plans_card_last_cooked">Last cooked %1$s</string>
-    <string name="meal_plans_card_schedule">Schedule this plan</string>
+    <string name="meal_plans_card_scheduled_last_cooked">%1$s · Last cooked %2$s</string>
+    <string name="meal_plan_delete_failed">Couldn\'t delete this meal plan</string>
     <plurals name="meal_plans_card_days">
         <item quantity="one">%d day</item>
         <item quantity="other">%d days</item>

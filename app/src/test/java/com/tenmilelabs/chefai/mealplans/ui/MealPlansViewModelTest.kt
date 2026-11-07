@@ -305,6 +305,55 @@ class MealPlansViewModelTest {
         }
     }
 
+    // --- Deleting from the plans list ---
+
+    @Test
+    fun `deleting a plan asks first, then removes it and says so`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        val plan = makePlan(userId, createdAt = weekStart, days = listOf(day(0)))
+        repository.emitPlans(plan)
+
+        viewModel.events.test {
+            viewModel.onDeletePlanRequested(plan.uuid)
+            assertThat(viewModel.pendingDeletePlanId.value).isEqualTo(plan.uuid)
+
+            viewModel.onDeletePlanConfirmed()
+
+            assertThat(awaitItem()).isEqualTo(MealPlansEvent.ShowMessage(R.string.meal_plan_deleted))
+            assertThat(viewModel.pendingDeletePlanId.value).isNull()
+            assertThat(repository.observeMealPlan(plan.uuid).first()).isNull()
+        }
+    }
+
+    @Test
+    fun `dismissing the confirmation keeps the plan`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        val plan = makePlan(userId, createdAt = weekStart, days = listOf(day(0)))
+        repository.emitPlans(plan)
+
+        viewModel.onDeletePlanRequested(plan.uuid)
+        viewModel.onDeletePlanDismissed()
+        viewModel.onDeletePlanConfirmed()
+
+        assertThat(viewModel.pendingDeletePlanId.value).isNull()
+        assertThat(repository.observeMealPlan(plan.uuid).first()).isNotNull()
+    }
+
+    @Test
+    fun `a failed delete reports an error`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        val plan = makePlan(userId, createdAt = weekStart, days = listOf(day(0)))
+        repository.emitPlans(plan)
+        repository.shouldThrowOnDelete = true
+
+        viewModel.events.test {
+            viewModel.onDeletePlanRequested(plan.uuid)
+            viewModel.onDeletePlanConfirmed()
+
+            assertThat(awaitItem()).isEqualTo(MealPlansEvent.ShowMessage(R.string.meal_plan_delete_failed))
+        }
+    }
+
     // --- The grocery summary ---
 
     @Test

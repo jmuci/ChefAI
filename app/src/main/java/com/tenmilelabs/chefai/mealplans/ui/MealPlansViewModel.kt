@@ -313,6 +313,38 @@ class MealPlansViewModel @Inject constructor(
         }
     }
 
+    // --- Deleting a plan from the plans list ---
+
+    private val _pendingDeletePlanId = MutableStateFlow<UUID?>(null)
+
+    /** The plan whose delete confirmation is open, or `null` while it is closed. */
+    val pendingDeletePlanId: StateFlow<UUID?> = _pendingDeletePlanId
+
+    fun onDeletePlanRequested(planId: UUID) {
+        _pendingDeletePlanId.value = planId
+    }
+
+    fun onDeletePlanDismissed() {
+        _pendingDeletePlanId.value = null
+    }
+
+    /** Soft-deletes the confirmed plan (the deletion syncs); the list drops it via its Room flow. */
+    fun onDeletePlanConfirmed() {
+        val planId = _pendingDeletePlanId.value ?: return
+        _pendingDeletePlanId.value = null
+        viewModelScope.launch {
+            try {
+                mealPlanRepository.deleteMealPlan(planId)
+                _events.send(MealPlansEvent.ShowMessage(R.string.meal_plan_deleted))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "onDeletePlanConfirmed: failed for plan $planId")
+                _events.send(MealPlansEvent.ShowMessage(R.string.meal_plan_delete_failed))
+            }
+        }
+    }
+
     fun onAddMealDismissed() {
         _addMealDate.value = null
         _addMealQuery.value = ""
