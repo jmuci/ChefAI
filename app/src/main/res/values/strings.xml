@@ -612,4 +612,9 @@
         <item quantity="other">%d days</item>
     </plurals>
 
+    <!-- Saved meal plans: repeat -->
+    <string name="saved_plan_repeat_date_title">Start this plan on</string>
+    <string name="saved_plan_repeated">Plan scheduled from your saved plan</string>
+    <string name="saved_plan_repeat_failed">Couldn\'t schedule this saved plan</string>
+
 </resources>

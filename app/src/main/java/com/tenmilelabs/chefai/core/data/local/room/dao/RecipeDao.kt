@@ -76,6 +76,10 @@ interface RecipeDao {
     @Query("SELECT * FROM recipes WHERE uuid = :uuid")
     fun observeRecipeById(uuid: UUID): Flow<RecipeEntity?>
 
+    /** Which of [ids] exist locally as soft-deleted rows. Unknown ids are not returned. */
+    @Query("SELECT uuid FROM recipes WHERE uuid IN (:ids) AND deletedAt IS NOT NULL")
+    suspend fun getSoftDeletedIds(ids: List<UUID>): List<UUID>
+
     @Transaction
     @Query("SELECT * FROM recipes WHERE uuid = :uuid AND deletedAt IS NULL")
     suspend fun getRecipeWithDetails(uuid: UUID): RecipeWithDetails?

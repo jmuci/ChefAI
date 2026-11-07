@@ -36,6 +36,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.mealplans.ui.components.MealPlanDatePickerDialog
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatBlockButton
 import com.tenmilelabs.chefai.core.ui.components.flat.RowRule
 import com.tenmilelabs.chefai.core.ui.components.flat.SectionRule
@@ -82,6 +83,7 @@ fun MealPlansScreen(
     onMealClick: (PlannedWeekMeal) -> Unit = {},
     onShoppingListClick: (UUID) -> Unit = {},
     onPlanClick: (UUID) -> Unit = {},
+    onPlanRepeated: (overlappingPlanName: String?) -> Unit = {},
     viewModel: MealPlansViewModel = hiltViewModel(),
     modifier: Modifier = Modifier,
 ) {
@@ -93,6 +95,8 @@ fun MealPlansScreen(
     val addMealRecipes by viewModel.addMealRecipes.collectAsStateWithLifecycle()
     val pendingDeletePlanId by viewModel.pendingDeletePlanId.collectAsStateWithLifecycle()
     val pendingDeleteSavedPlanId by viewModel.pendingDeleteSavedPlanId.collectAsStateWithLifecycle()
+    val pendingRepeatSavedPlanId by viewModel.pendingRepeatSavedPlanId.collectAsStateWithLifecycle()
+    val repeatDefaultDate by viewModel.repeatDefaultDate.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     LaunchedEffect(viewModel, snackbarHostState) {
@@ -100,6 +104,13 @@ fun MealPlansScreen(
             when (event) {
                 is MealPlansEvent.ShowMessage ->
                     snackbarHostState.showSnackbar(context.getString(event.messageRes))
+
+                // This screen is popped by the navigation, so the snackbars are posted by the
+                // nav graph (on a scope that outlives it) rather than launched here.
+                is MealPlansEvent.NavigateToPlan -> {
+                    onPlanClick(event.planId)
+                    onPlanRepeated(event.overlappingPlanName)
+                }
             }
         }
     }
@@ -127,6 +138,16 @@ fun MealPlansScreen(
         DeleteMealPlanDialog(
             onConfirm = viewModel::onDeletePlanConfirmed,
             onDismiss = viewModel::onDeletePlanDismissed,
+        )
+    }
+
+    if (pendingRepeatSavedPlanId != null) {
+        MealPlanDatePickerDialog(
+            initialDate = repeatDefaultDate,
+            today = LocalDate.now(),
+            title = stringResource(R.string.saved_plan_repeat_date_title),
+            onConfirm = viewModel::onRepeatSavedPlanConfirmed,
+            onDismiss = viewModel::onRepeatSavedPlanDismissed,
         )
     }
 
