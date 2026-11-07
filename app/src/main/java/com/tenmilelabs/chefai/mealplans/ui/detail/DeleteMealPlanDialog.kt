@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,12 +28,21 @@ import com.tenmilelabs.chefai.recipes.ui.editor.components.DialogPanel
 fun DeleteMealPlanDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    @StringRes titleRes: Int = R.string.meal_plan_delete_title,
+    @StringRes messageRes: Int = R.string.meal_plan_delete_message,
+    @StringRes confirmRes: Int = R.string.meal_plan_delete_confirm,
 ) {
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        DeleteMealPlanContent(onConfirm = onConfirm, onDismiss = onDismiss)
+        DeleteMealPlanContent(
+            onConfirm = onConfirm,
+            onDismiss = onDismiss,
+            titleRes = titleRes,
+            messageRes = messageRes,
+            confirmRes = confirmRes,
+        )
     }
 }
 
@@ -41,15 +51,18 @@ fun DeleteMealPlanDialog(
 private fun DeleteMealPlanContent(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    @StringRes titleRes: Int = R.string.meal_plan_delete_title,
+    @StringRes messageRes: Int = R.string.meal_plan_delete_message,
+    @StringRes confirmRes: Int = R.string.meal_plan_delete_confirm,
 ) {
     DialogPanel {
         Text(
-            text = stringResource(R.string.meal_plan_delete_title),
+            text = stringResource(titleRes),
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onBackground,
         )
         Text(
-            text = stringResource(R.string.meal_plan_delete_message),
+            text = stringResource(messageRes),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -63,7 +76,7 @@ private fun DeleteMealPlanContent(
                 variant = FlatButtonVariant.Ghost,
             )
             FlatButton(
-                text = stringResource(R.string.meal_plan_delete_confirm),
+                text = stringResource(confirmRes),
                 onClick = onConfirm,
                 variant = FlatButtonVariant.Destructive,
                 modifier = Modifier.testTag("DeleteMealPlanConfirm"),
