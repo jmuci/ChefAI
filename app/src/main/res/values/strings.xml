@@ -594,4 +594,22 @@
     <string name="wizard_saved_photo_content_description">Photo for the saved meal plan</string>
     <string name="wizard_saved_photo_failed">Couldn\'t use that photo</string>
     <string name="saved_plan_save_failed">Your plan was created, but it couldn\'t be saved for later</string>
+    <!-- Saved meal plans: plans list -->
+    <string name="meal_plans_tab_scheduled">Scheduled</string>
+    <string name="meal_plans_tab_saved">Saved</string>
+    <string name="saved_plan_repeat">Repeat saved plan</string>
+    <string name="saved_plan_delete">Delete saved plan</string>
+    <string name="saved_plan_delete_title">Delete saved plan?</string>
+    <string name="saved_plan_delete_message">It will be removed from Saved. Plans already scheduled from it stay.</string>
+    <string name="saved_plan_delete_confirm">Delete</string>
+    <string name="saved_plan_deleted">Saved plan deleted</string>
+    <string name="saved_plan_delete_failed">Couldn\'t delete this saved plan</string>
+    <string name="saved_plan_meal_type_dinners">Dinners</string>
+    <string name="saved_plan_meal_type_dinners_and_lunches">Dinners &amp; lunches</string>
+    <string name="saved_plan_card_meta">%1$s · %2$s</string>
+    <plurals name="saved_plan_days">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+
 </resources>

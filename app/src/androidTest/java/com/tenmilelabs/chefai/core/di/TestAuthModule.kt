@@ -23,8 +23,10 @@ import com.tenmilelabs.chefai.household.domain.repository.HouseholdRepository
 import com.tenmilelabs.chefai.mealplans.data.network.MealPlanApiService
 import com.tenmilelabs.chefai.mealplans.data.network.MealPlanNetworkDataSource
 import com.tenmilelabs.chefai.mealplans.data.repository.DefaultMealPlanRepository
+import com.tenmilelabs.chefai.mealplans.data.repository.DefaultSavedMealPlanRepository
 import com.tenmilelabs.chefai.mealplans.data.repository.DefaultShoppingListRepository
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
+import com.tenmilelabs.chefai.mealplans.domain.repository.SavedMealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.repository.ShoppingListRepository
 import com.tenmilelabs.chefai.recipes.data.network.SystemHostResolver
 import com.tenmilelabs.chefai.recipes.data.network.WebViewImageFetcher
@@ -169,6 +171,13 @@ abstract class TestRepositoryModule {
     @Binds
     @Singleton
     abstract fun bindMealPlanRepository(repository: DefaultMealPlanRepository): MealPlanRepository
+
+    /**
+     * Binds the saved meal plan repository (same as production).
+     */
+    @Binds
+    @Singleton
+    abstract fun bindSavedMealPlanRepository(repository: DefaultSavedMealPlanRepository): SavedMealPlanRepository
 
     /**
      * Binds the shopping list repository (same as production) — required for Hilt's shared test
