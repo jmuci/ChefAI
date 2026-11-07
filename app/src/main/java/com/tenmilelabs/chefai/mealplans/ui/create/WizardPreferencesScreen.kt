@@ -1,6 +1,9 @@
 package com.tenmilelabs.chefai.mealplans.ui.create
 
 import android.content.res.Configuration
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +25,7 @@ import com.tenmilelabs.chefai.core.ui.components.flat.FlatButtonVariant
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.mealplans.ui.create.components.DietaryChipGroup
 import com.tenmilelabs.chefai.mealplans.ui.create.components.RecipeSourceSelector
+import com.tenmilelabs.chefai.mealplans.ui.create.components.SaveForLaterSection
 import com.tenmilelabs.chefai.mealplans.ui.create.components.WizardHeader
 
 @Composable
@@ -33,9 +37,20 @@ fun WizardPreferencesScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // The launcher lives here, not in the stateless section: the section only asks for a pick.
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        viewModel.onAction(WizardAction.SavedImagePicked(uri?.toString()))
+    }
+
     WizardPreferencesContent(
         uiState = uiState,
-        onAction = viewModel::onAction,
+        onAction = { action ->
+            if (action is WizardAction.RequestSavedImagePick) {
+                photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            } else {
+                viewModel.onAction(action)
+            }
+        },
         onNext = onNext,
         onBack = onBack,
         modifier = modifier,
@@ -75,6 +90,15 @@ private fun WizardPreferencesContent(
                 onSourceSelected = { onAction(WizardAction.SetRecipeSource(it)) },
                 collectionTooSmall = uiState.collectionTooSmall,
             )
+
+            SaveForLaterSection(
+                saveForLater = uiState.saveForLater,
+                title = uiState.savedTitle,
+                imagePath = uiState.savedImagePath,
+                isImportingImage = uiState.isImportingImage,
+                imageFailed = uiState.savedImageFailed,
+                onAction = onAction,
+            )
         }
 
         Row(
@@ -92,6 +116,7 @@ private fun WizardPreferencesContent(
             FlatBlockButton(
                 text = stringResource(R.string.wizard_next),
                 onClick = onNext,
+                enabled = uiState.canProceedFromPreferences,
                 modifier = Modifier.weight(1f),
             )
         }

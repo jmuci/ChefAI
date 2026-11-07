@@ -583,4 +583,15 @@
     <string name="accept_invite_register_button">Register</string>
     <string name="accept_invite_try_again_button">Try another code</string>
 
+    <!-- Saved meal plans: wizard -->
+    <string name="wizard_save_for_later_title">Save this meal plan for the future?</string>
+    <string name="wizard_save_for_later_subtitle">Keep it under Saved to repeat later</string>
+    <string name="wizard_saved_title_label">Plan title</string>
+    <string name="wizard_saved_title_required">Give your saved plan a title</string>
+    <string name="wizard_saved_photo_add">Add photo (optional)</string>
+    <string name="wizard_saved_photo_change">Change</string>
+    <string name="wizard_saved_photo_remove">Remove</string>
+    <string name="wizard_saved_photo_content_description">Photo for the saved meal plan</string>
+    <string name="wizard_saved_photo_failed">Couldn\'t use that photo</string>
+    <string name="saved_plan_save_failed">Your plan was created, but it couldn\'t be saved for later</string>
 </resources>
