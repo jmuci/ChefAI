@@ -29,6 +29,12 @@ import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncCreatorDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDayDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncCookEventDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncSavedMealPlanDayDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncSavedMealPlanDto
+import com.tenmilelabs.chefai.core.data.local.room.SavedMealPlanEntity
+import com.tenmilelabs.chefai.mealplans.data.mapper.toDaysJson
+import com.tenmilelabs.chefai.mealplans.data.mapper.toSavedMealPlanDays
+import com.tenmilelabs.chefai.mealplans.domain.model.SavedMealPlanDay
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncGroceryListItem
 import java.time.LocalDate
 import java.util.UUID
@@ -320,6 +326,43 @@ fun SyncCookEventDto.toEntity(): RecipeCookEventEntity = RecipeCookEventEntity(
     dayIndex = dayIndex,
     slot = slot,
     cookedAt = cookedAt,
+    updatedAt = updatedAt,
+    deletedAt = deletedAt,
+    syncState = SyncState.SYNCED,
+)
+
+// --- Saved Meal Plans: both directions ---
+
+fun SavedMealPlanEntity.toSyncDto(): SyncSavedMealPlanDto = SyncSavedMealPlanDto(
+    uuid = uuid.toString(),
+    ownerId = userId.toString(),
+    title = title,
+    preferencesJson = preferencesJson,
+    days = daysJson.toSavedMealPlanDays().map {
+        SyncSavedMealPlanDayDto(it.dayIndex, it.lunchRecipeId?.toString(), it.dinnerRecipeId?.toString())
+    },
+    sourceMealPlanId = sourceMealPlanId?.toString(),
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    deletedAt = deletedAt,
+)
+
+/** [heroImagePath] is device-local; the caller passes the existing local path, if any. */
+fun SyncSavedMealPlanDto.toEntity(heroImagePath: String? = null): SavedMealPlanEntity = SavedMealPlanEntity(
+    uuid = UUID.fromString(uuid),
+    userId = UUID.fromString(ownerId),
+    title = title,
+    preferencesJson = preferencesJson,
+    daysJson = days.map {
+        SavedMealPlanDay(
+            dayIndex = it.dayIndex,
+            lunchRecipeId = it.lunchRecipeId?.let(UUID::fromString),
+            dinnerRecipeId = it.dinnerRecipeId?.let(UUID::fromString),
+        )
+    }.toDaysJson(),
+    sourceMealPlanId = sourceMealPlanId?.let(UUID::fromString),
+    heroImagePath = heroImagePath,
+    createdAt = createdAt,
     updatedAt = updatedAt,
     deletedAt = deletedAt,
     syncState = SyncState.SYNCED,

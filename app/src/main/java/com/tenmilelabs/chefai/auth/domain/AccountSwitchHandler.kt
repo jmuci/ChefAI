@@ -5,6 +5,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.local.room.dao.HouseholdDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.UserDao
+import com.tenmilelabs.chefai.mealplans.data.local.SavedPlanImageStore
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import kotlinx.coroutines.flow.first
 import timber.log.Timber
@@ -29,6 +30,7 @@ class AccountSwitchHandler @Inject constructor(
     private val userDao: UserDao,
     private val householdDao: HouseholdDao,
     private val recipeImageStore: RecipeImageStore,
+    private val savedPlanImageStore: SavedPlanImageStore,
 ) {
 
     /**
@@ -75,6 +77,7 @@ class AccountSwitchHandler @Inject constructor(
             Timber.i("Authenticated account changed from $previousUserId to $newUserId, clearing local database")
             database.clearAllTables()
                 recipeImageStore.deleteAll()
+                savedPlanImageStore.deleteAll()
                 AccountSwitchOutcome.CLEARED_DATABASE
             }
         }
@@ -95,5 +98,6 @@ class AccountSwitchHandler @Inject constructor(
         Timber.i("Clearing all local data after account deletion")
         database.clearAllTables()
         recipeImageStore.deleteAll()
+        savedPlanImageStore.deleteAll()
     }
 }

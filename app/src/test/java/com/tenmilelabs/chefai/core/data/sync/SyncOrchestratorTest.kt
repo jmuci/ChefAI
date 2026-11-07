@@ -21,6 +21,19 @@ import com.tenmilelabs.chefai.core.data.local.room.BookmarkedRecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeAllergenDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeBookmarkedRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeMealPlanDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSavedMealPlanDao
+import com.tenmilelabs.chefai.core.data.local.room.SavedMealPlanEntity
+import com.tenmilelabs.chefai.core.data.sync.network.dto.AcceptedEntityDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SavedMealPlanPushResults
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncErrorDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncSavedMealPlanDayDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncSavedMealPlanDto
+import com.tenmilelabs.chefai.core.domain.model.User
+import com.tenmilelabs.chefai.mealplans.data.local.SavedPlanImageStore
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.mockk
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeLabelDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
@@ -39,9 +52,7 @@ import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.sync.mapper.toMealPlanEntity
 import com.tenmilelabs.chefai.core.data.sync.network.FakeSyncNetworkDataSource
-import com.tenmilelabs.chefai.core.data.sync.network.dto.AcceptedEntityDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.ConflictEntityDto
-import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncErrorDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncBookmarkPullDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncCreatorDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncGroceryListItem
@@ -92,6 +103,8 @@ class SyncOrchestratorTest {
     private lateinit var mealPlanDao: FakeMealPlanDao
     private lateinit var shoppingListCheckDao: FakeShoppingListCheckDao
     private lateinit var cookEventDao: FakeRecipeCookEventDao
+    private lateinit var savedPlanDao: FakeSavedMealPlanDao
+    private lateinit var savedPlanImageStore: SavedPlanImageStore
     private lateinit var sessionManager: SessionManager
     private lateinit var userDao: FakeUserDao
     private lateinit var syncMetadataDao: FakeSyncMetadataDao
@@ -129,38 +142,44 @@ class SyncOrchestratorTest {
         mealPlanDao = FakeMealPlanDao()
         shoppingListCheckDao = FakeShoppingListCheckDao()
         cookEventDao = FakeRecipeCookEventDao()
+        savedPlanDao = FakeSavedMealPlanDao()
+        savedPlanImageStore = mockk(relaxed = true)
         sessionManager = createTestSessionManager(CoroutineScope(testDispatcher))
         syncMetadataDao = FakeSyncMetadataDao()
         syncNetworkDataSource = FakeSyncNetworkDataSource()
         recipeDetailNetworkDataSource = FakeRecipeDetailNetworkDataSource()
 
-        syncOrchestrator = SyncOrchestrator(
-            syncNetworkDataSource = syncNetworkDataSource,
-            recipeDetailNetworkDataSource = recipeDetailNetworkDataSource,
-            recipeDao = recipeDao,
-            recipeImageStateDao = FakeRecipeImageStateDao(),
-            recipeStepDao = recipeStepDao,
-            allergenDao = allergenDao,
-            sourceClassificationDao = sourceClassificationDao,
-            ingredientDao = ingredientDao,
-            tagDao = tagDao,
-            labelDao = labelDao,
-            userDao = userDao,
-            recipeIngredientDao = recipeIngredientDao,
-            recipeTagCrossRefDao = recipeTagCrossRefDao,
-            recipeLabelCrossRefDao = recipeLabelCrossRefDao,
-            bookmarkedRecipeDao = bookmarkedRecipeDao,
-            mealPlanDao = mealPlanDao,
-            shoppingListCheckDao = shoppingListCheckDao,
-            recipeCookEventDao = cookEventDao,
-            sessionManager = sessionManager,
-            syncMetadataDao = syncMetadataDao,
-            transactionRunner = fakeTransactionRunner,
-            ioDispatcher = testDispatcher
-        )
+        syncOrchestrator = buildOrchestrator(sessionManager)
     }
 
     // --- Helper functions ---
+
+    private fun buildOrchestrator(session: SessionManager) = SyncOrchestrator(
+        syncNetworkDataSource = syncNetworkDataSource,
+        recipeDetailNetworkDataSource = recipeDetailNetworkDataSource,
+        recipeDao = recipeDao,
+        recipeImageStateDao = FakeRecipeImageStateDao(),
+        recipeStepDao = recipeStepDao,
+        allergenDao = allergenDao,
+        sourceClassificationDao = sourceClassificationDao,
+        ingredientDao = ingredientDao,
+        tagDao = tagDao,
+        labelDao = labelDao,
+        userDao = userDao,
+        recipeIngredientDao = recipeIngredientDao,
+        recipeTagCrossRefDao = recipeTagCrossRefDao,
+        recipeLabelCrossRefDao = recipeLabelCrossRefDao,
+        bookmarkedRecipeDao = bookmarkedRecipeDao,
+        mealPlanDao = mealPlanDao,
+        shoppingListCheckDao = shoppingListCheckDao,
+        recipeCookEventDao = cookEventDao,
+        savedMealPlanDao = savedPlanDao,
+        savedPlanImageStore = savedPlanImageStore,
+        sessionManager = session,
+        syncMetadataDao = syncMetadataDao,
+        transactionRunner = fakeTransactionRunner,
+        ioDispatcher = testDispatcher
+    )
 
     private fun createDirtyRecipe(
         uuid: UUID = UuidV7Generator.newId(),
@@ -1902,6 +1921,259 @@ class SyncOrchestratorTest {
                 cookEvents = listOf(cookEventDto(updatedAt = 99_000L)),
             )
         )
+
+        syncOrchestrator.sync()
+
+        assertThat(syncMetadataDao.getLastSyncedAt(SyncOrchestrator.ENTITY_TYPE_RECIPES)).isEqualTo(5000L)
+    }
+
+    // ==================== SAVED MEAL PLAN SYNC ====================
+
+    private val savedOwnerId = UuidV7Generator.newId()
+
+    /** A session that reports an authenticated user, which the saved-plan pull requires. */
+    private fun signedInSession(): SessionManager = mockk<SessionManager>(relaxed = true).also {
+        every { it.getCurrentUser() } returns mockk<User>(relaxed = true)
+        every { it.getCurrentUserId() } returns savedOwnerId
+    }
+
+    private fun useSignedIn() {
+        syncOrchestrator = buildOrchestrator(signedInSession())
+    }
+
+    private fun savedPlan(
+        uuid: UUID = UuidV7Generator.newId(),
+        title: String = "Weeknight Plan",
+        updatedAt: Long = 1000L,
+        deletedAt: Long? = null,
+        heroImagePath: String? = null,
+        syncState: SyncState = SyncState.PENDING,
+    ) = SavedMealPlanEntity(
+        uuid = uuid,
+        userId = savedOwnerId,
+        title = title,
+        preferencesJson = "{}",
+        daysJson = "[]",
+        heroImagePath = heroImagePath,
+        createdAt = 500L,
+        updatedAt = updatedAt,
+        deletedAt = deletedAt,
+        syncState = syncState,
+    )
+
+    private fun savedPlanDto(
+        uuid: UUID = UuidV7Generator.newId(),
+        title: String = "Server Plan",
+        updatedAt: Long = 5000L,
+        deletedAt: Long? = null,
+        lunch: UUID? = null,
+    ) = SyncSavedMealPlanDto(
+        uuid = uuid.toString(),
+        ownerId = savedOwnerId.toString(),
+        title = title,
+        preferencesJson = "{}",
+        days = listOf(SyncSavedMealPlanDayDto(0, lunch?.toString(), null)),
+        createdAt = 500L,
+        updatedAt = updatedAt,
+        deletedAt = deletedAt,
+    )
+
+    private fun savedPullOf(vararg plans: SyncSavedMealPlanDto) = SyncPullResponse(
+        recipes = emptyList(),
+        serverTimestamp = 5000L,
+        hasMore = false,
+        savedMealPlans = plans.toList(),
+    )
+
+    private fun savedPushOf(results: SavedMealPlanPushResults) = SyncPushResponse(
+        accepted = emptyList(),
+        conflicts = emptyList(),
+        errors = emptyList(),
+        serverTimestamp = 5000L,
+        savedMealPlans = results,
+    )
+
+    @Test
+    fun `push sends pending saved plans and tombstones but not synced ones`() = runTest(testDispatcher) {
+        val live = savedPlan(heroImagePath = "/data/photo")
+        val tombstone = savedPlan(deletedAt = 2000L, updatedAt = 2000L)
+        savedPlanDao.upsert(live)
+        savedPlanDao.upsert(tombstone)
+        savedPlanDao.upsert(savedPlan(syncState = SyncState.SYNCED))
+
+        syncOrchestrator.sync()
+
+        val sent = syncNetworkDataSource.capturedPushRequests.single().savedMealPlans.associateBy { it.uuid }
+        assertThat(sent.keys).containsExactly(live.uuid.toString(), tombstone.uuid.toString())
+        assertThat(sent.getValue(live.uuid.toString()).ownerId).isEqualTo(savedOwnerId.toString())
+        assertThat(sent.getValue(tombstone.uuid.toString()).deletedAt).isEqualTo(2000L)
+    }
+
+    @Test
+    fun `accepted saved plan is marked synced with the server timestamp`() = runTest(testDispatcher) {
+        val plan = savedPlan()
+        savedPlanDao.upsert(plan)
+        syncNetworkDataSource.pushResponses.addLast(
+            savedPushOf(SavedMealPlanPushResults(accepted = listOf(AcceptedEntityDto(plan.uuid.toString(), 7000L))))
+        )
+
+        syncOrchestrator.sync()
+
+        val saved = requireNotNull(savedPlanDao.getById(plan.uuid))
+        assertThat(saved.syncState).isEqualTo(SyncState.SYNCED)
+        assertThat(saved.updatedAt).isEqualTo(7000L)
+    }
+
+    @Test
+    fun `saved plan deleted while its push is in flight stays pending`() = runTest(testDispatcher) {
+        val plan = savedPlan()
+        savedPlanDao.upsert(plan)
+        syncNetworkDataSource.onPush = { savedPlanDao.softDelete(plan.uuid, 3000L) }
+        syncNetworkDataSource.pushResponses.addLast(
+            savedPushOf(SavedMealPlanPushResults(accepted = listOf(AcceptedEntityDto(plan.uuid.toString(), 7000L))))
+        )
+
+        syncOrchestrator.sync()
+
+        val saved = requireNotNull(savedPlanDao.getById(plan.uuid))
+        assertThat(saved.syncState).isEqualTo(SyncState.PENDING)
+        assertThat(saved.deletedAt).isEqualTo(3000L)
+    }
+
+    @Test
+    fun `saved plan conflict leaves the row pending for the next pull`() = runTest(testDispatcher) {
+        val plan = savedPlan()
+        savedPlanDao.upsert(plan)
+        syncNetworkDataSource.pushResponses.addLast(
+            savedPushOf(SavedMealPlanPushResults(conflicts = listOf(plan.uuid.toString())))
+        )
+
+        syncOrchestrator.sync()
+
+        assertThat(savedPlanDao.getById(plan.uuid)?.syncState).isEqualTo(SyncState.PENDING)
+    }
+
+    @Test
+    fun `SAVED_PLAN_ID_TAKEN re-keys a live saved plan and moves its image`() = runTest(testDispatcher) {
+        val plan = savedPlan(heroImagePath = "/old/path")
+        savedPlanDao.upsert(plan)
+        coEvery { savedPlanImageStore.move(plan.uuid, any()) } returns "/new/path"
+        syncNetworkDataSource.pushResponses.addLast(
+            savedPushOf(SavedMealPlanPushResults(errors = listOf(SyncErrorDto(plan.uuid.toString(), "SAVED_PLAN_ID_TAKEN", "taken"))))
+        )
+
+        syncOrchestrator.sync()
+
+        assertThat(savedPlanDao.getById(plan.uuid)).isNull()
+        val rekeyed = savedPlanDao.all.single()
+        assertThat(rekeyed.uuid).isNotEqualTo(plan.uuid)
+        assertThat(rekeyed.syncState).isEqualTo(SyncState.PENDING)
+        assertThat(rekeyed.heroImagePath).isEqualTo("/new/path")
+        assertThat(rekeyed.title).isEqualTo(plan.title)
+    }
+
+    @Test
+    fun `SAVED_PLAN_ID_TAKEN drops a saved plan tombstone`() = runTest(testDispatcher) {
+        val tombstone = savedPlan(deletedAt = 2000L, updatedAt = 2000L)
+        savedPlanDao.upsert(tombstone)
+        syncNetworkDataSource.pushResponses.addLast(
+            savedPushOf(SavedMealPlanPushResults(errors = listOf(SyncErrorDto(tombstone.uuid.toString(), "SAVED_PLAN_ID_TAKEN", "taken"))))
+        )
+
+        syncOrchestrator.sync()
+
+        assertThat(savedPlanDao.all).isEmpty()
+    }
+
+    @Test
+    fun `a validation error parks the saved plan so it is not resent forever`() = runTest(testDispatcher) {
+        val plan = savedPlan()
+        savedPlanDao.upsert(plan)
+        syncNetworkDataSource.pushResponses.addLast(
+            savedPushOf(SavedMealPlanPushResults(errors = listOf(SyncErrorDto(plan.uuid.toString(), "INVALID_SAVED_PLAN_TITLE", "bad"))))
+        )
+
+        syncOrchestrator.sync()
+        syncOrchestrator.sync()
+
+        assertThat(savedPlanDao.getById(plan.uuid)?.syncState).isEqualTo(SyncState.CANCELLED)
+        assertThat(syncNetworkDataSource.capturedPushRequests).hasSize(1)
+    }
+
+    @Test
+    fun `pull inserts a new saved plan as synced`() = runTest(testDispatcher) {
+        useSignedIn()
+        val lunch = UuidV7Generator.newId()
+        val dto = savedPlanDto(lunch = lunch)
+        syncNetworkDataSource.pullResponses.addLast(savedPullOf(dto))
+
+        syncOrchestrator.sync()
+
+        val saved = requireNotNull(savedPlanDao.getById(UUID.fromString(dto.uuid)))
+        assertThat(saved.syncState).isEqualTo(SyncState.SYNCED)
+        assertThat(saved.title).isEqualTo("Server Plan")
+        assertThat(saved.heroImagePath).isNull()
+        assertThat(saved.daysJson).contains(lunch.toString())
+    }
+
+    @Test
+    fun `pull keeps the local image path of a known saved plan`() = runTest(testDispatcher) {
+        useSignedIn()
+        val local = savedPlan(heroImagePath = "/data/photo", updatedAt = 1000L, syncState = SyncState.SYNCED)
+        savedPlanDao.upsert(local)
+        syncNetworkDataSource.pullResponses.addLast(savedPullOf(savedPlanDto(uuid = local.uuid, title = "Renamed", updatedAt = 5000L)))
+
+        syncOrchestrator.sync()
+
+        val saved = requireNotNull(savedPlanDao.getById(local.uuid))
+        assertThat(saved.title).isEqualTo("Renamed")
+        assertThat(saved.heroImagePath).isEqualTo("/data/photo")
+    }
+
+    @Test
+    fun `stale pull loses to a newer local edit`() = runTest(testDispatcher) {
+        useSignedIn()
+        val local = savedPlan(title = "Local edit", updatedAt = 9000L)
+        savedPlanDao.upsert(local)
+        syncNetworkDataSource.pushResponses.addLast(savedPushOf(SavedMealPlanPushResults()))
+        syncNetworkDataSource.pullResponses.addLast(savedPullOf(savedPlanDto(uuid = local.uuid, updatedAt = 5000L)))
+
+        syncOrchestrator.sync()
+
+        assertThat(savedPlanDao.getById(local.uuid)?.title).isEqualTo("Local edit")
+    }
+
+    @Test
+    fun `pulled tombstone soft-deletes the saved plan and removes its image`() = runTest(testDispatcher) {
+        useSignedIn()
+        val local = savedPlan(heroImagePath = "/data/photo", updatedAt = 1000L, syncState = SyncState.SYNCED)
+        savedPlanDao.upsert(local)
+        syncNetworkDataSource.pullResponses.addLast(
+            savedPullOf(savedPlanDto(uuid = local.uuid, updatedAt = 6000L, deletedAt = 5500L))
+        )
+
+        syncOrchestrator.sync()
+
+        val saved = requireNotNull(savedPlanDao.getById(local.uuid))
+        assertThat(saved.deletedAt).isEqualTo(5500L)
+        assertThat(saved.heroImagePath).isNull()
+        coVerify { savedPlanImageStore.delete(local.uuid) }
+    }
+
+    @Test
+    fun `pull skips saved plans when there is no authenticated user`() = runTest(testDispatcher) {
+        // The default test session is anonymous.
+        syncNetworkDataSource.pullResponses.addLast(savedPullOf(savedPlanDto()))
+
+        syncOrchestrator.sync()
+
+        assertThat(savedPlanDao.all).isEmpty()
+    }
+
+    @Test
+    fun `saved plans do not move the pull cursor`() = runTest(testDispatcher) {
+        useSignedIn()
+        syncNetworkDataSource.pullResponses.addLast(savedPullOf(savedPlanDto(updatedAt = 99_000L)))
 
         syncOrchestrator.sync()
 

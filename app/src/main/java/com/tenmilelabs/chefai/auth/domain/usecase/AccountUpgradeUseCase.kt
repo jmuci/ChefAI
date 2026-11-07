@@ -4,6 +4,7 @@ import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.UserEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.BookmarkedRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.MealPlanDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.SavedMealPlanDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeLabelCrossRefDao
@@ -43,6 +44,7 @@ class AccountUpgradeUseCase @Inject constructor(
     private val recipeLabelCrossRefDao: RecipeLabelCrossRefDao,
     private val bookmarkedRecipeDao: BookmarkedRecipeDao,
     private val mealPlanDao: MealPlanDao,
+    private val savedMealPlanDao: SavedMealPlanDao,
 ) {
 
     /**
@@ -65,10 +67,11 @@ class AccountUpgradeUseCase @Inject constructor(
         val mealPlanCount = mealPlanDao.countMealPlansForUser(anonymousUserId)
 
         val bookmarkCount = bookmarkedRecipeDao.countLiveForUser(anonymousUserId)
+        val savedPlanCount = savedMealPlanDao.countLiveForUser(anonymousUserId)
 
         // Bookmarks count too: an anonymous user who only saved search results would otherwise
         // lose them on sign-in.
-        if (recipeCount == 0 && mealPlanCount == 0 && bookmarkCount == 0) {
+        if (recipeCount == 0 && mealPlanCount == 0 && bookmarkCount == 0 && savedPlanCount == 0) {
             Timber.d("No anonymous data to upgrade (new device or empty). Creating auth user only.")
             ensureAuthenticatedUserEntity(authenticatedUser)
             return 0
@@ -111,10 +114,17 @@ class AccountUpgradeUseCase @Inject constructor(
                 updatedAt = now
             )
 
+            // Step 4b: Reassign saved meal plans (templates) the same way
+            savedMealPlanDao.reassignUserAndMarkPending(
+                oldUserId = anonymousUserId,
+                newUserId = authenticatedUser.uuid,
+                updatedAt = now
+            )
+
             // Step 5: Delete the anonymous UserEntity (nothing points to it anymore)
             userDao.deleteUser(anonymousUserId)
 
-            Timber.d("Account upgrade complete: $recipeCount recipes, $mealPlanCount meal plans reassigned")
+            Timber.d("Account upgrade complete: $recipeCount recipes, $mealPlanCount meal plans, $savedPlanCount saved plans reassigned")
             recipeCount
         }
     }

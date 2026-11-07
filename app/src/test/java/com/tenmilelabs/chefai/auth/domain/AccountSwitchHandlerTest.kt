@@ -9,6 +9,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeHouseholdDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
+import com.tenmilelabs.chefai.mealplans.data.local.SavedPlanImageStore
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -28,6 +29,7 @@ class AccountSwitchHandlerTest {
     private lateinit var userDao: FakeUserDao
     private lateinit var householdDao: FakeHouseholdDao
     private lateinit var recipeImageStore: RecipeImageStore
+    private lateinit var savedPlanImageStore: SavedPlanImageStore
     private lateinit var handler: AccountSwitchHandler
 
     @Before
@@ -38,6 +40,7 @@ class AccountSwitchHandlerTest {
         userDao = FakeUserDao()
         householdDao = FakeHouseholdDao()
         recipeImageStore = mockk(relaxed = true)
+        savedPlanImageStore = mockk(relaxed = true)
         handler = AccountSwitchHandler(
             securePreferences = securePreferences,
             database = database,
@@ -45,6 +48,7 @@ class AccountSwitchHandlerTest {
             userDao = userDao,
             householdDao = householdDao,
             recipeImageStore = recipeImageStore,
+            savedPlanImageStore = savedPlanImageStore,
         )
     }
 
@@ -54,6 +58,7 @@ class AccountSwitchHandlerTest {
 
         coVerify(exactly = 1) { database.clearAllTables() }
         coVerify(exactly = 1) { recipeImageStore.deleteAll() }
+        coVerify(exactly = 1) { savedPlanImageStore.deleteAll() }
     }
 
     @Test
@@ -89,6 +94,7 @@ class AccountSwitchHandlerTest {
         assertThat(securePreferences.getStoredCurrentUserId().first()).isEqualTo(newUserId)
         coVerify(exactly = 1) { database.clearAllTables() }
         coVerify(exactly = 1) { recipeImageStore.deleteAll() }
+        coVerify(exactly = 1) { savedPlanImageStore.deleteAll() }
     }
 
     @Test
@@ -106,6 +112,7 @@ class AccountSwitchHandlerTest {
         assertThat(securePreferences.getStoredCurrentUserId().first()).isEqualTo(newUserId)
         coVerify(exactly = 0) { database.clearAllTables() }
         coVerify(exactly = 0) { recipeImageStore.deleteAll() }
+        coVerify(exactly = 0) { savedPlanImageStore.deleteAll() }
     }
 
     @Test

@@ -20,6 +20,8 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import com.tenmilelabs.chefai.household.domain.repository.FakeHouseholdRepository
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSavedMealPlanDao
+import com.tenmilelabs.chefai.mealplans.data.local.SavedPlanImageStore
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
@@ -66,6 +68,7 @@ fun createTestSessionManager(
             userDao = fakeUserDao,
             householdDao = FakeHouseholdDao(),
             recipeImageStore = mockk<RecipeImageStore>(relaxed = true),
+        savedPlanImageStore = mockk<SavedPlanImageStore>(relaxed = true),
         ),
         accountUpgradeUseCaseProvider = {
             AccountUpgradeUseCase(
@@ -78,6 +81,7 @@ fun createTestSessionManager(
                 FakeRecipeLabelCrossRefDao(),
                 FakeBookmarkedRecipeDao(),
                 FakeMealPlanDao(),
+                FakeSavedMealPlanDao(),
             )
         },
         syncSchedulerProvider = { FakeSyncScheduler() },
@@ -122,6 +126,7 @@ fun createTestSessionManagerWithAuthSource(
             userDao = fakeUserDao,
             householdDao = FakeHouseholdDao(),
             recipeImageStore = mockk<RecipeImageStore>(relaxed = true),
+        savedPlanImageStore = mockk<SavedPlanImageStore>(relaxed = true),
         ),
         accountUpgradeUseCaseProvider = {
             AccountUpgradeUseCase(
@@ -134,6 +139,7 @@ fun createTestSessionManagerWithAuthSource(
                 FakeRecipeLabelCrossRefDao(),
                 FakeBookmarkedRecipeDao(),
                 FakeMealPlanDao(),
+                FakeSavedMealPlanDao(),
             )
         },
         syncSchedulerProvider = { FakeSyncScheduler() },
@@ -166,13 +172,14 @@ fun createRealSessionManagerWithFakes(
             userDao = fakeUserDao,
             householdDao = FakeHouseholdDao(),
             recipeImageStore = mockk<RecipeImageStore>(relaxed = true),
+        savedPlanImageStore = mockk<SavedPlanImageStore>(relaxed = true),
         ),
         accountUpgradeUseCaseProvider = {
             AccountUpgradeUseCase(
                 FakeTransactionRunner(), fakeUserDao, FakeRecipeDao(),
                 FakeRecipeStepDao(), FakeRecipeIngredientDao(),
                 FakeRecipeTagCrossRefDao(), FakeRecipeLabelCrossRefDao(),
-                FakeBookmarkedRecipeDao(), FakeMealPlanDao(),
+                FakeBookmarkedRecipeDao(), FakeMealPlanDao(), FakeSavedMealPlanDao(),
             )
         },
         syncSchedulerProvider = { FakeSyncManager() },

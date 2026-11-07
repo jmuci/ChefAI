@@ -8,7 +8,8 @@ data class SyncPushRequest(
     val bookmarkedRecipes: List<SyncBookmarkPushDto> = emptyList(),
     val mealPlans: List<SyncMealPlanDto> = emptyList(),
     val groceryListItems: List<SyncGroceryListItem> = emptyList(),
-    val cookEvents: List<SyncCookEventDto> = emptyList()
+    val cookEvents: List<SyncCookEventDto> = emptyList(),
+    val savedMealPlans: List<SyncSavedMealPlanDto> = emptyList()
 )
 
 @Serializable
@@ -83,7 +84,8 @@ data class SyncPushResponse(
     val bookmarkErrors: List<BookmarkErrorDto> = emptyList(),
     val mealPlans: MealPlanPushResults = MealPlanPushResults(),
     val groceryListItems: GroceryItemPushResults = GroceryItemPushResults(),
-    val cookEvents: CookEventPushResults = CookEventPushResults()
+    val cookEvents: CookEventPushResults = CookEventPushResults(),
+    val savedMealPlans: SavedMealPlanPushResults = SavedMealPlanPushResults()
 )
 
 @Serializable
@@ -210,7 +212,8 @@ data class SyncPullResponse(
     val bookmarkedRecipes: List<SyncBookmarkPullDto> = emptyList(),
     val mealPlans: List<SyncMealPlanDto> = emptyList(),
     val groceryListItems: List<SyncGroceryListItem> = emptyList(),
-    val cookEvents: List<SyncCookEventDto> = emptyList()
+    val cookEvents: List<SyncCookEventDto> = emptyList(),
+    val savedMealPlans: List<SyncSavedMealPlanDto> = emptyList()
 )
 
 @Serializable
@@ -381,4 +384,35 @@ data class CookEventErrorDto(
 data class CookEventPushResults(
     val accepted: List<CookEventAcceptedDto> = emptyList(),
     val errors: List<CookEventErrorDto> = emptyList()
+)
+
+// --- Saved Meal Plan Sync DTOs ---
+
+/** A saved meal plan template, in both directions. `heroImagePath` is device-local and never sent. */
+@Serializable
+data class SyncSavedMealPlanDto(
+    val uuid: String,
+    val ownerId: String,
+    val title: String,
+    val preferencesJson: String,
+    val days: List<SyncSavedMealPlanDayDto>,
+    val sourceMealPlanId: String? = null,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val deletedAt: Long? = null
+)
+
+@Serializable
+data class SyncSavedMealPlanDayDto(
+    val dayIndex: Int,
+    val lunchRecipeId: String? = null,
+    val dinnerRecipeId: String? = null
+)
+
+/** Same shape as [MealPlanPushResults]; [SyncErrorDto.reason] stays a String so new codes can't break parsing. */
+@Serializable
+data class SavedMealPlanPushResults(
+    val accepted: List<AcceptedEntityDto> = emptyList(),
+    val conflicts: List<String> = emptyList(),
+    val errors: List<SyncErrorDto> = emptyList()
 )

@@ -46,6 +46,18 @@ class SavedPlanImageStore @Inject constructor(
         Unit
     }
 
+    /**
+     * Renames the stored image of [oldUuid] to [newUuid] after the plan was re-keyed.
+     *
+     * @return the new absolute path, or `null` when there was no image to move.
+     */
+    suspend fun move(oldUuid: UUID, newUuid: UUID): String? = withContext(ioDispatcher) {
+        val source = File(directory, oldUuid.toString())
+        if (!source.exists()) return@withContext null
+        val target = File(directory, newUuid.toString())
+        if (source.renameTo(target)) target.absolutePath else null
+    }
+
     /** Removes every stored saved-plan image — for when the local database is wiped wholesale. */
     suspend fun deleteAll(): Unit = withContext(ioDispatcher) {
         directory.deleteRecursively()
