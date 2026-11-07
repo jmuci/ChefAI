@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.recipes.data.local
 
+import com.tenmilelabs.chefai.core.data.local.sampleSizeFor
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

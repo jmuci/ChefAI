@@ -6,6 +6,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_13_14
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_14_15
+import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_15_16
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_1_2
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_2_3
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_3_4
@@ -653,14 +654,48 @@ class ChefAIDatabaseMigrationTest {
     }
 
     @Test
-    fun migrateAll1To15_succeeds() {
+    fun migrate15To16_addsAnEmptySavedMealPlansTableAndKeepsExistingPlans() {
+        val userId = UUID.randomUUID()
+        val planId = UUID.randomUUID()
+        helper.createDatabase(TEST_DB, 15).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO users (uuid, displayName, email, avatarUrl, updatedAt, deletedAt, syncState)
+                VALUES (?, 'Chef', 'c@t.com', '', 1, NULL, 'SYNCED')
+                """.trimIndent(),
+                arrayOf(userId.toBlob())
+            )
+            db.execSQL(
+                """
+                INSERT INTO meal_plans (uuid, userId, name, status, preferencesJson, createdAt, updatedAt, syncState)
+                VALUES (?, ?, 'Plan', 'READY', '{}', 1, 1, 'SYNCED')
+                """.trimIndent(),
+                arrayOf(planId.toBlob(), userId.toBlob())
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 16, true, MIGRATION_15_16)
+
+        db.query("SELECT COUNT(*) FROM saved_meal_plans").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(0, cursor.getInt(0))
+        }
+        db.query("SELECT COUNT(*) FROM meal_plans").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("existing plans are untouched", 1, cursor.getInt(0))
+        }
+    }
+
+    @Test
+    fun migrateAll1To16_succeeds() {
         helper.createDatabase(TEST_DB, 1).close()
 
         helper.runMigrationsAndValidate(
-            TEST_DB, 15, true,
+            TEST_DB, 16, true,
             MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
             MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
             MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15,
+            MIGRATION_15_16,
         )
     }
 }
