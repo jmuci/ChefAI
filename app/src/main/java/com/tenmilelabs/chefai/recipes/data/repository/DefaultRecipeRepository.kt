@@ -311,6 +311,9 @@ class DefaultRecipeRepository @Inject constructor(
         syncManager.requestMutationSync()
     }
 
+    override suspend fun getSoftDeletedRecipeIds(ids: Collection<UUID>): Set<UUID> =
+        if (ids.isEmpty()) emptySet() else recipeDao.getSoftDeletedIds(ids.distinct()).toSet()
+
     override suspend fun getRecipeCountForUser(userId: UUID): Int =
         recipeDao.countRecipesForUser(userId)
 

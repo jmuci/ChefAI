@@ -200,5 +200,11 @@ class FakeRecipesRepository : RecipesRepository {
 
     var fakeRecipeCount: Int = 0
 
+    /** Ids [getSoftDeletedRecipeIds] reports as soft-deleted locally. */
+    val softDeletedIds: MutableSet<UUID> = mutableSetOf()
+
+    override suspend fun getSoftDeletedRecipeIds(ids: Collection<UUID>): Set<UUID> =
+        ids.filter { it in softDeletedIds }.toSet()
+
     override suspend fun getRecipeCountForUser(userId: UUID): Int = fakeRecipeCount
 }
