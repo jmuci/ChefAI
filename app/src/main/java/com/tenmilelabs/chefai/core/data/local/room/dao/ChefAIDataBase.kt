@@ -22,6 +22,7 @@ import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.RecipeStepEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
+import com.tenmilelabs.chefai.core.data.local.room.SavedMealPlanEntity
 import com.tenmilelabs.chefai.core.data.local.room.ShoppingListCheckEntity
 import com.tenmilelabs.chefai.core.data.local.room.SourceClassificationEntity
 import com.tenmilelabs.chefai.core.data.local.room.SyncMetadataEntity
@@ -48,13 +49,14 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         RecipeLabelCrossRef::class,
         RecipeStepEntity::class,
         RecipeTagCrossRef::class,
+        SavedMealPlanEntity::class,
         ShoppingListCheckEntity::class,
         SourceClassificationEntity::class,
         SyncMetadataEntity::class,
         TagEntity::class,
         UserEntity::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = true
 )
 @TypeConverters(UuidConverters::class)
@@ -76,6 +78,7 @@ abstract class ChefAIDataBase : RoomDatabase() {
     abstract fun syncMetadataDao(): SyncMetadataDao
     abstract fun recipeDraftDao(): RecipeDraftDao
     abstract fun mealPlanDao(): MealPlanDao
+    abstract fun savedMealPlanDao(): SavedMealPlanDao
     abstract fun shoppingListCheckDao(): ShoppingListCheckDao
     abstract fun householdDao(): HouseholdDao
 }
@@ -435,5 +438,31 @@ val MIGRATION_14_15 = object : Migration(14, 15) {
         db.execSQL("ALTER TABLE recipe_cook_events ADD COLUMN deletedAt INTEGER")
         db.execSQL("ALTER TABLE recipe_cook_events ADD COLUMN syncState TEXT NOT NULL DEFAULT 'PENDING'")
         db.execSQL("UPDATE recipe_cook_events SET updatedAt = cookedAt")
+    }
+}
+
+/**
+ * v15 → v16: adds `saved_meal_plans`, the reusable meal-plan templates behind the Saved tab.
+ * A new table, so existing data is untouched and there is nothing to backfill.
+ */
+val MIGRATION_15_16 = object : Migration(15, 16) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `saved_meal_plans` (
+                `uuid` BLOB NOT NULL, `userId` BLOB NOT NULL, `title` TEXT NOT NULL,
+                `preferencesJson` TEXT NOT NULL, `daysJson` TEXT NOT NULL, `sourceMealPlanId` BLOB,
+                `heroImagePath` TEXT, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL,
+                `deletedAt` INTEGER, `syncState` TEXT NOT NULL,
+                PRIMARY KEY(`uuid`),
+                FOREIGN KEY(`userId`) REFERENCES `users`(`uuid`) ON UPDATE NO ACTION ON DELETE CASCADE
+            )
+            """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_saved_meal_plans_userId` ON `saved_meal_plans` (`userId`)")
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_saved_meal_plans_syncState_updatedAt` " +
+                "ON `saved_meal_plans` (`syncState`, `updatedAt`)"
+        )
     }
 }
