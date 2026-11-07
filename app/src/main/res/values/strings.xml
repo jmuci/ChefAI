@@ -422,6 +422,8 @@
     <string name="wizard_minutes_format">%1$d min</string>
 
     <string name="import_recipe_title">Import Recipe</string>
+    <string name="share_target_label">Pocket Chef</string>
+    <string name="share_no_link_found">No recipe link found in what was shared</string>
     <string name="import_recipe_lede">Paste a link and ChefAI reads the ingredients and steps off the page.</string>
     <string name="import_recipe_url_label">Recipe URL</string>
     <string name="import_recipe_url_placeholder">Paste a recipe link…</string>

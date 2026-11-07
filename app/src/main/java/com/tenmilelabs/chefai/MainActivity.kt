@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -68,11 +69,19 @@ class MainActivity : ComponentActivity() {
      * each time.
      */
     private fun consumeShareIntent(intent: Intent) {
-        if (intent.action != Intent.ACTION_SEND || intent.type != "text/plain") return
+        // startsWith: some senders append parameters, e.g. "text/plain; charset=utf-8".
+        if (intent.action != Intent.ACTION_SEND || intent.type?.startsWith("text/plain") != true) return
         // getCharSequenceExtra: some senders put a Spanned in EXTRA_TEXT, which getStringExtra
         // returns as null.
-        pendingSharedUrl = extractSharedRecipeUrl(intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString())
+        val sharedText = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString() ?: return
         intent.removeExtra(Intent.EXTRA_TEXT)
+        val url = extractSharedRecipeUrl(sharedText)
+        if (url == null) {
+            // Otherwise the app just opens on whatever screen was last up, with no hint why.
+            Toast.makeText(this, R.string.share_no_link_found, Toast.LENGTH_LONG).show()
+            return
+        }
+        pendingSharedUrl = url
     }
 
     /**

@@ -25,7 +25,11 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <intent-filter>
+            <!--
+                Share-sheet entry ("Share" in Chrome etc. → Pocket Chef → importer). The label is
+                what the chooser shows; without it Android falls back to the app label.
+            -->
+            <intent-filter android:label="@string/share_target_label">
                 <action android:name="android.intent.action.SEND" />
 
                 <category android:name="android.intent.category.DEFAULT" />
