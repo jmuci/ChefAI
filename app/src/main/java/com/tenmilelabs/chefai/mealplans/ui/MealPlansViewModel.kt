@@ -13,13 +13,17 @@ import com.tenmilelabs.chefai.core.util.WhileUiSubscribed
 import com.tenmilelabs.chefai.household.domain.model.Household
 import com.tenmilelabs.chefai.household.domain.repository.HouseholdRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
+import com.tenmilelabs.chefai.mealplans.domain.model.SavedMealPlan
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
+import com.tenmilelabs.chefai.mealplans.domain.repository.SavedMealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.usecase.MealRef
 import com.tenmilelabs.chefai.mealplans.domain.week.PlannedWeekMeal
 import com.tenmilelabs.chefai.mealplans.domain.repository.ShoppingListRepository
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.ShoppingListBuilder
 import com.tenmilelabs.chefai.mealplans.domain.summary.MealPlanSummary
 import com.tenmilelabs.chefai.mealplans.domain.summary.MealPlanSummaryBuilder
+import com.tenmilelabs.chefai.mealplans.domain.summary.SavedMealPlanSummary
+import com.tenmilelabs.chefai.mealplans.domain.summary.SavedMealPlanSummaryBuilder
 import com.tenmilelabs.chefai.mealplans.domain.week.DAYS_IN_WEEK
 import com.tenmilelabs.chefai.mealplans.domain.week.MealPlanWeek
 import com.tenmilelabs.chefai.mealplans.domain.week.MealPlanWeekProjector
@@ -52,13 +56,23 @@ import javax.inject.Inject
 /** Which of the tab's two views is showing. Not persisted — the tab opens on the calendar. */
 enum class MealPlansViewMode { WEEK, PLANS }
 
+/** The plans list's two tabs. "Saved" only exists while at least one saved plan does. */
+enum class PlanListTab { SCHEDULED, SAVED }
+
 /** What the plans list shows; separate from the week's state because it spans every plan. */
 sealed interface MealPlanListUiState {
     data object Loading : MealPlanListUiState
     data object Error : MealPlanListUiState
+    /**
+     * @property savedPlans the user's saved templates, newest first.
+     * @property selectedTab the tab on screen. Always [PlanListTab.SCHEDULED] while [savedPlans] is
+     *   empty, so deleting the last saved plan can never strand the user on a vanished tab.
+     */
     data class Success(
         val plans: List<MealPlanSummary>,
         val today: LocalDate,
+        val savedPlans: List<SavedMealPlanSummary> = emptyList(),
+        val selectedTab: PlanListTab = PlanListTab.SCHEDULED,
     ) : MealPlanListUiState
 }
 
@@ -93,6 +107,7 @@ sealed interface MealPlansUiState {
 @HiltViewModel
 class MealPlansViewModel @Inject constructor(
     private val mealPlanRepository: MealPlanRepository,
+    private val savedMealPlanRepository: SavedMealPlanRepository,
     private val recipesRepository: RecipesRepository,
     private val collectionsRepository: CollectionsRepository,
     shoppingListRepository: ShoppingListRepository,
@@ -123,6 +138,17 @@ class MealPlansViewModel @Inject constructor(
             }
         }
 
+    private val savedPlans: Flow<List<SavedMealPlan>> = sessionManager.userSession
+        .flatMapLatest { session ->
+            when (session) {
+                is UserSession.Loading -> emptyFlow()
+                is UserSession.Anonymous -> savedMealPlanRepository.observeSavedPlans(session.localUserId)
+                is UserSession.Authenticated -> savedMealPlanRepository.observeSavedPlans(session.user.uuid)
+            }
+        }
+
+    private val _planListTab = MutableStateFlow(PlanListTab.SCHEDULED)
+
     private val _viewMode = MutableStateFlow(MealPlansViewMode.WEEK)
     val viewMode: StateFlow<MealPlansViewMode> = _viewMode
 
@@ -130,19 +156,29 @@ class MealPlansViewModel @Inject constructor(
      * Every live plan, personal and shared alike: a plan the user invited others to is simply
      * theirs, so there is no "whose plans" switch to filter by.
      */
-    val listState: StateFlow<MealPlanListUiState> = plans
-        .flatMapLatest { plans ->
-            val recipeIds = plans.flatMap { plan ->
-                plan.days.flatMap { listOfNotNull(it.lunchRecipeId, it.dinnerRecipeId) }
-            }.distinct()
+    val listState: StateFlow<MealPlanListUiState> = combine(plans, savedPlans, _planListTab) { plans, saved, tab ->
+        PlanListInputs(plans, saved, tab)
+    }
+        .flatMapLatest { inputs ->
+            // One query for both lists: the saved plans' recipes are usually the scheduled ones'.
+            val recipeIds = (
+                inputs.plans.flatMap { plan ->
+                    plan.days.flatMap { listOfNotNull(it.lunchRecipeId, it.dinnerRecipeId) }
+                } + inputs.saved.flatMap { plan ->
+                    plan.days.flatMap { listOfNotNull(it.lunchRecipeId, it.dinnerRecipeId) }
+                }
+                ).distinct()
             recipesRepository.getRecipePreviewsByIds(recipeIds).map { previews ->
+                val byId = previews.associateBy { it.uuid }
                 val state: MealPlanListUiState = MealPlanListUiState.Success(
                     plans = MealPlanSummaryBuilder.build(
-                        plans = plans,
-                        recipes = previews.associateBy { it.uuid },
+                        plans = inputs.plans,
+                        recipes = byId,
                         zone = clock.zone,
                     ),
                     today = today(),
+                    savedPlans = SavedMealPlanSummaryBuilder.build(inputs.saved, byId),
+                    selectedTab = if (inputs.saved.isEmpty()) PlanListTab.SCHEDULED else inputs.tab,
                 )
                 state
             }
@@ -227,6 +263,10 @@ class MealPlansViewModel @Inject constructor(
         } else {
             null
         }
+
+    fun onPlanListTabSelected(tab: PlanListTab) {
+        _planListTab.value = tab
+    }
 
     fun onViewModeChange(mode: MealPlansViewMode) {
         _viewMode.value = mode
@@ -345,12 +385,66 @@ class MealPlansViewModel @Inject constructor(
         }
     }
 
+    // --- Saved plans (the "Saved" tab) ---
+
+    private val _pendingDeleteSavedPlanId = MutableStateFlow<UUID?>(null)
+
+    /** The saved plan whose delete confirmation is open, or `null` while it is closed. */
+    val pendingDeleteSavedPlanId: StateFlow<UUID?> = _pendingDeleteSavedPlanId
+
+    fun onDeleteSavedPlanRequested(savedPlanId: UUID) {
+        _pendingDeleteSavedPlanId.value = savedPlanId
+    }
+
+    fun onDeleteSavedPlanDismissed() {
+        _pendingDeleteSavedPlanId.value = null
+    }
+
+    /** Soft-deletes the confirmed saved plan (and its photo); the Saved tab drops it via Room. */
+    fun onDeleteSavedPlanConfirmed() {
+        val savedPlanId = _pendingDeleteSavedPlanId.value ?: return
+        _pendingDeleteSavedPlanId.value = null
+        viewModelScope.launch {
+            try {
+                savedMealPlanRepository.delete(savedPlanId)
+                _events.send(MealPlansEvent.ShowMessage(R.string.saved_plan_deleted))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "onDeleteSavedPlanConfirmed: failed for saved plan $savedPlanId")
+                _events.send(MealPlansEvent.ShowMessage(R.string.saved_plan_delete_failed))
+            }
+        }
+    }
+
+    private val _pendingRepeatSavedPlanId = MutableStateFlow<UUID?>(null)
+
+    /**
+     * The saved plan the user asked to repeat, or `null`. Only recorded here for now; the date
+     * picker and the use case that schedules it hook on to this.
+     */
+    val pendingRepeatSavedPlanId: StateFlow<UUID?> = _pendingRepeatSavedPlanId
+
+    fun onRepeatSavedPlanRequested(savedPlanId: UUID) {
+        _pendingRepeatSavedPlanId.value = savedPlanId
+    }
+
+    fun onRepeatSavedPlanDismissed() {
+        _pendingRepeatSavedPlanId.value = null
+    }
+
     fun onAddMealDismissed() {
         _addMealDate.value = null
         _addMealQuery.value = ""
     }
 
     private fun today(): LocalDate = LocalDate.now(clock)
+
+    private class PlanListInputs(
+        val plans: List<MealPlan>,
+        val saved: List<SavedMealPlan>,
+        val tab: PlanListTab,
+    )
 
     /** Everything the projection needs, gathered before the recipe queries it implies. */
     private inner class WeekInputs(

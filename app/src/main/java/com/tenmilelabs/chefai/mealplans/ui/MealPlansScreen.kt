@@ -15,7 +15,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,7 +49,10 @@ import com.tenmilelabs.chefai.mealplans.domain.week.PlannedWeekMeal
 import com.tenmilelabs.chefai.mealplans.domain.week.WeekDay
 import com.tenmilelabs.chefai.mealplans.domain.summary.MealPlanSummary
 import com.tenmilelabs.chefai.mealplans.ui.components.AddMealSheet
+import com.tenmilelabs.chefai.mealplans.domain.model.MealType
+import com.tenmilelabs.chefai.mealplans.domain.summary.SavedMealPlanSummary
 import com.tenmilelabs.chefai.mealplans.ui.components.MealPlanHeroCard
+import com.tenmilelabs.chefai.mealplans.ui.components.SavedMealPlanCard
 import com.tenmilelabs.chefai.mealplans.ui.detail.DeleteMealPlanDialog
 import com.tenmilelabs.chefai.mealplans.ui.components.WeekDayRow
 import com.tenmilelabs.chefai.mealplans.ui.components.rememberWeekMealDragState
@@ -85,6 +92,7 @@ fun MealPlansScreen(
     val addMealQuery by viewModel.addMealQuery.collectAsStateWithLifecycle()
     val addMealRecipes by viewModel.addMealRecipes.collectAsStateWithLifecycle()
     val pendingDeletePlanId by viewModel.pendingDeletePlanId.collectAsStateWithLifecycle()
+    val pendingDeleteSavedPlanId by viewModel.pendingDeleteSavedPlanId.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     LaunchedEffect(viewModel, snackbarHostState) {
@@ -122,12 +130,25 @@ fun MealPlansScreen(
         )
     }
 
+    if (pendingDeleteSavedPlanId != null) {
+        DeleteMealPlanDialog(
+            onConfirm = viewModel::onDeleteSavedPlanConfirmed,
+            onDismiss = viewModel::onDeleteSavedPlanDismissed,
+            titleRes = R.string.saved_plan_delete_title,
+            messageRes = R.string.saved_plan_delete_message,
+            confirmRes = R.string.saved_plan_delete_confirm,
+        )
+    }
+
     MealPlansContent(
         uiState = uiState,
         listState = listState,
         viewMode = viewMode,
         onPlanClick = onPlanClick,
         onDeletePlan = viewModel::onDeletePlanRequested,
+        onTabSelected = viewModel::onPlanListTabSelected,
+        onRepeatSavedPlan = viewModel::onRepeatSavedPlanRequested,
+        onDeleteSavedPlan = viewModel::onDeleteSavedPlanRequested,
         onPreviousWeek = viewModel::onPreviousWeek,
         onNextWeek = viewModel::onNextWeek,
         onMealClick = onMealClick,
@@ -145,6 +166,9 @@ private fun MealPlansContent(
     viewMode: MealPlansViewMode,
     onPlanClick: (UUID) -> Unit,
     onDeletePlan: (UUID) -> Unit,
+    onTabSelected: (PlanListTab) -> Unit,
+    onRepeatSavedPlan: (UUID) -> Unit,
+    onDeleteSavedPlan: (UUID) -> Unit,
     onPreviousWeek: () -> Unit,
     onNextWeek: () -> Unit,
     onMealClick: (PlannedWeekMeal) -> Unit,
@@ -158,6 +182,9 @@ private fun MealPlansContent(
             listState = listState,
             onPlanClick = onPlanClick,
             onDeletePlan = onDeletePlan,
+            onTabSelected = onTabSelected,
+            onRepeatSavedPlan = onRepeatSavedPlan,
+            onDeleteSavedPlan = onDeleteSavedPlan,
             modifier = modifier,
         )
         return
@@ -191,6 +218,9 @@ private fun PlanListContent(
     listState: MealPlanListUiState,
     onPlanClick: (UUID) -> Unit,
     onDeletePlan: (UUID) -> Unit,
+    onTabSelected: (PlanListTab) -> Unit,
+    onRepeatSavedPlan: (UUID) -> Unit,
+    onDeleteSavedPlan: (UUID) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (listState) {
@@ -203,20 +233,106 @@ private fun PlanListContent(
             modifier = modifier,
         )
 
-        is MealPlanListUiState.Success -> if (listState.plans.isEmpty()) {
-            EmptyContent(
-                title = R.string.no_meal_plans_title,
-                subtitle = R.string.no_meal_plans_subtitle,
-                noRecipesIconRes = R.drawable.ic_skillet_cooktop_24dp,
-                modifier = modifier,
+        is MealPlanListUiState.Success -> Column(modifier = modifier.fillMaxSize()) {
+            // Tabs exist only while there is something saved: without it, exactly the old screen.
+            val hasSaved = listState.savedPlans.isNotEmpty()
+            if (hasSaved) {
+                PlanListTabs(selected = listState.selectedTab, onTabSelected = onTabSelected)
+            }
+            when {
+                hasSaved && listState.selectedTab == PlanListTab.SAVED -> SavedPlanList(
+                    plans = listState.savedPlans,
+                    onRepeat = onRepeatSavedPlan,
+                    onDelete = onDeleteSavedPlan,
+                    modifier = Modifier.weight(1f),
+                )
+
+                listState.plans.isEmpty() -> EmptyContent(
+                    title = R.string.no_meal_plans_title,
+                    subtitle = R.string.no_meal_plans_subtitle,
+                    noRecipesIconRes = R.drawable.ic_skillet_cooktop_24dp,
+                    modifier = Modifier.weight(1f),
+                )
+
+                else -> PlanList(
+                    plans = listState.plans,
+                    today = listState.today,
+                    onPlanClick = onPlanClick,
+                    onDeletePlan = onDeletePlan,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+/** Scheduled / Saved, in the flat theme: ground-colored, a hairline rule, an accent underline. */
+@Composable
+private fun PlanListTabs(
+    selected: PlanListTab,
+    onTabSelected: (PlanListTab) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SecondaryTabRow(
+        selectedTabIndex = selected.ordinal,
+        modifier = modifier,
+        containerColor = MaterialTheme.chefColors.panelGround,
+        contentColor = MaterialTheme.chefColors.accentText,
+        indicator = {
+            TabRowDefaults.SecondaryIndicator(
+                modifier = Modifier.tabIndicatorOffset(selected.ordinal),
+                height = MaterialTheme.chefColors.sectionRuleWidth,
+                color = MaterialTheme.chefColors.accentText,
             )
-        } else {
-            PlanList(
-                plans = listState.plans,
-                today = listState.today,
-                onPlanClick = onPlanClick,
-                onDeletePlan = onDeletePlan,
-                modifier = modifier,
+        },
+        divider = {
+            HorizontalDivider(
+                thickness = MaterialTheme.chefColors.rowRuleWidth,
+                color = MaterialTheme.colorScheme.outline,
+            )
+        },
+    ) {
+        PlanListTab.entries.forEach { tab ->
+            Tab(
+                selected = tab == selected,
+                onClick = { onTabSelected(tab) },
+                selectedContentColor = MaterialTheme.chefColors.accentText,
+                unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = {
+                    Text(
+                        text = stringResource(
+                            when (tab) {
+                                PlanListTab.SCHEDULED -> R.string.meal_plans_tab_scheduled
+                                PlanListTab.SAVED -> R.string.meal_plans_tab_saved
+                            },
+                        ),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SavedPlanList(
+    plans: List<SavedMealPlanSummary>,
+    onRepeat: (UUID) -> Unit,
+    onDelete: (UUID) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.chefColors.panelGround),
+        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = FabClearance),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        items(plans, key = { it.id }) { summary ->
+            SavedMealPlanCard(
+                summary = summary,
+                onRepeatClick = { onRepeat(summary.id) },
+                onDeleteClick = { onDelete(summary.id) },
             )
         }
     }
@@ -386,6 +502,9 @@ private fun MealPlansPreview() {
             viewMode = MealPlansViewMode.WEEK,
             onPlanClick = {},
             onDeletePlan = {},
+            onTabSelected = {},
+            onRepeatSavedPlan = {},
+            onDeleteSavedPlan = {},
         )
     }
 }
@@ -416,6 +535,63 @@ private fun MealPlansEmptyWeekPreview() {
             viewMode = MealPlansViewMode.WEEK,
             onPlanClick = {},
             onDeletePlan = {},
+            onTabSelected = {},
+            onRepeatSavedPlan = {},
+            onDeleteSavedPlan = {},
+        )
+    }
+}
+
+@Preview(name = "Plans — Saved tab, light")
+@Preview(name = "Plans — Saved tab, dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun SavedTabPreview() {
+    ChefAITheme {
+        PlanListContent(
+            listState = MealPlanListUiState.Success(
+                plans = emptyList(),
+                today = LocalDate.of(2026, 8, 12),
+                savedPlans = listOf(
+                    SavedMealPlanSummary(
+                        id = UUID.randomUUID(),
+                        title = "Easy weeknights",
+                        heroImageModel = null,
+                        recipeTitles = listOf("Spaghetti Carbonara", "Margherita Pizza"),
+                        recipeCount = 5,
+                        dayCount = 5,
+                        mealType = MealType.DINNER,
+                    ),
+                ),
+                selectedTab = PlanListTab.SAVED,
+            ),
+            onPlanClick = {},
+            onDeletePlan = {},
+            onTabSelected = {},
+            onRepeatSavedPlan = {},
+            onDeleteSavedPlan = {},
+        )
+    }
+}
+
+@Preview(name = "Plans — Scheduled tab (empty), light")
+@Preview(name = "Plans — Scheduled tab (empty), dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun ScheduledTabPreview() {
+    ChefAITheme {
+        PlanListContent(
+            listState = MealPlanListUiState.Success(
+                plans = emptyList(),
+                today = LocalDate.of(2026, 8, 12),
+                savedPlans = listOf(
+                    SavedMealPlanSummary(UUID.randomUUID(), "Easy weeknights", null, emptyList(), 5, 5, MealType.DINNER),
+                ),
+                selectedTab = PlanListTab.SCHEDULED,
+            ),
+            onPlanClick = {},
+            onDeletePlan = {},
+            onTabSelected = {},
+            onRepeatSavedPlan = {},
+            onDeleteSavedPlan = {},
         )
     }
 }

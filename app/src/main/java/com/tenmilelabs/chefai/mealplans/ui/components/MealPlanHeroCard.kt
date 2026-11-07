@@ -31,7 +31,6 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.tenmilelabs.chefai.R
-import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.ui.components.flat.flatClickable
 import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
 import com.tenmilelabs.chefai.core.ui.recipeImageModel
@@ -64,7 +63,9 @@ fun MealPlanHeroCard(
             .background(MaterialTheme.chefColors.panelSurface)
             .flatClickable(onClick = onClick),
     ) {
-        Hero(recipe = summary.heroRecipe)
+        Hero(
+            model = summary.heroRecipe?.let { recipeImageModel(it.localImagePath, it.imageUrlThumbnail) },
+        )
 
         Column(
             modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 4.dp, bottom = 8.dp),
@@ -137,9 +138,9 @@ fun MealPlanHeroCard(
     }
 }
 
+/** The 16:9 card photo; [model] is anything Coil loads, or `null` for the placeholder. */
 @Composable
-private fun Hero(recipe: RecipePreview?, modifier: Modifier = Modifier) {
-    val model = recipe?.let { recipeImageModel(it.localImagePath, it.imageUrlThumbnail) }
+internal fun Hero(model: String?, modifier: Modifier = Modifier) {
     AsyncImage(
         model = ImageRequest.Builder(LocalContext.current).data(model).crossfade(true).build(),
         placeholder = painterResource(R.drawable.ic_img_placeholder),
