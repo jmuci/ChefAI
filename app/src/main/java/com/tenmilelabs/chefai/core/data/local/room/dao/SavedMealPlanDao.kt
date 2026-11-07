@@ -40,4 +40,22 @@ interface SavedMealPlanDao {
             "WHERE uuid = :uuid AND (:expectedUpdatedAt IS NULL OR updatedAt = :expectedUpdatedAt)"
     )
     suspend fun updateSyncState(uuid: UUID, state: SyncState, updatedAt: Long, expectedUpdatedAt: Long? = null): Int
+
+    /** Moves every saved plan of [oldUserId] to [newUserId] and queues them for push (anonymous -> account upgrade). */
+    @Query("UPDATE saved_meal_plans SET userId = :newUserId, syncState = 'PENDING', updatedAt = :updatedAt WHERE userId = :oldUserId")
+    suspend fun reassignUserAndMarkPending(oldUserId: UUID, newUserId: UUID, updatedAt: Long)
+
+    @Query("SELECT COUNT(*) FROM saved_meal_plans WHERE userId = :userId AND deletedAt IS NULL")
+    suspend fun countLiveForUser(userId: UUID): Int
+
+    /** Re-keys a row the server refused with `SAVED_PLAN_ID_TAKEN` and queues it again. */
+    @Query("UPDATE saved_meal_plans SET uuid = :newUuid, syncState = 'PENDING' WHERE uuid = :oldUuid")
+    suspend fun reassignId(oldUuid: UUID, newUuid: UUID)
+
+    /** Sets only the sync state, e.g. parking a refused row as `CANCELLED`. */
+    @Query("UPDATE saved_meal_plans SET syncState = :state WHERE uuid = :uuid")
+    suspend fun setSyncState(uuid: UUID, state: SyncState)
+
+    @Query("DELETE FROM saved_meal_plans WHERE uuid = :uuid")
+    suspend fun delete(uuid: UUID)
 }

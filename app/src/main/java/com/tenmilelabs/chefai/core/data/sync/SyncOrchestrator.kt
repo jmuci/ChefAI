@@ -4,6 +4,10 @@ import com.tenmilelabs.chefai.core.data.local.room.BookmarkedRecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.MealPlanDayEntity
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeCookEventDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.SavedMealPlanDao
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncErrorDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncSavedMealPlanDto
+import com.tenmilelabs.chefai.mealplans.data.local.SavedPlanImageStore
 import com.tenmilelabs.chefai.core.data.local.room.carryForwardCookedMarks
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.SyncMetadataEntity
@@ -103,6 +107,8 @@ class SyncOrchestrator @Inject constructor(
     private val mealPlanDao: MealPlanDao,
     private val shoppingListCheckDao: ShoppingListCheckDao,
     private val recipeCookEventDao: RecipeCookEventDao,
+    private val savedMealPlanDao: SavedMealPlanDao,
+    private val savedPlanImageStore: SavedPlanImageStore,
     private val sessionManager: SessionManager,
     private val syncMetadataDao: SyncMetadataDao,
     private val transactionRunner: TransactionRunner,
@@ -112,6 +118,7 @@ class SyncOrchestrator @Inject constructor(
         const val ENTITY_TYPE_RECIPES = "recipes"
         private const val PUSH_BATCH_SIZE = 50
         private const val COOK_EVENT_ID_TAKEN = "EVENT_ID_TAKEN"
+        private const val SAVED_PLAN_ID_TAKEN = "SAVED_PLAN_ID_TAKEN"
     }
 
     override suspend fun sync(): SyncResult = withContext(ioDispatcher) {
@@ -150,14 +157,17 @@ class SyncOrchestrator @Inject constructor(
         val dirtyCookEvents = recipeCookEventDao.getAllDirty()
         val syncCookEvents = dirtyCookEvents.map { it.toSyncDto() }
 
+        val dirtySavedPlans = savedMealPlanDao.getAllDirty()
+        val syncSavedPlans = dirtySavedPlans.map { it.toSyncDto() }
+
         if (dirtyRecipes.isEmpty() && dirtyBookmarks.isEmpty() && dirtyMealPlans.isEmpty() &&
-            dirtyGroceryItems.isEmpty() && dirtyCookEvents.isEmpty()
+            dirtyGroceryItems.isEmpty() && dirtyCookEvents.isEmpty() && dirtySavedPlans.isEmpty()
         ) {
             Timber.d("Push: Nothing dirty to push")
             return PushResult(0, 0, 0)
         }
 
-        Timber.d("Push: Found ${dirtyRecipes.size} dirty recipes, ${dirtyBookmarks.size} dirty bookmarks, ${dirtyMealPlans.size} dirty meal plans, ${dirtyGroceryItems.size} dirty grocery items, ${dirtyCookEvents.size} dirty cook events")
+        Timber.d("Push: Found ${dirtyRecipes.size} dirty recipes, ${dirtyBookmarks.size} dirty bookmarks, ${dirtyMealPlans.size} dirty meal plans, ${dirtyGroceryItems.size} dirty grocery items, ${dirtyCookEvents.size} dirty cook events, ${dirtySavedPlans.size} dirty saved plans")
 
         val syncRecipes = dirtyRecipes.map { recipe -> buildSyncRecipeDto(recipe) }
         val syncBookmarks = dirtyBookmarks.map { it.toSyncPushDto() }
@@ -170,6 +180,7 @@ class SyncOrchestrator @Inject constructor(
             mealPlans = dirtyMealPlans.associate { it.uuid to it.updatedAt },
             groceryItems = dirtyGroceryItems.associate { (it.mealPlanId to it.itemKey) to it.updatedAt },
             cookEvents = dirtyCookEvents.associate { it.uuid to it.updatedAt },
+            savedPlans = dirtySavedPlans.associate { it.uuid to it.updatedAt },
         )
 
         var totalAccepted = 0
@@ -186,10 +197,11 @@ class SyncOrchestrator @Inject constructor(
             val mealPlanBatch = if (index == recipeBatches.lastIndex) syncMealPlans else emptyList()
             val groceryBatch = if (index == recipeBatches.lastIndex) syncGroceryItems else emptyList()
             val cookEventBatch = if (index == recipeBatches.lastIndex) syncCookEvents else emptyList()
-            Timber.d("Push: Sending batch of ${recipeBatch.size} recipes, ${bookmarkBatch.size} bookmarks, ${mealPlanBatch.size} meal plans, ${groceryBatch.size} grocery items, ${cookEventBatch.size} cook events")
+            val savedPlanBatch = if (index == recipeBatches.lastIndex) syncSavedPlans else emptyList()
+            Timber.d("Push: Sending batch of ${recipeBatch.size} recipes, ${bookmarkBatch.size} bookmarks, ${mealPlanBatch.size} meal plans, ${groceryBatch.size} grocery items, ${cookEventBatch.size} cook events, ${savedPlanBatch.size} saved plans")
             // TODO decouple synchronization of unrelated entities such a recipes and meal plans.
             val response = syncNetworkDataSource.pushRecipes(
-                SyncPushRequest(recipeBatch, bookmarkBatch, mealPlanBatch, groceryBatch, cookEventBatch)
+                SyncPushRequest(recipeBatch, bookmarkBatch, mealPlanBatch, groceryBatch, cookEventBatch, savedPlanBatch)
             )
             processPushResponse(response, recipeBatch, pushedVersions)
             totalAccepted += response.accepted.size
@@ -245,6 +257,7 @@ class SyncOrchestrator @Inject constructor(
         val mealPlans: Map<UUID, Long>,
         val groceryItems: Map<Pair<UUID, String>, Long>,
         val cookEvents: Map<UUID, Long>,
+        val savedPlans: Map<UUID, Long>,
     )
 
     private suspend fun processPushResponse(
@@ -371,6 +384,54 @@ class SyncOrchestrator @Inject constructor(
         for (error in response.cookEvents.errors) {
             handleCookEventPushError(error)
         }
+
+        // Saved plans: version-guarded like meal plans, so an edit made mid-flight stays PENDING.
+        for (accepted in response.savedMealPlans.accepted) {
+            val uuid = UUID.fromString(accepted.uuid)
+            savedMealPlanDao.updateSyncState(
+                uuid, SyncState.SYNCED, accepted.serverUpdatedAt,
+                expectedUpdatedAt = pushedVersions.savedPlans[uuid],
+            )
+        }
+
+        // Conflict: the server holds a newer copy. Like meal plans, leave the row alone — the
+        // next pull applies the server version (last-writer-wins on updatedAt).
+        if (response.savedMealPlans.conflicts.isNotEmpty()) {
+            Timber.w("SavedMealPlan push conflicts: ${response.savedMealPlans.conflicts}")
+        }
+
+        for (error in response.savedMealPlans.errors) {
+            handleSavedPlanPushError(error)
+        }
+    }
+
+    /**
+     * A refused saved plan must not stay `PENDING`, or every sync would resend it forever.
+     * `SAVED_PLAN_ID_TAKEN` is the one reason a retry can fix: a live row is re-keyed with a fresh
+     * id (its local photo is renamed to match) and re-queued, a tombstone is dropped. Anything else
+     * (`INVALID_SAVED_PLAN_TITLE`, `INVALID_SAVED_PLAN_DAYS`, `INVALID_SOURCE_MEAL_PLAN`,
+     * `INVALID_UUID`, `INVALID_OWNER`, `OWNER_MISMATCH`, or a code this client doesn't know yet) is
+     * a failure no resend can change, so the row is parked as `CANCELLED`, which `getAllDirty` skips.
+     */
+    private suspend fun handleSavedPlanPushError(error: SyncErrorDto) {
+        Timber.w("SavedMealPlan push error for ${error.uuid}: ${error.reason} - ${error.message}")
+        val uuid = runCatching { UUID.fromString(error.uuid) }.getOrNull() ?: return
+        val local = savedMealPlanDao.getById(uuid) ?: return
+        if (error.reason == SAVED_PLAN_ID_TAKEN) {
+            if (local.deletedAt != null) {
+                savedMealPlanDao.delete(uuid)
+                savedPlanImageStore.delete(uuid)
+            } else {
+                val newId = UuidV7Generator.newId()
+                val newPath = savedPlanImageStore.move(uuid, newId)
+                savedMealPlanDao.reassignId(uuid, newId)
+                if (newPath != null) {
+                    savedMealPlanDao.getById(newId)?.let { savedMealPlanDao.upsert(it.copy(heroImagePath = newPath)) }
+                }
+            }
+        } else {
+            savedMealPlanDao.setSyncState(uuid, SyncState.CANCELLED)
+        }
     }
 
     /**
@@ -406,7 +467,7 @@ class SyncOrchestrator @Inject constructor(
 
         do {
             val response = syncNetworkDataSource.pullRecipes(since = since, limit = 100)
-            Timber.d("Pull: received ${response.recipes.size} recipes, ${response.mealPlans.size} meal plans, ${response.groceryListItems.size} grocery items, ${response.cookEvents.size} cook events, hasMore=${response.hasMore}")
+            Timber.d("Pull: received ${response.recipes.size} recipes, ${response.mealPlans.size} meal plans, ${response.groceryListItems.size} grocery items, ${response.cookEvents.size} cook events, ${response.savedMealPlans.size} saved plans, hasMore=${response.hasMore}")
 
             if (response.mealPlans.isNotEmpty()) {
                 val idsArrivingThisPage = response.recipes.mapTo(mutableSetOf()) { it.uuid }
@@ -460,6 +521,16 @@ class SyncOrchestrator @Inject constructor(
 
                 for (event in response.cookEvents) {
                     applyPulledCookEvent(event)
+                }
+
+                if (response.savedMealPlans.isNotEmpty()) {
+                    if (sessionManager.getCurrentUser() == null) {
+                        Timber.w("Pull: skipping ${response.savedMealPlans.size} saved plan(s) — no authenticated user")
+                    } else {
+                        for (dto in response.savedMealPlans) {
+                            applyPulledSavedMealPlan(dto)
+                        }
+                    }
                 }
             }
 
@@ -763,6 +834,26 @@ class SyncOrchestrator @Inject constructor(
                         .carryForwardCookedMarks(previousDays)
                 }
             )
+        }
+    }
+
+    /**
+     * Applies one pulled saved plan, last-writer-wins on `updatedAt`: a pull older than (or equal
+     * to) the local row loses, so an unpushed local edit isn't clobbered. The device-local photo
+     * is never in the payload, so an existing row keeps its `heroImagePath`; a pulled tombstone
+     * also removes the photo file. Like cook events, no foreign key to recipes, so nothing needs
+     * to have arrived first.
+     */
+    private suspend fun applyPulledSavedMealPlan(dto: SyncSavedMealPlanDto) {
+        val uuid = UUID.fromString(dto.uuid)
+        val local = savedMealPlanDao.getById(uuid)
+        if (local != null && dto.updatedAt <= local.updatedAt) return
+
+        if (dto.deletedAt != null) {
+            savedPlanImageStore.delete(uuid)
+            savedMealPlanDao.upsert(dto.toEntity(heroImagePath = null))
+        } else {
+            savedMealPlanDao.upsert(dto.toEntity(heroImagePath = local?.heroImagePath))
         }
     }
 

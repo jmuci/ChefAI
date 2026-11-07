@@ -12,6 +12,8 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDa
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeBookmarkedRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeMealPlanDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSavedMealPlanDao
+import com.tenmilelabs.chefai.core.data.local.room.SavedMealPlanEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
@@ -38,6 +40,7 @@ class AccountUpgradeUseCaseTest {
     private lateinit var fakeRecipeLabelCrossRefDao: FakeRecipeLabelCrossRefDao
     private lateinit var bookmarkedRecipeDao: FakeBookmarkedRecipeDao
     private lateinit var fakeMealPlanDao: FakeMealPlanDao
+    private lateinit var fakeSavedMealPlanDao: FakeSavedMealPlanDao
 
     private val anonymousId = UuidV7Generator.newId()
     private val authUser = User(
@@ -57,6 +60,7 @@ class AccountUpgradeUseCaseTest {
         fakeRecipeLabelCrossRefDao = FakeRecipeLabelCrossRefDao()
         bookmarkedRecipeDao = FakeBookmarkedRecipeDao()
         fakeMealPlanDao = FakeMealPlanDao()
+        fakeSavedMealPlanDao = FakeSavedMealPlanDao()
 
         useCase = AccountUpgradeUseCase(
             transactionRunner = FakeTransactionRunner(),
@@ -68,6 +72,7 @@ class AccountUpgradeUseCaseTest {
             recipeLabelCrossRefDao = fakeRecipeLabelCrossRefDao,
             bookmarkedRecipeDao = bookmarkedRecipeDao,
             mealPlanDao = fakeMealPlanDao,
+            savedMealPlanDao = fakeSavedMealPlanDao,
         )
     }
 
@@ -240,5 +245,28 @@ class AccountUpgradeUseCaseTest {
         // And: other user's recipe is untouched
         val updatedOther = fakeRecipeDao.getRecipeById(otherRecipe.uuid)
         assertThat(updatedOther?.creatorId).isEqualTo(otherUserId)
+    }
+
+    @Test
+    fun `upgrade reassigns saved meal plans and queues them for push even with no other data`() = runTest {
+        val plan = SavedMealPlanEntity(
+            uuid = UuidV7Generator.newId(),
+            userId = anonymousId,
+            title = "Template",
+            preferencesJson = "{}",
+            daysJson = "[]",
+            createdAt = 1000L,
+            updatedAt = 1000L,
+            syncState = SyncState.SYNCED,
+        )
+        fakeSavedMealPlanDao.upsert(plan)
+        fakeRecipeDao.seed(users = listOf(createAnonymousUser()), recipes = emptyList())
+
+        useCase.execute(anonymousId, authUser)
+
+        val moved = requireNotNull(fakeSavedMealPlanDao.getById(plan.uuid))
+        assertThat(moved.userId).isEqualTo(authUser.uuid)
+        assertThat(moved.syncState).isEqualTo(SyncState.PENDING)
+        assertThat(moved.updatedAt).isGreaterThan(1000L)
     }
 }
