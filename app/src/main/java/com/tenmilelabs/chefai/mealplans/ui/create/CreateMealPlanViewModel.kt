@@ -14,6 +14,9 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
 import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
+import com.tenmilelabs.chefai.mealplans.domain.model.SavedMealPlan
+import com.tenmilelabs.chefai.mealplans.data.local.SavedPlanImageStore
+import com.tenmilelabs.chefai.mealplans.domain.repository.SavedMealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.usecase.GenerateMealPlanUseCase
 import com.tenmilelabs.chefai.mealplans.domain.week.DAYS_IN_WEEK
@@ -43,6 +46,8 @@ class CreateMealPlanViewModel @Inject constructor(
     private val sessionManager: SessionManager,
     private val recipesRepository: RecipesRepository,
     private val generateMealPlanUseCase: GenerateMealPlanUseCase,
+    private val savedMealPlanRepository: SavedMealPlanRepository,
+    private val savedPlanImageStore: SavedPlanImageStore,
     savedStateHandle: SavedStateHandle,
     private val clock: Clock,
 ) : ViewModel() {
@@ -66,6 +71,12 @@ class CreateMealPlanViewModel @Inject constructor(
     private val includedSlot: MealSlot = savedStateHandle.get<String>(AppDestinationArgs.MEAL_PLAN_SLOT_ARG)
         ?.let { name -> MealSlot.entries.firstOrNull { it.name == name } }
         ?: MealSlot.DINNER
+
+    /**
+     * Key of the saved plan this wizard run may create. Generated up front so the photo can be
+     * copied under its final name the moment it is picked.
+     */
+    internal val savedPlanId: UUID = UuidV7Generator.newId()
 
     private val _uiState = MutableStateFlow(
         CreateMealPlanUiState(
@@ -148,6 +159,13 @@ class CreateMealPlanViewModel @Inject constructor(
             is WizardAction.SetBatchCooking -> _uiState.update { it.copy(batchCooking = action.enabled) }
             is WizardAction.SetLeftoverFriendly -> _uiState.update { it.copy(leftoverFriendly = action.enabled) }
             is WizardAction.SetVarietyPreference -> _uiState.update { it.copy(varietyPreference = action.preference) }
+            is WizardAction.SetSaveForLater -> _uiState.update { it.copy(saveForLater = action.enabled) }
+            is WizardAction.SetSavedTitle -> _uiState.update {
+                it.copy(savedTitle = action.title.take(SavedMealPlan.MAX_TITLE_LENGTH))
+            }
+            is WizardAction.SavedImagePicked -> action.uri?.let(::importSavedImage)
+            is WizardAction.RemoveSavedImage -> removeSavedImage()
+            is WizardAction.RequestSavedImagePick -> Unit // handled by the screen, which owns the launcher
             is WizardAction.SaveMealPlan -> saveMealPlan()
         }
     }
@@ -167,12 +185,45 @@ class CreateMealPlanViewModel @Inject constructor(
         }
     }
 
+    private fun importSavedImage(uri: String) {
+        _uiState.update { it.copy(isImportingImage = true) }
+        viewModelScope.launch {
+            val path = try {
+                savedPlanImageStore.writeFromUri(savedPlanId, uri)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.w(e, "Could not copy the saved-plan photo")
+                null
+            }
+            // A failed copy keeps whatever photo was there before (the store writes atomically).
+            _uiState.update { it.copy(isImportingImage = false, savedImagePath = path ?: it.savedImagePath) }
+            if (path == null) _uiEvent.send(CreateMealPlanEvent.ShowError(R.string.wizard_saved_photo_failed))
+        }
+    }
+
+    private fun removeSavedImage() {
+        _uiState.update { it.copy(savedImagePath = null) }
+        viewModelScope.launch { deleteSavedImageFile() }
+    }
+
+    private suspend fun deleteSavedImageFile() {
+        try {
+            savedPlanImageStore.delete(savedPlanId)
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Timber.w(e, "Could not delete the saved-plan photo")
+        }
+    }
+
     private fun saveMealPlan() {
         val userId = sessionManager.getCurrentUserId() ?: return
         val state = _uiState.value
         if (state.isSaving) return
 
         _uiState.update { it.copy(isSaving = true) }
+
+        val savingForLater = state.saveForLater && state.savedTitle.isNotBlank()
+        val savedTitle = state.savedTitle.trim()
 
         val preferences = MealPlanPreferences(
             planLengthDays = state.planLengthDays,
@@ -197,7 +248,7 @@ class CreateMealPlanViewModel @Inject constructor(
                 val mealPlan = MealPlan(
                     uuid = mealPlanId,
                     userId = userId,
-                    name = "${state.planLengthDays}-day meal plan",
+                    name = if (savingForLater) savedTitle else "${state.planLengthDays}-day meal plan",
                     preferences = preferences,
                     status = MealPlanStatus.DRAFT,
                     createdAt = now,
@@ -239,6 +290,30 @@ class CreateMealPlanViewModel @Inject constructor(
                     false
                 }
             } ?: false
+
+            if (savingForLater) {
+                // Snapshot of the plan as generated; later edits to the dated plan don't reach it.
+                val saved = try {
+                    savedMealPlanRepository.saveFromMealPlan(
+                        savedPlanId = savedPlanId,
+                        userId = userId,
+                        mealPlanId = mealPlanId,
+                        title = savedTitle,
+                        heroImagePath = state.savedImagePath,
+                    )
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    Result.failure(e)
+                }
+                saved.onFailure { e ->
+                    // The dated plan stands; only the template is missing (e.g. a DRAFT with no days).
+                    Timber.w(e, "Could not save meal plan $mealPlanId as a saved plan")
+                    deleteSavedImageFile()
+                    _uiEvent.send(CreateMealPlanEvent.ShowError(R.string.saved_plan_save_failed))
+                }
+            } else if (state.savedImagePath != null) {
+                deleteSavedImageFile() // photo picked, then the toggle was switched off
+            }
 
             _uiState.update { it.copy(isSaving = false) }
             _uiEvent.send(

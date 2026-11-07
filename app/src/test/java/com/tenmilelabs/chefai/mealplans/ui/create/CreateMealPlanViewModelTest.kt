@@ -10,7 +10,10 @@ import com.tenmilelabs.chefai.collections.data.repository.FakeCollectionsReposit
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncExecutor
 import com.tenmilelabs.chefai.core.domain.model.User
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
+import com.tenmilelabs.chefai.mealplans.data.local.SavedPlanImageStore
 import com.tenmilelabs.chefai.mealplans.data.repository.FakeMealPlanRepository
+import com.tenmilelabs.chefai.mealplans.data.repository.FakeSavedMealPlanRepository
+import com.tenmilelabs.chefai.mealplans.domain.model.SavedMealPlan
 import com.tenmilelabs.chefai.core.testutil.recipePreview1
 import com.tenmilelabs.chefai.core.testutil.recipePreview2
 import com.tenmilelabs.chefai.mealplans.domain.model.DietaryRestriction
@@ -27,6 +30,8 @@ import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
 import com.tenmilelabs.chefai.mealplans.domain.usecase.GenerateMealPlanUseCase
 import com.tenmilelabs.chefai.mealplans.domain.usecase.LocalMealPlanGenerator
 import io.mockk.every
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import java.util.UUID
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -47,6 +52,8 @@ class CreateMealPlanViewModelTest {
     private lateinit var recipesRepository: FakeRecipesRepository
     private lateinit var sessionManager: SessionManager
     private lateinit var syncExecutor: FakeSyncExecutor
+    private lateinit var savedRepository: FakeSavedMealPlanRepository
+    private lateinit var imageStore: SavedPlanImageStore
     private lateinit var viewModel: CreateMealPlanViewModel
 
     private val testUserId = UUID.randomUUID()
@@ -65,6 +72,8 @@ class CreateMealPlanViewModelTest {
         // takes — see generateForSession. Anonymous routing has its own dedicated tests below.
         authenticatedSession()
         syncExecutor = FakeSyncExecutor()
+        savedRepository = FakeSavedMealPlanRepository()
+        imageStore = mockk(relaxed = true)
         viewModel = createViewModel()
     }
 
@@ -99,6 +108,8 @@ class CreateMealPlanViewModelTest {
             sessionManager = sessionManager,
             recipesRepository = recipesRepository,
             generateMealPlanUseCase = generateMealPlanUseCase,
+            savedMealPlanRepository = savedRepository,
+            savedPlanImageStore = imageStore,
             savedStateHandle = savedStateHandle,
             clock = clock,
         )
@@ -470,6 +481,142 @@ class CreateMealPlanViewModelTest {
             awaitItem()
         }
         assertThat(viewModel.uiState.value.isSaving).isFalse()
+    }
+
+    // --- Save for later ---
+
+    @Test
+    fun `save for later is off by default and does not gate Next`() = runTest {
+        val state = viewModel.uiState.value
+        assertThat(state.saveForLater).isFalse()
+        assertThat(state.canProceedFromPreferences).isTrue()
+    }
+
+    @Test
+    fun `Next is gated on a title once save for later is on`() = runTest {
+        viewModel.onAction(WizardAction.SetSaveForLater(true))
+        assertThat(viewModel.uiState.value.canProceedFromPreferences).isFalse()
+
+        viewModel.onAction(WizardAction.SetSavedTitle("   "))
+        assertThat(viewModel.uiState.value.canProceedFromPreferences).isFalse()
+
+        viewModel.onAction(WizardAction.SetSavedTitle("Weeknights"))
+        assertThat(viewModel.uiState.value.canProceedFromPreferences).isTrue()
+    }
+
+    @Test
+    fun `turning save for later off keeps the typed title and stops gating Next`() = runTest {
+        viewModel.onAction(WizardAction.SetSaveForLater(true))
+        viewModel.onAction(WizardAction.SetSavedTitle("Weeknights"))
+        viewModel.onAction(WizardAction.SetSaveForLater(false))
+
+        assertThat(viewModel.uiState.value.savedTitle).isEqualTo("Weeknights")
+        assertThat(viewModel.uiState.value.canProceedFromPreferences).isTrue()
+    }
+
+    @Test
+    fun `SetSavedTitle caps the title at 60 characters`() = runTest {
+        viewModel.onAction(WizardAction.SetSavedTitle("x".repeat(80)))
+        assertThat(viewModel.uiState.value.savedTitle).hasLength(SavedMealPlan.MAX_TITLE_LENGTH)
+    }
+
+    @Test
+    fun `SaveMealPlan with save for later saves the template and names the plan after it`() = runTest {
+        repository.daysFromServer = listOf(serverDay())
+        coEvery { imageStore.writeFromUri(viewModel.savedPlanId, "content://photo") } returns "/files/hero.jpg"
+        viewModel.onAction(WizardAction.SetSaveForLater(true))
+        viewModel.onAction(WizardAction.SetSavedTitle("  Weeknights  "))
+        viewModel.onAction(WizardAction.SavedImagePicked("content://photo"))
+
+        viewModel.uiEvents.test {
+            viewModel.onAction(WizardAction.SaveMealPlan)
+            val event = awaitItem()
+            assertThat(event).isInstanceOf(CreateMealPlanEvent.MealPlanReady::class.java)
+            val planId = (event as CreateMealPlanEvent.MealPlanReady).mealPlanId
+
+            val call = savedRepository.saveCalls.single()
+            assertThat(call.savedPlanId).isEqualTo(viewModel.savedPlanId)
+            assertThat(call.userId).isEqualTo(testUserId)
+            assertThat(call.mealPlanId).isEqualTo(planId)
+            assertThat(call.title).isEqualTo("Weeknights")
+            assertThat(call.heroImagePath).isEqualTo("/files/hero.jpg")
+            assertThat(repository.observeMealPlan(planId).first()?.name).isEqualTo("Weeknights")
+        }
+    }
+
+    @Test
+    fun `SaveMealPlan with save for later off saves nothing and keeps the default name`() = runTest {
+        repository.daysFromServer = listOf(serverDay())
+        viewModel.onAction(WizardAction.SetSavedTitle("Weeknights")) // typed, then toggled off
+
+        viewModel.uiEvents.test {
+            val event = run {
+                viewModel.onAction(WizardAction.SaveMealPlan)
+                awaitItem() as CreateMealPlanEvent.MealPlanReady
+            }
+            assertThat(savedRepository.saveCalls).isEmpty()
+            assertThat(repository.observeMealPlan(event.mealPlanId).first()?.name).isEqualTo("5-day meal plan")
+        }
+    }
+
+    @Test
+    fun `a save failure on a DRAFT emits ShowError and still navigates to the plan`() = runTest {
+        // No days from the server and no local recipes: the plan stays a DRAFT, which cannot be saved.
+        savedRepository.saveFailure = IllegalStateException("plan has no days")
+        viewModel.onAction(WizardAction.SetSaveForLater(true))
+        viewModel.onAction(WizardAction.SetSavedTitle("Weeknights"))
+
+        viewModel.uiEvents.test {
+            viewModel.onAction(WizardAction.SaveMealPlan)
+            val error = awaitItem()
+            assertThat(error).isInstanceOf(CreateMealPlanEvent.ShowError::class.java)
+            assertThat((error as CreateMealPlanEvent.ShowError).message).isEqualTo(R.string.saved_plan_save_failed)
+
+            val navigation = awaitItem()
+            assertThat(navigation).isInstanceOf(CreateMealPlanEvent.MealPlanSavedAsDraft::class.java)
+            val planId = (navigation as CreateMealPlanEvent.MealPlanSavedAsDraft).mealPlanId
+            assertThat(repository.observeMealPlan(planId).first()).isNotNull()
+        }
+    }
+
+    @Test
+    fun `a failed image copy shows an error, leaves no path and does not block the save`() = runTest {
+        repository.daysFromServer = listOf(serverDay())
+        coEvery { imageStore.writeFromUri(any(), any()) } returns null
+        viewModel.onAction(WizardAction.SetSaveForLater(true))
+        viewModel.onAction(WizardAction.SetSavedTitle("Weeknights"))
+
+        viewModel.uiEvents.test {
+            viewModel.onAction(WizardAction.SavedImagePicked("content://broken"))
+            val error = awaitItem()
+            assertThat((error as CreateMealPlanEvent.ShowError).message).isEqualTo(R.string.wizard_saved_photo_failed)
+            assertThat(viewModel.uiState.value.savedImagePath).isNull()
+            assertThat(viewModel.uiState.value.isImportingImage).isFalse()
+
+            viewModel.onAction(WizardAction.SaveMealPlan)
+            assertThat(awaitItem()).isInstanceOf(CreateMealPlanEvent.MealPlanReady::class.java)
+            assertThat(savedRepository.saveCalls.single().heroImagePath).isNull()
+        }
+    }
+
+    @Test
+    fun `RemoveSavedImage clears the path and deletes the copied file`() = runTest {
+        coEvery { imageStore.writeFromUri(any(), any()) } returns "/files/hero.jpg"
+        viewModel.onAction(WizardAction.SavedImagePicked("content://photo"))
+        assertThat(viewModel.uiState.value.savedImagePath).isEqualTo("/files/hero.jpg")
+
+        viewModel.onAction(WizardAction.RemoveSavedImage)
+
+        assertThat(viewModel.uiState.value.savedImagePath).isNull()
+        coVerify { imageStore.delete(viewModel.savedPlanId) }
+    }
+
+    @Test
+    fun `dismissing the picker changes nothing`() = runTest {
+        viewModel.onAction(WizardAction.SavedImagePicked(null))
+        assertThat(viewModel.uiState.value.isImportingImage).isFalse()
+        assertThat(viewModel.uiState.value.savedImagePath).isNull()
+        coVerify(exactly = 0) { imageStore.writeFromUri(any(), any()) }
     }
 
     // --- Collection too small ---

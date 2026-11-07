@@ -28,9 +28,20 @@ data class CreateMealPlanUiState(
     val batchCooking: Boolean = false,
     val leftoverFriendly: Boolean = false,
     val varietyPreference: VarietyPreference = VarietyPreference.MEDIUM,
+    // Step 2: keep this plan as a reusable "Saved" template
+    val saveForLater: Boolean = false,
+    /** Kept when the toggle is switched off, but nothing is saved then. */
+    val savedTitle: String = "",
+    /** Local file the picked photo was copied to; `null` when there is none. */
+    val savedImagePath: String? = null,
+    val isImportingImage: Boolean = false,
     // Status
     val isSaving: Boolean = false,
-)
+) {
+    /** The Preferences step's Next is blocked while a saved plan is missing its required title. */
+    val canProceedFromPreferences: Boolean
+        get() = !saveForLater || savedTitle.isNotBlank()
+}
 
 sealed interface WizardAction {
     data class SetStartDate(val date: LocalDate) : WizardAction
@@ -43,6 +54,18 @@ sealed interface WizardAction {
     data class SetBatchCooking(val enabled: Boolean) : WizardAction
     data class SetLeftoverFriendly(val enabled: Boolean) : WizardAction
     data class SetVarietyPreference(val preference: VarietyPreference) : WizardAction
+    data class SetSaveForLater(val enabled: Boolean) : WizardAction
+    data class SetSavedTitle(val title: String) : WizardAction
+
+    /** The photo the user picked for the saved plan; `null` when the picker was dismissed. */
+    data class SavedImagePicked(val uri: String?) : WizardAction
+    data object RemoveSavedImage : WizardAction
+
+    /**
+     * The UI asking the screen to open the photo picker. Launching an activity is the screen's
+     * job, so the ViewModel ignores it; the result comes back as [SavedImagePicked].
+     */
+    data object RequestSavedImagePick : WizardAction
     data object SaveMealPlan : WizardAction
 }
 
