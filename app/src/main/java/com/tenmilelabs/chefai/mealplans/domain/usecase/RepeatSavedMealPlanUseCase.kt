@@ -65,12 +65,27 @@ class RepeatSavedMealPlanUseCase @Inject constructor(
                     startDate = startDate,
                 ),
             )
-            mealPlanRepository.saveLocallyGeneratedDays(planId, days)
+            try {
+                mealPlanRepository.saveLocallyGeneratedDays(planId, days)
+            } catch (e: Exception) {
+                // Don't leave an empty DRAFT behind; the caller still sees the original failure.
+                removeOrphan(planId)
+                throw e
+            }
             Result.success(planId)
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             Timber.e(e, "RepeatSavedMealPlanUseCase: failed for saved plan $savedPlanId")
             Result.failure(e)
+        }
+    }
+
+    private suspend fun removeOrphan(planId: UUID) {
+        try {
+            mealPlanRepository.deleteMealPlan(planId)
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Timber.e(e, "RepeatSavedMealPlanUseCase: could not clean up plan $planId")
         }
     }
 }
