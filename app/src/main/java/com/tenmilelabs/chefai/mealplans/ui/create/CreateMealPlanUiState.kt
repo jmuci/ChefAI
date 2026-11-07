@@ -35,6 +35,8 @@ data class CreateMealPlanUiState(
     /** Local file the picked photo was copied to; `null` when there is none. */
     val savedImagePath: String? = null,
     val isImportingImage: Boolean = false,
+    /** The last photo pick could not be copied; the previous photo (if any) is kept. */
+    val savedImageFailed: Boolean = false,
     // Status
     val isSaving: Boolean = false,
 ) {

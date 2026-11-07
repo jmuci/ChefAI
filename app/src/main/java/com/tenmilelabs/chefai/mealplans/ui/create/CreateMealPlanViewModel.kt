@@ -159,7 +159,7 @@ class CreateMealPlanViewModel @Inject constructor(
             is WizardAction.SetBatchCooking -> _uiState.update { it.copy(batchCooking = action.enabled) }
             is WizardAction.SetLeftoverFriendly -> _uiState.update { it.copy(leftoverFriendly = action.enabled) }
             is WizardAction.SetVarietyPreference -> _uiState.update { it.copy(varietyPreference = action.preference) }
-            is WizardAction.SetSaveForLater -> _uiState.update { it.copy(saveForLater = action.enabled) }
+            is WizardAction.SetSaveForLater -> _uiState.update { it.copy(saveForLater = action.enabled, savedImageFailed = false) }
             is WizardAction.SetSavedTitle -> _uiState.update {
                 it.copy(savedTitle = action.title.take(SavedMealPlan.MAX_TITLE_LENGTH))
             }
@@ -186,7 +186,7 @@ class CreateMealPlanViewModel @Inject constructor(
     }
 
     private fun importSavedImage(uri: String) {
-        _uiState.update { it.copy(isImportingImage = true) }
+        _uiState.update { it.copy(isImportingImage = true, savedImageFailed = false) }
         viewModelScope.launch {
             val path = try {
                 savedPlanImageStore.writeFromUri(savedPlanId, uri)
@@ -196,13 +196,18 @@ class CreateMealPlanViewModel @Inject constructor(
                 null
             }
             // A failed copy keeps whatever photo was there before (the store writes atomically).
-            _uiState.update { it.copy(isImportingImage = false, savedImagePath = path ?: it.savedImagePath) }
-            if (path == null) _uiEvent.send(CreateMealPlanEvent.ShowError(R.string.wizard_saved_photo_failed))
+            _uiState.update {
+                it.copy(
+                    isImportingImage = false,
+                    savedImagePath = path ?: it.savedImagePath,
+                    savedImageFailed = path == null,
+                )
+            }
         }
     }
 
     private fun removeSavedImage() {
-        _uiState.update { it.copy(savedImagePath = null) }
+        _uiState.update { it.copy(savedImagePath = null, savedImageFailed = false) }
         viewModelScope.launch { deleteSavedImageFile() }
     }
 

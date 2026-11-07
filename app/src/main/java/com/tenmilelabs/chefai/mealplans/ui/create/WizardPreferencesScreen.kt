@@ -96,6 +96,7 @@ private fun WizardPreferencesContent(
                 title = uiState.savedTitle,
                 imagePath = uiState.savedImagePath,
                 isImportingImage = uiState.isImportingImage,
+                imageFailed = uiState.savedImageFailed,
                 onAction = onAction,
             )
         }

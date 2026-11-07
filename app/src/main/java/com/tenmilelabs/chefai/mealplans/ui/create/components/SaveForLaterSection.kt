@@ -57,6 +57,7 @@ fun SaveForLaterSection(
     isImportingImage: Boolean,
     onAction: (WizardAction) -> Unit,
     modifier: Modifier = Modifier,
+    imageFailed: Boolean = false,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         ToggleOptionRow(
@@ -94,6 +95,13 @@ fun SaveForLaterSection(
                     isImporting = isImportingImage,
                     onAction = onAction,
                 )
+                if (imageFailed) {
+                    Text(
+                        text = stringResource(R.string.wizard_saved_photo_failed),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
         }
     }
@@ -178,6 +186,7 @@ private fun SaveForLaterPreviewContent(
     saveForLater: Boolean,
     title: String = "",
     imagePath: String? = null,
+    imageFailed: Boolean = false,
 ) {
     ChefAITheme {
         SaveForLaterSection(
@@ -186,6 +195,7 @@ private fun SaveForLaterPreviewContent(
             imagePath = imagePath,
             isImportingImage = false,
             onAction = {},
+            imageFailed = imageFailed,
         )
     }
 }
@@ -207,4 +217,13 @@ private fun SaveForLaterWithPhotoPreview() = SaveForLaterPreviewContent(
     saveForLater = true,
     title = "Weeknight favourites",
     imagePath = "/data/preview/hero.jpg",
+)
+
+@Preview(name = "Save for later, photo failed — light")
+@Preview(name = "Save for later, photo failed — dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun SaveForLaterPhotoFailedPreview() = SaveForLaterPreviewContent(
+    saveForLater = true,
+    title = "Weeknight favourites",
+    imageFailed = true,
 )

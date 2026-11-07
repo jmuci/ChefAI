@@ -577,7 +577,7 @@ class CreateMealPlanViewModelTest {
     }
 
     @Test
-    fun `a failed image copy shows an error, leaves no path and does not block the save`() = runTest {
+    fun `a failed image copy sets the flag, leaves no path and does not block the save`() = runTest {
         repository.daysFromServer = listOf(serverDay())
         coEvery { imageStore.writeFromUri(any(), any()) } returns null
         viewModel.onAction(WizardAction.SetSaveForLater(true))
@@ -585,8 +585,8 @@ class CreateMealPlanViewModelTest {
 
         viewModel.uiEvents.test {
             viewModel.onAction(WizardAction.SavedImagePicked("content://broken"))
-            val error = awaitItem()
-            assertThat((error as CreateMealPlanEvent.ShowError).message).isEqualTo(R.string.wizard_saved_photo_failed)
+            expectNoEvents()
+            assertThat(viewModel.uiState.value.savedImageFailed).isTrue()
             assertThat(viewModel.uiState.value.savedImagePath).isNull()
             assertThat(viewModel.uiState.value.isImportingImage).isFalse()
 
@@ -594,6 +594,29 @@ class CreateMealPlanViewModelTest {
             assertThat(awaitItem()).isInstanceOf(CreateMealPlanEvent.MealPlanReady::class.java)
             assertThat(savedRepository.saveCalls.single().heroImagePath).isNull()
         }
+    }
+
+    @Test
+    fun `a later successful pick clears the image-failed flag`() = runTest {
+        coEvery { imageStore.writeFromUri(any(), "content://broken") } returns null
+        coEvery { imageStore.writeFromUri(any(), "content://ok") } returns "/files/hero.jpg"
+        viewModel.onAction(WizardAction.SavedImagePicked("content://broken"))
+        assertThat(viewModel.uiState.value.savedImageFailed).isTrue()
+
+        viewModel.onAction(WizardAction.SavedImagePicked("content://ok"))
+
+        assertThat(viewModel.uiState.value.savedImageFailed).isFalse()
+        assertThat(viewModel.uiState.value.savedImagePath).isEqualTo("/files/hero.jpg")
+    }
+
+    @Test
+    fun `switching save for later off clears the image-failed flag`() = runTest {
+        coEvery { imageStore.writeFromUri(any(), any()) } returns null
+        viewModel.onAction(WizardAction.SavedImagePicked("content://broken"))
+
+        viewModel.onAction(WizardAction.SetSaveForLater(false))
+
+        assertThat(viewModel.uiState.value.savedImageFailed).isFalse()
     }
 
     @Test
