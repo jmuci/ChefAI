@@ -17,6 +17,10 @@ import com.tenmilelabs.chefai.mealplans.domain.model.SavedMealPlan
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.repository.SavedMealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.usecase.MealRef
+import com.tenmilelabs.chefai.mealplans.domain.usecase.RepeatSavedMealPlanUseCase
+import com.tenmilelabs.chefai.mealplans.domain.week.MealPlanOverlap
+import com.tenmilelabs.chefai.mealplans.domain.week.defaultMealPlanStartDate
+import kotlinx.coroutines.flow.first
 import com.tenmilelabs.chefai.mealplans.domain.week.PlannedWeekMeal
 import com.tenmilelabs.chefai.mealplans.domain.repository.ShoppingListRepository
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.ShoppingListBuilder
@@ -79,6 +83,12 @@ sealed interface MealPlanListUiState {
 /** One-shot messages for the tab; the screen turns them into snackbars. */
 sealed interface MealPlansEvent {
     data class ShowMessage(@StringRes val messageRes: Int) : MealPlansEvent
+
+    /**
+     * A saved plan was scheduled: open [planId]. [overlappingPlanName] is the existing plan its
+     * dates collide with, if any — a non-blocking notice, computed before the plan was created.
+     */
+    data class NavigateToPlan(val planId: UUID, val overlappingPlanName: String?) : MealPlansEvent
 }
 
 sealed interface MealPlansUiState {
@@ -114,6 +124,7 @@ class MealPlansViewModel @Inject constructor(
     householdRepository: HouseholdRepository,
     userPreferencesRepository: UserPreferencesRepository,
     private val sessionManager: SessionManager,
+    private val repeatSavedMealPlan: RepeatSavedMealPlanUseCase,
     private val clock: Clock,
 ) : ViewModel() {
 
@@ -419,11 +430,79 @@ class MealPlansViewModel @Inject constructor(
 
     private val _pendingRepeatSavedPlanId = MutableStateFlow<UUID?>(null)
 
-    /**
-     * The saved plan the user asked to repeat, or `null`. Only recorded here for now; the date
-     * picker and the use case that schedules it hook on to this.
-     */
+    /** The saved plan the user asked to repeat (its date picker is open), or `null`. */
     val pendingRepeatSavedPlanId: StateFlow<UUID?> = _pendingRepeatSavedPlanId
+
+    /**
+     * The date the repeat picker opens on: the day after the last planned meal, never before today.
+     * Same rule as the wizard's default.
+     */
+    val repeatDefaultDate: StateFlow<LocalDate> = plans
+        .map { defaultMealPlanStartDate(it, today(), clock.zone) }
+        .catch { e ->
+            if (e is CancellationException) throw e
+            emit(today())
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = WhileUiSubscribed,
+            initialValue = today(),
+        )
+
+    private var isRepeating = false
+
+    /** Schedules the pending saved plan on [date], then asks the screen to open the new plan. */
+    fun onRepeatSavedPlanConfirmed(date: LocalDate) {
+        val savedPlanId = _pendingRepeatSavedPlanId.value ?: return
+        _pendingRepeatSavedPlanId.value = null
+        if (isRepeating) return
+        isRepeating = true
+        viewModelScope.launch {
+            try {
+                val userId = sessionManager.getCurrentUserId()
+                val template = savedMealPlanRepository.getSavedPlan(savedPlanId)
+                if (userId == null || template == null) {
+                    _events.send(MealPlansEvent.ShowMessage(R.string.saved_plan_repeat_failed))
+                    return@launch
+                }
+                // Read before the new plan exists, so it cannot overlap itself.
+                val overlappingPlanName = findOverlappingPlanName(
+                    userId = userId,
+                    start = date,
+                    lengthDays = template.preferences.planLengthDays,
+                )
+                repeatSavedMealPlan(userId, savedPlanId, date).fold(
+                    onSuccess = { planId ->
+                        _events.send(MealPlansEvent.NavigateToPlan(planId, overlappingPlanName))
+                    },
+                    onFailure = {
+                        _events.send(MealPlansEvent.ShowMessage(R.string.saved_plan_repeat_failed))
+                    },
+                )
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "onRepeatSavedPlanConfirmed: failed for saved plan $savedPlanId")
+                _events.send(MealPlansEvent.ShowMessage(R.string.saved_plan_repeat_failed))
+            } finally {
+                isRepeating = false
+            }
+        }
+    }
+
+    /** The name of the oldest live plan the new dates would share, or `null`; a failed read is "none". */
+    private suspend fun findOverlappingPlanName(userId: UUID, start: LocalDate, lengthDays: Int): String? =
+        try {
+            MealPlanOverlap.overlapping(
+                plans = mealPlanRepository.observeMealPlansForUser(userId).first(),
+                start = start,
+                lengthDays = lengthDays,
+                zone = clock.zone,
+            ).minByOrNull { it.createdAt }?.name
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Timber.w(e, "Could not check for overlapping meal plans")
+            null
+        }
 
     fun onRepeatSavedPlanRequested(savedPlanId: UUID) {
         _pendingRepeatSavedPlanId.value = savedPlanId

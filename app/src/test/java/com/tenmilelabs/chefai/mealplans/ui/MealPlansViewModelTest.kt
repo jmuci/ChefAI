@@ -25,6 +25,7 @@ import com.tenmilelabs.chefai.mealplans.domain.model.SavedMealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.SavedMealPlanDay
 import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.PlannedIngredient
+import com.tenmilelabs.chefai.mealplans.domain.usecase.RepeatSavedMealPlanUseCase
 import com.tenmilelabs.chefai.mealplans.domain.week.weekStartFor
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
 import kotlinx.coroutines.CoroutineScope
@@ -99,6 +100,7 @@ class MealPlansViewModelTest {
         householdRepository = householdRepository,
         userPreferencesRepository = preferences,
         sessionManager = sessionManager,
+        repeatSavedMealPlan = RepeatSavedMealPlanUseCase(savedRepository, repository, recipesRepository, clock),
         clock = clock,
     )
 
@@ -424,6 +426,74 @@ class MealPlansViewModelTest {
 
             assertThat(awaitItem()).isEqualTo(MealPlansEvent.ShowMessage(R.string.saved_plan_delete_failed))
         }
+    }
+
+    @Test
+    fun `confirming a repeat clears the pending id and opens the new plan with the overlap name`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        val existing = makePlan(userId, createdAt = weekStart, days = listOf(day(0)))
+        repository.emitPlans(existing)
+        val saved = makeSaved(userId)
+        savedRepository.emitPlans(saved)
+
+        viewModel.events.test {
+            viewModel.onRepeatSavedPlanRequested(saved.uuid)
+            viewModel.onRepeatSavedPlanConfirmed(weekStart)
+
+            val event = awaitItem() as MealPlansEvent.NavigateToPlan
+            assertThat(event.overlappingPlanName).isEqualTo("Week plan")
+            assertThat(viewModel.pendingRepeatSavedPlanId.value).isNull()
+            val created = repository.observeMealPlansForUser(userId).first().single { it.uuid == event.planId }
+            assertThat(created.name).isEqualTo(saved.title)
+            assertThat(created.startDate).isEqualTo(weekStart)
+        }
+    }
+
+    @Test
+    fun `repeating onto free dates reports no overlap`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        val saved = makeSaved(userId)
+        savedRepository.emitPlans(saved)
+
+        viewModel.events.test {
+            viewModel.onRepeatSavedPlanRequested(saved.uuid)
+            viewModel.onRepeatSavedPlanConfirmed(weekStart)
+
+            assertThat((awaitItem() as MealPlansEvent.NavigateToPlan).overlappingPlanName).isNull()
+        }
+    }
+
+    @Test
+    fun `a repeat that fails says so and creates nothing`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        val saved = makeSaved(userId)
+        savedRepository.emitPlans(saved)
+        repository.shouldThrowOnCreate = true
+
+        viewModel.events.test {
+            viewModel.onRepeatSavedPlanRequested(saved.uuid)
+            viewModel.onRepeatSavedPlanConfirmed(weekStart)
+
+            assertThat(awaitItem()).isEqualTo(MealPlansEvent.ShowMessage(R.string.saved_plan_repeat_failed))
+        }
+        assertThat(repository.observeMealPlansForUser(userId).first()).isEmpty()
+    }
+
+    @Test
+    fun `confirming a repeat twice creates only one plan`() = runTest {
+        val userId = sessionManager.getCurrentUserId()!!
+        val saved = makeSaved(userId)
+        savedRepository.emitPlans(saved)
+
+        viewModel.events.test {
+            viewModel.onRepeatSavedPlanRequested(saved.uuid)
+            viewModel.onRepeatSavedPlanConfirmed(weekStart)
+            viewModel.onRepeatSavedPlanConfirmed(weekStart)
+
+            assertThat(awaitItem()).isInstanceOf(MealPlansEvent.NavigateToPlan::class.java)
+            expectNoEvents()
+        }
+        assertThat(repository.observeMealPlansForUser(userId).first()).hasSize(1)
     }
 
     @Test

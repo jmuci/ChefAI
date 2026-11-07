@@ -186,6 +186,7 @@ fun ChefAINavGraph(
             // The add-meal hand-off lives in *this entry's* handle, not the ViewModel's — the two
             // are different instances. See AddMealRequest.
             val tabHandle = backStackEntry.savedStateHandle
+            val context = LocalContext.current
             MealPlansScreen(
                 snackbarHostState = snackbarHostState,
                 // A recipe picked for a date seeds a new plan rather than becoming a one-meal plan:
@@ -209,6 +210,15 @@ fun ChefAINavGraph(
                     navActions.navigateToMealPlanShoppingList(planId)
                 },
                 onPlanClick = { planId -> navActions.navigateToMealPlanDetail(planId) },
+                // On navScope: the tab is covered by the detail screen the moment it opens.
+                onPlanRepeated = { overlappingPlanName ->
+                    navScope.launch {
+                        overlappingPlanName?.let {
+                            snackbarHostState.showSnackbar(context.getString(R.string.meal_plan_overlap_notice, it))
+                        }
+                        snackbarHostState.showSnackbar(context.getString(R.string.saved_plan_repeated))
+                    }
+                },
             )
         }
         composable(route = AppDestinations.MEAL_PLAN_DETAIL.route) { backStackEntry ->

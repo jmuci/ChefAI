@@ -54,6 +54,12 @@ interface RecipesRepository {
      */
     fun getRecipePreviewsByIds(ids: List<UUID>): Flow<List<RecipePreview>>
 
+    /**
+     * Which of [ids] are known locally as soft-deleted. Ids with no local row at all are not
+     * included — they may simply not have synced yet, which is not the same as deleted.
+     */
+    suspend fun getSoftDeletedRecipeIds(ids: Collection<UUID>): Set<UUID>
+
     /** Returns the number of recipes created by (or belonging to) the given user. */
     suspend fun getRecipeCountForUser(userId: UUID): Int
 }

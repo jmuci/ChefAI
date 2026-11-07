@@ -154,6 +154,9 @@ class FakeRecipeDao : RecipeDao {
 
     override fun observeRecipeById(uuid: UUID): Flow<RecipeEntity?> = trigger.map { recipes[uuid] }
 
+    override suspend fun getSoftDeletedIds(ids: List<UUID>): List<UUID> =
+        ids.filter { recipes[it]?.deletedAt != null }
+
     override suspend fun getRecipeWithDetails(uuid: UUID): RecipeWithDetails? {
         return recipes[uuid]?.takeIf { it.deletedAt == null }?.let { assembleRecipeWithDetails(it) }
     }

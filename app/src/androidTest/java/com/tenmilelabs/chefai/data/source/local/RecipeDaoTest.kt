@@ -248,4 +248,19 @@ class RecipeDaoTest {
         // THEN - the count drops by one
         assertEquals(1, database.recipeDao().countRecipesForUser(testUser.uuid))
     }
+
+    @Test
+    fun getSoftDeletedIds_returnsOnlyLocallySoftDeletedRows() = runTest {
+        // GIVEN - one live recipe, one soft-deleted, and an id with no row at all
+        database.recipeDao().upsertRecipe(recipe1)
+        database.recipeDao().upsertRecipe(recipe2)
+        database.recipeDao().softDelete(recipe1.uuid, System.currentTimeMillis())
+        val unknown = java.util.UUID.randomUUID()
+
+        // WHEN
+        val result = database.recipeDao().getSoftDeletedIds(listOf(recipe1.uuid, recipe2.uuid, unknown))
+
+        // THEN - unknown and live ids are not reported
+        assertEquals(listOf(recipe1.uuid), result)
+    }
 }
