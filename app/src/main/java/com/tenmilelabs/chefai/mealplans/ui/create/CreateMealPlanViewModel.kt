@@ -291,6 +291,7 @@ class CreateMealPlanViewModel @Inject constructor(
                 }
             } ?: false
 
+            var savedPlanFailed = false
             if (savingForLater) {
                 // Snapshot of the plan as generated; later edits to the dated plan don't reach it.
                 val saved = try {
@@ -309,7 +310,7 @@ class CreateMealPlanViewModel @Inject constructor(
                     // The dated plan stands; only the template is missing (e.g. a DRAFT with no days).
                     Timber.w(e, "Could not save meal plan $mealPlanId as a saved plan")
                     deleteSavedImageFile()
-                    _uiEvent.send(CreateMealPlanEvent.ShowError(R.string.saved_plan_save_failed))
+                    savedPlanFailed = true
                 }
             } else if (state.savedImagePath != null) {
                 deleteSavedImageFile() // photo picked, then the toggle was switched off
@@ -318,9 +319,9 @@ class CreateMealPlanViewModel @Inject constructor(
             _uiState.update { it.copy(isSaving = false) }
             _uiEvent.send(
                 if (filled || includedRecipeAssigned) {
-                    CreateMealPlanEvent.MealPlanReady(mealPlanId, overlappingPlanName)
+                    CreateMealPlanEvent.MealPlanReady(mealPlanId, overlappingPlanName, savedPlanFailed)
                 } else {
-                    CreateMealPlanEvent.MealPlanSavedAsDraft(mealPlanId, overlappingPlanName)
+                    CreateMealPlanEvent.MealPlanSavedAsDraft(mealPlanId, overlappingPlanName, savedPlanFailed)
                 }
             )
         }

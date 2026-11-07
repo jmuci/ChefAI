@@ -78,12 +78,16 @@ sealed interface CreateMealPlanEvent {
     data class MealPlanReady(
         val mealPlanId: java.util.UUID,
         val overlappingPlanName: String? = null,
+        /** The plan was created but could not also be saved for later. */
+        val savedPlanFailed: Boolean = false,
     ) : CreateMealPlanEvent
 
     /** Plan saved locally but generation failed (offline/BE error) — navigate to detail as DRAFT. */
     data class MealPlanSavedAsDraft(
         val mealPlanId: java.util.UUID,
         val overlappingPlanName: String? = null,
+        /** The plan was created but could not also be saved for later. */
+        val savedPlanFailed: Boolean = false,
     ) : CreateMealPlanEvent
 
     data class ShowError(val message: Int) : CreateMealPlanEvent

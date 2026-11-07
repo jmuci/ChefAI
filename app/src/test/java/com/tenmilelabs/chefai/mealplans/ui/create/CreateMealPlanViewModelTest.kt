@@ -560,7 +560,7 @@ class CreateMealPlanViewModelTest {
     }
 
     @Test
-    fun `a save failure on a DRAFT emits ShowError and still navigates to the plan`() = runTest {
+    fun `a save failure on a DRAFT navigates to the plan once, flagged, with no ShowError`() = runTest {
         // No days from the server and no local recipes: the plan stays a DRAFT, which cannot be saved.
         savedRepository.saveFailure = IllegalStateException("plan has no days")
         viewModel.onAction(WizardAction.SetSaveForLater(true))
@@ -568,13 +568,10 @@ class CreateMealPlanViewModelTest {
 
         viewModel.uiEvents.test {
             viewModel.onAction(WizardAction.SaveMealPlan)
-            val error = awaitItem()
-            assertThat(error).isInstanceOf(CreateMealPlanEvent.ShowError::class.java)
-            assertThat((error as CreateMealPlanEvent.ShowError).message).isEqualTo(R.string.saved_plan_save_failed)
-
             val navigation = awaitItem()
             assertThat(navigation).isInstanceOf(CreateMealPlanEvent.MealPlanSavedAsDraft::class.java)
-            val planId = (navigation as CreateMealPlanEvent.MealPlanSavedAsDraft).mealPlanId
+            assertThat((navigation as CreateMealPlanEvent.MealPlanSavedAsDraft).savedPlanFailed).isTrue()
+            val planId = navigation.mealPlanId
             assertThat(repository.observeMealPlan(planId).first()).isNotNull()
         }
     }

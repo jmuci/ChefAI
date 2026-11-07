@@ -304,10 +304,14 @@ fun ChefAINavGraph(
 
                 // Non-blocking: the plan is created either way and the week view shows both. On
                 // navScope because this destination is popped by the navigation just before it.
-                fun noteOverlap(planName: String?) {
-                    planName ?: return
-                    val message = context.getString(R.string.meal_plan_overlap_notice, planName)
-                    navScope.launch { snackbarHostState.showSnackbar(message) }
+                fun noteCreated(planName: String?, savedPlanFailed: Boolean) {
+                    val messages = listOfNotNull(
+                        planName?.let { context.getString(R.string.meal_plan_overlap_notice, it) },
+                        if (savedPlanFailed) context.getString(R.string.saved_plan_save_failed) else null,
+                    )
+                    if (messages.isEmpty()) return
+                    // One after the other: showSnackbar suspends until each is dismissed.
+                    navScope.launch { messages.forEach { snackbarHostState.showSnackbar(it) } }
                 }
 
                 LaunchedEffect(Unit) {
@@ -316,15 +320,15 @@ fun ChefAINavGraph(
                             is CreateMealPlanEvent.MealPlanReady -> {
                                 // Generation succeeded — go straight to the detail screen
                                 navActions.navigateToCreatedMealPlan(event.mealPlanId)
-                                noteOverlap(event.overlappingPlanName)
+                                noteCreated(event.overlappingPlanName, event.savedPlanFailed)
                             }
                             is CreateMealPlanEvent.MealPlanSavedAsDraft -> {
                                 // Offline / BE error — show detail as DRAFT with Generate button
                                 navActions.navigateToCreatedMealPlan(event.mealPlanId)
-                                noteOverlap(event.overlappingPlanName)
+                                noteCreated(event.overlappingPlanName, event.savedPlanFailed)
                             }
                             is CreateMealPlanEvent.ShowError -> {
-                                snackbarHostState.showSnackbar("Failed to create meal plan")
+                                snackbarHostState.showSnackbar(context.getString(event.message))
                             }
                         }
                     }
