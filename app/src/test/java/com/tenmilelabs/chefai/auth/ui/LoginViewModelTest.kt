@@ -28,6 +28,8 @@ import com.tenmilelabs.chefai.core.ui.banner.StatusBannerController
 import com.tenmilelabs.chefai.core.ui.banner.StatusBannerPlacement
 import com.tenmilelabs.chefai.core.ui.banner.StatusBannerTone
 import com.tenmilelabs.chefai.household.domain.repository.FakeHouseholdRepository
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSavedMealPlanDao
+import com.tenmilelabs.chefai.mealplans.data.local.SavedPlanImageStore
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -80,13 +82,14 @@ class LoginViewModelTest {
                 userDao = fakeUserDao,
                 householdDao = FakeHouseholdDao(),
                 recipeImageStore = mockk<RecipeImageStore>(relaxed = true),
+            savedPlanImageStore = mockk<SavedPlanImageStore>(relaxed = true),
             ),
             accountUpgradeUseCaseProvider = {
                 AccountUpgradeUseCase(
                     FakeTransactionRunner(), fakeUserDao, fakeRecipeDao,
                     FakeRecipeStepDao(), FakeRecipeIngredientDao(),
                     FakeRecipeTagCrossRefDao(), FakeRecipeLabelCrossRefDao(),
-                    FakeBookmarkedRecipeDao(), FakeMealPlanDao(),
+                    FakeBookmarkedRecipeDao(), FakeMealPlanDao(), FakeSavedMealPlanDao(),
                 )
             },
             syncSchedulerProvider = { FakeSyncManager() },

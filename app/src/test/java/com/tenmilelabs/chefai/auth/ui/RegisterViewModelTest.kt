@@ -23,6 +23,8 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
 import com.tenmilelabs.chefai.household.domain.repository.FakeHouseholdRepository
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSavedMealPlanDao
+import com.tenmilelabs.chefai.mealplans.data.local.SavedPlanImageStore
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -69,13 +71,14 @@ class RegisterViewModelTest {
                 userDao = fakeUserDao,
                 householdDao = FakeHouseholdDao(),
                 recipeImageStore = mockk<RecipeImageStore>(relaxed = true),
+            savedPlanImageStore = mockk<SavedPlanImageStore>(relaxed = true),
             ),
             accountUpgradeUseCaseProvider = {
                 AccountUpgradeUseCase(
                     FakeTransactionRunner(), fakeUserDao, fakeRecipeDao,
                     FakeRecipeStepDao(), FakeRecipeIngredientDao(),
                     FakeRecipeTagCrossRefDao(), FakeRecipeLabelCrossRefDao(),
-                    FakeBookmarkedRecipeDao(), FakeMealPlanDao(),
+                    FakeBookmarkedRecipeDao(), FakeMealPlanDao(), FakeSavedMealPlanDao(),
                 )
             },
             syncSchedulerProvider = { FakeSyncManager() },

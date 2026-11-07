@@ -26,6 +26,8 @@ import com.tenmilelabs.chefai.household.domain.model.Household
 import com.tenmilelabs.chefai.household.domain.model.HouseholdMember
 import com.tenmilelabs.chefai.household.domain.repository.FakeHouseholdRepository
 import io.mockk.coVerify
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSavedMealPlanDao
+import com.tenmilelabs.chefai.mealplans.data.local.SavedPlanImageStore
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -86,6 +88,7 @@ class SessionManagerTest {
                 recipeLabelCrossRefDao = fakeRecipeLabelCrossRefDao,
                 bookmarkedRecipeDao = FakeBookmarkedRecipeDao(),
                 mealPlanDao = FakeMealPlanDao(),
+                savedMealPlanDao = FakeSavedMealPlanDao(),
             )
         }
 
@@ -99,6 +102,7 @@ class SessionManagerTest {
             userDao = fakeUserDao,
             householdDao = FakeHouseholdDao(),
             recipeImageStore = mockk<RecipeImageStore>(relaxed = true),
+        savedPlanImageStore = mockk<SavedPlanImageStore>(relaxed = true),
         )
 
         // Create SessionManager with test scope

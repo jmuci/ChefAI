@@ -43,4 +43,27 @@ class FakeSavedMealPlanDao : SavedMealPlanDao {
         rows.value = rows.value + (uuid to existing.copy(syncState = state, updatedAt = updatedAt))
         return 1
     }
+
+    override suspend fun reassignUserAndMarkPending(oldUserId: UUID, newUserId: UUID, updatedAt: Long) {
+        rows.value = rows.value.mapValues { (_, v) ->
+            if (v.userId == oldUserId) v.copy(userId = newUserId, syncState = SyncState.PENDING, updatedAt = updatedAt) else v
+        }
+    }
+
+    override suspend fun countLiveForUser(userId: UUID): Int =
+        rows.value.values.count { it.userId == userId && it.deletedAt == null }
+
+    override suspend fun reassignId(oldUuid: UUID, newUuid: UUID) {
+        val existing = rows.value[oldUuid] ?: return
+        rows.value = rows.value - oldUuid + (newUuid to existing.copy(uuid = newUuid, syncState = SyncState.PENDING))
+    }
+
+    override suspend fun setSyncState(uuid: UUID, state: SyncState) {
+        val existing = rows.value[uuid] ?: return
+        rows.value = rows.value + (uuid to existing.copy(syncState = state))
+    }
+
+    override suspend fun delete(uuid: UUID) {
+        rows.value = rows.value - uuid
+    }
 }

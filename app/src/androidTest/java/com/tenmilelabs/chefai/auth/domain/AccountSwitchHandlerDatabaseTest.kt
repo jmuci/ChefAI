@@ -10,6 +10,7 @@ import com.tenmilelabs.chefai.core.data.local.room.HouseholdEntity
 import com.tenmilelabs.chefai.core.data.local.room.HouseholdInviteEntity
 import com.tenmilelabs.chefai.core.data.local.room.HouseholdMemberEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
+import com.tenmilelabs.chefai.mealplans.data.local.SavedPlanImageStore
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import junit.framework.TestCase.assertNull
 import junit.framework.TestCase.assertTrue
@@ -51,6 +52,7 @@ class AccountSwitchHandlerDatabaseTest {
             userDao = database.userDao(),
             householdDao = database.householdDao(),
             recipeImageStore = RecipeImageStore(getApplicationContext(), Dispatchers.IO),
+            savedPlanImageStore = SavedPlanImageStore(getApplicationContext(), Dispatchers.IO),
         )
     }
 
@@ -101,5 +103,32 @@ class AccountSwitchHandlerDatabaseTest {
         assertNull(database.householdDao().observeHousehold(household.uuid).first())
         assertTrue(database.householdDao().observeMembers(household.uuid).first().isEmpty())
         assertTrue(database.householdDao().observePendingInvites().first().isEmpty())
+    }
+
+    @Test
+    fun accountSwitchClearsSavedMealPlansAndTheirImages() = runTest {
+        val previousUserId = UuidV7Generator.newId()
+        securePreferences.setCurrentUserId(previousUserId)
+        database.userDao().upsertUser(
+            com.tenmilelabs.chefai.core.data.local.room.UserEntity(
+                uuid = previousUserId, displayName = "Chef", email = "c@test.com",
+                avatarUrl = "", updatedAt = 0L, deletedAt = null,
+            )
+        )
+        val planId = UuidV7Generator.newId()
+        database.savedMealPlanDao().upsert(
+            com.tenmilelabs.chefai.core.data.local.room.SavedMealPlanEntity(
+                uuid = planId, userId = previousUserId, title = "T", preferencesJson = "{}",
+                daysJson = "[]", createdAt = 1L, updatedAt = 1L,
+            )
+        )
+        val dir = java.io.File(getApplicationContext<android.content.Context>().filesDir, "saved_plan_images")
+        dir.mkdirs()
+        val image = java.io.File(dir, planId.toString()).apply { writeText("x") }
+
+        handler.handleLogin(newUserId = UuidV7Generator.newId())
+
+        assertNull(database.savedMealPlanDao().getById(planId))
+        assertTrue(!image.exists())
     }
 }

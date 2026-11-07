@@ -161,4 +161,27 @@ class SavedMealPlanDaoTest {
 
         assertNull(dao.getById(plan.uuid))
     }
+
+    @Test
+    fun reassignUserAndMarkPending_movesOnlyTheOldUsersPlansAndQueuesThem() = runTest {
+        val dao = database.savedMealPlanDao()
+        val newUser = user.copy(uuid = UUID.randomUUID(), email = "new@example.com")
+        database.userDao().upsertUser(newUser)
+        val mine = saved().copy(syncState = SyncState.SYNCED, updatedAt = 1_000L)
+        val theirs = saved().copy(userId = newUser.uuid, syncState = SyncState.SYNCED, updatedAt = 1_000L)
+        dao.upsert(mine)
+        dao.upsert(theirs)
+        val stranger = UUID.randomUUID()
+
+        dao.reassignUserAndMarkPending(oldUserId = stranger, newUserId = newUser.uuid, updatedAt = 5_000L)
+        assertEquals(user.uuid, requireNotNull(dao.getById(mine.uuid)).userId)
+
+        dao.reassignUserAndMarkPending(oldUserId = user.uuid, newUserId = newUser.uuid, updatedAt = 5_000L)
+
+        val moved = requireNotNull(dao.getById(mine.uuid))
+        assertEquals(newUser.uuid, moved.userId)
+        assertEquals(SyncState.PENDING, moved.syncState)
+        assertEquals(5_000L, moved.updatedAt)
+        assertEquals(1_000L, requireNotNull(dao.getById(theirs.uuid)).updatedAt)
+    }
 }

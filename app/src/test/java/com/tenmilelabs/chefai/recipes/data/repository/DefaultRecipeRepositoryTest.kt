@@ -120,6 +120,7 @@ class DefaultRecipeRepositoryTest {
                 userDao = fakeUserDao,
                 householdDao = FakeHouseholdDao(),
                 recipeImageStore = mockk<RecipeImageStore>(relaxed = true),
+                savedPlanImageStore = mockk(relaxed = true),
             ),
             accountUpgradeUseCaseProvider = {
                 AccountUpgradeUseCase(
@@ -127,6 +128,7 @@ class DefaultRecipeRepositoryTest {
                     FakeRecipeStepDao(), FakeRecipeIngredientDao(),
                     FakeRecipeTagCrossRefDao(), FakeRecipeLabelCrossRefDao(),
                     FakeBookmarkedRecipeDao(), FakeMealPlanDao(),
+                    com.tenmilelabs.chefai.core.data.local.room.dao.FakeSavedMealPlanDao(),
                 )
             },
             syncSchedulerProvider = { FakeSyncManager() },

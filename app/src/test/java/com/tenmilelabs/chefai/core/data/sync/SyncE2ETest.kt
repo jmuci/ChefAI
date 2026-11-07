@@ -133,6 +133,8 @@ class SyncE2ETest {
             mealPlanDao = FakeMealPlanDao(),
             shoppingListCheckDao = FakeShoppingListCheckDao(),
             recipeCookEventDao = FakeRecipeCookEventDao(),
+            savedMealPlanDao = com.tenmilelabs.chefai.core.data.local.room.dao.FakeSavedMealPlanDao(),
+            savedPlanImageStore = io.mockk.mockk(relaxed = true),
             sessionManager = sessionManager,
             syncMetadataDao = syncMetadataDao,
             transactionRunner = fakeTransactionRunner,
