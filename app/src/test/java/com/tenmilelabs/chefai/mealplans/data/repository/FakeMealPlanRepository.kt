@@ -110,7 +110,10 @@ class FakeMealPlanRepository : MealPlanRepository {
         }
     }
 
+    var shouldThrowOnSaveLocalDays: Boolean = false
+
     override suspend fun saveLocallyGeneratedDays(planId: UUID, days: List<MealPlanDay>) {
+        if (shouldThrowOnSaveLocalDays) throw RuntimeException("Fake save days error")
         locallyGeneratedIds.add(planId)
         plans.value = plans.value.map { plan ->
             if (plan.uuid == planId) {

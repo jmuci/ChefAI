@@ -103,6 +103,18 @@ class RepeatSavedMealPlanUseCaseTest {
         assertThat(mealPlanRepository.observeMealPlansForUser(userId).first()).isEmpty()
     }
 
+    @Test
+    fun `given the days fail to save, when repeated, then the new plan is deleted and the original failure returned`() = runTest {
+        val saved = savedPlan(SavedMealPlanDay(0, null, UUID.randomUUID()))
+        savedRepository.emitPlans(saved)
+        mealPlanRepository.shouldThrowOnSaveLocalDays = true
+
+        val result = useCase(userId, saved.uuid, startDate)
+
+        assertThat(result.exceptionOrNull()).hasMessageThat().isEqualTo("Fake save days error")
+        assertThat(mealPlanRepository.observeMealPlansForUser(userId).first()).isEmpty()
+    }
+
     private fun savedPlan(vararg days: SavedMealPlanDay) = SavedMealPlan(
         uuid = UUID.randomUUID(),
         userId = userId,
