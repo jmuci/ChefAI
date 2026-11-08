@@ -22,7 +22,9 @@ import com.tenmilelabs.chefai.core.domain.model.User
 import com.tenmilelabs.chefai.household.domain.model.Household
 import com.tenmilelabs.chefai.household.domain.repository.HouseholdRepository
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +32,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.util.UUID
 import javax.inject.Inject
@@ -327,6 +330,8 @@ class SessionManager @Inject constructor(
                     val upgraded = accountUpgradeUseCaseProvider.get()
                         .execute(anonymousUserId, user)
                     Timber.d("Upgraded $upgraded anonymous recipes to authenticated user")
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     Timber.e(e, "Account upgrade failed, but login succeeded. Recipes may not be transferred.")
                 }
@@ -350,6 +355,12 @@ class SessionManager @Inject constructor(
 
             Timber.d("Login successful for user: ${user.uuid}")
             Result.success(user)
+        } catch (e: CancellationException) {
+            // The caller's scope went away mid-request. Not a failure to report, but the session
+            // was set to Loading above, so still settle it — non-cancellably, or the restore would
+            // itself be cancelled at its first suspension and leave every observer waiting.
+            withContext(NonCancellable) { enterAnonymousSession() }
+            throw e
         } catch (e: Exception) {
             Timber.e(e, "Login failed")
             enterAnonymousSession()
@@ -408,6 +419,8 @@ class SessionManager @Inject constructor(
                     val upgraded = accountUpgradeUseCaseProvider.get()
                         .execute(anonymousUserId, user)
                     Timber.d("Upgraded $upgraded anonymous recipes to authenticated user")
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     Timber.e(e, "Account upgrade failed, but registration succeeded.")
                 }
@@ -431,6 +444,12 @@ class SessionManager @Inject constructor(
 
             Timber.d("Registration successful for user: ${user.uuid}")
             Result.success(user)
+        } catch (e: CancellationException) {
+            // The caller's scope went away mid-request. Not a failure to report, but the session
+            // was set to Loading above, so still settle it — non-cancellably, or the restore would
+            // itself be cancelled at its first suspension and leave every observer waiting.
+            withContext(NonCancellable) { enterAnonymousSession() }
+            throw e
         } catch (e: Exception) {
             Timber.e(e, "Registration failed")
             enterAnonymousSession()
