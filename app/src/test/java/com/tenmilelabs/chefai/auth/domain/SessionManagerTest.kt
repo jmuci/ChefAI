@@ -32,10 +32,13 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSavedMealPlanDao
 import com.tenmilelabs.chefai.mealplans.data.local.SavedPlanImageStore
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import io.mockk.mockk
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -261,6 +264,61 @@ class SessionManagerTest {
 
         val session = sessionManager.userSession.first()
         assertThat(session).isInstanceOf(UserSession.Anonymous::class.java)
+    }
+
+    @Test
+    fun `login rethrows cancellation instead of returning a failure`() = testScope.runTest {
+        // Given: the request is cancelled mid-flight
+        fakeAuthNetworkDataSource.shouldThrowError = true
+        fakeAuthNetworkDataSource.errorToThrow = CancellationException("caller went away")
+
+        // When: Logging in
+        val thrown = try {
+            sessionManager.login("test@example.com", "password123")
+            null
+        } catch (e: CancellationException) {
+            e
+        }
+
+        // Then: the cancellation propagates, and the session isn't left on Loading
+        assertThat(thrown).isNotNull()
+        assertThat(sessionManager.userSession.value).isInstanceOf(UserSession.Anonymous::class.java)
+    }
+
+    @Test
+    fun `register rethrows cancellation instead of returning a failure`() = testScope.runTest {
+        // Given: the request is cancelled mid-flight
+        fakeAuthNetworkDataSource.shouldThrowError = true
+        fakeAuthNetworkDataSource.errorToThrow = CancellationException("caller went away")
+
+        // When: Registering
+        val thrown = try {
+            sessionManager.register("testuser", "test@example.com", "password123")
+            null
+        } catch (e: CancellationException) {
+            e
+        }
+
+        // Then: the cancellation propagates, and the session isn't left on Loading
+        assertThat(thrown).isNotNull()
+        assertThat(sessionManager.userSession.value).isInstanceOf(UserSession.Anonymous::class.java)
+    }
+
+    @Test
+    fun `cancelling the caller's job mid-login settles the session back to anonymous`() = testScope.runTest {
+        // Given: a slow login request
+        fakeAuthNetworkDataSource.networkDelayMs = 1_000
+        val loginJob = launch { sessionManager.login("test@example.com", "password123") }
+        advanceTimeBy(500)
+        assertThat(sessionManager.userSession.value).isEqualTo(UserSession.Loading)
+
+        // When: the caller's scope is cancelled while the request is in flight
+        loginJob.cancel()
+        advanceUntilIdle()
+
+        // Then: the job ends cancelled, not completed, and the session is restored
+        assertThat(loginJob.isCancelled).isTrue()
+        assertThat(sessionManager.userSession.value).isInstanceOf(UserSession.Anonymous::class.java)
     }
 
     @Test

@@ -21,8 +21,8 @@ private const val DEFAULT_UNIT = "unit"
 /**
  * Converts a scraped recipe into a [RecipeDraft] ready to seed the editor.
  *
- * Times and servings are never left blank — [RecipeDraft.toRecipe] throws on a blank numeric
- * string, so every value the page didn't publish becomes `"0"` here rather than `""`; Save simply
+ * Times and servings are never left blank — every value the page didn't publish becomes `"0"` here
+ * rather than `""`, the same value [RecipeDraft.toRecipe] falls back to for a blank; Save simply
  * stays disabled until the user fills in what's missing. Ingredients and tags are matched by name
  * (case-insensitively) against the app's existing catalogs before minting a new id, mirroring
  * [com.tenmilelabs.chefai.recipes.ui.editor.RecipeEditorViewModel.selectIngredient] and
