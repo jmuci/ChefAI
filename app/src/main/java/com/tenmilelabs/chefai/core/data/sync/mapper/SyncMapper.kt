@@ -122,7 +122,7 @@ fun SyncIngredientDto.toIngredientEntity(): IngredientEntity = IngredientEntity(
  * locally before the backend can round-trip them.
  *
  * `imageBlobId` needs no such threading: it is server-owned, so the DTO's value is by definition
- * the authoritative one (ADR-011 / Stage 2 D1).
+ * the authoritative one (ADR-012 Decision 7).
  *
  * [existingLanguage] is a fallback, not a passthrough: the DTO's `language` wins when present, but
  * a `null` one — from a backend that doesn't store languages yet — keeps whatever this device had.

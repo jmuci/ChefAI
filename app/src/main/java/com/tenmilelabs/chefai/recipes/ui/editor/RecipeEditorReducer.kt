@@ -89,7 +89,7 @@ object RecipeEditorReducer {
 
         // A stored photo and a remote URL are alternatives, never both: the editor offers them as an
         // either/or, and everything downstream — the backfill worker most of all — reads a blank
-        // imageUrl as "this image is the user's own, don't try to re-derive it". See ADR-011.
+        // imageUrl as "this image is the user's own, don't try to re-derive it". See ADR-012.
         is EditorAction.PickedImageStored -> state.copy(
             recipeFields = state.recipeFields.copy(
                 imageUrl = "",

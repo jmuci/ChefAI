@@ -103,7 +103,7 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
  * `selectedImageUri` held the raw `content://` string from the photo picker, which nothing ever read
  * back — `RecipeDraft.toRecipe()` dropped it on save, and the picker's read grant did not survive
  * process death anyway. A picked photo is now copied into `RecipeImageStore` at pick time and lives
- * in `localImagePath` alongside a scraped one, so the column has no remaining job. See ADR-011.
+ * in `localImagePath` alongside a scraped one, so the column has no remaining job. See ADR-012.
  *
  * The column is removed by rebuilding the table rather than with `ALTER TABLE … DROP COLUMN`, which
  * needs SQLite 3.35 — only guaranteed from API 34, below this module's `minSdk`.
@@ -157,7 +157,7 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
  *
  * `recipes.imageBlobId` is the content hash of the uploaded image, and is the one image-related
  * field that *does* travel through sync — it is the pointer a second device needs for bytes it
- * cannot re-derive. It is server-owned; see ADR-011 and the Stage 2 plan.
+ * cannot re-derive. It is server-owned; see ADR-012 Decision 7.
  *
  * The three `recipe_image_state` columns track the upload half of the ladder, deliberately separate
  * from the existing download counters so a recipe stuck on one cannot block the other.

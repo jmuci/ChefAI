@@ -8,7 +8,7 @@ import java.time.ZoneId
 /**
  * Which existing plans a new plan's dates would collide with.
  *
- * Overlap is allowed — the week view shows every plan's meals (ADR-015 amendment) — so this only
+ * Overlap is allowed — the week view shows every plan's meals (ADR-015 Decision 3) — so this only
  * feeds a non-blocking notice. Pure, so the date arithmetic is unit-tested directly.
  */
 object MealPlanOverlap {

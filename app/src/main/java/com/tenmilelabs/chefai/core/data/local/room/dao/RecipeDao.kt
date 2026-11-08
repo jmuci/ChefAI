@@ -176,7 +176,7 @@ interface RecipeDao {
      *
      * `imageUrl != ''` alone used to be the whole predicate, and it deliberately excluded a user's
      * own photo — a picked image has no source URL, so re-deriving it is impossible and the editor
-     * clears `imageUrl` precisely so this predicate can tell the two apart (ADR-011 Decision 3).
+     * clears `imageUrl` precisely so this predicate can tell the two apart (ADR-012 Decision 3).
      * `OR imageBlobId IS NOT NULL` is what finally lets those photos be restored on a second device:
      * once they are uploaded there *is* somewhere to fetch them from. This is the whole point of
      * Stage 2.
@@ -215,7 +215,7 @@ interface RecipeDao {
      * ordering question between the two.
      *
      * User photos are ordered first because they are the only images that cannot be re-derived from
-     * anywhere — a blank `imageUrl` means exactly that (ADR-011 Decision 3). If a sweep only gets
+     * anywhere — a blank `imageUrl` means exactly that (ADR-012 Decision 3). If a sweep only gets
      * through part of its batch, the irreplaceable bytes are the ones that made it.
      *
      * Deliberately over-selects rows that already have an `imageBlobId`: whether the file on disk is

@@ -84,7 +84,8 @@ Domain (Use Cases, Domain Entities, Repository Interfaces)
 
 ### Implementation facts (Nov 2026)
 
-Feature status lives only in CLAUDE.md's [Current Gaps](../CLAUDE.md) table — this file keeps the
+Feature status lives in CLAUDE.md's [Current Gaps](../CLAUDE.md) table (one line per area) and
+[feature-status.md](feature-status.md) (detail for areas without an ADR) — this file keeps the
 structural facts that change rarely:
 
 - **Room:** 23 entities, schema v16, migrations `MIGRATION_1_2` … `MIGRATION_15_16`, schemas exported
@@ -149,16 +150,16 @@ Mappers convert between these layers under `data/mapper/` and `ui/mappers/`.
 - [`/CLAUDE.md`](../CLAUDE.md) — project instructions and the actively-maintained Current Gaps table.
 - [`/docs/adrs/adr-001-hybrid-architecture-choice.md`](adrs/adr-001-hybrid-architecture-choice.md) — rationale for choosing this hybrid architecture.
 - [`/docs/adrs/adr-002–local-DB-choice-and-ID-gen.md`](adrs/adr-002–local-DB-choice-and-ID-gen.md) — SQLite/Room + UUIDv7.
-- [`/docs/adrs/adr-003–two-step-BE-sync.md`](adrs/adr-003–two-step-BE-sync.md) — Two-step sync model (superseded by ADR-006).
-- [`/docs/adrs/adr-004-data-layer.md`](adrs/adr-004-data-layer.md) — Data layer composition.
 - [`/docs/adrs/adr-0005-feature-based-package-structure.md`](adrs/adr-0005-feature-based-package-structure.md) — Feature-based packaging.
-- [`/docs/adrs/adr-006-sync-protocol.md`](adrs/adr-006-sync-protocol.md) — current sync protocol (push/pull, conflicts, triggers).
+- [`/docs/adrs/adr-006-sync-protocol.md`](adrs/adr-006-sync-protocol.md) — current sync protocol (push/pull, conflicts, triggers); its History section absorbs ADR-003 and ADR-004 (data layer).
 - [`/docs/adrs/adr-007-anonymous-first.md`](adrs/adr-007-anonymous-first.md) — anonymous-first account model.
 - [`/docs/adrs/adr-008-data-handling-across-sessions.md`](adrs/adr-008-data-handling-across-sessions.md) — logout/account-switch data handling.
 - [`/docs/adrs/adr-009-navigation-scoped-viewmodel-for-wizards.md`](adrs/adr-009-navigation-scoped-viewmodel-for-wizards.md) — nav-graph-scoped ViewModel for wizards.
 - [`/docs/adrs/adr-010-client-side-recipe-scraping.md`](adrs/adr-010-client-side-recipe-scraping.md) — `:recipe-scraper` module and the URL-import fetch pipeline.
-- [`/docs/adrs/adr-011-cross-device-recipe-images.md`](adrs/adr-011-cross-device-recipe-images.md) and [`adr-012`](adrs/adr-012-recipe-image-upload.md) — recipe image sync/upload.
+- [`/docs/adrs/adr-012-recipe-image-upload.md`](adrs/adr-012-recipe-image-upload.md) — recipe images: on-device cache, cross-device sync and upload (absorbs ADR-011).
 - ADR-013 to ADR-018 — units, households, week view, recipe language, cook history, saved plans; see the [ADR index](claude/decisions.md).
 - [`/docs/sync-deep-dive.md`](sync-deep-dive.md) — step-by-step sync flow, scenarios, and a manual testing checklist.
 - [`/docs/pocket-chef-sdui-guide.md`](pocket-chef-sdui-guide.md) — see the disclaimer at the top before using this one; it does not describe the shipped implementation.
 - [`/docs/authentication.md`](authentication.md) — Auth system documentation.
+- [`/docs/feature-status.md`](feature-status.md) — implementation detail for features without an ADR.
+- [`/docs/archive/`](archive/) — one-off implementation prompts and plans, kept for history only.
