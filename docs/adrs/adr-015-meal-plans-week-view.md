@@ -1,11 +1,27 @@
 # ADR 015 – The Meal Plans Week View
 
 **Date:** September 2026
-**Status:** Accepted
+**Status:** Accepted — **Decisions 2, 3 and 5 are superseded** by the amendments at the end
 **Author:** Claude (Opus 5), on behalf of Jose Mucientes
 **Related:** [ADR-005](adr-0005-feature-based-package-structure.md),
 [ADR-006](adr-006-sync-protocol.md), [ADR-013](adr-013-measurement-unit-conversion.md),
 [ADR-014](adr-014-households.md)
+
+> **Current state (Nov 2026), read this first.** The decisions below are the September design; four
+> amendments at the end override parts of it. What holds today:
+> - A week is a date window that every live plan is projected onto (Decision 1 — unchanged).
+> - Day 0 is `MealPlan.startDate` (DB v13), falling back to `createdAt` for older plans, via
+>   `MealPlan.dateOf` (supersedes Decision 2).
+> - Overlapping plans **all** show, ordered by slot then plan `createdAt`, each row tagged with its
+>   plan (supersedes Decision 3).
+> - The selected week lives in the ViewModel over an injected `Clock` (Decision 4 — unchanged).
+> - There is no "Just me / Family" toggle; the header is **Week | Plans**, and a week containing a
+>   shared plan shops for the household (supersedes Decision 5).
+> - "Generate Grocery List" is per plan and disabled for a multi-plan week (Decision 6 — unchanged).
+> - "+ Add meal" opens `AddMealSheet` over saved recipes; a pick opens the wizard seeded with that
+>   recipe on day 0 and the tapped date as start. No one-day "Added meals" plans.
+>
+> Candidate for a clean rewrite once it stops changing.
 
 ---
 
@@ -76,7 +92,7 @@ time and has nothing to say about the days between plans. A date-first screen re
 week whether that week is covered by one plan, two, or none — the empty days are simply days no plan
 claimed, and they render as the design's "+ Add meal".
 
-## Decision 2: Day 0 is the plan's `createdAt` date. There is no `startDate` column
+## Decision 2 (superseded): Day 0 is the plan's `createdAt` date. There is no `startDate` column
 
 `MealPlanWeekProjector.project` anchors every plan with `planDateFor` — two lines duplicated
 deliberately from `MealPlanBoard.mealPlanDateFor`, since domain may not import from `ui/` and the
@@ -99,7 +115,7 @@ of the thing they just created as "my week". Anchoring on `createdAt` means the 
 side-effect of when you happened to tap Create. This is the single largest known shortcoming of the
 screen, and `startDate` is the fix; see Consequences.
 
-## Decision 3: One meal per (date, slot), resolved by `updatedAt`
+## Decision 3 (superseded): One meal per (date, slot), resolved by `updatedAt`
 
 Nothing prevents two live plans from covering the same date — the wizard does not check, and a
 household member's shared plan can overlap your personal one. The design has one row per day, so
@@ -139,7 +155,7 @@ handoff's Mon–Sun is one locale's rendering of "a week"; in `en-US` a week sta
 planner that disagrees with the phone's own calendar app about where the week begins is a bug in
 every locale but the one it was drawn in.
 
-## Decision 5: The household toggle selects a *serving basis*, applied at display time only
+## Decision 5 (superseded): The household toggle selects a *serving basis*, applied at display time only
 
 `MealPlanServingBasis` is a two-value enum — `JUST_ME`, `FAMILY` — and it does two things:
 

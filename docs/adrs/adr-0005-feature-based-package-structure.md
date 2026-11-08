@@ -18,6 +18,10 @@ package.
 
 ### Package Structure
 
+> **Current features (Nov 2026):** `auth`, `recipes`, `search`, `collections`, `home`, `mealplans`,
+> `household`, `settings`, `developeroptions`, plus `core`. The tree below is the original 2025
+> snapshot and is kept for the layout it illustrates, not as an inventory.
+
 ```
 com.tenmilelabs.chefai/
 ├── auth/                    # Authentication Feature
@@ -195,8 +199,9 @@ it.
 
 ### Packages
 
-- Feature packages: lowercase, singular (e.g., `auth`, `recipe`, not `recipes`)
-- Exception: `recipes` kept for historical reasons and semantic clarity
+- Feature packages: lowercase, one word, named the way the feature is spoken of (`auth`,
+  `recipes`, `mealplans`, `household`, `settings`). *Amended:* the original "singular" rule was never
+  followed in practice and is dropped — don't rename existing packages to satisfy it.
 - Layer packages: lowercase (e.g., `data`, `domain`, `ui`)
 - Sub-packages: descriptive (e.g., `local`, `network`, `repository`, `components`)
 
@@ -228,9 +233,7 @@ it.
 
 ### Documentation
 
-- Main source reorganization: `FEATURE_REORGANIZATION_SUMMARY.md`
-- Test reorganization: `TEST_REORGANIZATION_SUMMARY.md`
-- Combined overview: `COMPLETE_REORGANIZATION_SUMMARY.md`
+The migration summaries this section used to link were never committed; this ADR is the record.
 
 ---
 

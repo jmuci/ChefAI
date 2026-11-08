@@ -1,7 +1,8 @@
 # ADR 011 – Cross-Device Recipe Images
 
 **Date:** August 2026
-**Status:** Accepted
+**Status:** Accepted — Decision 1 superseded by [ADR-012](adr-012-recipe-image-upload.md) (every
+image is uploaded, not only user-authored ones); Decisions 2–7 stand.
 **Author:** Claude (Opus 5), on behalf of Jose Mucientes
 **Related:** [ADR-006](adr-006-sync-protocol.md), [ADR-007](adr-007-anonymous-first.md),
 [ADR-008](adr-008-data-handling-across-sessions.md),

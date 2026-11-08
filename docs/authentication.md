@@ -118,8 +118,11 @@ Handles cross-account login behavior before sync begins.
   - different-account login with active anonymous data
   - different-account login without anonymous data
 - Preserves anonymous data created after logout when switching accounts
-- Removes stale data from the previous authenticated account
-- Falls back to `database.clearAllTables()` only when there is no anonymous session to preserve
+- Removes everything the previous account left: its recipes (+ cached images), every meal plan,
+  saved plan (+ photo), bookmark and cook event the anonymous session doesn't own, the pull cursor,
+  and the household cache — unpushed edits of that account are lost (logout doesn't flush)
+- Falls back to `database.clearAllTables()` only when the previous session was not anonymous (in
+  practice, a cold-start reconciliation) — see the ADR-008 Nov 2026 amendment
 
 #### 4. **AuthInterceptor** (`AuthInterceptor.kt`)
 
@@ -127,8 +130,9 @@ Ktor client plugin that automatically adds authentication headers to HTTP reques
 
 **Functionality:**
 
-- Intercepts all HTTP requests
-- Adds `Authorization: Bearer <token>` header if user is authenticated
+- Intercepts all requests made with the default (unqualified) `HttpClient`
+- Adds `Authorization: Bearer <token>` if a token is available — **regardless of host**, so that
+  client must only ever call the ChefAI API (gotchas #18)
 - Logs auth status for debugging
 
 #### 5. **Domain Models**
@@ -147,7 +151,11 @@ data class AuthToken(
 
 ```kotlin
 sealed class UserSession {
-    data class Authenticated(val user: User, val authToken: AuthToken) : UserSession()
+    data class Authenticated(
+        val user: User,
+        val authToken: AuthToken,
+        val household: AuthenticatedHousehold? = null,
+    ) : UserSession()
     data class Anonymous(val localUserId: UUID) : UserSession()
     data object Loading : UserSession()
 }
@@ -347,18 +355,20 @@ so all API requests will include the auth token if available:
 // In NetworkModule.kt
 @Provides
 @Singleton
-fun provideHttpClient(sessionManager: SessionManager) = HttpClient(CIO) {
+fun provideHttpClient(tokenProvider: TokenProvider, /* … */) = HttpClient(OkHttp) {
     install(AuthInterceptor) {
-        this.sessionManager = sessionManager
+        this.tokenProvider = tokenProvider
     }
     // ... other configurations
 }
 ```
 
-## Current Development Setup (Aug 2026)
+## Current Development Setup (Nov 2026)
 
 **Auth API calls are implemented.** `SessionManager.login()`, `register()`, and `refreshToken()` all
-make real Ktor HTTP calls to the backend at `http://10.0.2.2:8080` (emulator localhost).
+make real Ktor HTTP calls. Debug builds default to `http://10.0.2.2:8080` (emulator localhost) and
+can switch to the deployed API in Developer options; release builds use `chefaiApiBaseUrl`
+(`https://api.pocket-chef.app`).
 
 **Done, despite what an older version of this doc said:**
 
@@ -371,7 +381,10 @@ make real Ktor HTTP calls to the backend at `http://10.0.2.2:8080` (emulator loc
 
 **What still needs work:**
 
-- Token refresh is not yet serialized — see [gotchas.md #13](claude/gotchas.md).
+- Token refresh is serialized behind a `Mutex` in `SessionManager.refreshToken()`. It is
+  refresh-on-401 per call site, not a client-wide plugin: `SyncWorker`, search and account deletion
+  retry once after refreshing; household, meal-plan generation, recipe detail, home layout and image
+  calls do not, so they fail on an expired token until something else refreshes it.
 - Biometric auth, "Remember Me", explicit session timeout, and logout-on-401 are unbuilt (see
   Future Enhancements below).
 
@@ -384,7 +397,7 @@ All HTTP requests automatically include authentication headers. The `AuthInterce
 
 ```kotlin
 // The auth token is automatically added
-val response = httpClient.get("https://api.chefai.com/recipes")
+val response = httpClient.get("${BuildConfig.API_BASE_URL}/api/v1/recipes/search")
 ```
 
 
@@ -438,7 +451,7 @@ if (sessionManager.isTokenExpired()) {
 1. **Encrypted Storage**: All auth data encrypted at rest using AES256-GCM
 2. **Token Expiry Management**: Access tokens have expiry timestamps and can be refreshed
 3. **Secure KeyStore**: MasterKey stored in Android KeyStore hardware-backed when available
-4. **Memory Safety**: Tokens stored in secure preferences, not in plain memory
+4. **At rest only**: tokens are encrypted on disk; in memory they sit in plain `UserSession.Authenticated`
 5. **Automatic Cleanup**: Logout clears all stored authentication data
 
 ## Future Enhancements

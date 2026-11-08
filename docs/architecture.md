@@ -1,6 +1,6 @@
 # ChefAI Architecture Overview
 
-_Last updated: August 2026_
+_Last updated: November 2026_
 
 ChefAI follows a **Hybrid Architecture** based on Google’s Modern Android Architecture, selectively enhanced with **Clean Architecture principles**.  
 The goal is to balance **developer velocity** (for a solo engineer) with **clarity, testability, and scalability** for future growth or collaboration.
@@ -58,7 +58,7 @@ Domain (Use Cases, Domain Entities, Repository Interfaces)
 │                                                   │
 │  ┌─────────────┐    ┌──────────────┐             │
 │  │  Room (SSOT) │    │ Ktor Client  │             │
-│  │  18 entities │    │ Auth + Sync  │             │
+│  │  23 entities │    │ Auth + Sync  │             │
 │  │  sync_meta   │    │ endpoints    │             │
 │  └──────┬──────┘    └──────┬───────┘             │
 │         │                   │                     │
@@ -82,25 +82,18 @@ Domain (Use Cases, Domain Entities, Repository Interfaces)
 > is a Mermaid source that's closer to current — treat it as the fallback until these PNGs are
 > regenerated.
 
-### Current Implementation Status (Aug 2026)
+### Implementation facts (Nov 2026)
 
-See CLAUDE.md's [Current Gaps](../CLAUDE.md) table for the up-to-date, actively-maintained version of
-this list — it changes faster than this file does. Snapshot as of this update:
+Feature status lives only in CLAUDE.md's [Current Gaps](../CLAUDE.md) table — this file keeps the
+structural facts that change rarely:
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Room database (18 entities) | Done | Version 7, 6 migrations (`MIGRATION_1_2` … `MIGRATION_6_7`) |
-| DAOs with CRUD + pagination | Done | `RecipeDao` includes paginated query |
-| Repositories (Recipe, Metadata) | Done | Resolve the real user via `SessionManager.userSession`, no hardcoded UUID |
-| Ktor HTTP client + auth interceptor | Done | CIO engine, JSON, logging |
-| Auth (SessionManager, SecurePrefs) | Done | Login/register/refresh against backend API |
-| Paging 3 integration | Done | PagingSource → Repository → ViewModel → UI |
-| SyncableEntity interface | Done | All entities have syncState, updatedAt, deletedAt |
-| Anonymous-first usage | Done | See [ADR-007](adrs/adr-007-anonymous-first.md); app is fully usable without login |
-| Sync (push/pull, WorkManager) | Done | See [ADR-006](adrs/adr-006-sync-protocol.md) and [Sync Deep Dive](sync-deep-dive.md) |
-| Offline conflict resolution | Not started | `SyncState.CONFLICT` defined but unused |
-| HomeScreen repository integration | Done | Server-driven UI, `GET /api/v1/home/layout`; see [SDUI backend prompt](prompts/sdui-backend-prompt.md) |
-| Meal Plans | Done | Wizard, list, detail view, on-device generation fallback, shopping lists |
+- **Room:** 23 entities, schema v16, migrations `MIGRATION_1_2` … `MIGRATION_15_16`, schemas exported
+  to `app/schemas/`. No FTS tables; no Paging 3 (lists are `Flow<List<…>>`, bounded with `LIMIT`).
+- **Network:** Ktor with the **OkHttp** engine (not CIO — see `NetworkModule`), kotlinx JSON, an
+  `AuthInterceptor` on the default client and a separate unauthenticated `@ScraperHttpClient`.
+- **Sync:** `SyncWorker` → `SyncOrchestrator`, push then pull — [ADR-006](adrs/adr-006-sync-protocol.md).
+- **Session:** `SessionManager` exposes `UserSession` (`Loading` / `Anonymous` / `Authenticated`).
+- **Modules:** `:app` and the pure-Kotlin `:recipe-scraper`.
 
 ---
 
@@ -162,8 +155,10 @@ Mappers convert between these layers under `data/mapper/` and `ui/mappers/`.
 - [`/docs/adrs/adr-006-sync-protocol.md`](adrs/adr-006-sync-protocol.md) — current sync protocol (push/pull, conflicts, triggers).
 - [`/docs/adrs/adr-007-anonymous-first.md`](adrs/adr-007-anonymous-first.md) — anonymous-first account model.
 - [`/docs/adrs/adr-008-data-handling-across-sessions.md`](adrs/adr-008-data-handling-across-sessions.md) — logout/account-switch data handling.
+- [`/docs/adrs/adr-009-navigation-scoped-viewmodel-for-wizards.md`](adrs/adr-009-navigation-scoped-viewmodel-for-wizards.md) — nav-graph-scoped ViewModel for wizards.
 - [`/docs/adrs/adr-010-client-side-recipe-scraping.md`](adrs/adr-010-client-side-recipe-scraping.md) — `:recipe-scraper` module and the URL-import fetch pipeline.
 - [`/docs/adrs/adr-011-cross-device-recipe-images.md`](adrs/adr-011-cross-device-recipe-images.md) and [`adr-012`](adrs/adr-012-recipe-image-upload.md) — recipe image sync/upload.
+- ADR-013 to ADR-018 — units, households, week view, recipe language, cook history, saved plans; see the [ADR index](claude/decisions.md).
 - [`/docs/sync-deep-dive.md`](sync-deep-dive.md) — step-by-step sync flow, scenarios, and a manual testing checklist.
 - [`/docs/pocket-chef-sdui-guide.md`](pocket-chef-sdui-guide.md) — see the disclaimer at the top before using this one; it does not describe the shipped implementation.
 - [`/docs/authentication.md`](authentication.md) — Auth system documentation.

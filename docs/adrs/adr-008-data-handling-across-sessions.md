@@ -1,6 +1,6 @@
 # ADR-008: Local Database Behavior on Logout and Account Switch
 
-**Date:** 2026-03-08
+**Date:** 2026-03-08 (amended Aug 2026, Nov 2026)
 
 **Status:** Accepted
 
@@ -28,6 +28,30 @@ When a user logs in:
 - Logging out **does not immediately clear local data** and returns the app to an anonymous session.
 
 The account-switch handling happens **after successful authentication but before synchronization begins**.
+
+### Amendment (Nov 2026): how `AccountSwitchHandler` actually decides — and a known gap
+
+Two places where the code is narrower than the rules above:
+
+- **"Active anonymous data" is checked as "was the session anonymous".** `SessionManager.login()` /
+  `register()` pass the anonymous `localUserId` whenever the previous session was `Anonymous`, which
+  is always the case on the login screen. So an interactive switch always takes the *preserve*
+  branch, even with no anonymous data at all; `clearAllTables()` is reached only from a cold-start
+  `loadSession()` reconciliation.
+- **The preserve branch keeps only what the anonymous session owns.** It removes, in one
+  transaction: the previous account's recipes (+ images); every meal plan, saved plan (+ photo) and
+  bookmark not owned by the anonymous user (so household plans the old account could see go too);
+  every cook event not on one of the anonymous user's plans; and the pull cursor. The household
+  cache is cleared as well. The server restores whatever had synced when the old account signs in
+  again; its **unpushed** edits are lost, because logout cancels sync without flushing first.
+
+**Fixed (Nov 2026):** the preserve branch used to keep the previous account's meal plans, saved
+plans, bookmarks and cook events on the theory that every read filters by `userId`. Two things
+didn't: `recipe_cook_events` has no user column and `observeCookedRecipeIds()` reads the whole
+table (the incoming account saw the old "Cooked before" history), and `SyncOrchestrator.push()`
+collects meal plans, saved plans and cook events without a user filter (the old account's `PENDING`
+rows went out under the new JWT). Keeping the old pull cursor also made the new account's first
+pull skip everything it had changed before that moment.
 
 ### Amendment (Aug 2026): these rules cover on-disk files, not just Room tables
 

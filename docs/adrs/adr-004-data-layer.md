@@ -1,7 +1,20 @@
 # 🧱 ADR 004 – Data Layer Composition & Repository Pattern
 
 **Date:** 2025-11-10  
-**Status:** Accepted  
+**Status:** Accepted, partially superseded — see the amendment below  
+
+> **Amendment (Nov 2026): what was actually built.** The repository pattern stands; three details
+> never landed and should not be copied:
+> - **No `outbox` table.** Each `SyncableEntity` row's `syncState` (`PENDING`/`DELETED`) *is* the
+>   outbox; `SyncOrchestrator` queries `getAllDirty()` per table. `sync_metadata` exists and holds
+>   the pull cursor.
+> - **No `LocalDataSource`/`RemoteDataSource` interface pair.** Repositories inject DAOs directly and
+>   a feature-specific network data source only where they call the API outside sync.
+> - **Sync is not in repositories.** Push/pull and conflict handling live in `SyncOrchestrator`
+>   (driven by `SyncWorker`), per [ADR-006](adr-006-sync-protocol.md). Repositories only write Room
+>   and call `SyncScheduler`.
+>
+> DI is Hilt (Koin was never used).
 **Context:**  
 ChefAI is an offline-first Android app that stores and syncs user data (recipes, ingredients, meal plans, and grocery lists) between a local SQLite database and a backend service. The data layer must support both offline operation and background synchronization while maintaining clean separation from the domain and UI layers.
 

@@ -14,7 +14,9 @@ This project is still under development.
 
 # Documentation
 
+* [Architecture](docs/architecture.md) and the [ADR index](docs/claude/decisions.md)
 * [Authentication](docs/authentication.md)
+* [Sync deep dive](docs/sync-deep-dive.md)
 
 See the [docs folder](docs/)
 
@@ -32,17 +34,17 @@ Below are a couple of the app screens to get an idea of how it looks.
 
 ### 🏗️ Architecture Overview
 
-ChefAI follows a Clean Architecture with an offline-first design.
+ChefAI follows a hybrid of Google's Modern Android Architecture and selective Clean Architecture ([ADR-001](docs/adrs/adr-001-hybrid-architecture-choice.md)), with an offline-first design.
 
-UI Layer – Jetpack Compose screens with ViewModels that interact only with domain use cases.
+UI Layer – Jetpack Compose screens with ViewModels exposing `StateFlow`; use cases only where logic is reused or complex.
 
 Domain Layer – Pure Kotlin business logic, entity models, and repository interfaces.
 
-Data Layer – Dual-source repositories combining Room (SQLite) for local caching and a Ktor network client for backend access.
+Data Layer – Repositories over Room (the local source of truth); all writes go to Room first.
 
-Sync – Planned: Background WorkManager will handle two-step sync (push local outbox → pull backend deltas). Not yet implemented.
+Sync – WorkManager push-then-pull against the [Ktor backend](https://github.com/jmuci/Chef.ai_Backend), last-writer-wins ([ADR-006](docs/adrs/adr-006-sync-protocol.md)). Anonymous-first: the app is fully usable without an account ([ADR-007](docs/adrs/adr-007-anonymous-first.md)).
 
-IDs & Storage – All entities use client-generated, time-sortable UUIDv7 IDs; Room provides full-text search and ACID transactions.
+IDs & Storage – All entities use client-generated, time-sortable UUIDv7 IDs; Room provides ACID transactions.
 
 Dependency Injection – Hilt modules wire DAOs, network clients, and repositories.
 
@@ -65,7 +67,7 @@ Image Loading:
 * [Coil](https://github.com/coil-kt/coil)
 
 Networking: 
-* [Ktor](https://ktor.io/docs/welcome.html) with CIO engine, content negotiation, and logging
+* [Ktor](https://ktor.io/docs/welcome.html) with the OkHttp engine, content negotiation, and logging
 * [Kotlinx Serialization](https://github.com/Kotlin/kotlinx.serialization)
 
 Coroutines:
@@ -112,10 +114,10 @@ maestro test .maestro/smoke                    # one folder
 Every flow starts from `clearState`, so it wipes the app's local data on the device it runs on.
 `maestro studio` opens an interactive inspector that helps when writing new flows.
 
-## Backend Test End Points
+## Backend
 
-You can use the enpoints hosted in this repo to test the backend:
-https://github.com/jmuci/ChATestAPI/tree/main?tab=readme-ov-file
+The app talks to [Chef.ai_Backend](https://github.com/jmuci/Chef.ai_Backend) — locally on port 8080 in
+debug builds, or the deployed API (switchable in Developer options).
 
 ## Contributing
 

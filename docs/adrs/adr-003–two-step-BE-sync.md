@@ -1,7 +1,8 @@
 # 🔄 ~~ADR 003 – Two-Step Synchronization with Backend~~
 
 **Date:** 2025-11-10  
-**Status:** Deprecated -> [adr-006-anonymous-first-sync](adr-006-sync-protocol.md)
+**Status:** Superseded by [ADR-006 – Sync Protocol](adr-006-sync-protocol.md). The Outbox table and
+`sync_metadata` checkpoint below were never built as described: `syncState` on each row is the outbox.
 **Context:** The ChefAI app must keep user data (recipes, ingredients, meal plans) synchronized between local SQLite storage and the backend. The app is offline-first, and sync must be efficient and robust against intermittent connectivity.
 
 ---

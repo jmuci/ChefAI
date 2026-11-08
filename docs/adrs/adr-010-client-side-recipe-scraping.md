@@ -298,6 +298,15 @@ re-validated via `validateRedirectTarget` before being followed, and `ScraperWeb
 same treatment — closing the gap a `<script src="http://169.254.169.254/...">` on a hostile page
 would otherwise have opened.
 
+**Connection-time pinning (#253).** Validating before the fetch still left a rebinding window:
+OkHttp resolves the host again to connect. The scraper client's OkHttp engine is configured with
+`SsrfSafeDns`, which applies the same `isBlockedAddress` check to the addresses OkHttp actually
+connects to, so a second, internal answer fails the connection. **The WebView tier has no
+equivalent** — `shouldInterceptRequest` resolves and checks, then WebView resolves on its own — so a
+rebinding host can still reach an internal address there. Accepted for now: the WebView only renders
+and its page has no `addJavascriptInterface`, so the attacker cannot read the response back through
+the app; the plain-HTTP tier, whose bytes the app does consume, is pinned.
+
 **A second, weaker check stays, deliberately.** `normalizeUrlForDisplay` — used synchronously from
 `MainActivity.onCreate`/`onNewIntent` for the share-target intent, where a real DNS lookup would risk
 `NetworkOnMainThreadException` — still only pattern-matches literal IPv4/`localhost` hosts. It exists
@@ -335,4 +344,6 @@ boundary.
   has to re-run its own WebView tier, and a user-picked local photo can't be synced at all since it
   never had a source URL. **Resolved by [ADR-011](adr-011-cross-device-recipe-images.md)** (issue
   #132): the second device now re-derives via a background backfill worker, and image bytes are
-  confirmed never to ride the sync payload. Uploading user-authored photos remains deferred.
+  confirmed never to ride the sync payload. ~~Uploading user-authored photos remains deferred.~~
+  Uploading shipped in [ADR-012](adr-012-recipe-image-upload.md), for every image, not just
+  user-authored ones.

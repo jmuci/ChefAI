@@ -15,7 +15,7 @@ Rules extracted from real patterns in the codebase. These supplement the coding 
 | Repository impl | `Default[Entity]Repository` | `DefaultRecipeRepository` |
 | Mappers | `[Source][Target]Map.kt` (extension fns) | `RoomDomainMap.kt`, `NetworkDomainMap.kt` |
 | Test fakes | `Fake[ClassName]` | `FakeRecipeRepository`, `FakeRecipeDao` |
-| UiState | `[Feature]UiState` (data class) | `HomeUiState`, `LoginUiState` |
+| UiState | `[Feature]UiState` — `sealed interface` (Loading/Success/Error) for screen state, `data class` for form state | `HomeUiState`, `LoginUiState` |
 | UiEvent | `[Feature]UiEvent` (sealed interface) | `HomeUiEvent`, `LoginUiEvent` |
 | DB entities | `[Name]Entity` | `RecipeEntity` |
 | Network DTOs | `[Name]Response` / `[Name]Request` | `RecipeResponse` |
@@ -63,7 +63,8 @@ feature/
 - All IDs: UUIDv7, stored as 16-byte blobs in SQLite
 - DAO functions: `suspend` for writes, `Flow<T>` for reads
 - Mappers: extension functions (`RecipeEntity.toDomain()`, `Recipe.toEntity()`)
-- Network: Ktor client, `@Serializable` DTOs with `@SerialName("snake_case")`
+- Network: Ktor client, `@Serializable` DTOs with **camelCase** property names matching the API's JSON
+  (no `@SerialName` renames); `@SerialName` is used only for polymorphic type discriminators (SDUI)
 - TypeConverters: centralized in `core/data/local/util/`
 
 ## Testing Conventions
