@@ -31,7 +31,7 @@ details-screen button is the smaller half.
 
 ### Design decisions (already made — don't re-litigate)
 
-- **Soft delete, not hard delete.** Required by the sync protocol ([ADR-006](../adrs/adr-006-sync-protocol.md)):
+- **Soft delete, not hard delete.** Required by the sync protocol ([ADR-006](../../adrs/adr-006-sync-protocol.md)):
   the tombstone row is what gets pushed so the backend learns about the delete. `deleteRecipe()`
   (hard) stays on the interface but is not what the UI calls.
 - **Confirm dialog, not undo-snackbar.** Matches the editor flow and the existing
@@ -43,7 +43,7 @@ details-screen button is the smaller half.
   `recipes/ui/editor/components/EditorDialogs.kt` and is used only by the editor. Since the details
   screen now needs it too, it moves to `recipes/ui/components/DeleteConfirmationDialog.kt` (new file,
   sibling to `editor/` and `urlimport/` within the `recipes` feature package — not `core/ui/`, per
-  [ADR-005](../adrs/adr-0005-feature-based-package-structure.md): stay in the feature package until a
+  [ADR-005](../../adrs/adr-0005-feature-based-package-structure.md): stay in the feature package until a
   second *feature* needs it, not just a second screen). `UnsavedChangesDialog` stays put — it's
   editor-only. This is T2 below, and both editor and details screens update their imports.
 - **Filed as a follow-up, not fixed here**: [#128](https://github.com/jmuci/ChefAI/issues/128) —

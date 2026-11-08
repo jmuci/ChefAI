@@ -1,209 +1,145 @@
 # ADR 015 – The Meal Plans Week View
 
-**Date:** September 2026
-**Status:** Accepted — **Decisions 2, 3 and 5 are superseded** by the amendments at the end
+**Date:** September 2026 (rewritten November 2026 to fold in four amendments)
+**Status:** Accepted
 **Author:** Claude (Opus 5), on behalf of Jose Mucientes
 **Related:** [ADR-005](adr-0005-feature-based-package-structure.md),
 [ADR-006](adr-006-sync-protocol.md), [ADR-013](adr-013-measurement-unit-conversion.md),
-[ADR-014](adr-014-households.md)
+[ADR-014](adr-014-households.md), [ADR-018](adr-018-saved-meal-plans.md)
 
-> **Current state (Nov 2026), read this first.** The decisions below are the September design; four
-> amendments at the end override parts of it. What holds today:
-> - A week is a date window that every live plan is projected onto (Decision 1 — unchanged).
-> - Day 0 is `MealPlan.startDate` (DB v13), falling back to `createdAt` for older plans, via
->   `MealPlan.dateOf` (supersedes Decision 2).
-> - Overlapping plans **all** show, ordered by slot then plan `createdAt`, each row tagged with its
->   plan (supersedes Decision 3).
-> - The selected week lives in the ViewModel over an injected `Clock` (Decision 4 — unchanged).
-> - There is no "Just me / Family" toggle; the header is **Week | Plans**, and a week containing a
->   shared plan shops for the household (supersedes Decision 5).
-> - "Generate Grocery List" is per plan and disabled for a multi-plan week (Decision 6 — unchanged).
-> - "+ Add meal" opens `AddMealSheet` over saved recipes; a pick opens the wizard seeded with that
->   recipe on day 0 and the tapped date as start. No one-day "Added meals" plans.
->
-> Candidate for a clean rewrite once it stops changing.
+> This ADR was rewritten in November 2026. The original September version, and the four amendments
+> that overrode parts of it, are in git history; the **History** section at the end summarises what
+> changed and why. Decision numbers are kept where code comments cite them.
 
 ---
 
 ## Context
 
-The Modernist redesign replaces the Meal Plans screen wholesale. Every other screen in that
-redesign is a restyle — the same data, drawn differently. This one is not. Today
-`mealplans/ui/MealPlansScreen.kt` is a `LazyColumn` of `MealPlanCard`s: **a list of plans**, each
-one an opaque object you open to see inside. Screen 06 of the handoff is **a week**: seven dated
-rows, Mon–Sun, each holding either a planned meal or a "+ Add meal" link, with a week navigator
-above and a grocery summary below.
+The Modernist redesign replaced the Meal Plans screen wholesale. The old screen was a `LazyColumn`
+of plan cards: **a list of plans**, each an opaque object you opened to see inside. Screen 06 of the
+handoff is **a week**: seven dated rows, each holding planned meals or a "+ Add meal" link, with a
+week navigator above and a grocery summary below.
 
-Those are different questions. The old screen answers *"what plans do I have?"*. The new one
-answers *"what am I eating on Thursday?"*. The second question is the one a meal planner exists to
-answer, and the data model was never built to answer it, because **`MealPlan` has no date**.
-
-What it has:
-
-- `MealPlan.createdAt` / `.updatedAt` — epoch millis, bookkeeping timestamps, not schedule.
-- `MealPlan.preferences.planLengthDays` — 3, 5 or 7.
-- `MealPlanDay.dayIndex` — a bare `Int` offset within the plan. Not a date. Not even a weekday.
-
-There is exactly one place in the codebase that has already had to turn a `dayIndex` into a
-calendar date, and it did so by assumption:
-
-```kotlin
-// mealplans/ui/detail/MealPlanBoard.kt
-fun mealPlanDateFor(planCreatedAt: Long, dayIndex: Int): LocalDate =
-    Instant.ofEpochMilli(planCreatedAt).atZone(ZoneId.systemDefault()).toLocalDate()
-        .plusDays(dayIndex.toLong())
-```
-
-Day 0 is the day you created the plan. That assumption was invisible on the detail screen, which
-renders one plan's own days in order and never has to reconcile them with a calendar. A week view
-cannot avoid reconciling them, and so this ADR is largely about making that assumption explicit and
-deciding what to do at its edges.
-
-A second question arrives with the design: the header carries a **"Just me" / "Family" segmented
-control**. The handoff's own note on it is *"switches Meal Plans between single-serving and
-family-scaled plans/quantities — exact scaling logic not specified in this prototype; needs product
-input."* ADR-014 gives us the membership half of that for free (`MealPlan.householdId` is null for a
-personal plan, non-null for a shared one); the *quantities* half has no field anywhere.
+Those answer different questions. The old screen answered *"what plans do I have?"*; the new one
+answers *"what am I eating on Thursday?"* — the one a meal planner exists for. The data model was
+not built to answer it: `MealPlan` had no date, only `createdAt` (bookkeeping), `planLengthDays`
+(3, 5 or 7) and `MealPlanDay.dayIndex` (a bare offset within the plan).
 
 ---
 
 ## Decision 1: A week is a date window projected over plans, not a plan
 
-The week view does **not** pick a plan and render it. It picks seven consecutive dates, then asks
-every live plan which of its days land on them.
+The week view does not pick a plan and render it. It picks seven consecutive dates and asks every
+live plan which of its days land on them:
 
 ```
 MealPlanWeekProjector.project(
-    plans: List<MealPlan>,      // the user's plans; ARCHIVED ones are dropped inside
-    weekStart: LocalDate,       // the week's first day, per the locale
+    plans: List<MealPlan>,      // ARCHIVED plans are dropped inside
+    weekStart: LocalDate,
     recipes: Map<UUID, RecipePreview>,
     zone: ZoneId,               // from the injected clock
 ): MealPlanWeek                 // exactly 7 WeekDay rows, some empty
 ```
 
-This lives in `mealplans/domain/week/MealPlanWeek.kt` — pure Kotlin, no Android imports, no
-repository — for the same reason `ShoppingListBuilder` and `MealPlanScheduler` do: the projection
-rules are the part worth testing, and they test better without a `ViewModel` around them. It mirrors
-the relationship `MealPlanBoard` already has to `MealPlanDetailViewModel`, which is the local
-precedent for "a pure view-model-shaped object built by a pure function."
+It lives in `mealplans/domain/week/MealPlanWeek.kt` — pure Kotlin, no repository — like
+`ShoppingListBuilder` and `MealPlanScheduler`, because the projection rules are the part worth
+testing. A date-first screen renders a coherent week whether it is covered by one plan, several, or
+none; the days no plan claims render as "+ Add meal".
 
-The inversion matters more than it looks. A plan-first screen can only ever show you one plan at a
-time and has nothing to say about the days between plans. A date-first screen renders a coherent
-week whether that week is covered by one plan, two, or none — the empty days are simply days no plan
-claimed, and they render as the design's "+ Add meal".
+## Decision 2: Day 0 is the plan's start date, falling back to `createdAt`
 
-## Decision 2 (superseded): Day 0 is the plan's `createdAt` date. There is no `startDate` column
+The wizard's Basics step asks "Which day does the meal plan start?". `MealPlan.startDate`
+(`LocalDate?`) is stored as `meal_plans.startEpochDay` (DB v13, `MIGRATION_12_13`, nullable, no
+backfill) and syncs as an optional ISO date `SyncMealPlanDto.startDate` — a calendar date, not an
+instant, so devices in different zones agree on the day. A pull that omits it keeps the local value
+(the same carry-forward as cooked marks).
 
-`MealPlanWeekProjector.project` anchors every plan with `planDateFor` — two lines duplicated
-deliberately from `MealPlanBoard.mealPlanDateFor`, since domain may not import from `ui/` and the
-pair should collapse when a `startDate` column lands. A plan occupies the absolute range
-`[createdAt.toLocalDate(), + planLengthDays - 1]`, and nothing new is persisted.
+Every date derivation goes through `MealPlan.dateOf`, which falls back to `createdAt`'s local date
+when `startDate` is null, so plans created before v13 do not move.
 
-The alternative was to add `MealPlan.startDate`: a Room column with a v10→v11 migration, a field on
-`SyncMealPlanDto` and a matching backend agreement, and a date picker in the wizard. It was
-rejected **for this PR**, not on the merits — it is the correct model — but because a redesign PR
-that migrates the schema and changes the sync payload is no longer a redesign PR, and because the
-wizard screens it would touch were being edited in parallel.
+**Default start** (`defaultMealPlanStartDate`): the day after the last date that already has a
+meal, never before today; gaps before that meal are skipped, since a plan is a run of consecutive
+days. When the week view's "+" opens the wizard, the route carries that week's first day
+(`weekStart` nav arg) and only meals inside that week count; an empty week defaults to its first
+day, or today if the week is under way. From the plans list, every future meal counts.
 
-The cost is real and should be named plainly rather than discovered later:
+## Decision 3: Overlapping plans all show
 
-> **A plan created mid-week straddles two weeks.** Create a 7-day plan on a Thursday and the week
-> view shows four planned days this week and three the next, with the rest offering "+ Add meal".
+Nothing prevents two live plans from covering the same date — a household member's shared plan can
+overlap a personal one, and the wizard allows it. The projector does **not** pick a winner: every
+live plan's meal lands on its date, ordered by slot, then by plan `createdAt` (oldest first, `uuid`
+as tiebreak). `updatedAt` is deliberately not used, because a regeneration or slot edit bumps it and
+would reshuffle rows for no visible reason.
 
-That is *arithmetically correct* for a date-anchored week view and *wrong* for the user, who thinks
-of the thing they just created as "my week". Anchoring on `createdAt` means the schedule is a
-side-effect of when you happened to tap Create. This is the single largest known shortcoming of the
-screen, and `startDate` is the fix; see Consequences.
+When two plans fill the same slot, both rows render, each tagged with its plan's name
+(`WeekDay.sharedSlots`, `PlannedWeekMeal.planName`). Each row carries its own `dayId`/`slot`, so
+the cooked toggle reached from it acts on that plan's slot only. `MealType.DINNER_AND_LUNCH` plans
+stack both slots under one date.
 
-## Decision 3 (superseded): One meal per (date, slot), resolved by `updatedAt`
-
-Nothing prevents two live plans from covering the same date — the wizard does not check, and a
-household member's shared plan can overlap your personal one. The design has one row per day, so
-the projection must choose.
-
-The rule: **highest `updatedAt` wins**, tie-broken by `createdAt`, then by `uuid` so that the
-outcome is total and stable rather than dependent on query order. `ARCHIVED` plans are excluded
-before the contest.
-
-This is not a new conflict policy; it is the one ADR-006 already applies to sync
-(`last-writer-wins based on updatedAt`), reused for presentation. Using a *different* tiebreak here
-would mean the screen and the sync layer could disagree about which of two plans is the live one,
-and there is no version of that conversation that ends well.
-
-A day may still legitimately hold two meals — `MealType.DINNER_AND_LUNCH` fills both slots — and in
-that case both render, stacked under a single date column. The contest is per **slot**, not per day.
-Dropping the lunch to preserve a literal one-line-per-day reading would be hiding planned data to
-match a screenshot.
+The wizard warns, non-blockingly, when a new plan's dates overlap an existing one
+(`MealPlanOverlap`, a snackbar after creation).
 
 ## Decision 4: The selected week lives in the ViewModel, over an injected `Clock`
 
-`MealPlansViewModel` holds `MutableStateFlow<LocalDate>` (the week start) and combines it with the
-plans, household and preference flows. Prev/next shift it by ±7 days.
+`MealPlansViewModel` holds the week start in a `MutableStateFlow<LocalDate>`; prev/next shift it by
+±7 days. It is **not** in `SavedStateHandle`: surviving rotation is wanted, surviving process death
+is not — a user returning to a cold app wants this week.
 
-It is deliberately **not** in `SavedStateHandle`. Surviving rotation is what a `ViewModel` is for;
-surviving process death is not wanted here — a user returning to a cold app wants this week, not
-whatever week they were browsing yesterday.
+`java.time.Clock` is injected rather than calling `LocalDate.now()`, so "which week opens" and
+"which row is today" are testable on any day. The week's first day comes from
+`WeekFields.of(Locale.getDefault()).firstDayOfWeek` (`weekStartFor`), not a hard Monday.
 
-`java.time.Clock` is injected (`@Provides Clock.systemDefaultZone()`) rather than calling
-`LocalDate.now()`. Both "which week do we open on" and "which row draws in accent as today" are
-clock-dependent, and a test that can only pass on the right day of the week is not a test. This is
-the same seam `SessionManager.uuidGenerator` and `RecipeTimerController.timeSource` already
-establish.
+## Decision 5: Week | Plans, and no serving-basis toggle
 
-The week's first day is `WeekFields.of(Locale.getDefault()).firstDayOfWeek`, not a hard Monday. The
-handoff's Mon–Sun is one locale's rendering of "a week"; in `en-US` a week starts on Sunday, and a
-planner that disagrees with the phone's own calendar app about where the week begins is a bug in
-every locale but the one it was drawn in.
+The header toggle is **Week | Plans** (`MealPlansViewMode`, in-memory, opens on Week). *Plans* is a
+list of hero cards (`MealPlanHeroCard`) built by the pure `MealPlanSummaryBuilder` from every
+non-archived plan, newest first; a card opens the plan detail screen and offers delete. A plan with
+no user-given title gets one generated from its most common recipe tag ("Italian week"). Once a
+saved plan exists, *Plans* gains **Scheduled / Saved** tabs ([ADR-018](adr-018-saved-meal-plans.md)).
 
-## Decision 5 (superseded): The household toggle selects a *serving basis*, applied at display time only
-
-`MealPlanServingBasis` is a two-value enum — `JUST_ME`, `FAMILY` — and it does two things:
-
-1. **Filters** which plans the projection sees. `JUST_ME` → `householdId == null`; `FAMILY` →
-   `householdId != null`. This half is free: ADR-014 already put that distinction in the model.
-2. **Overrides the servings** used for grocery aggregation: `JUST_ME` → 1 serving per meal,
-   `FAMILY` → the household's member count. It is passed as `ShoppingListBuilder`'s
-   `plannedServings` in place of `plan.preferences.servingsPerMeal`.
-
-Point 2 is a genuine product decision with a genuine cost, and it was taken deliberately: it means
-the basis **silently overrides what the wizard was told**. A user who answered "4 servings per meal"
-and then reads the week on "Just me" is shown quantities for one. The mitigation is that this is
-strictly a *reading* of the plan, never a write — exactly the posture ADR-013 takes toward unit
-conversion, down to the wording: it is a way of reading the plan, not an edit to it.
-`meal_plans.preferences` is never touched, the plan is never dirtied, and the detail screen
-continues to show the plan's own numbers.
-
-When the user has no household, `FAMILY` is disabled at 45% opacity (§4.3 of the design system) and
-the basis is forced to `JUST_ME` — there is nothing to scale to and nothing to filter for.
-
-The basis is stored in the existing device-local `UserPreferencesRepository`
-(`chefai_user_prefs` DataStore), alongside `measurementSystem`, and for the same three reasons that
-preference gives: it describes how *this device* presents things, it needs no schema migration or
-backend agreement, and it is readable by any screen without threading it through a nav argument.
-That last one is load-bearing — the shopping list is reached by a route that carries only a plan id,
-so a basis held in this screen's `ViewModel` could never reach the list it is supposed to scale.
+Nothing filters by `householdId`: a plan shared with a household is simply one of the user's plans.
+Grocery servings are not a user choice — a week containing a shared plan shops for the household's
+member count, otherwise for one.
 
 ## Decision 6: "Generate Grocery List" reuses the per-plan route, and disables itself otherwise
 
-`ShoppingListScreen` is routed by `mealPlanId` and `ShoppingListBuilder.build` takes a single
-`plannedServings`. When the visible week resolves to exactly one plan — the overwhelmingly common
-case — the button navigates to that plan's existing shopping list and **no new path is built**.
+`ShoppingListScreen` is routed by `mealPlanId`. When the visible week resolves to exactly one plan
+(`MealPlanWeek.singlePlanId`), the button opens that plan's existing list. For zero or several
+plans it is disabled. Routing to a "dominant" plan was rejected: it produces a plausible-looking
+list that silently shops for part of the week, and that is discovered in the shop.
 
-When the week covers zero plans, or two or more, the button is disabled. The rejected alternative
-was to route to the "dominant" plan (the one contributing the most meals), which is worse than
-disabling: it produces a plausible-looking list that silently shops for only part of the week, and
-a wrong quantity on a shopping list is discovered in the shop.
+The summary line above it is computed over **every** meal shown, by running `ShoppingListBuilder`
+across them, and says when they come from several plans ("8 meals planned across 2 plans · 45
+ingredients") — which is what tells the user why the button is unavailable.
 
-The summary line above it (`"4 meals planned · 24 ingredients"`) is computed for the **whole** week
-regardless, by running `ShoppingListBuilder` over every meal the projection found. The builder is
-pure and the ingredient rows come from one Room query, so this is cheap; and because Decision 5
-makes servings a function of the basis rather than of the plan, a multi-plan week aggregates without
-contradiction. The count is therefore honest even when the button next to it is not available —
-which is what tells the user *why* it is not.
+## Decision 7: "+ Add meal" seeds the wizard instead of writing a meal
 
-A genuinely week-scoped shopping list (a route carrying a date range) is the eventual answer. It was
-not built here because it would add a second entry point into `ui/shoppinglist/`, which was under
-concurrent edit.
+An empty day's "+ Add meal" opens `AddMealSheet`, a fixed ~80%-height bottom sheet (past M3's 50%
+initial cap, so results fit above the keyboard). It searches the user's **saved** (bookmarked)
+recipes in place — all of them before anything is typed, filtered by title as the user types.
+
+A pick does not add a lone meal. It opens the meal-plan wizard with the recipe (`recipeUuid`), its
+slot (`mealPlanSlot`) and the tapped date (`startDate`) as nav args; the wizard pre-selects that
+date as the start (still editable) and places the recipe on day 0, overwriting what generation put
+there. A lunch pick defaults the plan to "Dinners + Lunches"; switching back to dinners only moves
+the recipe to day 0's dinner.
+
+"Add a New Recipe" goes to the importer instead. `AddMealRequest` carries the date and slot through
+the importer and editor, and `finishAddMeal` consumes it, pops back to the tab and opens the same
+wizard. The request lives in the Meal Plans entry's **`NavBackStackEntry.savedStateHandle`**, read
+and written from the nav graph — not `MealPlansViewModel`'s Hilt-injected handle, which is a
+different object. Writing into the ViewModel's handle silently delivered nothing.
+
+Trade-off: "+ Add meal" cannot add one meal to a plan that already covers the day. The new plan
+overlaps it, and the overlap notice says so.
+
+## Decision 8: Meals reorder by drag, within one plan
+
+A planned meal can be dragged onto another meal of the **same** plan (`WeekMealDragState`,
+`MealPlansViewModel.onMoveMeal`, `MealPlanRepository.moveMeal`). The pure `MealPlanReorder.move`
+keeps the plan's occupied (day, slot) positions fixed and moves only which recipe sits where;
+cooked meals are pinned, so `recipe_cook_events` rows stay valid. A drop onto another plan's meal
+or an empty day is ignored, since it has no defined meaning.
 
 ---
 
@@ -211,142 +147,33 @@ concurrent edit.
 
 **Good**
 
-- The screen answers the question the feature exists for. "What am I eating Thursday?" is now one
-  glance, not a list of plans to open.
-- No schema change, no migration, no sync-payload field, no backend agreement. The entire week view
-  is a projection over data that already exists.
-- The projection, the overlap resolution and the grocery aggregation are all pure functions in
-  `mealplans/domain/`, unit-tested without Robolectric or an emulator.
-- The conflict rule matches ADR-006's, and the display-time-only posture matches ADR-013's. Nothing
-  here invents a new principle.
+- The screen answers the question the feature exists for, in one glance.
+- The projection, overlap ordering, reordering and grocery aggregation are pure functions in
+  `mealplans/domain/`, unit-tested without Robolectric.
+- No planned data is hidden: every live plan's meals and cooked marks show.
 
 **Bad, and known**
 
-- **Mid-week plan creation straddles two weeks** (Decision 2). This is the one to fix, and
-  `MealPlan.startDate` is how: a Room v10→v11 migration, a `SyncMealPlanDto` field, a start-date
-  control in the wizard's Basics step, and `planDateFor` falling back to `createdAt` for rows
-  written before the migration. `MealPlanWeekTest` pins the current behaviour with a test named
-  "a plan created mid-week straddles two weeks", so the change announces itself. Tracked as a
-  follow-up.
-- **The serving basis overrides the plan's own `servingsPerMeal`** (Decision 5) without saying so in
-  the UI. The design has no affordance for explaining it; a future revision should.
-- **The basis does not yet reach the shopping list.** It is persisted where that screen can read it,
-  but wiring `ShoppingListViewModel` to prefer it over `plan.preferences.servingsPerMeal` is a
-  separate change in a file under concurrent edit. Until it lands, "family-scaled quantities" stops
-  at this screen's summary line.
-- **"+ Add meal" does not open a picker.** There is no `MealPlanRepository` write that assigns a
-  recipe to a (day, slot), and inventing one — including deciding which plan an unclaimed date would
-  write into — is a feature, not a restyle. For now the link routes to the meal-plan wizard, which
-  also preserves the create-plan entry point that the redesigned header otherwise removes.
-- **Deleting a meal plan has no UI any more.** The delete button lived on `MealPlanCard`, which the
-  week view replaces; screen 06 draws no equivalent, and the plan detail screen has none either.
-  `MealPlanRepository.deleteMealPlan` is untouched and still covered by its own repository tests, so
-  re-wiring it is a call site, not a feature — most naturally an overflow action on plan detail.
-- **Two plans covering one day means one of them is invisible on this screen.** With the plan list
-  replaced, the losing plan is reachable only through the days it does win. This is acceptable while
-  plans are mostly sequential and would not be if plan overlap became normal.
-- **The plan detail screen loses its entry point.** Tapping a planned meal opens that meal's recipe
-  (through `MEAL_PLAN_RECIPE_DETAIL`, carrying `dayId`/`slot` so the cooked toggle still works),
-  which is both the more useful destination and the one consistent with the detail screen's own row
-  behaviour. But it means `MEAL_PLAN_DETAIL` is now reachable *only* immediately after the wizard
-  creates a plan: leave it, and you cannot get back. Screen 06 as drawn has no affordance for it —
-  no plan name, no "Plan →" link — so rather than invent one, this is recorded as a gap for the next
-  revision of the design. The nearest on-system fix is Home's pattern: a section label with a
-  trailing accent link, which screen 06 already has the label half of ("GROCERY LIST").
+- Shopping lists stay per plan. A week built from several plans has no single list; a
+  date-range-scoped list is the eventual answer.
+- Overlap is allowed and only warned about, so a user can build a crowded week by accident.
+- A pull that omits `startDate` keeps the local value, so a backend that drops the field cannot
+  move a plan — but it cannot deliver one set on another device either.
 
-## Amendment — Decision 5 superseded (Just me / Family removed)
+---
 
-The header's "Just me" / "Family" toggle (`MealPlanServingBasis`, `MealPlanPreferencesRepository`) is
-gone. A plan shared with a household is simply the user's plan, so the week now projects every live
-plan and nothing filters by `householdId`. Grocery servings are no longer a user choice: a week that
-contains a shared plan shops for the household's member count, otherwise for one.
+## History
 
-The header toggle is now **Week | Plans** (`MealPlansViewMode`, in-memory, opens on Week). *Plans*
-is a vertical list of hero cards (`MealPlanHeroCard`) built by the pure `MealPlanSummaryBuilder`
-from every non-archived plan, newest first. A plan without a user-given title gets one generated
-from its most common recipe tag ("Italian week"). The card's calendar button is a deliberate no-op
-until plan scheduling lands.
-
-## Amendment — Decision 3 superseded (overlapping plans all show)
-
-"One meal per (date, slot), highest `updatedAt` wins" hid planned data in practice. A 3-day and a
-5-day plan created the same day showed only the newer plan's dinner on the shared days; the older
-plan's meal *and its cooked mark* vanished from the week, while the summary line still counted
-ingredients for the visible meals only, and nothing told the user a plan was being hidden.
-
-`MealPlanWeekProjector` no longer picks a winner. Every live plan's meal lands on its date, ordered
-by slot and then by plan `createdAt` (oldest first, `uuid` as tiebreak) — not `updatedAt`, which a
-regeneration or slot edit bumps and would reshuffle rows for no visible reason. When two plans fill
-the same slot, both rows render and each is tagged with its plan's name (`WeekDay.sharedSlots`,
-`PlannedWeekMeal.planName`). Each row still carries its own `dayId`/`slot`, so the cooked toggle
-reached from it acts on that plan's slot only.
-
-The ADR-006 alignment argument for Decision 3 no longer applies: sync resolves two versions of the
-*same* entity, whereas overlapping plans are different entities that are both live.
-
-The grocery summary counts every meal shown and says when they come from several plans
-("8 meals planned across 2 plans · 45 ingredients"). "Generate Grocery List" stays disabled for a
-multi-plan week (Decision 6 unchanged). The wizard now warns, non-blockingly, when a new plan's dates
-overlap an existing one (`MealPlanOverlap`, a snackbar after creation). Still no schema change: plans
-remain anchored on `createdAt` (Decision 2), so "Schedule this plan" stays a no-op.
-
-## Amendment — "+ Add meal" opens a sheet (supersedes the "does not open a picker" consequence)
-
-An empty day's "+ Add meal" opens a bottom sheet (`AddMealSheet`): a Lunch/Dinner choice, then
-**Search for a Recipe** (`RecipePickerScreen` — "My recipes" and "Discover" tabs reusing the
-Recipes and Search screens) or **Add a New Recipe** (the importer, whose manual fallback reaches
-the editor). Either path ends by delivering a recipe id to the Meal Plans tab's back-stack entry
-(`AddMealRequest`); `MealPlansViewModel` then calls `AddRecipeToDateUseCase`.
-
-**Revised (Nov 2026):** the separate picker screen is gone. The sheet opens at a fixed ~80% of the
-screen (deliberately past M3's 50% initial cap, so results fit above the keyboard) and searches the
-user's **saved** (bookmarked) recipes in place — all of them before anything is typed, filtered by
-title as the user types; no public catalog. A pick calls `MealPlansViewModel.onRecipeChosen`
-directly. Only "Add a New Recipe" still uses `AddMealRequest`, and it now reads and writes the tab
-entry's `NavBackStackEntry.savedStateHandle` from the nav graph: that handle is backed by
-Navigation's own internal ViewModel, not `MealPlansViewModel`'s Hilt-injected handle, so the
-original version (which wrote the request into the ViewModel's handle) never delivered anything.
-
-Binding a recipe to a date reuses Decision 2's anchor rather than adding a column:
-- a **READY plan of the user's own** whose span covers the date (oldest first) gets the recipe via
-  `assignRecipeToSlot`;
-- otherwise a new **one-day plan** named "Added meals" is created with `createdAt` at local noon of
-  that date, so `planDateFor` projects it straight back onto the row it was added from.
-
-Draft/generating plans are never written into (generation replaces their days wholesale). Known
-costs: every uncovered date becomes its own one-day plan (the plan list fills with them until
-`startDate` lands), `planLengthDays = 1` is outside the wizard's 3/5/7 and is not yet confirmed
-against backend validation, and shopping lists stay per-plan, so a week of such meals has no single
-list to open (Decision 6's disabled button).
-
-**Revised again (Nov 2026) — a pick seeds a plan instead of becoming one.** The "Added meals"
-one-day plans described above are gone, along with `AddRecipeToDateUseCase`. Picking a saved recipe
-in the sheet, or saving one made via "Add a New Recipe", now opens the meal-plan wizard with three
-nav args: the recipe (`recipeUuid`), its slot (`mealPlanSlot`) and the tapped date (`startDate`). The
-wizard pre-selects that date as the start, still editable, in place of `defaultMealPlanStartDate`,
-and places the recipe on day 0 of the generated plan, overwriting whatever generation put there. A
-lunch pick defaults the plan to "Dinners + Lunches". If the user switches it back to dinners only,
-the recipe moves to day 0's dinner, since that plan has no lunch slot. `AddMealRequest` now only
-carries date and slot through the importer and editor; `finishAddMeal` consumes it (`take`), pops
-back to the tab, then opens the wizard. Because the result is a regular plan of the user's chosen
-length, the known costs listed above (a stream of one-day plans, `planLengthDays = 1`, no single
-shopping list) no longer apply. The trade-off: "+ Add meal" can no longer add one meal to a plan
-that already covers that day. The new plan overlaps it, and the wizard's overlap notice says so.
-
-## Amendment — Decision 2 superseded (plans have a start date)
-
-The wizard's Basics step now opens with "Which day does the meal plan start?", so day 0 is a date
-the user picked rather than the moment they tapped Create. `MealPlan.startDate` (`LocalDate?`) is
-stored as `meal_plans.startEpochDay` (DB v13, `MIGRATION_12_13`, nullable, no backfill) and travels
-as an optional ISO date `SyncMealPlanDto.startDate` — a calendar date, not an instant, so devices in
-different zones agree on the day. Every date derivation goes through `MealPlan.dateOf`, which falls
-back to `createdAt`'s date when `startDate` is null, so plans created before v13 do not move.
-
-Until the backend stores the field it echoes plans back without it; `applyPulledMealPlan` keeps the
-local value when a pull carries none, the same carry-forward shape as cooked marks.
-
-**Default start date** (`defaultMealPlanStartDate`): the day after the last date that already has a
-meal, never before today — gaps before that last meal are skipped, since a plan is a run of
-consecutive days. When the "+" is tapped on the week view, the route carries that week's first day
-(`weekStart` nav arg) and only meals inside the week count; an empty week defaults to its first day
-(or today, if the week is under way). From the plans list, every future meal counts.
+- **Sep 2026 (original):** day 0 was the plan's `createdAt` date with no `startDate` column; one
+  meal per (date, slot), highest `updatedAt` winning; a "Just me / Family" toggle filtered plans by
+  `householdId` and overrode grocery servings; "+ Add meal" routed straight to the wizard.
+- **Amendment — toggle removed:** filtering hid a user's own shared plans, and overriding servings
+  silently contradicted what the wizard was told. Replaced by Week | Plans (Decision 5).
+- **Amendment — overlap shows all:** last-writer-wins hid the older plan's meal and its cooked mark
+  while the summary still counted only visible meals. The ADR-006 alignment argument did not hold:
+  sync resolves two versions of one entity; overlapping plans are two live entities (Decision 3).
+- **Amendment — "+ Add meal":** first a picker screen that wrote into a covering plan or created
+  one-day "Added meals" plans (`AddRecipeToDateUseCase`); then an in-place sheet; finally the
+  current wizard seeding (Decision 7), which removed the one-day plans and `planLengthDays = 1`.
+- **Amendment — start date:** a plan created mid-week straddled two weeks; `startDate` (DB v13)
+  replaced the `createdAt` anchor, which survives only as the fallback (Decision 2).

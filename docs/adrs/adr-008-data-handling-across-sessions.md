@@ -58,7 +58,7 @@ pull skip everything it had changed before that moment.
 The rules above were written purely in terms of the database, which left cached recipe images
 (`filesDir/recipe_images/`, added by [ADR-010](adr-010-client-side-recipe-scraping.md) Decision 6)
 outside them. Two consequences, both since fixed — see
-[ADR-011](adr-011-cross-device-recipe-images.md) Decision 7:
+[ADR-012](adr-012-recipe-image-upload.md) Decision 10:
 
 - **"Removes stale data belonging to the previous authenticated user" includes their images.** Only
   the recipe rows were being deleted, so on a shared device the previous account's photos stayed

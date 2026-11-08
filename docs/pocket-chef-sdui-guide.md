@@ -4,7 +4,7 @@
 > **⚠️ Not what got built — do not use this as a spec.** This document is interview-prep material
 > (see "Context for This Document" at the bottom) written before SDUI was actually implemented. The
 > shipped design differs in almost every particular: it's a real backend endpoint
-> (`GET /api/v1/home/layout`, see [`sdui-backend-prompt.md`](prompts/sdui-backend-prompt.md)) that
+> (`GET /api/v1/home/layout`, see [`sdui-backend-prompt.md`](archive/prompts/sdui-backend-prompt.md)) that
 > returns components plus a denormalized "sidecar" payload upserted into Room before rendering — not
 > the local-`assets/home.json`-or-bare-`/home`-endpoint design below, and not limited to the 3
 > component types listed here. See `home/data/model/ComponentModel.kt`,

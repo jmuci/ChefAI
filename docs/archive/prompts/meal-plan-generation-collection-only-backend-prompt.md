@@ -107,10 +107,10 @@ have after a correct query.
 Any `COLLECTION_ONLY` plan generated for an account whose collection is small relative to
 `planLengthDays × meals/day` risks landing a recipe the client can never resolve. Per-user this
 shows up as a meal-plan slot stuck reading "Recipe not available" forever (see
-[`MealPlanMealRow.kt`](../../app/src/main/java/com/tenmilelabs/chefai/mealplans/ui/components/MealPlanMealRow.kt))
+[`MealPlanMealRow.kt`](../../../app/src/main/java/com/tenmilelabs/chefai/mealplans/ui/components/MealPlanMealRow.kt))
 — there's no client-side retry that fixes it, because the recipe was never a candidate the pull
 endpoint would ever serve to that account (`creator_id = :userId OR privacy = 'PUBLIC'`, per
-[RFC-001 §11.2](../rfcs/rfc-001-offline-first-sync.md)). It also *silently* inflates that plan's
+[RFC-001 §11.2](../../rfcs/rfc-001-offline-first-sync.md)). It also *silently* inflates that plan's
 progress denominator client-side today, though the Android client has since been changed to drop
 an unresolvable reference outright rather than display it broken (see §5).
 

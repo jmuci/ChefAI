@@ -342,8 +342,6 @@ boundary.
   editor's save flow.
 - Cached images (Decision 6) are per-device: a second device re-hits the same CDN wall on pull and
   has to re-run its own WebView tier, and a user-picked local photo can't be synced at all since it
-  never had a source URL. **Resolved by [ADR-011](adr-011-cross-device-recipe-images.md)** (issue
-  #132): the second device now re-derives via a background backfill worker, and image bytes are
-  confirmed never to ride the sync payload. ~~Uploading user-authored photos remains deferred.~~
-  Uploading shipped in [ADR-012](adr-012-recipe-image-upload.md), for every image, not just
-  user-authored ones.
+  never had a source URL. **Resolved by [ADR-012](adr-012-recipe-image-upload.md)** (issue
+  #132): every image is uploaded and fetched back on other devices, with a background backfill
+  worker re-deriving the rest; image bytes never ride the sync payload.

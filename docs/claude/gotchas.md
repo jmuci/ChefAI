@@ -195,7 +195,7 @@ after the local write, not at some distant future sync. This cost a full debuggi
 `localImagePath` (fixed in #139 by threading the existing value through explicitly). For state that is
 purely local and has nothing to do with the server, prefer a **sibling table** keyed to the recipe
 (`recipe_image_state`) — structurally immune, and it can't be forgotten by the next person adding a
-field to the mapper. See ADR-011 Decision 5.
+field to the mapper. See ADR-012 Decision 5.
 
 ### 25. MockK cannot reliably mock a suspend function that returns `kotlin.Result<T>`
 `coEvery { sessionManager.refreshToken() } returns Result.failure(e)` (and `coAnswers { Result.failure(e) }`

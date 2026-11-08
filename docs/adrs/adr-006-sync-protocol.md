@@ -6,7 +6,8 @@
 
 **Context:** ChefAI must work fully offline, allow recipe creation without login, and sync data incrementally when connected. This ADR captures the key architectural decisions made during the implementation of RFC-001 (Phases 1–5) and subsequent refinements.
 
-**Supersedes:** ADR-003 [adr-003–two-step-BE-sync](adr-003%E2%80%93two-step-BE-sync.md) (Two-Step Sync)
+**Supersedes and absorbs:** ADR-003 (Two-Step Sync) and ADR-004 (Data Layer Composition) — both are
+now pointers to the **History** section at the end of this file.
 
 **Related:** ADR-001 (Hybrid Architecture), ADR-002 (Local DB & ID Generation), ADR-007 (Anonymous-First), ADR-008 (Data Handling Across Sessions), RFC-001
 
@@ -98,7 +99,7 @@ the unique work name `recipe_sync`:
 REPLACE cancels a *running* worker too, not just a queued one; `SyncWorker` treats that
 cancellation as "superseded" (status back to `Idle`), not as a failure. After a successful sync the
 worker enqueues the image backfill and upload sweeps (`scheduleImageBackfill` /
-`scheduleImageUpload`, ADR-011/012).
+`scheduleImageUpload`, ADR-012).
 
 All work requests require network connectivity (`NetworkType.CONNECTED` constraint) and use **exponential backoff** (30s base; `SyncWorker` gives up after 3 retries) on failure.
 
@@ -162,12 +163,38 @@ interface SyncScheduler {
 
 ---
 
+## History: ADR-003 and ADR-004 (Nov 2025)
+
+Both were written before the sync was built and were merged here in November 2026. Their files
+remain as pointers; the original text is in git history.
+
+**ADR-003 — Two-Step Synchronization.** Chose push (`POST /sync/push`) then pull
+(`GET /sync/pull?since=<timestamp>`), last-writer-wins on `updatedAt`, WorkManager triggers on
+startup, connectivity and local edits, and a `sync_metadata` checkpoint. All of that survives in
+Decision 1 and the triggers above. What did not: an **Outbox table** queuing JSON mutation payloads.
+Each `SyncableEntity` row's `syncState` (`PENDING`/`DELETED`) is the outbox, and
+`SyncOrchestrator` queries `getAllDirty()` per table.
+
+**ADR-004 — Data Layer Composition.** What held, and is still the rule:
+
+- One repository per aggregate root (`RecipesRepository`, `MealPlanRepository`, …), interfaces in
+  `domain/repository/`, implementations in `data/repository/`.
+- Room is the local source of truth: all writes go to Room first, and the UI reads only Room flows.
+- Repositories write Room and call `SyncScheduler`; they never push or pull.
+
+What never landed and should not be copied: the `outbox` table above; a
+`LocalDataSource`/`RemoteDataSource` interface pair per repository (repositories inject DAOs
+directly, plus a feature-specific network data source only where they call the API outside sync);
+and sync and conflict resolution inside repositories — that is `SyncOrchestrator`, driven by
+`SyncWorker`. DI is Hilt; Koin was never used.
+
+---
+
 ## References
 
 - [RFC-001: Offline-First Architecture & Sync Protocol](../rfcs/rfc-001-offline-first-sync.md)
 - [Sync Deep Dive: Step-by-Step & Manual Testing](../sync-deep-dive.md)
 - ADR-001: Hybrid Architecture Choice
 - ADR-002: Local DB Choice & ID Generation
-- ADR-003: Two-Step Synchronization (superseded by this ADR)
 - ADR-007: Anonymous-First Session Model
 - ADR-008: Local Database Behavior on Logout and Account Switch
