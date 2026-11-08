@@ -6,10 +6,8 @@ import com.tenmilelabs.chefai.auth.domain.TokenProvider
 import com.tenmilelabs.chefai.developeroptions.data.network.ApiEnvironmentInterceptor
 import com.tenmilelabs.chefai.developeroptions.domain.model.ApiBaseUrls
 import com.tenmilelabs.chefai.developeroptions.domain.repository.ApiEnvironmentRepository
-import com.tenmilelabs.chefai.recipes.data.network.ChefAIApiService
 import com.tenmilelabs.chefai.recipes.data.network.RecipeDetailApiService
 import com.tenmilelabs.chefai.recipes.data.network.RecipeDetailNetworkDataSource
-import com.tenmilelabs.chefai.recipes.data.network.RecipeNetworkDataSource
 import com.tenmilelabs.chefai.recipes.data.network.SsrfSafeDns
 import com.tenmilelabs.chefai.search.data.network.RecipeSearchApiService
 import com.tenmilelabs.chefai.search.data.network.RecipeSearchNetworkDataSource
@@ -42,11 +40,6 @@ private const val SCRAPER_USER_AGENT =
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RecipeNetworkDataSourceModule {
-
-    @Binds
-    abstract fun bindRecipeNetworkDataSource(
-        chefAIApiService: ChefAIApiService
-    ): RecipeNetworkDataSource
 
     @Binds
     abstract fun bindRecipeSearchNetworkDataSource(
@@ -104,9 +97,13 @@ object NetworkModule {
             }
         }
 
-        // Install authentication interceptor
+        // Attaches the JWT only to requests bound for the ChefAI backend (local or remote base).
         install(AuthInterceptor) {
             this.tokenProvider = tokenProvider
+            allowedBaseUrls = listOfNotNull(
+                apiBaseUrls.local,
+                apiBaseUrls.remote.takeIf { apiBaseUrls.remoteConfigured },
+            )
         }
 
         // No requestTimeoutMillis here deliberately: SyncApiService.pullRecipes pages ~100

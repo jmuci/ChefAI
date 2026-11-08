@@ -51,7 +51,6 @@ import com.tenmilelabs.chefai.core.testutil.testSteps2
 import com.tenmilelabs.chefai.core.testutil.testSteps3
 import com.tenmilelabs.chefai.core.testutil.testTags
 import com.tenmilelabs.chefai.core.testutil.testUser
-import com.tenmilelabs.chefai.recipes.data.network.FakeApiService
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipeFetchResult
 import io.mockk.coEvery
@@ -82,7 +81,6 @@ class DefaultRecipeRepositoryTest {
     private lateinit var labelDao: FakeLabelDao
     private lateinit var recipeTagDao: FakeRecipeTagCrossRefDao
     private lateinit var recipeLabelDao: FakeRecipeLabelCrossRefDao
-    private lateinit var remoteDataSource: FakeApiService
     private lateinit var sessionManager: SessionManager
     private lateinit var syncManager: FakeSyncManager
     private lateinit var recipeImageStore: RecipeImageStore
@@ -157,7 +155,6 @@ class DefaultRecipeRepositoryTest {
         labelDao = FakeLabelDao()
         recipeTagDao = FakeRecipeTagCrossRefDao()
         recipeLabelDao = FakeRecipeLabelCrossRefDao()
-        remoteDataSource = FakeApiService()
         syncManager = FakeSyncManager()
         recipeImageStore = mockk(relaxed = true)
         syncOrchestrator = mockk(relaxed = true)
@@ -172,7 +169,6 @@ class DefaultRecipeRepositoryTest {
                 labelDao,
                 recipeTagDao,
                 recipeLabelDao,
-                remoteDataSource,
                 sessionManager,
                 recipeImageStore,
                 syncManager,

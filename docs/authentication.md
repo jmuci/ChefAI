@@ -131,8 +131,12 @@ Ktor client plugin that automatically adds authentication headers to HTTP reques
 **Functionality:**
 
 - Intercepts all requests made with the default (unqualified) `HttpClient`
-- Adds `Authorization: Bearer <token>` if a token is available — **regardless of host**, so that
-  client must only ever call the ChefAI API (gotchas #18)
+- Adds `Authorization: Bearer <token>` if a token is available **and** the request's origin
+  (scheme, host and port) matches one of the configured ChefAI base URLs — `BuildConfig.API_BASE_URL`
+  and, when configured, `REMOTE_API_BASE_URL` (both, because a debug build's
+  `ApiEnvironmentInterceptor` can rewrite one into the other). Any other host goes out without the
+  token, and an empty allowlist authenticates nothing (`AuthInterceptorTest`)
+- Still: third-party fetches belong on `@ScraperHttpClient`, not the default client (gotchas #18)
 - Logs auth status for debugging
 
 #### 5. **Domain Models**
@@ -349,7 +353,7 @@ fun MyTopAppBar() {
 ## Integration with Network Layer
 
 The `AuthInterceptor` is automatically installed in the Ktor `HttpClient` (see `NetworkModule.kt`),
-so all API requests will include the auth token if available:
+so all requests to the ChefAI API will include the auth token if available:
 
 ```kotlin
 // In NetworkModule.kt
@@ -358,6 +362,10 @@ so all API requests will include the auth token if available:
 fun provideHttpClient(tokenProvider: TokenProvider, /* … */) = HttpClient(OkHttp) {
     install(AuthInterceptor) {
         this.tokenProvider = tokenProvider
+        allowedBaseUrls = listOfNotNull(
+            apiBaseUrls.local,
+            apiBaseUrls.remote.takeIf { apiBaseUrls.remoteConfigured },
+        )
     }
     // ... other configurations
 }
@@ -390,8 +398,9 @@ can switch to the deployed API in Developer options; release builds use `chefaiA
 
 ## API Requests
 
-All HTTP requests automatically include authentication headers. The `AuthInterceptor` adds
-`Authorization: Bearer <token>` to every request if the user is authenticated.
+All HTTP requests to the ChefAI API automatically include authentication headers. The
+`AuthInterceptor` adds `Authorization: Bearer <token>` to every request bound for a configured ChefAI
+base URL if the user is authenticated; requests to any other host never get it.
 
 **No additional code needed!** Just make your API calls as normal:
 

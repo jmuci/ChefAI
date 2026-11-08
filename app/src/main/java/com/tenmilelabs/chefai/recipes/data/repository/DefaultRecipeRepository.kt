@@ -22,7 +22,6 @@ import com.tenmilelabs.chefai.recipes.data.mapper.toCrossRef
 import com.tenmilelabs.chefai.recipes.data.mapper.toDomain
 import com.tenmilelabs.chefai.recipes.data.mapper.toRecipePreviewDomain
 import com.tenmilelabs.chefai.recipes.data.mapper.toRoomEntity
-import com.tenmilelabs.chefai.recipes.data.network.RecipeNetworkDataSource
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipeFetchResult
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import kotlinx.coroutines.flow.Flow
@@ -30,16 +29,12 @@ import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.io.IOException
 import timber.log.Timber
-import java.nio.channels.UnresolvedAddressException
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.coroutines.cancellation.CancellationException
 
 @Singleton
 class DefaultRecipeRepository @Inject constructor(
@@ -51,7 +46,6 @@ class DefaultRecipeRepository @Inject constructor(
     private val labelDao: LabelDao,
     private val recipeTagDao: RecipeTagCrossRefDao,
     private val recipeLabelDao: RecipeLabelCrossRefDao,
-    private val networkDataSource: RecipeNetworkDataSource,
     private val sessionManager: SessionManager,
     private val recipeImageStore: RecipeImageStore,
     private val syncManager: SyncScheduler,
@@ -85,35 +79,13 @@ class DefaultRecipeRepository @Inject constructor(
         }
     }
 
-    override fun getRecipesStream(): Flow<List<Recipe>> {
-        return if (false) { // Network
-            flow {
-                emit(getAllItemsFromNetwork())
-            }
-        } else {        // Local
-            return recipeDao.observeRecipesWithDetails().map { recipes ->
-                recipes.toDomain()
-            }.catch { e ->
-                // TODO try to recover by potentially wiping the DB, recreating and re-syncing
-                logAndReThrow(e)
-            }
+    override fun getRecipesStream(): Flow<List<Recipe>> =
+        recipeDao.observeRecipesWithDetails().map { recipes ->
+            recipes.toDomain()
+        }.catch { e ->
+            // TODO try to recover by potentially wiping the DB, recreating and re-syncing
+            logAndReThrow(e)
         }
-    }
-
-    private suspend fun getAllItemsFromNetwork(): List<Recipe> = try {
-        val recipes = networkDataSource.getRecipes().toDomain()
-        Timber.d("Fetched ${recipes.size} recipes from the BE")
-        recipes
-    } catch (e: CancellationException) {
-        Timber.w("Network request cancelled.")
-        throw e
-    } catch (e: UnresolvedAddressException) {
-        Timber.e(e, "DNS resolution failed. Device may be offline.")
-        throw e
-    } catch (e: IOException) {
-        Timber.e(e, "A network error occurred.")
-        throw e
-    }
 
     override fun getRecipeStream(uuid: UUID): Flow<Recipe?> {
         val ingredientsFlow = recipeDao.observeIngredientsForRecipe(uuid)
