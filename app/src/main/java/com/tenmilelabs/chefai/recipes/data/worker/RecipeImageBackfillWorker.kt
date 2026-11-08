@@ -28,7 +28,7 @@ internal const val IMAGE_BACKFILL_BATCH = 10
  * Fetches recipe images this device is missing but another one already has.
  *
  * A recipe arriving over sync never carries the importing device's cached copy — a local file path
- * is meaningless on the wire (ADR-011). What it may carry is an `imageBlobId`, and the sweep prefers
+ * is meaningless on the wire (ADR-012). What it may carry is an `imageBlobId`, and the sweep prefers
  * that: a plain authenticated GET against our own backend, which will not bot-wall us. For a photo
  * the user took themselves that is the only possibility at all, since `imageUrl` is blank and there
  * is nothing to re-derive from.

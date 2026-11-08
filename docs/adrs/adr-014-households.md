@@ -5,7 +5,7 @@
 **Author:** Claude (Sonnet 5), on behalf of Jose Mucientes
 **Related:** [ADR-006](adr-006-sync-protocol.md), [ADR-007](adr-007-anonymous-first.md),
 [ADR-008](adr-008-data-handling-across-sessions.md),
-`docs/prompts/households-android-prompt.md`, `docs/prompts/households-backend-prompt.md`
+`docs/archive/prompts/households-android-prompt.md`, `docs/archive/prompts/households-backend-prompt.md`
 
 ---
 
@@ -25,7 +25,7 @@ Two things constrain the answer:
    payload. Sharing a list means building that path from nothing, on both client and server.
 
 The full design — including the backend half — lives in
-`docs/prompts/households-backend-prompt.md` and `docs/prompts/households-android-prompt.md`; this
+`docs/archive/prompts/households-backend-prompt.md` and `docs/archive/prompts/households-android-prompt.md`; this
 ADR records the decisions those prompts commit to, for anyone who lands in this code without having
 read either.
 
@@ -179,7 +179,7 @@ sequence-diagram scenario (grocery-item LWW), added alongside the existing recip
 
 ## Status
 
-Complete. PRs A1–A12 (`docs/prompts/households-android-prompt.md` §9) and the follow-up fixes
+Complete. PRs A1–A12 (`docs/archive/prompts/households-android-prompt.md` §9) and the follow-up fixes
 #226–#228 are merged.
 
 ---

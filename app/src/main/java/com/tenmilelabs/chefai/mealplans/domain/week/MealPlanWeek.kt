@@ -37,7 +37,7 @@ data class WeekDay(
     val date: LocalDate,
     /**
      * Empty means nothing is planned — the design's "+ Add meal" row. Ordered by slot, then by
-     * plan; a slot that overlapping plans both fill appears once per plan (ADR-015 amendment).
+     * plan; a slot that overlapping plans both fill appears once per plan (ADR-015 Decision 3).
      */
     val meals: List<PlannedWeekMeal>,
 ) {
@@ -135,7 +135,7 @@ object MealPlanWeekProjector {
 
         // Overlapping plans are not resolved to a single winner: every planned meal is shown, and
         // two plans filling one slot both appear under it. Picking one silently hid the other
-        // plan's meal *and* its cooked mark (ADR-015 amendment, superseding Decision 3).
+        // plan's meal *and* its cooked mark (ADR-015 Decision 3).
         val mealsByDate = candidates
             .sortedWith(compareBy<Candidate> { it.meal.slot.ordinal }.then(PLAN_ORDER))
             .groupBy(keySelector = { it.date }, valueTransform = { it.meal })
@@ -171,7 +171,7 @@ object MealPlanWeekProjector {
 /**
  * The calendar date this plan's [dayIndex] lands on: day 0 is [MealPlan.startDate], the day the
  * wizard asked for. Plans created before it asked have none and fall back to their `createdAt`
- * date — ADR-015 Decision 2's original rule.
+ * date — ADR-015 Decision 2's fallback.
  */
 fun MealPlan.dateOf(dayIndex: Int, zone: ZoneId): LocalDate =
     (startDate ?: planDateFor(createdAt, dayIndex = 0, zone = zone)).plusDays(dayIndex.toLong())

@@ -149,7 +149,7 @@ class RecipeImageUploadDaoTest {
 
     @Test
     fun userPhotosAreOrderedAheadOfScrapedImages() = runTest {
-        // A blank imageUrl means the image cannot be re-derived from anywhere (ADR-011 Decision 3).
+        // A blank imageUrl means the image cannot be re-derived from anywhere (ADR-012 Decision 3).
         // If a sweep only gets partway through its batch, those are the bytes worth saving first —
         // even though this scraped recipe is the more recently updated of the two.
         val userPhoto = recipe(imageUrl = "", updatedAt = 1_000L)

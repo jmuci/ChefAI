@@ -38,7 +38,7 @@ data class RecipeEntity(
      * uploaded. Server-owned: only the image upload endpoint sets it, and a push never changes it.
      *
      * Unlike [localImagePath] this *does* ride the sync payload, because it is exactly the pointer a
-     * second device needs to fetch bytes it cannot re-derive. It is a hash, not an image — ADR-011
+     * second device needs to fetch bytes it cannot re-derive. It is a hash, not an image — ADR-012
      * Decision 2's rule that bytes never travel in the JSON payload is intact.
      */
     val imageBlobId: String? = null,

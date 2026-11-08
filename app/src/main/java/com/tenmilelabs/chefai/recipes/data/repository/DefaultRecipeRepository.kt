@@ -303,7 +303,7 @@ class DefaultRecipeRepository @Inject constructor(
      * For a scraped image this costs nothing — the backfill can re-derive it from `imageUrl` if the
      * recipe ever comes back. For a user-picked photo it is irreversible, since there is no source to
      * re-derive from. That asymmetry is the clearest argument for uploading user-authored images,
-     * which is Stage 2 of #132; see ADR-011.
+     * which is Stage 2 of #132; see ADR-012.
      */
     override suspend fun softDeleteRecipe(recipeId: UUID) {
         recipeDao.softDelete(recipeId, System.currentTimeMillis())

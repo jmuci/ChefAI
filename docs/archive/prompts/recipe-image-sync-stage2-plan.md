@@ -2,7 +2,7 @@
 
 > Drafted: August 2026
 > Tracking issue: [#94](https://github.com/jmuci/ChefAI/issues/94) (pre-existing; supersedes the
-> "Stage 2" section of [ADR-011](../adrs/adr-011-cross-device-recipe-images.md))
+> "Stage 2" section of [ADR-011](../../adrs/adr-011-cross-device-recipe-images.md))
 > Prerequisite: Stage 1, merged as #140 / #141 / #142 / #143
 > Backend counterpart: [recipe-image-upload-backend-prompt.md](recipe-image-upload-backend-prompt.md)
 
@@ -134,7 +134,7 @@ cancelled by `cancelAllSync()`.
 
 ### D5 — Every image is stored server-side and served to anyone who can see the recipe
 
-**Decided (Jose, Aug 2026). This supersedes [ADR-011](../adrs/adr-011-cross-device-recipe-images.md)
+**Decided (Jose, Aug 2026). This supersedes [ADR-011](../../adrs/adr-011-cross-device-recipe-images.md)
 Decision 1**, which said user-authored images are the only upload candidates.
 
 An image is worth persisting whatever its origin: a CDN URL may be unreachable from the app and
@@ -280,7 +280,7 @@ duplicate would be indefensible.
 - `MIGRATION_3_4` — plain `ALTER TABLE ... ADD COLUMN` on both tables (only `DROP COLUMN` needs the
   API-34 SQLite), commit `app/schemas/.../4.json`, add the `MigrationTestHelper` case.
 - **Thread `imageBlobId` through `Recipe.toRoomEntity()`
-  ([RoomDomainMap.kt:136](../../app/src/main/java/com/tenmilelabs/chefai/recipes/data/mapper/RoomDomainMap.kt))**
+  ([RoomDomainMap.kt:136](../../../app/src/main/java/com/tenmilelabs/chefai/recipes/data/mapper/RoomDomainMap.kt))**
   — that mapper already hardcodes `deletedAt = null, // or appropriate value`, which is
   [#128](https://github.com/jmuci/ChefAI/issues/128). Adding a field to the entity without adding it
   there means every save through the domain path silently wipes the blob pointer. Worth fixing #128
