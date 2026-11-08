@@ -13,8 +13,7 @@ import kotlinx.coroutines.flow.first
  *
  * Every ChefAI endpoint is built as an absolute URL from `BuildConfig.API_BASE_URL` (the local
  * backend in debug), so rather than thread a provider through every API service this rewrites
- * that prefix on the way out. Requests to any other host — the static recipe feed, for one — are
- * left alone. Installed only on debug builds; release has nothing to rewrite.
+ * that prefix on the way out. Requests to any other host are left alone. Installed only on debug builds; release has nothing to rewrite.
  */
 val ApiEnvironmentInterceptor = createClientPlugin("ApiEnvironmentInterceptor", ::ApiEnvironmentInterceptorConfig) {
     val repository = pluginConfig.repository

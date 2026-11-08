@@ -122,11 +122,11 @@ Save disabled until the user confirms real values — it doesn't silently save a
 
 ### 18. The unqualified `HttpClient` carries ChefAI auth headers
 `NetworkModule.provideHttpClient()` installs `AuthInterceptor`, which attaches the bearer token to
-**every** request regardless of host, and is injected by most API services. One legacy exception
-violates this rule today: `ChefAIApiService` points it at `jmuci.github.io` — reachable only through
-an `if (false)` branch in `DefaultRecipeRepository.getRecipesStream()`, so dead, but delete it
-rather than revive it.
-**Never point it at a third-party host** — a scraper, webhook receiver, or any code fetching a
+requests whose origin matches the configured ChefAI base URLs (`API_BASE_URL`, plus
+`REMOTE_API_BASE_URL` when configured) and is injected by most API services. The origin check is a
+backstop, not a licence: if you add a new backend base URL, add it to `allowedBaseUrls` in
+`NetworkModule` or its requests go out unauthenticated.
+**Still never point it at a third-party host** — a scraper, webhook receiver, or any code fetching a
 user-supplied URL must use the separate `@ScraperHttpClient`-qualified client (no auth interceptor,
 no content negotiation, its own timeout/retry/logging config). Don't add a qualifier to the existing
 `provideHttpClient` to "fix" this — it would break every service that injects it unqualified; add
