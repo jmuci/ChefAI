@@ -69,13 +69,16 @@ in place rather than deleted, since other entries and code comments cite gotchas
 Every schema change needs a migration. Forgetting one crashes the app on update. Always add migration + test with in-memory DB.
 
 ### 10. UUIDv7 byte ordering
-SQLite stores UUIDs as 16-byte blobs. The byte ordering matters for time-sortability. Use the project's `generateUuid7()` utility — don't roll your own.
+SQLite stores UUIDs as 16-byte blobs. The byte ordering matters for time-sortability. Use `UuidV7Generator.newId()` (`core/data/local/`) — don't roll your own.
 
 ### 11. SyncState transitions
 ```
 SYNCED → (local edit) → PENDING → (push accepted) → SYNCED
-SYNCED → (local delete) → DELETED → (push accepted) → hard delete
-PENDING → (pull conflict) → CONFLICT (not yet handled)
+SYNCED → (local delete) → DELETED → (push accepted) → SYNCED, row kept with deletedAt (soft delete;
+                                                       nothing hard-deletes synced rows)
+PENDING → (push edited mid-flight) → stays PENDING (expectedUpdatedAt guard)
+PENDING → (push refused, unfixable) → CANCELLED (cook events, saved plans — excluded from getAllDirty)
+CONFLICT — defined, never set
 ```
 Never set syncState directly in UI code. Repository methods handle transitions.
 
@@ -86,8 +89,10 @@ Never set syncState directly in UI code. Repository methods handle transitions.
 ### 12. Anonymous session persistence
 The anonymous `localUserId` is stored in SecurePreferences. If you clear app data, a new anonymous ID is generated and all local data becomes orphaned.
 
-### 13. Token refresh race condition
-Multiple simultaneous 401s can trigger parallel refresh attempts. The `SessionManager` should serialize refresh calls (currently not fully hardened).
+### 13. (Resolved) Token refresh race condition
+`SessionManager.refreshToken()` is serialized with a `Mutex` and skips the network call when another
+caller already refreshed the token it saw. Refresh is still per call site, not a client plugin — see
+`docs/authentication.md` → "What still needs work".
 
 ---
 
@@ -116,11 +121,15 @@ plus `description` to be non-blank for `isFormValid`, so a draft seeded with `"0
 Save disabled until the user confirms real values — it doesn't silently save a zero.
 
 ### 18. The unqualified `HttpClient` carries ChefAI auth headers
-`NetworkModule.provideHttpClient()` installs `AuthInterceptor` and is injected by five API services.
+`NetworkModule.provideHttpClient()` installs `AuthInterceptor`, which attaches the bearer token to
+**every** request regardless of host, and is injected by most API services. One legacy exception
+violates this rule today: `ChefAIApiService` points it at `jmuci.github.io` — reachable only through
+an `if (false)` branch in `DefaultRecipeRepository.getRecipesStream()`, so dead, but delete it
+rather than revive it.
 **Never point it at a third-party host** — a scraper, webhook receiver, or any code fetching a
 user-supplied URL must use the separate `@ScraperHttpClient`-qualified client (no auth interceptor,
 no content negotiation, its own timeout/retry/logging config). Don't add a qualifier to the existing
-`provideHttpClient` to "fix" this — it would break all five services that inject it unqualified; add
+`provideHttpClient` to "fix" this — it would break every service that injects it unqualified; add
 a new provider alongside it instead, as `ScraperHttpClient.kt` does.
 
 ### 19. Never name a package or class after a Kotlin reserved word

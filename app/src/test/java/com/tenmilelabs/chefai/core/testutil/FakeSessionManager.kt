@@ -7,6 +7,8 @@ import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.usecase.AccountUpgradeUseCase
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeCookEventDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSyncMetadataDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeBookmarkedRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeMealPlanDao
@@ -67,6 +69,12 @@ fun createTestSessionManager(
             recipeDao = FakeRecipeDao(),
             userDao = fakeUserDao,
             householdDao = FakeHouseholdDao(),
+            mealPlanDao = FakeMealPlanDao(),
+            savedMealPlanDao = FakeSavedMealPlanDao(),
+            bookmarkedRecipeDao = FakeBookmarkedRecipeDao(),
+            recipeCookEventDao = FakeRecipeCookEventDao(),
+            syncMetadataDao = FakeSyncMetadataDao(),
+            transactionRunner = FakeTransactionRunner(),
             recipeImageStore = mockk<RecipeImageStore>(relaxed = true),
         savedPlanImageStore = mockk<SavedPlanImageStore>(relaxed = true),
         ),
@@ -125,6 +133,12 @@ fun createTestSessionManagerWithAuthSource(
             recipeDao = FakeRecipeDao(),
             userDao = fakeUserDao,
             householdDao = FakeHouseholdDao(),
+            mealPlanDao = FakeMealPlanDao(),
+            savedMealPlanDao = FakeSavedMealPlanDao(),
+            bookmarkedRecipeDao = FakeBookmarkedRecipeDao(),
+            recipeCookEventDao = FakeRecipeCookEventDao(),
+            syncMetadataDao = FakeSyncMetadataDao(),
+            transactionRunner = FakeTransactionRunner(),
             recipeImageStore = mockk<RecipeImageStore>(relaxed = true),
         savedPlanImageStore = mockk<SavedPlanImageStore>(relaxed = true),
         ),
@@ -171,6 +185,12 @@ fun createRealSessionManagerWithFakes(
             recipeDao = FakeRecipeDao(),
             userDao = fakeUserDao,
             householdDao = FakeHouseholdDao(),
+            mealPlanDao = FakeMealPlanDao(),
+            savedMealPlanDao = FakeSavedMealPlanDao(),
+            bookmarkedRecipeDao = FakeBookmarkedRecipeDao(),
+            recipeCookEventDao = FakeRecipeCookEventDao(),
+            syncMetadataDao = FakeSyncMetadataDao(),
+            transactionRunner = FakeTransactionRunner(),
             recipeImageStore = mockk<RecipeImageStore>(relaxed = true),
         savedPlanImageStore = mockk<SavedPlanImageStore>(relaxed = true),
         ),

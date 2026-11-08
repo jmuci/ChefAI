@@ -12,6 +12,7 @@ import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.core.data.local.room.FakeTransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeHouseholdDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeCookEventDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeIngredientDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeLabelCrossRefDao
@@ -19,6 +20,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeBookmarkedRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeMealPlanDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeTagCrossRefDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSyncMetadataDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
@@ -70,6 +72,12 @@ class RegisterViewModelTest {
                 recipeDao = fakeRecipeDao,
                 userDao = fakeUserDao,
                 householdDao = FakeHouseholdDao(),
+                mealPlanDao = FakeMealPlanDao(),
+                savedMealPlanDao = FakeSavedMealPlanDao(),
+                bookmarkedRecipeDao = FakeBookmarkedRecipeDao(),
+                recipeCookEventDao = FakeRecipeCookEventDao(),
+                syncMetadataDao = FakeSyncMetadataDao(),
+                transactionRunner = FakeTransactionRunner(),
                 recipeImageStore = mockk<RecipeImageStore>(relaxed = true),
             savedPlanImageStore = mockk<SavedPlanImageStore>(relaxed = true),
             ),

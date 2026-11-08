@@ -53,6 +53,13 @@ class FakeSavedMealPlanDao : SavedMealPlanDao {
     override suspend fun countLiveForUser(userId: UUID): Int =
         rows.value.values.count { it.userId == userId && it.deletedAt == null }
 
+    override suspend fun getIdsNotOwnedBy(keepOwnedBy: UUID): List<UUID> =
+        rows.value.values.filter { it.userId != keepOwnedBy }.map { it.uuid }
+
+    override suspend fun deleteAllNotOwnedBy(keepOwnedBy: UUID) {
+        rows.value = rows.value.filterValues { it.userId == keepOwnedBy }
+    }
+
     override suspend fun reassignId(oldUuid: UUID, newUuid: UUID) {
         val existing = rows.value[oldUuid] ?: return
         rows.value = rows.value - oldUuid + (newUuid to existing.copy(uuid = newUuid, syncState = SyncState.PENDING))

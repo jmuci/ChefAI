@@ -7,7 +7,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import java.util.UUID
 
-class FakeRecipeCookEventDao : RecipeCookEventDao {
+/**
+ * @param mealPlanDao backs [deleteAllNotOnPlansOf]'s plan-ownership subquery; pass the one the
+ * test seeds plans into.
+ */
+class FakeRecipeCookEventDao(private val mealPlanDao: MealPlanDao = FakeMealPlanDao()) : RecipeCookEventDao {
 
     private val events = MutableStateFlow<List<RecipeCookEventEntity>>(emptyList())
 
@@ -71,5 +75,9 @@ class FakeRecipeCookEventDao : RecipeCookEventDao {
 
     override suspend fun delete(uuid: UUID) {
         events.value = events.value.filterNot { it.uuid == uuid }
+    }
+
+    override suspend fun deleteAllNotOnPlansOf(userId: UUID) {
+        events.value = events.value.filter { mealPlanDao.getMealPlanById(it.mealPlanId)?.userId == userId }
     }
 }

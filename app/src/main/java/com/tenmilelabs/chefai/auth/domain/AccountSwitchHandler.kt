@@ -1,9 +1,15 @@
 package com.tenmilelabs.chefai.auth.domain
 
 import com.tenmilelabs.chefai.auth.data.local.SecurePreferencesInterface
+import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
+import com.tenmilelabs.chefai.core.data.local.room.dao.BookmarkedRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.local.room.dao.HouseholdDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.MealPlanDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeCookEventDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.SavedMealPlanDao
+import com.tenmilelabs.chefai.core.data.local.room.dao.SyncMetadataDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.UserDao
 import com.tenmilelabs.chefai.mealplans.data.local.SavedPlanImageStore
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
@@ -29,6 +35,12 @@ class AccountSwitchHandler @Inject constructor(
     private val recipeDao: RecipeDao,
     private val userDao: UserDao,
     private val householdDao: HouseholdDao,
+    private val mealPlanDao: MealPlanDao,
+    private val savedMealPlanDao: SavedMealPlanDao,
+    private val bookmarkedRecipeDao: BookmarkedRecipeDao,
+    private val recipeCookEventDao: RecipeCookEventDao,
+    private val syncMetadataDao: SyncMetadataDao,
+    private val transactionRunner: TransactionRunner,
     private val recipeImageStore: RecipeImageStore,
     private val savedPlanImageStore: SavedPlanImageStore,
 ) {
@@ -47,20 +59,37 @@ class AccountSwitchHandler @Inject constructor(
                 AccountSwitchOutcome.NO_CHANGE
             }
             anonymousUserId != null -> {
-                Timber.i("Authenticated account changed from $previousUserId to $newUserId while anonymous data exists, removing previous authenticated user recipes only")
-                // Delete only recipes (server can restore them on next sync).
-                // We intentionally keep the UserEntity and its meal plans: all queries
-                // filter by userId so they're invisible to other users, and when the
-                // original user logs back in their local plans will still be there.
+                Timber.i("Authenticated account changed from $previousUserId to $newUserId while anonymous data exists, removing previous authenticated user data only")
+                // Keep everything the anonymous session owns (the upgrade that follows moves it to
+                // the new account) and drop everything the departing account left behind; the
+                // server restores whatever had synced when that account signs in again.
                 //
-                // Ids are collected first because deleteRecipesForUser is a bulk SQL delete — after
-                // it runs there is no way to tell which images belonged to the departing account.
-                // Without this the previous user's photos stay readable on a shared device: the rows
-                // go but the files in recipe_images/ do not. deleteAll() would be wrong here, since
-                // this branch exists precisely to preserve the anonymous session's own images.
-                val departingRecipeIds = recipeDao.getRecipeIdsForUser(previousUserId)
-                recipeDao.deleteRecipesForUser(previousUserId)
+                // Keeping the departing account's rows used to look harmless because most reads
+                // filter by userId, but two things didn't: cook events have no user column (the
+                // incoming account saw the departing one's "Cooked before" history), and the push
+                // collects meal plans, saved plans and cook events without a user filter (they
+                // were sent under the incoming account's token). Unpushed edits of the departing
+                // account are lost here — logout cancels sync without flushing them first.
+                //
+                // Ids are collected first because the deletes are bulk SQL — after they run there
+                // is no way to tell which image files belonged to the departing account.
+                // deleteAll() would be wrong here, since this branch exists precisely to preserve
+                // the anonymous session's own images.
+                val (departingRecipeIds, departingSavedPlanIds) = transactionRunner {
+                    val recipeIds = recipeDao.getRecipeIdsForUser(previousUserId)
+                    val savedPlanIds = savedMealPlanDao.getIdsNotOwnedBy(anonymousUserId)
+                    recipeDao.deleteRecipesForUser(previousUserId)
+                    recipeCookEventDao.deleteAllNotOnPlansOf(anonymousUserId)
+                    mealPlanDao.deleteAllNotOwnedBy(anonymousUserId)
+                    savedMealPlanDao.deleteAllNotOwnedBy(anonymousUserId)
+                    bookmarkedRecipeDao.deleteAllNotOwnedBy(anonymousUserId)
+                    // The pull cursor is the departing account's: kept, the incoming account's
+                    // first pull would skip everything it changed before that moment.
+                    syncMetadataDao.clear()
+                    recipeIds to savedPlanIds
+                }
                 departingRecipeIds.forEach { recipeImageStore.delete(it) }
+                departingSavedPlanIds.forEach { savedPlanImageStore.delete(it) }
                 // Unlike recipes/meal plans, the household cache has no userId column to filter
                 // by (see HouseholdEntity's doc) — it's a single global "my household" mirror, so
                 // leaving it in place would hand the incoming account the departing one's

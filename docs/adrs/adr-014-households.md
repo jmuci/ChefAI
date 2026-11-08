@@ -111,7 +111,7 @@ next real toggle marks it `PENDING` again.
 
 ## Decision 6: App Links host and token extraction
 
-Invite links use `https://chefai.app/invite?token=...` — matching the backend's default
+Invite links use `https://pocket-chef.app/invite?token=...` (*amended:* originally `chefai.app`) — matching the backend's default
 `household.inviteBaseUrl` (`ktor-chefai`'s `Application.kt`), not a placeholder chosen
 independently on the Android side.
 
@@ -179,11 +179,8 @@ sequence-diagram scenario (grocery-item LWW), added alongside the existing recip
 
 ## Status
 
-This ADR is written and the Room schema (this migration, v8→v9) lands in the same change. The
-household domain/network/UI layers, App Links, the sync wiring for `meal_plans.householdId` and
-`shopping_list_checks`, the anonymous→authenticated join flow, leave/removal local cleanup, and the
-shared-plan UI badges (PRs A1–A11) have landed. Only offline/conflict documentation (this PR, A12)
-remains — see `docs/prompts/households-android-prompt.md` §9 for the full PR sequence.
+Complete. PRs A1–A12 (`docs/prompts/households-android-prompt.md` §9) and the follow-up fixes
+#226–#228 are merged.
 
 ---
 
@@ -204,10 +201,10 @@ remains — see `docs/prompts/households-android-prompt.md` §9 for the full PR 
 - **Silent last-writer-wins on the grocery list** (see Decision 7): two people ticking the same
   item in the same aisle will occasionally see a tick disappear with no explanation. `SyncState
   .CONFLICT` exists in the enum but is unused here, same as everywhere else in this codebase.
-- **No "who checked this" attribution** in the UI, even though `checkedBy` exists on the wire —
-  deferred as a follow-up once the base sync path is proven.
+- ~~**No "who checked this" attribution** in the UI~~ — done: the shopping list shows who ticked
+  an item (`ShoppingListRow`), from `checkedBy`. Not yet exercised with two live accounts.
 - **`assetlinks.json` hosting is outside this repository.** App Links verification silently falls
-  back to a disambiguation dialog until `https://chefai.app/.well-known/assetlinks.json` is served
+  back to a disambiguation dialog until `https://pocket-chef.app/.well-known/assetlinks.json` is served
   with this app's signing cert fingerprint — a deploy-pipeline dependency, not something fixed by
   an app-side change. `android:autoVerify="true"` is already set on the intent filter; it has
   nothing to verify against until that file exists.

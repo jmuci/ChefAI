@@ -1,6 +1,6 @@
 # Sync Deep Dive: Step-by-Step Flow, Scenarios & Manual Testing
 
-**Last updated:** 2026-09-16
+**Last updated:** 2026-11-07
 **Related:** [ADR-006](adrs/adr-006-sync-protocol.md), [RFC-001](rfcs/rfc-001-offline-first-sync.md),
 [ADR-014](adrs/adr-014-households.md)
 
@@ -488,7 +488,9 @@ Scenario B above. Sharing only changes who can trigger it, never the resolution 
 
 - [ ] **Foreground trigger**: Background app, wait > 5s, bring to foreground → sync fires
 - [ ] **Mutation trigger**: Edit a recipe → sync fires within 5s (debounce)
-- [ ] **Periodic trigger**: Leave app running for 15+ minutes → sync fires automatically
+- [ ] **Periodic trigger**: daily, charging + connected only (ADR-006) — verify with
+  `adb shell cmd jobscheduler run -f <package> <jobId>` or WorkManager's diagnostics rather than waiting
+- [ ] **Pull-to-refresh**: pull on a list → sync fires even if a debounced sync is queued (REPLACE)
 - [ ] **Login trigger**: Logout and re-login → immediate sync fires
 
 ### 5.7 Household Grocery List (Scenario F)

@@ -80,6 +80,15 @@ class FakeMealPlanDao : MealPlanDao {
         notifyChange()
     }
 
+    override suspend fun deleteAllNotOwnedBy(keepOwnedBy: UUID) {
+        val removed = plans.values.filter { it.userId != keepOwnedBy }.map { it.uuid }.toSet()
+        removed.forEach { plans.remove(it) }
+        // Days cascade, as the real foreign key does.
+        days.values.filter { it.mealPlanId in removed }.map { it.uuid }.forEach { days.remove(it) }
+        notifyChange()
+        notifyDaysChange()
+    }
+
     override suspend fun clearHouseholdLinkForOwnPlans(householdId: UUID, userId: UUID) {
         plans.values.filter { it.householdId == householdId && it.userId == userId }
             .forEach { plans[it.uuid] = it.copy(householdId = null) }

@@ -58,4 +58,12 @@ interface SavedMealPlanDao {
 
     @Query("DELETE FROM saved_meal_plans WHERE uuid = :uuid")
     suspend fun delete(uuid: UUID)
+
+    /** Ids [deleteAllNotOwnedBy] would remove — read first so their photos can be deleted too. */
+    @Query("SELECT uuid FROM saved_meal_plans WHERE userId != :keepOwnedBy")
+    suspend fun getIdsNotOwnedBy(keepOwnedBy: UUID): List<UUID>
+
+    /** Account switch: hard-deletes every saved plan not owned by [keepOwnedBy]. */
+    @Query("DELETE FROM saved_meal_plans WHERE userId != :keepOwnedBy")
+    suspend fun deleteAllNotOwnedBy(keepOwnedBy: UUID)
 }

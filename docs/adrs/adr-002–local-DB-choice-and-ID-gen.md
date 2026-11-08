@@ -26,6 +26,9 @@ We will:
 - **Relational fit:** Recipes, ingredients, steps, and meal plans have clear one-to-many and many-to-many relationships, which align perfectly with a relational model.
     
 - **Built-in FTS support:** SQLite FTS5 enables full-text search for recipes and ingredients.
+  *Amended (Nov 2026): never adopted.* There are no FTS tables. On-device search is a bounded
+  `LIKE` scan over title/tags/labels (`RecipeDao`), the offline fallback for the backend's Postgres
+  `tsvector` search (#151). At single-device corpus sizes FTS buys nothing yet.
     
 - **Offline-first & transactional:** ACID compliance, robust local caching, and atomic updates make it ideal for offline operation.
     
@@ -73,20 +76,10 @@ Rejected because random UUIDs degrade database index locality compared to time-o
 
 ## Consequences
 
-- The backend must accept client-generated IDs as canonical.
-- Synchronization endpoints must be **idempotent** (e.g., UPSERT by ID).
-- All client-created entities must generate their ID at creation time.
-
----
-
-## Consequences
-
 - The backend must accept client-generated IDs as canonical. 
  
 - Synchronization endpoints must be **idempotent** (e.g., UPSERT by ID).
 
 - All client-created entities must generate their ID at creation time.
 
-- Migrations in Room must maintain FTS tables.
-     
 - This design ensures future compatibility with Postgres + Exposed on the backend.

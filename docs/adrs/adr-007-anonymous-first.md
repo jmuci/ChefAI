@@ -18,14 +18,22 @@ Users interact with the app immediately without registration. The session model 
 sealed class UserSession {
     data object Loading : UserSession()
     data class Anonymous(val localUserId: UUID) : UserSession()
-    data class Authenticated(val user: User, val authToken: AuthToken) : UserSession()
+    data class Authenticated(
+        val user: User,
+        val authToken: AuthToken,
+        val household: AuthenticatedHousehold? = null, // ADR-014 Decision 2
+    ) : UserSession()
 }
 ```
 
 - On first launch, a `UUIDv7` local user ID is generated, stored in `SecurePreferences`, and a corresponding `UserEntity` is inserted into Room.
 - All recipes created offline use `creatorId = localUserId`.
 - There is **no server-side anonymous user**. The backend only knows about a user after registration.
-- Registration triggers an account-upgrade flow (`POST /auth/upgrade`) that re-parents all local recipes from the anonymous UUID to the new authenticated user UUID.
+- Registration **or login** triggers a **local** account upgrade (`AccountUpgradeUseCase`, one Room
+  transaction) that re-parents the anonymous user's recipes, bookmarks, meal plans and saved meal
+  plans to the authenticated UUID and marks them `PENDING`; the next push uploads them.
+  *Amended (Nov 2026):* an earlier draft named a `POST /auth/upgrade` endpoint — it was never built
+  and is not needed, since ordinary push already accepts client-generated ids (ADR-002).
 
 ### Rationale
 

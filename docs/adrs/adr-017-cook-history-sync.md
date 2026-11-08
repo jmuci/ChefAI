@@ -74,8 +74,12 @@ not move the pull cursor** (the server returns it on every page; re-applying is 
 
 ## Consequences
 
-- **Per user.** The server never shares cook history with a household (ADR-014 does not apply). The
-  local table is still wiped per account by `clearAllTables()` on a switch.
+- **Per user.** The server never shares cook history with a household (ADR-014 does not apply). Locally the
+  table has no user column. ADR-008's *clear* branch wipes it with `clearAllTables()`; the
+  *preserve* branch (the usual one on interactive login) keeps only events on the anonymous
+  session's own plans (`deleteAllNotOnPlansOf`) — see the ADR-008 Nov 2026 amendment. A user column
+  would make this exact rather than inferred from plan ownership; not needed while an anonymous
+  session can only see its own plans.
 - **Deploy order.** The server must accept `cookEvents` first. An older backend ignores the field on
   push, so events would stay `PENDING` unacknowledged — harmless but unsynced. Backend #107 ships
   before this client.
