@@ -335,11 +335,10 @@ boundary.
 - A URL that loads fine but isn't a recipe now costs the extra 8s render budget (Decision 5) before
   reporting `NoRecipeFound`, up from roughly a second. `RENDER_BUDGET` is a single constant; tune it
   once there is real usage to tune against.
-- `RecipeDraft.toRecipe()` still throws `NumberFormatException` on a blank numeric string, a
-  pre-existing contract the mapper works around by emitting `"0"` rather than `""` for absent
-  numerics — see `docs/claude/gotchas.md`. Hardening that contract (`toIntOrNull() ?: 0`) is a good
-  separate change, kept out of this diff since it touches a documented, tested path used by the
-  editor's save flow.
+- `RecipeDraft.toRecipe()` threw `NumberFormatException` on a blank numeric string, which the
+  mapper worked around by emitting `"0"` rather than `""` for absent numerics. *Amended Nov 2026:*
+  `toRecipe()` now uses `toIntOrNull() ?: 0`; the mapper still emits `"0"` — see
+  `docs/claude/gotchas.md` #17.
 - Cached images (Decision 6) are per-device: a second device re-hits the same CDN wall on pull and
   has to re-run its own WebView tier, and a user-picked local photo can't be synced at all since it
   never had a source URL. **Resolved by [ADR-012](adr-012-recipe-image-upload.md)** (issue

@@ -190,7 +190,8 @@ fun RecipeDraftEntity.toRecipeDraft(): RecipeDraft = RecipeDraft(
  * Converts a [RecipeDraft] back to a [Recipe] for saving to the repository.
  * Requires the [creator] since drafts don't store full user objects.
  *
- * @throws NumberFormatException if numeric string fields contain invalid values.
+ * A blank or non-numeric prep time, cook time or servings maps to `0` — the draft keeps form input as
+ * typed, so a half-filled form must not throw here (gotchas #17). Calories and protein map to `null`.
  */
 fun RecipeDraft.toRecipe(creator: User): Recipe = Recipe(
     uuid = recipeId,
@@ -199,9 +200,9 @@ fun RecipeDraft.toRecipe(creator: User): Recipe = Recipe(
     imageUrl = imageUrl,
     imageUrlThumbnail = imageUrl,
     localImagePath = localImagePath,
-    prepTimeMinutes = prepTimeMinutes.toInt(),
-    cookTimeMinutes = cookTimeMinutes.toInt(),
-    servings = servings.toInt(),
+    prepTimeMinutes = prepTimeMinutes.toIntOrNull() ?: 0,
+    cookTimeMinutes = cookTimeMinutes.toIntOrNull() ?: 0,
+    servings = servings.toIntOrNull() ?: 0,
     caloriesPerServing = caloriesPerServing.toIntOrNull(),
     proteinGramsPerServing = proteinGramsPerServing.toIntOrNull(),
     languageCode = languageCode,

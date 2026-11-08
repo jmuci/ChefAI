@@ -111,14 +111,14 @@ Always use `MockEngine` for testing network calls. Don't mock the repository whe
 
 ## Recipe Import / Scraping (`:recipe-scraper`)
 
-### 17. `RecipeDraft.toRecipe()` throws on blank numeric strings
+### 17. `RecipeDraft.toRecipe()` turns blank numeric strings into `0`
 `prepTimeMinutes`, `cookTimeMinutes`, and `servings` are `String` on `RecipeDraft` (so partial or
-invalid form input survives auto-save), but `toRecipe()` (`DraftMapper.kt`) calls bare `.toInt()` on
-them — a blank string throws `NumberFormatException`. Any code that builds a `RecipeDraft` from a
-source other than the editor's own form (e.g. `ScrapedRecipeMapper`) **must emit `"0"`, never `""`,
-for an absent numeric value**. `RecipeEditorReducer.revalidate()` also requires these three fields
-plus `description` to be non-blank for `isFormValid`, so a draft seeded with `"0"` correctly leaves
-Save disabled until the user confirms real values — it doesn't silently save a zero.
+invalid form input survives auto-save). `toRecipe()` (`DraftMapper.kt`) maps a blank or non-numeric
+value to `0` (`toIntOrNull() ?: 0`); until Nov 2026 it called bare `.toInt()` and threw
+`NumberFormatException`. The mapper no longer guards Save, so `RecipeEditorReducer.revalidate()` is
+what stops a zero being saved by accident: it requires these three fields plus `description` to be
+non-blank for `isFormValid`. Calories and protein are different — blank means "not entered" and
+maps to `null`, never `0`. `ScrapedRecipeMapper` still seeds absent times/servings with `"0"`.
 
 ### 18. The unqualified `HttpClient` carries ChefAI auth headers
 `NetworkModule.provideHttpClient()` installs `AuthInterceptor`, which attaches the bearer token to

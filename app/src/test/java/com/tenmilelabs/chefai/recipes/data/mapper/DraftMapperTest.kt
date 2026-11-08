@@ -355,8 +355,8 @@ class DraftMapperTest {
         assertEquals("/files/recipe_images/abc", recipe.localImagePath)
     }
 
-    @Test(expected = NumberFormatException::class)
-    fun `draft toRecipe throws when prepTime is invalid`() {
+    @Test
+    fun `draft toRecipe maps non-numeric prepTime to zero`() {
         val draft = RecipeDraft(
             recipeId = UUID.randomUUID(),
             isNewRecipe = true,
@@ -367,7 +367,33 @@ class DraftMapperTest {
         )
 
         val creator = User(UUID.randomUUID(), "Chef", "chef@example.com", "")
-        draft.toRecipe(creator) // should throw
+        val recipe = draft.toRecipe(creator)
+
+        assertEquals(0, recipe.prepTimeMinutes)
+    }
+
+    @Test
+    fun `draft toRecipe maps blank times and servings to zero instead of throwing`() {
+        // Given — the editor's own defaults: nothing typed into any numeric field yet
+        val draft = RecipeDraft(
+            recipeId = UUID.randomUUID(),
+            isNewRecipe = true,
+            prepTimeMinutes = "",
+            cookTimeMinutes = " ",
+            servings = "",
+            updatedAt = 1L,
+        )
+        val creator = User(UUID.randomUUID(), "Chef", "chef@example.com", "")
+
+        // When
+        val recipe = draft.toRecipe(creator)
+
+        // Then
+        assertEquals(0, recipe.prepTimeMinutes)
+        assertEquals(0, recipe.cookTimeMinutes)
+        assertEquals(0, recipe.servings)
+        assertNull(recipe.caloriesPerServing)
+        assertNull(recipe.proteinGramsPerServing)
     }
 
     // --- Language ---
