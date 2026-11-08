@@ -13,6 +13,7 @@ import com.tenmilelabs.chefai.core.data.local.room.TagEntity
 import com.tenmilelabs.chefai.core.data.local.room.UserEntity
 import com.tenmilelabs.chefai.core.data.local.room.relations.PlanIngredientRow
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeImageCandidate
+import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeLocalImagePath
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeImageUploadCandidate
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeWithDetails
@@ -303,6 +304,16 @@ class FakeRecipeDao : RecipeDao {
 
     override suspend fun updateLocalImagePath(uuid: UUID, localImagePath: String?) {
         recipes[uuid]?.let { recipes[uuid] = it.copy(localImagePath = localImagePath) }
+        triggerUpdate()
+    }
+
+    override suspend fun getLocalImagePaths(): List<RecipeLocalImagePath> = recipes.values
+        .mapNotNull { recipe -> recipe.localImagePath?.let { RecipeLocalImagePath(recipe.uuid, it) } }
+
+    override suspend fun clearLocalImagePathIfUnchanged(uuid: UUID, localImagePath: String) {
+        val existing = recipes[uuid] ?: return
+        if (existing.localImagePath != localImagePath) return
+        recipes[uuid] = existing.copy(localImagePath = null)
         triggerUpdate()
     }
 

@@ -12,11 +12,15 @@ import coil3.SingletonImageLoader
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
+import com.tenmilelabs.chefai.core.di.ApplicationScope
+import com.tenmilelabs.chefai.recipes.data.local.MissingRecipeImageRepair
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.HiltAndroidApp
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import timber.log.Timber
 import timber.log.Timber.DebugTree
 import javax.inject.Inject
@@ -32,6 +36,8 @@ class ChefAIApplication : Application(), SingletonImageLoader.Factory, Configura
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var syncScheduler: SyncScheduler
     @Inject lateinit var sessionManager: SessionManager
+    @Inject lateinit var missingRecipeImageRepair: MissingRecipeImageRepair
+    @Inject @field:ApplicationScope lateinit var applicationScope: CoroutineScope
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -50,6 +56,10 @@ class ChefAIApplication : Application(), SingletonImageLoader.Factory, Configura
         if (BuildConfig.DEBUG) {
             Timber.plant(DebugTree())
         }
+
+        // Rows restored from a backup (or left by an interrupted wipe) can point at image files
+        // that no longer exist; clear them so the UI falls back to the remote URL.
+        applicationScope.launch { missingRecipeImageRepair() }
 
         // Trigger immediate sync when app comes to foreground
         ProcessLifecycleOwner.get().lifecycle.addObserver(
