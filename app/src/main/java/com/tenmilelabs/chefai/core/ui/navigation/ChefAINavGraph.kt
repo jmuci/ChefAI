@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.tenmilelabs.chefai.auth.ui.UserProfileMenu
+import com.tenmilelabs.chefai.auth.ui.message
 import com.tenmilelabs.chefai.core.ui.sync.SyncStatusIndicator
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
@@ -579,11 +580,17 @@ fun ChefAINavGraph(
                         ChefAINavigation.None
                     }
                     val profileMenu: @Composable () -> Unit = {
+                        val resources = LocalContext.current.resources
                         UserProfileMenu(
                             // Detail screens (meal plan, shopping list, household) are keyed by id, not
                             // by session, so they would keep rendering the departed account's data
                             // for the new guest. Clear the whole back stack down to Home.
-                            onLogout = { navActions.navigateToHome() },
+                            onLogout = { notice ->
+                                navActions.navigateToHome()
+                                notice?.let {
+                                    navScope.launch { snackbarHostState.showSnackbar(it.message(resources)) }
+                                }
+                            },
                             onLogin = { navActions.navigateToLogin() },
                             onSettings = { navActions.navigateToSettings() },
                             onHousehold = { navActions.navigateToHousehold() },

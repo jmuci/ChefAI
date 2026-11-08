@@ -68,8 +68,9 @@ class AccountSwitchHandler @Inject constructor(
                 // filter by userId, but two things didn't: cook events have no user column (the
                 // incoming account saw the departing one's "Cooked before" history), and the push
                 // collects meal plans, saved plans and cook events without a user filter (they
-                // were sent under the incoming account's token). Unpushed edits of the departing
-                // account are lost here — logout cancels sync without flushing them first.
+                // were sent under the incoming account's token). Edits the departing account
+                // still hadn't pushed are lost here; LogoutUseCase tries to push them before the
+                // session ends, so this is only what that best-effort push couldn't send.
                 //
                 // Ids are collected first because the deletes are bulk SQL — after they run there
                 // is no way to tell which image files belonged to the departing account.

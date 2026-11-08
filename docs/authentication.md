@@ -120,7 +120,8 @@ Handles cross-account login behavior before sync begins.
 - Preserves anonymous data created after logout when switching accounts
 - Removes everything the previous account left: its recipes (+ cached images), every meal plan,
   saved plan (+ photo), bookmark and cook event the anonymous session doesn't own, the pull cursor,
-  and the household cache — unpushed edits of that account are lost (logout doesn't flush)
+  and the household cache — including that account's still-unpushed edits, which `LogoutUseCase`
+  tries to push before logging out (ADR-008, "logout pushes pending changes first")
 - Falls back to `database.clearAllTables()` only when the previous session was not anonymous (in
   practice, a cold-start reconciliation) — see the ADR-008 Nov 2026 amendment
 
@@ -183,8 +184,10 @@ When an anonymous user logs in or registers for the first time:
 
 ### Logout
 
-When a user logs out:
+When a user logs out (through `LogoutUseCase`, which wraps `SessionManager.logout()`):
 
+- pending changes are pushed first with the still-valid token, best effort and capped at 4 s;
+  offline with changes waiting, the profile menu asks before logging out (ADR-008)
 - auth tokens are cleared
 - the app returns to an anonymous session
 - the anonymous `localUserId` is preserved
@@ -285,7 +288,8 @@ class MyViewModel @Inject constructor(
 ```kotlin
 @HiltViewModel
 class AuthViewModel @Inject constructor(
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val logoutUseCase: LogoutUseCase,
 ) : ViewModel() {
     
     fun login(email: String, password: String) {
@@ -299,9 +303,11 @@ class AuthViewModel @Inject constructor(
         }
     }
     
+    // Logout goes through LogoutUseCase rather than sessionManager.logout(), so pending
+    // changes are pushed first — see UserProfileViewModel.
     fun logout() {
         viewModelScope.launch {
-            sessionManager.logout()
+            val result = logoutUseCase() // LogoutResult: what, if anything, wasn't uploaded
             // Navigate to login screen
         }
     }
@@ -341,8 +347,8 @@ fun MyTopAppBar() {
         title = { Text("My App") },
         actions = {
             UserProfileMenu(
-                onLogout = {
-                    // Navigate to login screen or show logged out message
+                onLogout = { notice ->
+                    // Navigate; if notice != null, show notice.message(resources) in a snackbar
                 }
             )
         }

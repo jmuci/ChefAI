@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.auth.ui
 
 import android.content.res.Configuration.UI_MODE_NIGHT_YES
+import android.content.res.Resources
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,11 +11,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -25,6 +30,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -33,13 +39,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.tenmilelabs.chefai.R
-import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.AuthToken
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.core.domain.model.User
@@ -55,26 +59,7 @@ import com.tenmilelabs.chefai.core.ui.components.flat.flatClickable
 import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.core.ui.theme.chefColors
-import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
-import javax.inject.Inject
-import kotlinx.coroutines.launch
-
-/**
- * ViewModel for handling user profile actions like logout.
- */
-@HiltViewModel
-class UserProfileViewModel @Inject constructor(
-    private val sessionManager: SessionManager
-) : ViewModel() {
-
-    fun logout(onLogoutComplete: () -> Unit = {}) {
-        viewModelScope.launch {
-            sessionManager.logout()
-            onLogoutComplete()
-        }
-    }
-}
 
 /** The profile-specific geometry; the panel's own lives in [FlatMenuMetrics]. */
 private object MenuMetrics {
@@ -106,7 +91,8 @@ private object MenuMetrics {
  * actions row — cannot reach. It belongs with whoever owns the Scaffold.
  *
  * @param onLogin Callback invoked to open the login screen
- * @param onLogout Callback invoked after successful logout
+ * @param onLogout Callback invoked once the session has ended, with what to tell the user about
+ *   changes the logout left behind without uploading them (null when there is nothing to say).
  * @param onSettings Callback invoked to open the settings screen. Offered to signed-in and guest
  *   sessions alike — the settings behind it are device preferences, not account properties.
  * @param onHousehold Callback invoked to open the household screen. Authenticated only — an
@@ -118,13 +104,31 @@ private object MenuMetrics {
 fun UserProfileMenu(
     modifier: Modifier = Modifier,
     onLogin: () -> Unit = {},
-    onLogout: () -> Unit = {},
+    onLogout: (LogoutNotice?) -> Unit = {},
     onSettings: () -> Unit = {},
     onHousehold: () -> Unit = {},
     viewModel: UserProfileViewModel = hiltViewModel()
 ) {
     val userSession by rememberUserSession()
+    val logoutState by viewModel.logoutState.collectAsStateWithLifecycle()
     var expanded by remember { mutableStateOf(false) }
+    val currentOnLogout by rememberUpdatedState(onLogout)
+
+    LaunchedEffect(viewModel) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                is UserProfileEffect.LoggedOut -> {
+                    expanded = false
+                    currentOnLogout(effect.notice)
+                }
+            }
+        }
+    }
+    // The panel stays open through the pre-logout push, showing "Logging out…"; it gives way to
+    // the dialog when the user has to decide.
+    LaunchedEffect(logoutState) {
+        if (logoutState is LogoutUiState.ConfirmOfflineLogout) expanded = false
+    }
 
     Box(modifier = modifier) {
         ProfileAvatar(
@@ -146,10 +150,8 @@ fun UserProfileMenu(
                             expanded = false
                             onSettings()
                         },
-                        onLogout = {
-                            expanded = false
-                            viewModel.logout(onLogout)
-                        },
+                        isLoggingOut = logoutState == LogoutUiState.LoggingOut,
+                        onLogout = { viewModel.onAction(UserProfileAction.LogoutClicked) },
                     )
 
                     is UserSession.Anonymous -> AnonymousRows(
@@ -172,7 +174,58 @@ fun UserProfileMenu(
                 }
             }
         }
+
+        (logoutState as? LogoutUiState.ConfirmOfflineLogout)?.let { state ->
+            OfflineLogoutDialog(
+                unsyncedChanges = state.unsyncedChanges,
+                onAction = viewModel::onAction,
+            )
+        }
     }
+}
+
+/**
+ * Asked only when logging out now would leave unsynced changes behind because there is no network
+ * to push them with. They aren't deleted on logout — only when a different account signs in here.
+ */
+@Composable
+private fun OfflineLogoutDialog(
+    unsyncedChanges: Int,
+    onAction: (UserProfileAction) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = { onAction(UserProfileAction.OfflineLogoutDismissed) },
+        title = { Text(stringResource(R.string.logout_offline_dialog_title)) },
+        text = {
+            Text(
+                pluralStringResource(
+                    R.plurals.logout_offline_dialog_message,
+                    unsyncedChanges,
+                    unsyncedChanges,
+                ),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onAction(UserProfileAction.OfflineLogoutConfirmed) }) {
+                Text(
+                    stringResource(R.string.logout_offline_dialog_confirm),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { onAction(UserProfileAction.OfflineLogoutDismissed) }) {
+                Text(stringResource(R.string.logout_offline_dialog_dismiss))
+            }
+        },
+    )
+}
+
+/** The snackbar text for [this]; resolved from [Resources] because it is shown from a callback. */
+fun LogoutNotice.message(resources: Resources): String = when (this) {
+    is LogoutNotice.ChangesNotUploaded ->
+        resources.getQuantityString(R.plurals.logout_changes_not_uploaded, count, count)
+    LogoutNotice.UploadStatusUnknown -> resources.getString(R.string.logout_upload_status_unknown)
 }
 
 @Composable
@@ -181,6 +234,7 @@ private fun AuthenticatedRows(
     onHousehold: () -> Unit,
     onSettings: () -> Unit,
     onLogout: () -> Unit,
+    isLoggingOut: Boolean = false,
 ) {
     MenuHeader(displayName = displayName)
     FlatMenuRow(
@@ -198,8 +252,11 @@ private fun AuthenticatedRows(
     )
     RowRule()
     FlatMenuRow(
-        label = stringResource(R.string.profile_menu_logout),
+        label = stringResource(
+            if (isLoggingOut) R.string.profile_menu_logging_out else R.string.profile_menu_logout,
+        ),
         icon = ChefAIIcons.LogOut,
+        enabled = !isLoggingOut,
         // accentText resolves to accent-700 in light — the design's Logout color, and the step
         // that is legible at 14px. In a mono palette the deep accent step is what carries
         // destructive intent; there is no error red to reach for.
@@ -398,6 +455,34 @@ private fun UserProfileMenuAnonymousPreview() {
 @Composable
 private fun UserProfileMenuLoadingPreview() {
     ChefAITheme { PreviewPanel(UserSession.Loading) }
+}
+
+@Preview(name = "Offline logout dialog", showBackground = true)
+@Preview(name = "Offline logout dialog, dark", showBackground = true, uiMode = UI_MODE_NIGHT_YES)
+@Composable
+private fun OfflineLogoutDialogPreview() {
+    ChefAITheme { OfflineLogoutDialog(unsyncedChanges = 3, onAction = {}) }
+}
+
+@Preview(name = "Profile menu \u2014 logging out", showBackground = true)
+@Preview(
+    name = "Profile menu \u2014 logging out, dark",
+    showBackground = true,
+    uiMode = UI_MODE_NIGHT_YES,
+)
+@Composable
+private fun UserProfileMenuLoggingOutPreview() {
+    ChefAITheme {
+        FlatMenuPanel {
+            AuthenticatedRows(
+                displayName = PreviewUser.displayName,
+                onHousehold = {},
+                onSettings = {},
+                onLogout = {},
+                isLoggingOut = true,
+            )
+        }
+    }
 }
 
 @Preview(name = "Profile avatar", showBackground = true)

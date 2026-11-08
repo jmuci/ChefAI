@@ -118,7 +118,8 @@ fun createTestSessionManager(
  * object sidesteps it entirely.
  */
 fun createTestSessionManagerWithAuthSource(
-    testScope: CoroutineScope = CoroutineScope(Dispatchers.Main)
+    testScope: CoroutineScope = CoroutineScope(Dispatchers.Main),
+    syncScheduler: SyncScheduler = FakeSyncScheduler(),
 ): Pair<SessionManager, FakeAuthNetworkDataSource> {
     val fakeAuthNetworkDataSource = FakeAuthNetworkDataSource()
     val fakeUserDao = FakeUserDao()
@@ -156,7 +157,7 @@ fun createTestSessionManagerWithAuthSource(
                 FakeSavedMealPlanDao(),
             )
         },
-        syncSchedulerProvider = { FakeSyncScheduler() },
+        syncSchedulerProvider = { syncScheduler },
         householdRepositoryProvider = { FakeHouseholdRepository() },
         applicationScope = testScope
     ).apply {

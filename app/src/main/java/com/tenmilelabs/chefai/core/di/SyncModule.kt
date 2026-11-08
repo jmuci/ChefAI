@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.core.di
 
 import com.tenmilelabs.chefai.core.data.sync.ConnectivityObserver
 import com.tenmilelabs.chefai.core.data.sync.NetworkMonitor
+import com.tenmilelabs.chefai.core.data.sync.PendingChangesPusher
 import com.tenmilelabs.chefai.core.data.sync.SyncExecutor
 import com.tenmilelabs.chefai.core.data.sync.SyncManager
 import com.tenmilelabs.chefai.core.data.sync.SyncOrchestrator
@@ -35,6 +36,12 @@ abstract class SyncNetworkDataSourceModule {
     abstract fun bindSyncExecutor(
         syncOrchestrator: SyncOrchestrator
     ): SyncExecutor
+
+    @Binds
+    @Singleton
+    abstract fun bindPendingChangesPusher(
+        syncOrchestrator: SyncOrchestrator
+    ): PendingChangesPusher
 
     @Binds
     @Singleton
