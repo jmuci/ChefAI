@@ -7,6 +7,7 @@ import androidx.room.Upsert
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.relations.PlanIngredientRow
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeImageCandidate
+import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeLocalImagePath
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeImageUploadCandidate
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeWithDetails
@@ -206,6 +207,17 @@ interface RecipeDao {
 
     @Query("UPDATE recipes SET localImagePath = :localImagePath WHERE uuid = :uuid")
     suspend fun updateLocalImagePath(uuid: UUID, localImagePath: String?)
+
+    /** Every recipe that claims an on-device image copy, deleted rows included. */
+    @Query("SELECT uuid AS recipeId, localImagePath FROM recipes WHERE localImagePath IS NOT NULL")
+    suspend fun getLocalImagePaths(): List<RecipeLocalImagePath>
+
+    /**
+     * Forgets [localImagePath] for [uuid], but only while the row still holds that exact path: a
+     * backfill or import that stored a fresh copy in the meantime must not be undone.
+     */
+    @Query("UPDATE recipes SET localImagePath = NULL WHERE uuid = :uuid AND localImagePath = :localImagePath")
+    suspend fun clearLocalImagePathIfUnchanged(uuid: UUID, localImagePath: String)
 
     /**
      * Recipes whose cached image may not be on the backend yet.

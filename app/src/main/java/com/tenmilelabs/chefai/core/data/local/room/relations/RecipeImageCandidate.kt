@@ -33,3 +33,9 @@ data class RecipeImageUploadCandidate(
     val imageBlobId: String?,
     val uploadedFileModifiedAt: Long?,
 )
+
+/** A recipe and the on-device image file its row points at, which may no longer exist. */
+data class RecipeLocalImagePath(
+    val recipeId: UUID,
+    val localImagePath: String,
+)

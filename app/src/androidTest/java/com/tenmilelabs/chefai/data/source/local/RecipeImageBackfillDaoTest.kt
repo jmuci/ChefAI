@@ -165,4 +165,35 @@ class RecipeImageBackfillDaoTest {
 
         assertEquals(null, database.recipeImageStateDao().getByRecipeId(recipe.uuid))
     }
+
+    @Test
+    fun getLocalImagePaths_returnsOnlyRowsWithACachedPath() = runTest {
+        val cached = recipe(localImagePath = "/files/recipe_images/a")
+        database.recipeDao().upsertRecipe(cached)
+        database.recipeDao().upsertRecipe(recipe(localImagePath = null))
+
+        val paths = database.recipeDao().getLocalImagePaths()
+
+        assertEquals(listOf(cached.uuid to "/files/recipe_images/a"), paths.map { it.recipeId to it.localImagePath })
+    }
+
+    @Test
+    fun clearLocalImagePathIfUnchanged_clearsAMatchingPath() = runTest {
+        val recipe = recipe(localImagePath = "/files/recipe_images/a")
+        database.recipeDao().upsertRecipe(recipe)
+
+        database.recipeDao().clearLocalImagePathIfUnchanged(recipe.uuid, "/files/recipe_images/a")
+
+        assertEquals(null, database.recipeDao().getRecipeById(recipe.uuid)?.localImagePath)
+    }
+
+    @Test
+    fun clearLocalImagePathIfUnchanged_keepsAPathWrittenSince() = runTest {
+        val recipe = recipe(localImagePath = "/files/recipe_images/fresh")
+        database.recipeDao().upsertRecipe(recipe)
+
+        database.recipeDao().clearLocalImagePathIfUnchanged(recipe.uuid, "/files/recipe_images/stale")
+
+        assertEquals("/files/recipe_images/fresh", database.recipeDao().getRecipeById(recipe.uuid)?.localImagePath)
+    }
 }
