@@ -7,7 +7,11 @@ class FakeSyncExecutor : SyncExecutor {
 
     var shouldThrow: Boolean = false
 
+    /** Thrown one per call, in order, before [shouldThrow] is consulted — e.g. a 401 then success. */
+    val errorsToThrow: ArrayDeque<Exception> = ArrayDeque()
+
     override suspend fun sync(): SyncResult {
+        errorsToThrow.removeFirstOrNull()?.let { throw it }
         if (shouldThrow) throw RuntimeException("Fake sync error")
         syncCount++
         return SyncResult(
