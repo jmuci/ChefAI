@@ -12,4 +12,8 @@ interface SyncMetadataDao {
 
     @Upsert
     suspend fun upsert(metadata: SyncMetadataEntity)
+
+    /** Forgets every pull cursor, so the next pull starts from `since=0`. */
+    @Query("DELETE FROM sync_metadata")
+    suspend fun clear()
 }

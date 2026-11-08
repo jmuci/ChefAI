@@ -83,4 +83,16 @@ interface RecipeCookEventDao {
 
     @Query("DELETE FROM recipe_cook_events WHERE uuid = :uuid")
     suspend fun delete(uuid: UUID)
+
+    /**
+     * Account switch: keeps only the events recorded on [userId]'s own plans. Events have no user
+     * column, so the plan is the only owner signal. That is exact for an anonymous session — it
+     * can only see its own plans, and deleting a plan is a soft delete, so the plan row (and the
+     * history on it) is still there — which is the only caller this needs to be right for.
+     */
+    @Query(
+        "DELETE FROM recipe_cook_events " +
+            "WHERE mealPlanId NOT IN (SELECT uuid FROM meal_plans WHERE userId = :userId)"
+    )
+    suspend fun deleteAllNotOnPlansOf(userId: UUID)
 }

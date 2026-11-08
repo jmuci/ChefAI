@@ -56,6 +56,13 @@ interface MealPlanDao {
     @Query("DELETE FROM meal_plans WHERE householdId = :householdId AND userId != :keepOwnedBy")
     suspend fun deleteHouseholdPlansNotOwnedBy(householdId: UUID, keepOwnedBy: UUID)
 
+    /**
+     * Account switch: hard-deletes every plan not owned by [keepOwnedBy] — the departing account's
+     * own plans and any household plans it could see. Days and shopping-list checks cascade.
+     */
+    @Query("DELETE FROM meal_plans WHERE userId != :keepOwnedBy")
+    suspend fun deleteAllNotOwnedBy(keepOwnedBy: UUID)
+
     /** Un-shares the leaving user's own plans without deleting them. */
     @Query("UPDATE meal_plans SET householdId = NULL WHERE householdId = :householdId AND userId = :userId")
     suspend fun clearHouseholdLinkForOwnPlans(householdId: UUID, userId: UUID)

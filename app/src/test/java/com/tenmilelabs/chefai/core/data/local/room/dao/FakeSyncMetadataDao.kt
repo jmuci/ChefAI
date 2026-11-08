@@ -13,4 +13,8 @@ class FakeSyncMetadataDao : SyncMetadataDao {
     override suspend fun upsert(metadata: SyncMetadataEntity) {
         this.metadata[metadata.entityType] = metadata
     }
+
+    override suspend fun clear() {
+        metadata.clear()
+    }
 }

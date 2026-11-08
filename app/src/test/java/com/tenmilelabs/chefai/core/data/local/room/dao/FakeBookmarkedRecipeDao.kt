@@ -86,6 +86,11 @@ class FakeBookmarkedRecipeDao : BookmarkedRecipeDao {
     override suspend fun countLiveForUser(userId: UUID): Int =
         store.count { it.key.first == userId && it.value.deletedAt == null }
 
+    override suspend fun deleteAllNotOwnedBy(keepOwnedBy: UUID) {
+        store.keys.filter { it.first != keepOwnedBy }.toList().forEach { store.remove(it) }
+        notifyChange()
+    }
+
     override suspend fun deleteAllForUser(userId: UUID) {
         store.keys.filter { it.first == userId }.toList().forEach { store.remove(it) }
         notifyChange()

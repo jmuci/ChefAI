@@ -92,4 +92,8 @@ interface BookmarkedRecipeDao {
 
     @Query("DELETE FROM bookmarked_recipes WHERE userId = :userId")
     suspend fun deleteAllForUser(userId: UUID)
+
+    /** Account switch: hard-deletes every bookmark not owned by [keepOwnedBy]. */
+    @Query("DELETE FROM bookmarked_recipes WHERE userId != :keepOwnedBy")
+    suspend fun deleteAllNotOwnedBy(keepOwnedBy: UUID)
 }
