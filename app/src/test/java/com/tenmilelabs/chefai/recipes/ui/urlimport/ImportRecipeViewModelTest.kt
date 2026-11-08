@@ -38,12 +38,10 @@ class ImportRecipeViewModelTest {
         viewModel = createViewModel()
     }
 
-    private fun createViewModel(prefillUrl: String? = null): ImportRecipeViewModel {
-        val savedStateHandle = SavedStateHandle().apply {
-            if (prefillUrl != null) {
-                set(AppDestinationArgs.PREFILL_URL_ARG, prefillUrl)
-            }
-        }
+    private fun createViewModel(
+        prefillUrl: String? = null,
+        savedStateHandle: SavedStateHandle = prefillHandle(prefillUrl),
+    ): ImportRecipeViewModel {
         return ImportRecipeViewModel(
             recipeImporter = recipeImporter,
             saveImportedDraft = SaveImportedDraft(
@@ -53,6 +51,12 @@ class ImportRecipeViewModelTest {
             ),
             savedStateHandle = savedStateHandle,
         )
+    }
+
+    private fun prefillHandle(prefillUrl: String?) = SavedStateHandle().apply {
+        if (prefillUrl != null) {
+            set(AppDestinationArgs.PREFILL_URL_ARG, prefillUrl)
+        }
     }
 
     @Test
@@ -166,10 +170,67 @@ class ImportRecipeViewModelTest {
 
     @Test
     fun `seeds the url field from a PREFILL_URL_ARG passed via SavedStateHandle`() = runTest {
+        // Given an import that never finishes, so the in-flight state is observable
+        recipeImporter.gate = CompletableDeferred()
+
+        // When the screen opens from the share sheet
         val prefilled = createViewModel(prefillUrl = "https://example.com/shared-recipe")
 
+        // Then the field shows the shared URL
         assertThat(prefilled.state.value.url).isEqualTo("https://example.com/shared-recipe")
-        assertThat(prefilled.state.value.canImport).isTrue()
+        assertThat(prefilled.state.value.isImporting).isTrue()
+    }
+
+    @Test
+    fun `a shared url is imported straight away without tapping Import`() = runTest {
+        // Given a page with a recipe on it
+        val draftId = UUID.randomUUID()
+        recipeImporter.result = RecipeImportResult.Success(
+            RecipeDraft(recipeId = draftId, isNewRecipe = true, title = "Shared Recipe"),
+        )
+
+        // When the screen opens from the share sheet
+        val prefilled = createViewModel(prefillUrl = "https://example.com/shared-recipe")
+
+        // Then the import runs on its own and goes on to the editor
+        prefilled.effects.test {
+            assertThat(awaitItem()).isEqualTo(ImportEffect.NavigateToEditorWithDraft(draftId))
+        }
+        assertThat(recipeImporter.callCount).isEqualTo(1)
+        assertThat(recipeImporter.lastImportedUrl).isEqualTo("https://example.com/shared-recipe")
+    }
+
+    @Test
+    fun `a shared url that fails to import leaves the error and the url for a retry`() = runTest {
+        // Given a page with no recipe on it
+        recipeImporter.result = RecipeImportResult.NoRecipeFound
+
+        // When the screen opens from the share sheet
+        val prefilled = createViewModel(prefillUrl = "https://example.com/not-a-recipe")
+
+        // Then the user lands on the importer with the error and the manual-entry option
+        assertThat(prefilled.state.value.errorRes).isEqualTo(R.string.import_recipe_no_recipe_found)
+        assertThat(prefilled.state.value.showManualEntryOption).isTrue()
+        assertThat(prefilled.state.value.url).isEqualTo("https://example.com/not-a-recipe")
+    }
+
+    @Test
+    fun `a recreated ViewModel does not import the shared url a second time`() = runTest {
+        // Given a share-sheet import that already ran on this destination
+        val handle = prefillHandle("https://example.com/shared-recipe")
+        createViewModel(savedStateHandle = handle)
+        assertThat(recipeImporter.callCount).isEqualTo(1)
+
+        // When the ViewModel is rebuilt from the same SavedStateHandle (process death)
+        createViewModel(savedStateHandle = handle)
+
+        // Then no second import is started
+        assertThat(recipeImporter.callCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `no import starts on its own when there is no PREFILL_URL_ARG`() = runTest {
+        assertThat(recipeImporter.callCount).isEqualTo(0)
     }
 
     @Test

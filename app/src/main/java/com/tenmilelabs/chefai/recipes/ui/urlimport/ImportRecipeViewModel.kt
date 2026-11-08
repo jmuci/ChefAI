@@ -24,7 +24,7 @@ import javax.inject.Inject
 class ImportRecipeViewModel @Inject constructor(
     private val recipeImporter: RecipeImporter,
     private val saveImportedDraft: SaveImportedDraft,
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
     /** Set when the screen was opened via the share sheet, e.g. Chrome's "Share" → Pocket Chef. */
@@ -37,6 +37,10 @@ class ImportRecipeViewModel @Inject constructor(
 
     private val _effects = Channel<ImportEffect>(Channel.BUFFERED)
     val effects: Flow<ImportEffect> = _effects.receiveAsFlow()
+
+    init {
+        autoImportSharedUrl()
+    }
 
     fun dispatch(action: ImportAction) {
         when (action) {
@@ -87,7 +91,24 @@ class ImportRecipeViewModel @Inject constructor(
         }
     }
 
+    /**
+     * A URL shared into the app (share sheet → Pocket Chef) is imported straight away: sharing the
+     * page *was* the user's choice, so making them tap Import again adds nothing.
+     *
+     * Runs at most once per destination. The import screen stays on the back stack under the
+     * editor, and after process death this ViewModel is rebuilt from the same [SavedStateHandle]
+     * (prefill argument included) — without the flag, coming back to the app would silently
+     * import the same page a second time.
+     */
+    private fun autoImportSharedUrl() {
+        if (prefillUrl == null || savedStateHandle.get<Boolean>(AUTO_IMPORT_STARTED_KEY) == true) return
+        savedStateHandle[AUTO_IMPORT_STARTED_KEY] = true
+        import()
+    }
+
     private fun failWith(@StringRes messageRes: Int) {
         _state.update { it.copy(isImporting = false, errorRes = messageRes, showManualEntryOption = false) }
     }
 }
+
+private const val AUTO_IMPORT_STARTED_KEY = "autoImportStarted"
