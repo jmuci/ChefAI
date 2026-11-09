@@ -17,6 +17,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.TagDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.UserDao
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.di.IoDispatcher
+import com.tenmilelabs.chefai.home.data.mapper.mintedIngredientId
 import com.tenmilelabs.chefai.home.data.mapper.toIngredientEntity
 import com.tenmilelabs.chefai.home.data.mapper.toLabelEntity
 import com.tenmilelabs.chefai.home.data.mapper.toRecipeEntity
@@ -68,6 +69,17 @@ class DefaultHomeRecipeSidecarRepository @Inject constructor(
                 val uuid = runCatching { UUID.fromString(dto.uuid) }.getOrNull() ?: return@forEach
                 recipeDao.replaceRetiredImageHost(uuid, dto.imageUrl, dto.imageUrlThumbnail)
             }
+
+            // 1c. Earlier versions wrote name-minted ingredient ids as SYNCED, so the push sent
+            //    them and the server rejected every recipe using one (INGREDIENT_NOT_FOUND, #338).
+            //    Heal those rows on every delivery — recipes are skipped below once written, so
+            //    this can't wait for a rewrite. Safe: the server never uses a minted id.
+            val mintedIds = sidecar.recipes
+                .flatMap { it.ingredients }
+                .filter { it.ingredientId == null }
+                .map { it.mintedIngredientId() }
+                .distinct()
+            mintedIds.chunked(500).forEach { ingredientDao.markPendingIfSynced(it) }
 
             // 2. Determine which recipes to skip: PENDING rows (unpushed local edits) and any recipe
             //    that already has detail (steps or ingredients) — i.e. one that arrived complete via
@@ -161,7 +173,9 @@ class DefaultHomeRecipeSidecarRepository @Inject constructor(
                 }
             }
 
-            if (allIngredients.isNotEmpty()) ingredientDao.upsertAll(allIngredients)
+            // Insert-if-absent: ingredients are shared reference data, and a pulled row (allergen,
+            // source, SYNCED) must not be overwritten by the sidecar's bare name-only copy.
+            if (allIngredients.isNotEmpty()) ingredientDao.insertAllIfAbsent(allIngredients)
             if (allRecipeIngredients.isNotEmpty()) recipeIngredientDao.upsertAll(allRecipeIngredients)
             if (allSteps.isNotEmpty()) recipeStepDao.upsertAll(allSteps)
 

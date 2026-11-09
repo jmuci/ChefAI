@@ -38,11 +38,17 @@ data class SidecarRecipeDto(
     val steps: List<SidecarStep> = emptyList(),
 )
 
+/**
+ * @property ingredientId the server catalogue's id for this ingredient. Optional: the backend does
+ *   not send it yet, and without it the client mints a name-derived id the server doesn't know
+ *   (see `SidecarMapper.mintedIngredientId`, #338).
+ */
 @Serializable
 data class SidecarIngredient(
     val name: String,
     val quantity: Double,
     val unit: String,
+    val ingredientId: String? = null,
 )
 
 @Serializable

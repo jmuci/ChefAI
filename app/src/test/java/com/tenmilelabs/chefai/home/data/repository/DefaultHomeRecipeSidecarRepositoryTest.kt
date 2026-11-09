@@ -303,6 +303,86 @@ class DefaultHomeRecipeSidecarRepositoryTest {
         assertThat(recipeStepDao.getStepsForRecipe(UUID.fromString(recipe1Id))).isEmpty()
     }
 
+    // --- #338: name-minted ingredient ids are unknown to the server ---
+
+    @Test
+    fun `an ingredient without a server id is written PENDING so the push leaves it out`() = runTest {
+        // Given a sidecar ingredient carrying only a name
+        val sidecarWithIngredient = sidecar.copy(
+            recipes = listOf(
+                sidecar.recipes[0].copy(
+                    ingredients = listOf(SidecarIngredient(name = "Plain flour", quantity = 100.0, unit = "g")),
+                ),
+            ),
+        )
+
+        // When the sidecar is written
+        repository.upsertSidecar(sidecarWithIngredient)
+
+        // Then the minted ingredient is not claimed as known to the server
+        val minted = UUID.nameUUIDFromBytes("plain flour".toByteArray())
+        assertThat(ingredientDao.getIngredientById(minted)?.syncState).isEqualTo(SyncState.PENDING)
+        assertThat(ingredientDao.getSyncedExistingIds(listOf(minted))).isEmpty()
+    }
+
+    @Test
+    fun `a minted ingredient an older build stored as SYNCED is healed even when its recipe is skipped`() = runTest {
+        // Given an install where an earlier delivery wrote the recipe in full and the minted
+        // ingredient as SYNCED
+        val minted = UUID.nameUUIDFromBytes("plain flour".toByteArray())
+        val withIngredient = sidecar.copy(
+            recipes = listOf(
+                sidecar.recipes[0].copy(
+                    ingredients = listOf(SidecarIngredient(name = "Plain flour", quantity = 100.0, unit = "g")),
+                ),
+            ),
+        )
+        repository.upsertSidecar(withIngredient)
+        ingredientDao.upsertIngredient(
+            requireNotNull(ingredientDao.getIngredientById(minted)).copy(syncState = SyncState.SYNCED)
+        )
+
+        // When the same sidecar is delivered again (the recipe now has detail, so it is skipped)
+        val written = repository.upsertSidecar(withIngredient)
+
+        // Then the row is downgraded to PENDING
+        assertThat(written).isEqualTo(0)
+        assertThat(ingredientDao.getIngredientById(minted)?.syncState).isEqualTo(SyncState.PENDING)
+    }
+
+    @Test
+    fun `a server ingredient id is used as-is, SYNCED, and never overwrites the pulled row`() = runTest {
+        // Given the catalogue row already pulled from the server, with an allergen
+        val serverId = UUID.fromString("2ded662b-0000-3000-8000-000000000001")
+        val allergenId = UUID.randomUUID()
+        ingredientDao.upsertIngredient(
+            com.tenmilelabs.chefai.core.data.local.room.IngredientEntity(
+                uuid = serverId, displayName = "Plain Flour", allergenId = allergenId, sourcePrimaryId = null,
+                updatedAt = 1L, deletedAt = null, syncState = SyncState.SYNCED,
+            )
+        )
+        val sidecarWithServerId = sidecar.copy(
+            recipes = listOf(
+                sidecar.recipes[0].copy(
+                    ingredients = listOf(
+                        SidecarIngredient(name = "Plain flour", quantity = 100.0, unit = "g", ingredientId = serverId.toString()),
+                    ),
+                ),
+            ),
+        )
+
+        // When the sidecar is written
+        repository.upsertSidecar(sidecarWithServerId)
+
+        // Then the recipe points at the server id and the pulled row is untouched
+        val crossRef = recipeIngredientDao.getIngredientsForRecipe(UUID.fromString(recipe1Id)).single()
+        assertThat(crossRef.ingredientId).isEqualTo(serverId)
+        val stored = requireNotNull(ingredientDao.getIngredientById(serverId))
+        assertThat(stored.allergenId).isEqualTo(allergenId)
+        assertThat(stored.syncState).isEqualTo(SyncState.SYNCED)
+        assertThat(ingredientDao.getAllIngredients()).hasSize(1)
+    }
+
     @Test
     fun `SYNCED recipe with no ingredients gains ingredients and steps from a later sidecar delivery`() = runTest {
         // Simulates the exact scenario the skip-on-SYNCED bug used to strand permanently: an
