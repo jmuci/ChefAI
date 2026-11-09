@@ -5,6 +5,7 @@ import com.tenmilelabs.chefai.core.data.sync.ConnectivityObserver
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncNetworkDataSource
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncScheduler
 import com.tenmilelabs.chefai.core.data.sync.NetworkMonitor
+import com.tenmilelabs.chefai.core.data.sync.PendingChangesPusher
 import com.tenmilelabs.chefai.core.data.sync.PullResult
 import com.tenmilelabs.chefai.core.data.sync.PushResult
 import com.tenmilelabs.chefai.core.data.sync.SyncExecutor
@@ -24,6 +25,7 @@ import javax.inject.Singleton
  * - [SyncScheduler] → [FakeSyncScheduler]: no-op; prevents WorkManager from being
  *   called. WorkManager requires on-demand initialisation that isn't set up by the
  *   Hilt test application.
+ * - [PendingChangesPusher] → nothing pending, so logout never pushes.
  * - [SyncNetworkDataSource] → [FakeSyncNetworkDataSource]: no-op; returns empty
  *   successful responses without touching the network.
  * - [ConnectivityObserver] → [NetworkMonitor]: kept real; it only reads
@@ -47,6 +49,14 @@ object TestSyncModule {
             pushResult = PushResult(accepted = 0, conflicts = 0, errors = 0),
             pullResult = PullResult(upserted = 0, deleted = 0, pages = 1),
         )
+    }
+
+    @Provides
+    @Singleton
+    fun provideFakePendingChangesPusher(): PendingChangesPusher = object : PendingChangesPusher {
+        override suspend fun countPendingChanges(): Int = 0
+        override suspend fun pushPendingChanges(): PushResult =
+            PushResult(accepted = 0, conflicts = 0, errors = 0)
     }
 
     @Provides

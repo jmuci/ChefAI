@@ -113,7 +113,7 @@ class SyncOrchestrator @Inject constructor(
     private val syncMetadataDao: SyncMetadataDao,
     private val transactionRunner: TransactionRunner,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
-) : SyncExecutor {
+) : SyncExecutor, PendingChangesPusher {
     companion object {
         const val ENTITY_TYPE_RECIPES = "recipes"
         private const val PUSH_BATCH_SIZE = 50
@@ -127,14 +127,25 @@ class SyncOrchestrator @Inject constructor(
         SyncResult(pushResult, pullResult)
     }
 
-    private suspend fun push(): PushResult {
-        val dirtyRecipes = recipeDao.getAllDirty()
-        val allDirtyBookmarks = bookmarkedRecipeDao.getAllDirty()
+    override suspend fun pushPendingChanges(): PushResult = withContext(ioDispatcher) { push() }
 
-        // Only push bookmarks that belong to the current authenticated user.
-        // Bookmarks with stale local UUIDs would be rejected by the backend (USER_MISMATCH).
+    override suspend fun countPendingChanges(): Int = withContext(ioDispatcher) {
+        recipeDao.getAllDirty().size +
+            dirtyBookmarksForCurrentUser().size +
+            mealPlanDao.getAllDirty().size +
+            shoppingListCheckDao.getAllDirty().size +
+            recipeCookEventDao.getAllDirty().size +
+            savedMealPlanDao.getAllDirty().size
+    }
+
+    /**
+     * Only bookmarks that belong to the current authenticated user are pushed. Bookmarks with stale
+     * local UUIDs would be rejected by the backend (USER_MISMATCH).
+     */
+    private suspend fun dirtyBookmarksForCurrentUser(): List<BookmarkedRecipeEntity> {
+        val allDirtyBookmarks = bookmarkedRecipeDao.getAllDirty()
         val authenticatedUserId = sessionManager.getCurrentUserId()
-        val dirtyBookmarks = if (authenticatedUserId != null) {
+        return if (authenticatedUserId != null) {
             val (valid, stale) = allDirtyBookmarks.partition { it.userId == authenticatedUserId }
             if (stale.isNotEmpty()) {
                 Timber.w("Push: Skipping ${stale.size} bookmark(s) with non-matching userId (expected $authenticatedUserId)")
@@ -144,6 +155,11 @@ class SyncOrchestrator @Inject constructor(
             Timber.w("Push: No authenticated userId available, skipping all bookmark pushes")
             emptyList()
         }
+    }
+
+    private suspend fun push(): PushResult {
+        val dirtyRecipes = recipeDao.getAllDirty()
+        val dirtyBookmarks = dirtyBookmarksForCurrentUser()
 
         val dirtyMealPlans = mealPlanDao.getAllDirty()
         val syncMealPlans = dirtyMealPlans.map { plan ->

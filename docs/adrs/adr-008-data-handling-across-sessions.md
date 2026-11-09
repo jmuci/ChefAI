@@ -43,7 +43,32 @@ Two places where the code is narrower than the rules above:
   bookmark not owned by the anonymous user (so household plans the old account could see go too);
   every cook event not on one of the anonymous user's plans; and the pull cursor. The household
   cache is cleared as well. The server restores whatever had synced when the old account signs in
-  again; its **unpushed** edits are lost, because logout cancels sync without flushing first.
+  again. Whatever the old account still had `PENDING`/`DELETED` is deleted with it, so logout now
+  tries to push it first — see the next amendment.
+
+### Amendment (Nov 2026): logout pushes pending changes first (best effort)
+
+The preserve branch above traded "the departing account's rows leak to the next account" for "the
+departing account's unpushed edits are lost". `LogoutUseCase` narrows that loss; the profile menu's
+logout goes through it.
+
+- **Before the token is cleared**, it runs one push-only pass (`PendingChangesPusher`, implemented
+  by `SyncOrchestrator`, no pull) with the still-valid token, capped at
+  `LogoutUseCase.PUSH_TIMEOUT_MS` (4 s). A 401 gets one token refresh and one retry, as in
+  `SyncWorker`.
+- **Logout is never blocked by it.** No network, a timeout or a failure all end in
+  `SessionManager.logout()` anyway. The push runs in the caller's coroutine (the menu's
+  `viewModelScope`); cancelled mid-push, nothing has been cleared yet and the user is still signed in.
+- **Offline with changes waiting, the user is asked first** ("Log out anyway" / "Stay signed in"),
+  since no push can even be tried. Online, logout goes ahead and a snackbar reports any rows still
+  dirty afterwards (timeout, network failure, or rows the server rejected).
+- **What's left is not deleted at logout.** Unpushed rows stay on the device; signing back in with
+  the *same* account uploads them on its next sync. They are deleted only when a *different* account
+  signs in here first (the preserve branch).
+
+Still not covered: rows the server keeps rejecting are lost on an account switch however often
+logout retries them; and the developer-options environment switch (`SwitchApiEnvironment`) still
+calls `SessionManager.logout()` directly, without the push.
 
 **Fixed (Nov 2026):** the preserve branch used to keep the previous account's meal plans, saved
 plans, bookmarks and cook events on the theory that every read filters by `userId`. Two things
