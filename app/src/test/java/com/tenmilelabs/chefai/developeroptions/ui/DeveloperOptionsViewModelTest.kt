@@ -35,13 +35,15 @@ class DeveloperOptionsViewModelTest {
     )
 
     @Test
-    fun `starts on the remote environment by default and shows its URL`() = runTest {
+    fun `starts on the local environment by default and shows its URL — issue 341`() = runTest {
+        // Given nothing stored yet (fresh install or pm clear)
         val viewModel = viewModel(FakeApiEnvironmentRepository())
 
         viewModel.uiState.test {
+            // Then the debug build talks to the local backend, never the deployed one
             val state = awaitItem()
-            assertThat(state.isRemote).isTrue()
-            assertThat(state.activeBaseUrl).isEqualTo("https://api.example.com")
+            assertThat(state.isRemote).isFalse()
+            assertThat(state.activeBaseUrl).isEqualTo("http://10.0.2.2:8080")
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -52,7 +54,7 @@ class DeveloperOptionsViewModelTest {
         val viewModel = viewModel(repository)
 
         viewModel.uiState.test {
-            // Seeded with the (remote) default before the repository flow is collected.
+            // Seeded with the (local) default before the repository flow is collected.
             var latest = awaitItem()
             if (latest.isRemote) latest = awaitItem()
             assertThat(latest.isRemote).isFalse()

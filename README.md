@@ -117,7 +117,8 @@ Every flow starts from `clearState`, so it wipes the app's local data on the dev
 ## Backend
 
 The app talks to [Chef.ai_Backend](https://github.com/jmuci/Chef.ai_Backend) — locally on port 8080 in
-debug builds, or the deployed API (switchable in Developer options).
+debug builds by default (also after a fresh install or `pm clear`), or the deployed API once you switch
+to it in Developer options. Release builds always use the deployed API.
 
 ## Contributing
 
