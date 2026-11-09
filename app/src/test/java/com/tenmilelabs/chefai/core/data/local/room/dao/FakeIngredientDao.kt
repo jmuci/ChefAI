@@ -74,6 +74,20 @@ class FakeIngredientDao : IngredientDao {
         }
     }
 
+    override suspend fun insertAllIfAbsent(ingredients: List<IngredientEntity>) {
+        ingredients.forEach { insertIfAbsent(it) }
+    }
+
+    override suspend fun markPendingIfSynced(uuids: List<UUID>) {
+        ingredientsFlow.value = ingredientsFlow.value.map { ingredient ->
+            if (ingredient.uuid in uuids && ingredient.syncState == SyncState.SYNCED) {
+                ingredient.copy(syncState = SyncState.PENDING)
+            } else {
+                ingredient
+            }
+        }
+    }
+
     override suspend fun upsertAll(ingredients: List<IngredientEntity>) {
         val currentList = ingredientsFlow.value.toMutableList()
         ingredients.forEach { ingredient ->

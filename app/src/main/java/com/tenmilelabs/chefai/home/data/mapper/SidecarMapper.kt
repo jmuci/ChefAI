@@ -61,18 +61,38 @@ fun SidecarCreatorDto.toUserEntity(): UserEntity = UserEntity(
     syncState = SyncState.SYNCED,
 )
 
-fun SidecarIngredient.toIngredientEntity(now: Long): IngredientEntity = IngredientEntity(
-    uuid = UUID.nameUUIDFromBytes(name.lowercase().trim().toByteArray()),
-    displayName = name,
-    allergenId = null,
-    sourcePrimaryId = null,
-    updatedAt = now,
-    deletedAt = null,
-    syncState = SyncState.SYNCED,
-)
+/**
+ * The id this device derives from the ingredient's name when the sidecar carries no server id. The
+ * server's catalogue never uses it (its ids are seeded differently), so an ingredient row with this
+ * id is unknown to the server and must not be marked SYNCED (#338).
+ */
+fun SidecarIngredient.mintedIngredientId(): UUID = UUID.nameUUIDFromBytes(name.lowercase().trim().toByteArray())
+
+/** The server's catalogue id when the sidecar sent a valid one. */
+private fun SidecarIngredient.serverIngredientId(): UUID? =
+    ingredientId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+
+/**
+ * SYNCED only for a server-provided id. A minted id is PENDING, like any other ingredient the
+ * device created: the push then leaves it out (see `SyncOrchestrator.buildSyncRecipeDto`) instead
+ * of sending an id the server answers with INGREDIENT_NOT_FOUND, which rejected the whole recipe
+ * of any user who picked this ingredient by name (#338).
+ */
+fun SidecarIngredient.toIngredientEntity(now: Long): IngredientEntity {
+    val serverId = serverIngredientId()
+    return IngredientEntity(
+        uuid = serverId ?: mintedIngredientId(),
+        displayName = name,
+        allergenId = null,
+        sourcePrimaryId = null,
+        updatedAt = now,
+        deletedAt = null,
+        syncState = if (serverId != null) SyncState.SYNCED else SyncState.PENDING,
+    )
+}
 
 fun SidecarIngredient.toRecipeIngredientEntity(recipeId: UUID, now: Long): RecipeIngredientEntity {
-    val ingredientId = UUID.nameUUIDFromBytes(name.lowercase().trim().toByteArray())
+    val ingredientId = serverIngredientId() ?: mintedIngredientId()
     return RecipeIngredientEntity(
         recipeId = recipeId,
         ingredientId = ingredientId,

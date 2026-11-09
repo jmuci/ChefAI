@@ -65,6 +65,17 @@ interface IngredientDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertIfAbsent(ingredient: IngredientEntity)
 
+    /** [insertIfAbsent] for a batch. */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAllIfAbsent(ingredients: List<IngredientEntity>)
+
+    /**
+     * Downgrades rows in [uuids] from SYNCED to PENDING, leaving every other state alone. For ids
+     * the device minted itself and once mislabelled as known to the server (#338).
+     */
+    @Query("UPDATE ingredients SET syncState = 'PENDING' WHERE uuid IN (:uuids) AND syncState = 'SYNCED'")
+    suspend fun markPendingIfSynced(uuids: List<UUID>)
+
     @Query("SELECT * FROM ingredients WHERE syncState = 'PENDING'")
     suspend fun getDirty(): List<IngredientEntity>
 

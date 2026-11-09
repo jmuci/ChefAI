@@ -4,6 +4,7 @@ import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
+import com.tenmilelabs.chefai.auth.data.network.dto.TokenRefreshResponse
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.auth.domain.usecase.AccountUpgradeUseCase
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
@@ -33,6 +34,8 @@ import com.tenmilelabs.chefai.mealplans.data.local.SavedPlanImageStore
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
 import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -1088,6 +1091,73 @@ class SessionManagerTest {
         advanceUntilIdle()
 
         assertThat(sessionManager.userSession.value).isInstanceOf(UserSession.Anonymous::class.java)
+    }
+
+    @Test
+    fun `a token refresh that completes after logout does not resurrect the session — issue 337`() = testScope.runTest {
+        // Given a signed-in user whose token refresh is held in flight on a gate
+        val userId = UuidV7Generator.newId()
+        fakeAuthNetworkDataSource.authResponse = AuthResponse(
+            token = "fake_token", refreshToken = "fake_refresh", userId = userId.toString(),
+            username = "chef", email = "chef@example.com", expiresIn = 3600
+        )
+        sessionManager.login("chef@example.com", "password123")
+        advanceUntilIdle()
+        fakeAuthNetworkDataSource.tokenRefreshResponse = TokenRefreshResponse(
+            accessToken = "refreshed_access", refreshToken = "refreshed_refresh",
+            userId = userId.toString(), expiresIn = 3600
+        )
+        val gate = CompletableDeferred<Unit>()
+        fakeAuthNetworkDataSource.refreshGate = gate
+        val refresh = async { sessionManager.refreshToken() }
+        advanceUntilIdle() // the refresh is now suspended inside the network call
+
+        // When the user logs out, and only then does the refresh response arrive
+        sessionManager.logout()
+        gate.complete(Unit)
+        val result = refresh.await()
+        advanceUntilIdle()
+
+        // Then logout wins: still anonymous, no tokens re-written, and the refresh reports failure
+        assertThat(sessionManager.userSession.value).isInstanceOf(UserSession.Anonymous::class.java)
+        assertThat(fakeSecurePreferences.getAccessToken().first()).isNull()
+        assertThat(fakeSecurePreferences.getRefreshToken().first()).isNull()
+        assertThat(result.isFailure).isTrue()
+    }
+
+    @Test
+    fun `a token refresh keeps the latest session state when nothing ended it`() = testScope.runTest {
+        // Given a signed-in user whose refresh is in flight while their household state changes
+        val userId = UuidV7Generator.newId()
+        fakeAuthNetworkDataSource.authResponse = AuthResponse(
+            token = "fake_token", refreshToken = "fake_refresh", userId = userId.toString(),
+            username = "chef", email = "chef@example.com", expiresIn = 3600
+        )
+        fakeHouseholdRepository.householdAfterRefresh = householdOf(userId, HouseholdRole.OWNER)
+        val householdGate = fakeHouseholdRepository.enqueueRefreshGate()
+        sessionManager.login("chef@example.com", "password123")
+        advanceUntilIdle()
+        fakeAuthNetworkDataSource.tokenRefreshResponse = TokenRefreshResponse(
+            accessToken = "refreshed_access", refreshToken = "refreshed_refresh",
+            userId = userId.toString(), expiresIn = 3600
+        )
+        val gate = CompletableDeferred<Unit>()
+        fakeAuthNetworkDataSource.refreshGate = gate
+        val refresh = async { sessionManager.refreshToken() }
+        advanceUntilIdle()
+
+        // When the household refresh lands first, then the token refresh
+        householdGate.complete(Unit)
+        advanceUntilIdle()
+        gate.complete(Unit)
+        val result = refresh.await()
+
+        // Then the new token is applied on top of the household the session gained meanwhile
+        val session = sessionManager.userSession.value as UserSession.Authenticated
+        assertThat(result.isSuccess).isTrue()
+        assertThat(session.authToken.accessToken).isEqualTo("refreshed_access")
+        assertThat(session.household?.role).isEqualTo(HouseholdRole.OWNER)
+        assertThat(fakeSecurePreferences.getAccessToken().first()).isEqualTo("refreshed_access")
     }
 
     @Test

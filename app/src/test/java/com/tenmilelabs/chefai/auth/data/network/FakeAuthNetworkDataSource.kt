@@ -6,6 +6,7 @@ import com.tenmilelabs.chefai.auth.data.network.dto.RefreshTokenRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RegisterRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.TokenRefreshResponse
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 
 /**
@@ -42,6 +43,12 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
      */
     var tokenRefreshResponse: TokenRefreshResponse? = null
 
+    /**
+     * When set, [refreshToken] suspends on it before responding — lets a test hold a refresh
+     * "in flight" deterministically and interleave other calls, without wall-clock delays.
+     */
+    var refreshGate: CompletableDeferred<Unit>? = null
+
     override suspend fun register(request: RegisterRequest): AuthResponse {
         if (networkDelayMs > 0) {
             delay(networkDelayMs)
@@ -76,6 +83,7 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
         if (networkDelayMs > 0) {
             delay(networkDelayMs)
         }
+        refreshGate?.await()
 
         if (shouldThrowError) {
             throw Exception("Simulated network error during token refresh")
@@ -119,5 +127,6 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
         networkDelayMs = 0
         authResponse = null
         tokenRefreshResponse = null
+        refreshGate = null
     }
 }
