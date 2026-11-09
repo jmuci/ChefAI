@@ -7,6 +7,7 @@ import com.tenmilelabs.chefai.core.domain.model.Recipe
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
 import com.tenmilelabs.chefai.core.domain.model.User
+import com.tenmilelabs.chefai.core.domain.units.IngredientQuantity
 import com.tenmilelabs.chefai.recipes.domain.model.RecipeDraft
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -49,10 +50,11 @@ private val draftJson = Json { ignoreUnknownKeys = true }
 
 // --- Domain ↔ DTO mappers ---
 
+// draftJson can't encode NaN/Infinity — one such row used to throw out of SaveImportedDraft (#336).
 private fun RecipeIngredient.toDto(): DraftIngredientDto = DraftIngredientDto(
     ingredientId = ingredientId.toString(),
     ingredientDisplayName = ingredientDisplayName,
-    quantity = quantity,
+    quantity = IngredientQuantity.sanitized(quantity),
     unit = unit,
     allergenName = allergenName,
     srcCategory = srcCategory,

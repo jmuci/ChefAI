@@ -383,6 +383,66 @@ class RecipeEditorReducerTest {
     }
 
     @Test
+    fun `IngredientQuantityChanged rejects non-finite and non-plain numbers — issue 336`() {
+        // Given inputs String.toDoubleOrNull accepts but that aren't plain amounts
+        listOf("NaN", "Infinity", "-Infinity", "1e307", "1d", "2f", "-2", "0x1p3").forEach { input ->
+            // When typed or pasted into the quantity field
+            val result = RecipeEditorReducer.reduce(emptyState, EditorAction.IngredientQuantityChanged(input))
+
+            // Then the field is left unchanged
+            assertEquals("input \"$input\"", "", result.ingredients.quantity)
+        }
+    }
+
+    @Test
+    fun `IngredientQuantityChanged caps the amount at MAX_ENTRY — issue 335`() {
+        // Given a pasted plain-digit 1e307 and an amount just past the cap
+        val huge = "1" + "0".repeat(307)
+        val pastCap = "1000000.5"
+
+        // When each is entered
+        val hugeResult = RecipeEditorReducer.reduce(emptyState, EditorAction.IngredientQuantityChanged(huge))
+        val pastCapResult = RecipeEditorReducer.reduce(emptyState, EditorAction.IngredientQuantityChanged(pastCap))
+        val atCap = RecipeEditorReducer.reduce(emptyState, EditorAction.IngredientQuantityChanged("1000000"))
+
+        // Then both are refused and the cap itself is still accepted
+        assertEquals("", hugeResult.ingredients.quantity)
+        assertEquals("", pastCapResult.ingredients.quantity)
+        assertEquals("1000000", atCap.ingredients.quantity)
+    }
+
+    @Test
+    fun `IngredientSelected refuses a quantity above MAX_ENTRY — issue 335`() {
+        val state = emptyState.copy(ingredients = IngredientsFields(quantity = "1" + "0".repeat(307)))
+
+        val result = RecipeEditorReducer.reduce(state, EditorAction.IngredientSelected("Flour", UUID.randomUUID()))
+
+        assertTrue(result.ingredients.selectedIngredients.isEmpty())
+    }
+
+    @Test
+    fun `IngredientQuantityChanged accepts plain decimals and in-progress input`() {
+        listOf("2", "2.", "2.5", ".5", "0").forEach { input ->
+            val result = RecipeEditorReducer.reduce(emptyState, EditorAction.IngredientQuantityChanged(input))
+            assertEquals(input, result.ingredients.quantity)
+        }
+    }
+
+    @Test
+    fun `IngredientSelected does nothing when the quantity is not a finite amount — issue 336`() {
+        // Given a quantity that bypassed IngredientQuantityChanged (e.g. a restored form field)
+        listOf("NaN", "Infinity", ".").forEach { quantity ->
+            val state = emptyState.copy(ingredients = IngredientsFields(quantity = quantity))
+
+            // When an ingredient is picked
+            val result = RecipeEditorReducer.reduce(state, EditorAction.IngredientSelected("Flour", UUID.randomUUID()))
+
+            // Then nothing is added
+            assertTrue("quantity \"$quantity\"", result.ingredients.selectedIngredients.isEmpty())
+        }
+    }
+
+    @Test
     fun `RemoveIngredient removes the specified ingredient`() {
         val ingredient = RecipeIngredient(
             UUID.randomUUID(), "Flour", 200.0, "grams", null, null, null

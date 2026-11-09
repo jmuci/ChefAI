@@ -125,4 +125,27 @@ class QuantityFormatTest {
         assertThat(QuantityFormat.cooking(0.5, "pinch")).isEqualTo("½")
         assertThat(QuantityFormat.cooking(1.5, "handful")).isEqualTo("1½")
     }
+
+    @Test
+    fun `decimal - huge finite values render instead of overflowing into BigDecimal — issue 335`() {
+        // Given values whose `* 100` overflows to Infinity (~1.8e306 and up), and the largest double
+        val huge = listOf(1e307, -1e307, 1.8e306, Double.MAX_VALUE)
+
+        huge.forEach { value ->
+            // When formatted (this threw NumberFormatException: Infinite or NaN)
+            val text = QuantityFormat.decimal(value)
+
+            // Then the plain digits come back
+            assertThat(text).doesNotContain("E")
+            assertThat(text.toBigDecimal().toDouble()).isEqualTo(value)
+        }
+        assertThat(QuantityFormat.decimal(1e307)).isEqualTo("1" + "0".repeat(307))
+        assertThat(QuantityFormat.cooking(1e307, "cup")).isEqualTo("1" + "0".repeat(307))
+    }
+
+    @Test
+    fun `decimal - values either side of 2^53 keep their existing rendering`() {
+        assertThat(QuantityFormat.decimal(1e16)).isEqualTo("10000000000000000")
+        assertThat(QuantityFormat.decimal(1e15 + 0.5)).isEqualTo("1000000000000000.5")
+    }
 }

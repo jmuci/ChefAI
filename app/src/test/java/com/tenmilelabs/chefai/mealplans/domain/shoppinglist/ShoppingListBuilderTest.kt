@@ -770,4 +770,28 @@ class ShoppingListBuilderTest {
 
         assertThat(list.allItems().single().quantityLabel).isEqualTo("100 g + 50 ml")
     }
+
+    @Test
+    fun `huge stored quantities build a list instead of crashing — issue 335`() {
+        // Given rows carrying 1e307, scaled and summed alongside ordinary ones
+        val recipeA = UUID.randomUUID()
+        val recipeB = UUID.randomUUID()
+        val ingredients = listOf(
+            ingredient(recipeA, 2, "flour", 1e307, "g"),
+            ingredient(recipeB, 4, "flour", 200.0, "g"),
+            ingredient(recipeA, 2, "milk", 1e307, "cup"),
+            ingredient(recipeA, 2, "eggs", 1e307, ""),
+            ingredient(recipeB, 4, "sugar", Double.MAX_VALUE, "tbsp"),
+        )
+
+        MeasurementSystem.entries.forEach { system ->
+            // When built for six servings (scaling multiplies the huge values further)
+            val list = ShoppingListBuilder.build(
+                ingredients, mapOf(recipeA to 2, recipeB to 1), 6, emptySet(), system,
+            )
+
+            // Then every row still has a label
+            assertWithMessage("system $system").that(list.allItems()).hasSize(4)
+        }
+    }
 }

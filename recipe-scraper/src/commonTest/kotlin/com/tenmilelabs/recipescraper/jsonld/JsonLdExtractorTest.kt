@@ -164,4 +164,67 @@ class JsonLdExtractorTest {
     fun `leaves language null when the recipe declares none`() {
         assertNull(extract(JsonLdFixtures.PLAIN_OBJECT)?.language)
     }
+
+    @Test
+    fun `array-valued fields nested past MAX_NESTING_DEPTH are left out — issue 339`() {
+        // Given a page whose image, author, yield, category, keywords and language each sit one
+        // array deeper than the cap (uncapped, this recursion overflowed the stack on deep pages;
+        // JsonLdDeepNestingTest covers the overflow itself)
+        fun deep(value: String): String = "[".repeat(MAX_NESTING_DEPTH + 1) + value + "]".repeat(MAX_NESTING_DEPTH + 1)
+        val html = """
+            <script type="application/ld+json">
+            {
+              "@type": "Recipe",
+              "name": "Deep Pancakes",
+              "recipeIngredient": ["1 cup flour"],
+              "image": ${deep("\"https://example.com/p.jpg\"")},
+              "author": ${deep("\"Jane\"")},
+              "recipeYield": ${deep("\"4\"")},
+              "recipeCategory": ${deep("\"Breakfast\"")},
+              "recipeCuisine": ${deep("\"French\"")},
+              "keywords": ${deep("\"easy\"")},
+              "inLanguage": ${deep("\"en\"")}
+            }
+            </script>
+        """.trimIndent()
+
+        // When extracted
+        val recipe = extract(html)
+
+        // Then the recipe still maps, with the over-nested values simply left out
+        assertEquals("Deep Pancakes", recipe?.title)
+        assertEquals(listOf("1 cup flour"), recipe?.ingredients?.map { it.raw })
+        assertNull(recipe?.imageUrl)
+        assertNull(recipe?.author)
+        assertNull(recipe?.servings)
+        assertNull(recipe?.language)
+        assertEquals(emptyList(), recipe?.keywords)
+    }
+
+    @Test
+    fun `values nested right up to the depth cap are still read`() {
+        fun nested(value: String): String = "[".repeat(MAX_NESTING_DEPTH) + value + "]".repeat(MAX_NESTING_DEPTH)
+        val html = """
+            <script type="application/ld+json">
+            {
+              "@type": "Recipe",
+              "name": "Shallow Pancakes",
+              "recipeIngredient": ["1 cup flour"],
+              "image": ${nested("\"https://example.com/p.jpg\"")},
+              "author": ${nested("\"Jane\"")},
+              "recipeYield": ${nested("\"4\"")},
+              "keywords": ${nested("\"easy\"")},
+              "inLanguage": ${nested("\"en\"")}
+            }
+            </script>
+        """.trimIndent()
+
+        val recipe = extract(html)
+
+        assertEquals("https://example.com/p.jpg", recipe?.imageUrl)
+        assertEquals("Jane", recipe?.author)
+        assertEquals(4, recipe?.servings)
+        assertEquals("en", recipe?.language?.code)
+        assertEquals(listOf("easy"), recipe?.keywords)
+    }
 }

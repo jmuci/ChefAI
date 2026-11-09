@@ -62,20 +62,20 @@ internal fun JsonObject.stringOrNull(key: String): String? = (this[key] as? Json
  * `inLanguage` as schema.org allows it: a bare tag (`"es-ES"`), or a `Language` object carrying
  * the tag in `alternateName`. An array is read for its first entry.
  */
-private fun JsonElement.languageTagOrNull(): String? = when (this) {
-    is JsonArray -> firstNotNullOfOrNull { it.languageTagOrNull() }
+private fun JsonElement.languageTagOrNull(depth: Int = 0): String? = when (this) {
+    is JsonArray -> if (depth >= MAX_NESTING_DEPTH) null else firstNotNullOfOrNull { it.languageTagOrNull(depth + 1) }
     is JsonObject -> stringOrNull("alternateName")
     is JsonPrimitive -> contentOrNull
 }
 
-private fun JsonElement.firstImageUrlOrNull(): String? = when (this) {
-    is JsonArray -> firstNotNullOfOrNull { it.firstImageUrlOrNull() }
+private fun JsonElement.firstImageUrlOrNull(depth: Int = 0): String? = when (this) {
+    is JsonArray -> if (depth >= MAX_NESTING_DEPTH) null else firstNotNullOfOrNull { it.firstImageUrlOrNull(depth + 1) }
     is JsonObject -> stringOrNull("url")
     is JsonPrimitive -> contentOrNull
 }
 
-private fun JsonElement.yieldStrings(): List<String> = when (this) {
-    is JsonArray -> flatMap { it.yieldStrings() }
+private fun JsonElement.yieldStrings(depth: Int = 0): List<String> = when (this) {
+    is JsonArray -> if (depth >= MAX_NESTING_DEPTH) emptyList() else flatMap { it.yieldStrings(depth + 1) }
     is JsonPrimitive -> listOfNotNull(contentOrNull)
     is JsonObject -> emptyList()
 }
@@ -96,9 +96,10 @@ private fun JsonElement.toIngredients(depth: Int = 0): List<ScrapedIngredient> =
     }
 
 /**
- * How deep nested arrays / `HowToSection`s are followed. Real pages nest two or three levels; the
- * cap stops a hostile page from nesting tens of thousands deep and overflowing the stack — a
- * `StackOverflowError` is not an `Exception`, so RecipeHtmlParser's catch wouldn't contain it.
+ * How deep nested arrays / `HowToSection`s are followed — by every recursive helper in this file and
+ * by `findRecipeCandidates`. Real pages nest two or three levels; the cap stops a hostile page from
+ * nesting thousands deep and overflowing the stack — a `StackOverflowError` is not an `Exception`,
+ * so RecipeHtmlParser's catch wouldn't contain it (#339). Any new recursive walker must take it too.
  */
 internal const val MAX_NESTING_DEPTH = 32
 
@@ -137,14 +138,14 @@ private fun JsonObject.keywords(): List<String> {
     return all.filter { it.isNotBlank() && seen.add(it.lowercase()) }
 }
 
-private fun JsonElement.commaOrArraySeparated(): List<String> = when (this) {
-    is JsonArray -> flatMap { it.commaOrArraySeparated() }
+private fun JsonElement.commaOrArraySeparated(depth: Int = 0): List<String> = when (this) {
+    is JsonArray -> if (depth >= MAX_NESTING_DEPTH) emptyList() else flatMap { it.commaOrArraySeparated(depth + 1) }
     is JsonPrimitive -> contentOrNull?.split(",")?.map { it.trim() }.orEmpty()
     is JsonObject -> emptyList()
 }
 
-private fun JsonElement.firstAuthorNameOrNull(): String? = when (this) {
-    is JsonArray -> firstNotNullOfOrNull { it.firstAuthorNameOrNull() }
+private fun JsonElement.firstAuthorNameOrNull(depth: Int = 0): String? = when (this) {
+    is JsonArray -> if (depth >= MAX_NESTING_DEPTH) null else firstNotNullOfOrNull { it.firstAuthorNameOrNull(depth + 1) }
     is JsonObject -> stringOrNull("name")
     is JsonPrimitive -> contentOrNull
 }

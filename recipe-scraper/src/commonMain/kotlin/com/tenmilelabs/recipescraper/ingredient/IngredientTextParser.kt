@@ -140,20 +140,33 @@ private fun parseSingleNumber(text: String): Double? {
         val fraction = VULGAR_FRACTIONS[text[vulgarAt]] ?: return null
         val whole = text.substring(0, vulgarAt)
         if (whole.isEmpty()) return fraction
-        return whole.toDoubleOrNull()?.plus(fraction)
+        return parsePlainDecimal(whole)?.plus(fraction)
     }
 
     if (text.contains('/')) {
         val parts = text.split('/')
         if (parts.size != 2) return null
-        val numerator = parts[0].toDoubleOrNull() ?: return null
-        val denominator = parts[1].toDoubleOrNull() ?: return null
-        return if (denominator == 0.0) null else numerator / denominator
+        val numerator = parsePlainDecimal(parts[0]) ?: return null
+        val denominator = parsePlainDecimal(parts[1]) ?: return null
+        return if (denominator == 0.0) null else (numerator / denominator).takeIf { it.isFinite() }
     }
 
-    // Accept a comma decimal separator, as used across most of Europe.
-    return text.replace(',', '.').toDoubleOrNull()
+    return parsePlainDecimal(text)
 }
+
+/**
+ * Digits with an optional decimal part, and nothing else. `toDoubleOrNull` alone would also read
+ * `"NaN"`, `"Infinity"`, `"1e999"`, `"1d"` and `"2f"` as numbers — and a non-finite amount can't be
+ * serialized by the app downstream. A long enough run of digits still overflows, hence the
+ * [isFinite] check.
+ */
+private fun parsePlainDecimal(text: String): Double? {
+    if (!PLAIN_DECIMAL.matches(text)) return null
+    // Accept a comma decimal separator, as used across most of Europe.
+    return text.replace(',', '.').toDoubleOrNull()?.takeIf { it.isFinite() }
+}
+
+private val PLAIN_DECIMAL = Regex("""\d+([.,]\d*)?|[.,]\d+""")
 
 /**
  * Maps a unit token onto a canonical short form, or `null` if it isn't a recognised unit.

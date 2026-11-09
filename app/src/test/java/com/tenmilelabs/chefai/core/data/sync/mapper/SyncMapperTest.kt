@@ -215,6 +215,20 @@ class SyncMapperTest {
     }
 
     @Test
+    fun `toSyncDto pushes a non-finite quantity as no amount so the payload still encodes — issue 336`() {
+        // Given rows already persisted with NaN / Infinity quantities
+        val poisoned = listOf(Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)
+            .map { ingredientEntities[0].copy(quantity = it) }
+
+        // When mapped for push
+        val dto = recipeEntity.toSyncDto(stepEntities, poisoned, tagCrossRefs, labelCrossRefs)
+
+        // Then every quantity is NO_AMOUNT and the default (no special floats) Json encodes it
+        assertThat(dto.ingredients.map { it.quantity }).containsExactly(0.0, 0.0, 0.0)
+        assertThat(Json.encodeToString(dto)).contains("\"quantity\":0.0")
+    }
+
+    @Test
     fun `toSyncDto maps tag and label IDs as strings`() {
         val dto = recipeEntity.toSyncDto(stepEntities, ingredientEntities, tagCrossRefs, labelCrossRefs)
 

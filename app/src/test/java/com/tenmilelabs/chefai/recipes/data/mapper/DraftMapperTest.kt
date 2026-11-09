@@ -182,6 +182,33 @@ class DraftMapperTest {
     }
 
     @Test
+    fun `a non-finite ingredient quantity is stored as no amount instead of throwing — issue 336`() {
+        // Given a draft carrying NaN and Infinity quantities alongside a valid one
+        val original = RecipeDraft(
+            recipeId = UUID.randomUUID(),
+            isNewRecipe = true,
+            ingredients = listOf(Double.NaN, Double.POSITIVE_INFINITY, 2.5).map { quantity ->
+                RecipeIngredient(
+                    ingredientId = UUID.randomUUID(),
+                    ingredientDisplayName = "Flour",
+                    quantity = quantity,
+                    unit = "g",
+                    allergenName = null,
+                    srcCategory = null,
+                    srcSubcategory = null,
+                )
+            },
+            updatedAt = 1L,
+        )
+
+        // When persisted and read back (this used to throw JsonEncodingException)
+        val restored = original.toRecipeDraftEntity().toRecipeDraft()
+
+        // Then the bad rows read as no amount and the valid one is untouched
+        assertEquals(listOf(0.0, 0.0, 2.5), restored.ingredients.map { it.quantity })
+    }
+
+    @Test
     fun `draft entity preserves localImagePath when null`() {
         val original = RecipeDraft(
             recipeId = UUID.randomUUID(),

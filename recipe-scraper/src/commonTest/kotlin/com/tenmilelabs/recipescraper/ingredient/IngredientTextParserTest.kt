@@ -273,4 +273,47 @@ class IngredientTextParserTest {
     fun `does not treat a as a range word in English`() {
         assertParsed("2 a 3 cups flour", 2.0, null, "a 3 cups flour")
     }
+
+    // --- Non-numbers that toDoubleOrNull would accept (#336) ---
+
+    @Test
+    fun `never reads NaN or Infinity as an amount`() {
+        // Given lines whose leading token Kotlin's own number parser reads as non-finite
+        val lines = listOf("NaN g flour", "Infinity g flour", "1e999 g flour", "-Infinity cups milk")
+
+        lines.forEach { raw ->
+            // When parsed
+            val result = parseIngredient(raw)
+
+            // Then no amount is reported and the line survives as the name
+            assertNull(result.quantity, "quantity for \"$raw\"")
+            assertEquals(raw, result.name, "name for \"$raw\"")
+        }
+    }
+
+    @Test
+    fun `reads only digits and fractions, not exponent or type-suffixed tokens`() {
+        listOf("1e2 g flour", "1d eggs", "2f eggs", "0x10 g sugar").forEach { raw ->
+            assertNull(parseIngredient(raw).quantity, "quantity for \"$raw\"")
+        }
+    }
+
+    @Test
+    fun `drops an amount too long to be finite`() {
+        // Given a run of digits that overflows a Double
+        val raw = "9".repeat(400) + " g flour"
+
+        // When parsed
+        val quantity = parseIngredient(raw).quantity
+
+        // Then it is not reported as Infinity
+        assertNull(quantity)
+    }
+
+    @Test
+    fun `still reads plain decimals with either separator`() {
+        assertParsed("1.5 kg potatoes", 1.5, "kg", "potatoes")
+        assertParsed("1,5 kg potatoes", 1.5, "kg", "potatoes")
+        assertParsed(".5 cup milk", 0.5, "cup", "milk")
+    }
 }
