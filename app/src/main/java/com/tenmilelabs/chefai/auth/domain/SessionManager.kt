@@ -66,6 +66,14 @@ class SessionManager @Inject constructor(
     private val refreshMutex = Mutex()
 
     /**
+     * Makes a completing [refreshToken]'s "is this still the same session? then write the new
+     * tokens" one step with respect to [logout] and [endDeletedAccountSession] tearing the session
+     * down. Separate from [refreshMutex] so logging out never waits on a refresh's network call —
+     * only on its few local writes. Never held across network I/O.
+     */
+    private val sessionEndMutex = Mutex()
+
+    /**
      * The background job started by the most recent [attachHouseholdState] call. Tracked so a new
      * call — or [logout] — can cancel a previous one still in flight: without this, a slow response
      * for an account that has since logged out or switched away can land after the household cache
@@ -462,7 +470,7 @@ class SessionManager @Inject constructor(
      * Reuses the existing anonymous localUserId from SecurePreferences so that
      * data continuity is maintained on the device (RFC-001 Section 7.3).
      */
-    suspend fun logout() {
+    suspend fun logout(): Unit = sessionEndMutex.withLock {
         try {
             val currentUser = getCurrentUser()
             Timber.d("Logging out user: ${currentUser?.uuid}")
@@ -511,7 +519,7 @@ class SessionManager @Inject constructor(
      * holds the deleted account's data. The session still ends up anonymous either way, since
      * the credentials are dead server-side regardless.
      */
-    suspend fun endDeletedAccountSession() {
+    suspend fun endDeletedAccountSession(): Unit = sessionEndMutex.withLock {
         Timber.d("Ending session for deleted account: ${getCurrentUser()?.uuid}")
         householdRefreshJob?.cancel()
         syncSchedulerProvider.get().cancelAllSync()
@@ -560,23 +568,37 @@ class SessionManager @Inject constructor(
 
             val newAuthToken = response.toAuthToken()
 
-            // Update secure storage with new tokens
-            securePreferences.updateAccessToken(
-                accessToken = newAuthToken.accessToken,
-                tokenExpiry = newAuthToken.expiresAt
-            )
+            sessionEndMutex.withLock {
+                // The network call above suspends, and logout() doesn't wait for it. Re-read the
+                // session now: if it ended (or became someone else's) meanwhile, writing the tokens
+                // back would resurrect a session the user just left (#337).
+                val latestSession = _userSession.value
+                if (latestSession !is UserSession.Authenticated ||
+                    latestSession.user.uuid != currentSession.user.uuid ||
+                    latestSession.authToken.accessToken != currentSession.authToken.accessToken
+                ) {
+                    Timber.d("Session ended while the token refresh was in flight, discarding it")
+                    return Result.failure(IllegalStateException("Session ended during token refresh"))
+                }
 
-            // Note: In token rotation, we also need to update the refresh token
-            securePreferences.updateRefreshToken(
-                refreshToken = newAuthToken.refreshToken
-            )
+                // Update secure storage with new tokens
+                securePreferences.updateAccessToken(
+                    accessToken = newAuthToken.accessToken,
+                    tokenExpiry = newAuthToken.expiresAt
+                )
 
-            // Update session state. `.copy()`, not a fresh Authenticated(...) — this is a mutation
-            // of the existing session (only the token changed), not a new sign-in, so `household`
-            // must carry forward. Reconstructing from parts here would silently drop it back to
-            // null on every token refresh, which fires on its own timer independent of any
-            // household state change.
-            _userSession.value = currentSession.copy(authToken = newAuthToken)
+                // Note: In token rotation, we also need to update the refresh token
+                securePreferences.updateRefreshToken(
+                    refreshToken = newAuthToken.refreshToken
+                )
+
+                // Update session state. `.copy()` of the *latest* session, not a fresh
+                // Authenticated(...) nor the snapshot taken before the network call — this is a
+                // mutation of the existing session (only the token changed), so `household` must
+                // carry forward, including any household state that landed while the refresh was
+                // in flight.
+                _userSession.value = latestSession.copy(authToken = newAuthToken)
+            }
 
             Timber.d("Token refreshed successfully")
             Result.success(Unit)
