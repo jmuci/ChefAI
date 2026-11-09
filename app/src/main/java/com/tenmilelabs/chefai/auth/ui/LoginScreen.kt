@@ -1,7 +1,7 @@
 package com.tenmilelabs.chefai.auth.ui
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -145,113 +147,125 @@ fun LoginScreenContent(
             // menu (Home is the start destination), so there is always somewhere to go back to.
             ChefAITopAppBarWithWordmark(navigation = ChefAINavigation.Back(onClick = onNavigateBack))
 
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                // Flush left, vertically centered — Modernist forbids centered hero copy.
+            // Scrolls once the form outgrows the screen (landscape, large font scale) — it used to be
+            // clipped there, with the bottom-pinned footer drawn over the fields (#340). When it fits,
+            // the min height keeps the form centered and the footer at the bottom, as before.
+            BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                val viewportHeight = maxHeight
                 Column(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .testTag("LoginScreen")
-                        .padding(
-                            horizontal = dimensionResource(id = R.dimen.padding_medium),
-                            vertical = dimensionResource(id = R.dimen.padding_large),
-                        ),
-                    horizontalAlignment = Alignment.Start,
-                    verticalArrangement = Arrangement.Center
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .heightIn(min = viewportHeight),
                 ) {
-                    Text(
-                        text = stringResource(R.string.welcome_back),
-                        style = MaterialTheme.typography.displayMedium,
-                        color = MaterialTheme.colorScheme.onBackground,
-                    )
-
-                    Spacer(modifier = Modifier.height(AuthMetrics.TitleToSubtitleGap))
-
-                    Text(
-                        text = stringResource(R.string.login_subtitle),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Spacer(modifier = Modifier.height(AuthMetrics.SubtitleToFieldsGap))
-
-                    // Email Field with autocomplete dropdown
-                    EmailTextField(
-                        email = uiState.email,
-                        suggestions = uiState.emailSuggestions,
-                        onEmailChange = onEmailChange,
-                        onSuggestionSelected = onEmailSuggestionSelected,
-                        onDismissSuggestions = onEmailSuggestionsDismissed,
-                        error = uiState.emailError,
-                        onNext = { focusManager.moveFocus(FocusDirection.Down) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(modifier = Modifier.height(AuthMetrics.FieldGap))
-
-                    // Password Field
-                    PasswordTextField(
-                        password = uiState.password,
-                        onPasswordChange = onPasswordChange,
-                        isVisible = uiState.isPasswordVisible,
-                        onVisibilityToggle = onPasswordVisibilityToggle,
-                        error = uiState.passwordError,
-                        modifier = Modifier.fillMaxWidth(),
-                        onDone = onLoginClick
-                    )
-
-                    Spacer(modifier = Modifier.height(AuthMetrics.FieldGap))
-
-                    // Remember Me row
-                    RememberMeRow(
-                        isChecked = uiState.rememberMe,
-                        onCheckedChange = onRememberMeChange
-                    )
-
-                    Spacer(modifier = Modifier.height(AuthMetrics.FieldGap))
-
-                    // Login Button
-                    FlatBlockButton(
-                        text = stringResource(R.string.login_button),
-                        onClick = onLoginClick,
-                        loading = uiState.isLoading,
-                        modifier = Modifier.testTag("LoginButton"),
-                    )
-
-                    Spacer(modifier = Modifier.height(AuthMetrics.ButtonToFooterGap))
-
-                    // Create Account Link
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(AuthMetrics.FooterItemGap),
-                        verticalAlignment = Alignment.CenterVertically
+                    // Flush left, vertically centered — Modernist forbids centered hero copy.
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .testTag("LoginScreen")
+                            .padding(
+                                horizontal = dimensionResource(id = R.dimen.padding_medium),
+                                vertical = dimensionResource(id = R.dimen.padding_large),
+                            ),
+                        horizontalAlignment = Alignment.Start,
+                        verticalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = stringResource(R.string.dont_have_account),
+                            text = stringResource(R.string.welcome_back),
+                            style = MaterialTheme.typography.displayMedium,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
+
+                        Spacer(modifier = Modifier.height(AuthMetrics.TitleToSubtitleGap))
+
+                        Text(
+                            text = stringResource(R.string.login_subtitle),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
-                        Text(
-                            text = stringResource(R.string.create_account),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.chefColors.accentText,
-                            modifier = Modifier
-                                .flatClickable(onClick = onCreateAccountClick, role = Role.Button)
-                                .testTag("CreateAccountButton"),
-                        )
-                    }
-                }
+                        Spacer(modifier = Modifier.height(AuthMetrics.SubtitleToFieldsGap))
 
-                // The version sits right under the Developer options link, or alone on release builds.
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(horizontal = dimensionResource(id = R.dimen.padding_medium)),
-                ) {
-                    if (onDeveloperOptionsClick != null) {
-                        DeveloperOptionsLink(onClick = onDeveloperOptionsClick)
+                        // Email Field with autocomplete dropdown
+                        EmailTextField(
+                            email = uiState.email,
+                            suggestions = uiState.emailSuggestions,
+                            onEmailChange = onEmailChange,
+                            onSuggestionSelected = onEmailSuggestionSelected,
+                            onDismissSuggestions = onEmailSuggestionsDismissed,
+                            error = uiState.emailError,
+                            onNext = { focusManager.moveFocus(FocusDirection.Down) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(AuthMetrics.FieldGap))
+
+                        // Password Field
+                        PasswordTextField(
+                            password = uiState.password,
+                            onPasswordChange = onPasswordChange,
+                            isVisible = uiState.isPasswordVisible,
+                            onVisibilityToggle = onPasswordVisibilityToggle,
+                            error = uiState.passwordError,
+                            modifier = Modifier.fillMaxWidth(),
+                            onDone = onLoginClick
+                        )
+
+                        Spacer(modifier = Modifier.height(AuthMetrics.FieldGap))
+
+                        // Remember Me row
+                        RememberMeRow(
+                            isChecked = uiState.rememberMe,
+                            onCheckedChange = onRememberMeChange
+                        )
+
+                        Spacer(modifier = Modifier.height(AuthMetrics.FieldGap))
+
+                        // Login Button
+                        FlatBlockButton(
+                            text = stringResource(R.string.login_button),
+                            onClick = onLoginClick,
+                            loading = uiState.isLoading,
+                            modifier = Modifier.testTag("LoginButton"),
+                        )
+
+                        Spacer(modifier = Modifier.height(AuthMetrics.ButtonToFooterGap))
+
+                        // Create Account Link
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(AuthMetrics.FooterItemGap),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = stringResource(R.string.dont_have_account),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Text(
+                                text = stringResource(R.string.create_account),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.chefColors.accentText,
+                                modifier = Modifier
+                                    .flatClickable(onClick = onCreateAccountClick, role = Role.Button)
+                                    .testTag("CreateAccountButton"),
+                            )
+                        }
                     }
-                    AppVersionText(version = appVersion)
+
+                    // The version sits right under the Developer options link, or alone on release builds.
+                    // Laid out below the form rather than overlaid on it, so the two can never collide.
+                    Column(
+                        modifier = Modifier
+                            .padding(horizontal = dimensionResource(id = R.dimen.padding_medium)),
+                    ) {
+                        if (onDeveloperOptionsClick != null) {
+                            DeveloperOptionsLink(onClick = onDeveloperOptionsClick)
+                        }
+                        AppVersionText(version = appVersion)
+                    }
                 }
             }
         }
@@ -438,6 +452,43 @@ private fun LoginScreenPreview() {
 @Preview(showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun LoginScreenDarkPreview() {
+    ChefAITheme(darkTheme = true) {
+        LoginScreenContent(
+            uiState = LoginUiState(
+                email = "alice@example.com",
+                password = "Password123!"
+            ),
+            focusManager = LocalFocusManager.current,
+            onDeveloperOptionsClick = {},
+            appVersion = "1.0-a1b2c3d-debug",
+        )
+    }
+}
+
+/** A phone on its side (#340): the form scrolls instead of being clipped under the footer. */
+@Preview(showBackground = true, device = "spec:width=891dp,height=411dp,orientation=landscape")
+@Composable
+private fun LoginScreenLandscapePreview() {
+    ChefAITheme {
+        LoginScreenContent(
+            uiState = LoginUiState(
+                email = "alice@example.com",
+                password = "Password123!"
+            ),
+            focusManager = LocalFocusManager.current,
+            onDeveloperOptionsClick = {},
+            appVersion = "1.0-a1b2c3d-debug",
+        )
+    }
+}
+
+@Preview(
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+private fun LoginScreenLandscapeDarkPreview() {
     ChefAITheme(darkTheme = true) {
         LoginScreenContent(
             uiState = LoginUiState(
