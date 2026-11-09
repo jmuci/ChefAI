@@ -237,7 +237,7 @@ class ScrapedRecipeMapperTest {
     fun `a non-finite or negative scraped amount is stored as no amount — issue 336`() {
         // Given scraper output carrying amounts no reader can use
         val scraped = minimalScrapedRecipe(
-            ingredients = listOf(Double.NaN, Double.POSITIVE_INFINITY, -2.0).mapIndexed { index, quantity ->
+            ingredients = listOf(Double.NaN, Double.POSITIVE_INFINITY, -2.0, 1e307).mapIndexed { index, quantity ->
                 scrapedIngredient(name = "flour $index", quantity = quantity, unit = "g")
             },
         )
@@ -246,7 +246,7 @@ class ScrapedRecipeMapperTest {
         val draft = scraped.toRecipeDraft(UUID.randomUUID(), emptyList(), emptyList())
 
         // Then each one reads as no amount
-        assertEquals(List(3) { IngredientUnits.NO_AMOUNT }, draft.ingredients.map { it.quantity })
+        assertEquals(List(4) { IngredientUnits.NO_AMOUNT }, draft.ingredients.map { it.quantity })
     }
 
     @Test

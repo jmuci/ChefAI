@@ -395,6 +395,32 @@ class RecipeEditorReducerTest {
     }
 
     @Test
+    fun `IngredientQuantityChanged caps the amount at MAX_ENTRY — issue 335`() {
+        // Given a pasted plain-digit 1e307 and an amount just past the cap
+        val huge = "1" + "0".repeat(307)
+        val pastCap = "1000000.5"
+
+        // When each is entered
+        val hugeResult = RecipeEditorReducer.reduce(emptyState, EditorAction.IngredientQuantityChanged(huge))
+        val pastCapResult = RecipeEditorReducer.reduce(emptyState, EditorAction.IngredientQuantityChanged(pastCap))
+        val atCap = RecipeEditorReducer.reduce(emptyState, EditorAction.IngredientQuantityChanged("1000000"))
+
+        // Then both are refused and the cap itself is still accepted
+        assertEquals("", hugeResult.ingredients.quantity)
+        assertEquals("", pastCapResult.ingredients.quantity)
+        assertEquals("1000000", atCap.ingredients.quantity)
+    }
+
+    @Test
+    fun `IngredientSelected refuses a quantity above MAX_ENTRY — issue 335`() {
+        val state = emptyState.copy(ingredients = IngredientsFields(quantity = "1" + "0".repeat(307)))
+
+        val result = RecipeEditorReducer.reduce(state, EditorAction.IngredientSelected("Flour", UUID.randomUUID()))
+
+        assertTrue(result.ingredients.selectedIngredients.isEmpty())
+    }
+
+    @Test
     fun `IngredientQuantityChanged accepts plain decimals and in-progress input`() {
         listOf("2", "2.", "2.5", ".5", "0").forEach { input ->
             val result = RecipeEditorReducer.reduce(emptyState, EditorAction.IngredientQuantityChanged(input))

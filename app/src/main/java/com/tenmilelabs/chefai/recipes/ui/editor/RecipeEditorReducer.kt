@@ -108,10 +108,11 @@ object RecipeEditorReducer {
             ingredients = state.ingredients.copy(input = action.input)
         ) // suggestions updated by ViewModel
 
-        // Plain digits and one '.' only — `toDoubleOrNull` would also let a pasted "NaN",
-        // "Infinity" or "1e307" through, which then broke every sync push (#336).
+        // Plain digits and one '.' only, capped at MAX_ENTRY — `toDoubleOrNull` would also let a
+        // pasted "NaN", "Infinity" or "1e307" through, which broke every sync push (#336) or
+        // crashed every screen that formatted it (#335).
         is EditorAction.IngredientQuantityChanged -> {
-            if (IngredientQuantity.isPlainDecimalInput(action.quantity)) {
+            if (IngredientQuantity.isAcceptableInput(action.quantity)) {
                 state.copy(
                     ingredients = state.ingredients.copy(quantity = action.quantity)
                 )

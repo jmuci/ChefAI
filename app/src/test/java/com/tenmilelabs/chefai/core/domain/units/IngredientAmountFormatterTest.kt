@@ -133,4 +133,22 @@ class IngredientAmountFormatterTest {
 
         assertThat(label.text).isEqualTo("To taste")
     }
+
+    @Test
+    fun `a huge stored quantity formats in every system instead of crashing — issue 335`() {
+        // Given a quantity a pasted 1e307 left behind, in units each conversion path handles
+        val units = listOf("g", "cup", "oz", "clove", "", "tbsp")
+
+        MeasurementSystem.entries.forEach { system ->
+            units.forEach { unit ->
+                // When formatted for the recipe details screen and the shopping list
+                val cooking = IngredientAmountFormatter.format(1e307, unit, "flour", system)
+                val decimal = IngredientAmountFormatter.format(1e307, unit, "flour", system, cookingFractions = false)
+
+                // Then a label comes back
+                assertThat(cooking.text).isNotEmpty()
+                assertThat(decimal.text).isNotEmpty()
+            }
+        }
+    }
 }

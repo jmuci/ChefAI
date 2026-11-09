@@ -22,6 +22,12 @@ object QuantityFormat {
         // BigDecimal below rejects these outright, and there is nothing sensible to render anyway.
         if (!value.isFinite()) return value.toString()
 
+        // Every double from 2^53 up is already a whole number, so there is nothing to round — and
+        // `value * 100` below would overflow to Infinity past ~1.8e306 and reach BigDecimal (#335).
+        // `valueOf` goes through the shortest decimal form, so 1e307 prints as 1 and 307 zeros
+        // rather than the binary value's exact expansion.
+        if (abs(value) >= WHOLE_NUMBERS_ONLY) return BigDecimal.valueOf(value).toPlainString()
+
         val rounded = round(value * 100.0) / 100.0
         if (rounded == floor(rounded) && abs(rounded) < 1e15) return rounded.toLong().toString()
 
@@ -57,6 +63,9 @@ object QuantityFormat {
     }
 
     private const val DECIMAL_PLACES = 2
+
+    /** 2^53: from here up a double has no fractional part. */
+    private const val WHOLE_NUMBERS_ONLY = 9_007_199_254_740_992.0
 
     /**
      * Tight enough that 0.6 stays "0.6" rather than being rounded up to ⅝ (a 0.025 gap), loose

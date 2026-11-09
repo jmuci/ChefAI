@@ -95,8 +95,8 @@ private fun List<ScrapedIngredient>.toRecipeIngredients(
             ingredientDisplayName = name,
             // "Salt, to taste" has no amount. Inventing a 1 here is what later scaled into
             // "0.33" on the shopping list; NO_AMOUNT is read as "nothing to show" everywhere.
-            // A non-finite or negative amount is no amount either (#336).
-            quantity = ingredient.quantity?.takeIf(IngredientQuantity::isValid) ?: IngredientUnits.NO_AMOUNT,
+            // A non-finite, negative or absurdly large amount is no amount either (#335, #336).
+            quantity = ingredient.quantity?.takeIf(IngredientQuantity::isEnterable) ?: IngredientUnits.NO_AMOUNT,
             unit = ingredient.unit ?: DEFAULT_UNIT,
             allergenName = null,
             srcCategory = null,
