@@ -13,11 +13,13 @@ enum class ApiEnvironment {
 
     companion object {
         /**
-         * What a debug build starts on: the deployed backend, so a fresh install works without a
-         * local server running. [ApiBaseUrls.effective] still drops to [LOCAL] when the build has
-         * no remote configured.
+         * What a debug build starts on — after a fresh install, `pm clear`, or a stored value it
+         * can't read: the developer's own backend. Never [REMOTE]: with `chefaiApiBaseUrl` set in
+         * `~/.gradle/gradle.properties` that is production, and a debug build silently talking to
+         * it created test accounts there (#341). Going remote is an explicit Developer options
+         * choice. Release builds don't use this at all (see the class KDoc).
          */
-        val DEFAULT: ApiEnvironment = REMOTE
+        val DEFAULT: ApiEnvironment = LOCAL
 
         /** Stored by [name], so a missing or unknown value falls back to [DEFAULT]. */
         fun fromName(name: String?): ApiEnvironment =

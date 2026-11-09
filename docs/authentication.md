@@ -380,9 +380,10 @@ fun provideHttpClient(tokenProvider: TokenProvider, /* … */) = HttpClient(OkHt
 ## Current Development Setup (Nov 2026)
 
 **Auth API calls are implemented.** `SessionManager.login()`, `register()`, and `refreshToken()` all
-make real Ktor HTTP calls. Debug builds default to `http://10.0.2.2:8080` (emulator localhost) and
-can switch to the deployed API in Developer options; release builds use `chefaiApiBaseUrl`
-(`https://api.pocket-chef.app`).
+make real Ktor HTTP calls. Debug builds default to `http://10.0.2.2:8080` (emulator localhost) — also
+after a fresh install or `pm clear`, since `ApiEnvironment.DEFAULT` is `LOCAL` (#341) — and can switch
+to the deployed API in Developer options; release builds use `chefaiApiBaseUrl`
+(`https://api.pocket-chef.app`) and never read the stored choice.
 
 **Done, despite what an older version of this doc said:**
 
