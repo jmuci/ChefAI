@@ -383,6 +383,40 @@ class RecipeEditorReducerTest {
     }
 
     @Test
+    fun `IngredientQuantityChanged rejects non-finite and non-plain numbers — issue 336`() {
+        // Given inputs String.toDoubleOrNull accepts but that aren't plain amounts
+        listOf("NaN", "Infinity", "-Infinity", "1e307", "1d", "2f", "-2", "0x1p3").forEach { input ->
+            // When typed or pasted into the quantity field
+            val result = RecipeEditorReducer.reduce(emptyState, EditorAction.IngredientQuantityChanged(input))
+
+            // Then the field is left unchanged
+            assertEquals("input \"$input\"", "", result.ingredients.quantity)
+        }
+    }
+
+    @Test
+    fun `IngredientQuantityChanged accepts plain decimals and in-progress input`() {
+        listOf("2", "2.", "2.5", ".5", "0").forEach { input ->
+            val result = RecipeEditorReducer.reduce(emptyState, EditorAction.IngredientQuantityChanged(input))
+            assertEquals(input, result.ingredients.quantity)
+        }
+    }
+
+    @Test
+    fun `IngredientSelected does nothing when the quantity is not a finite amount — issue 336`() {
+        // Given a quantity that bypassed IngredientQuantityChanged (e.g. a restored form field)
+        listOf("NaN", "Infinity", ".").forEach { quantity ->
+            val state = emptyState.copy(ingredients = IngredientsFields(quantity = quantity))
+
+            // When an ingredient is picked
+            val result = RecipeEditorReducer.reduce(state, EditorAction.IngredientSelected("Flour", UUID.randomUUID()))
+
+            // Then nothing is added
+            assertTrue("quantity \"$quantity\"", result.ingredients.selectedIngredients.isEmpty())
+        }
+    }
+
+    @Test
     fun `RemoveIngredient removes the specified ingredient`() {
         val ingredient = RecipeIngredient(
             UUID.randomUUID(), "Flour", 200.0, "grams", null, null, null

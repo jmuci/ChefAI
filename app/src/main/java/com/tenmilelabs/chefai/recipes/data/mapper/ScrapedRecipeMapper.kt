@@ -6,6 +6,7 @@ import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.domain.model.Ingredient
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
 import com.tenmilelabs.chefai.core.domain.model.Tag
+import com.tenmilelabs.chefai.core.domain.units.IngredientQuantity
 import com.tenmilelabs.chefai.core.domain.units.IngredientUnits
 import com.tenmilelabs.chefai.recipes.domain.model.RecipeDraft
 import com.tenmilelabs.recipescraper.model.LanguageConfidence
@@ -94,7 +95,8 @@ private fun List<ScrapedIngredient>.toRecipeIngredients(
             ingredientDisplayName = name,
             // "Salt, to taste" has no amount. Inventing a 1 here is what later scaled into
             // "0.33" on the shopping list; NO_AMOUNT is read as "nothing to show" everywhere.
-            quantity = ingredient.quantity ?: IngredientUnits.NO_AMOUNT,
+            // A non-finite or negative amount is no amount either (#336).
+            quantity = ingredient.quantity?.takeIf(IngredientQuantity::isValid) ?: IngredientUnits.NO_AMOUNT,
             unit = ingredient.unit ?: DEFAULT_UNIT,
             allergenName = null,
             srcCategory = null,

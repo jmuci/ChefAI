@@ -36,6 +36,7 @@ import com.tenmilelabs.chefai.mealplans.data.mapper.toDaysJson
 import com.tenmilelabs.chefai.mealplans.data.mapper.toSavedMealPlanDays
 import com.tenmilelabs.chefai.mealplans.domain.model.SavedMealPlanDay
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncGroceryListItem
+import com.tenmilelabs.chefai.core.domain.units.IngredientQuantity
 import java.time.LocalDate
 import java.util.UUID
 
@@ -75,9 +76,13 @@ fun RecipeStepEntity.toSyncDto(): SyncRecipeStepDto = SyncRecipeStepDto(
     instruction = instruction
 )
 
+/**
+ * A non-finite quantity is sent as [com.tenmilelabs.chefai.core.domain.units.IngredientUnits.NO_AMOUNT]:
+ * the sync `Json` can't encode NaN/Infinity, and one such row used to fail every push (#336).
+ */
 fun RecipeIngredientEntity.toSyncDto(): SyncRecipeIngredientDto = SyncRecipeIngredientDto(
     ingredientId = ingredientId.toString(),
-    quantity = quantity,
+    quantity = IngredientQuantity.sanitized(quantity),
     unit = unit
 )
 

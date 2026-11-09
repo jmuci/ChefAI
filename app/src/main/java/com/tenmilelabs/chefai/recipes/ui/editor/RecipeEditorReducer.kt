@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.recipes.ui.editor
 
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
 import com.tenmilelabs.chefai.core.domain.model.RecipeStep
+import com.tenmilelabs.chefai.core.domain.units.IngredientQuantity
 import com.tenmilelabs.chefai.recipes.domain.model.RecipeDraft
 import java.util.UUID
 
@@ -107,8 +108,10 @@ object RecipeEditorReducer {
             ingredients = state.ingredients.copy(input = action.input)
         ) // suggestions updated by ViewModel
 
+        // Plain digits and one '.' only — `toDoubleOrNull` would also let a pasted "NaN",
+        // "Infinity" or "1e307" through, which then broke every sync push (#336).
         is EditorAction.IngredientQuantityChanged -> {
-            if (action.quantity.isEmpty() || action.quantity.toDoubleOrNull() != null) {
+            if (IngredientQuantity.isPlainDecimalInput(action.quantity)) {
                 state.copy(
                     ingredients = state.ingredients.copy(quantity = action.quantity)
                 )
@@ -121,11 +124,12 @@ object RecipeEditorReducer {
 
         is EditorAction.IngredientSelected -> {
             val fields = state.ingredients
-            if (fields.quantity.isNotBlank() && fields.quantity.toDoubleOrNull() != null) {
+            val quantity = IngredientQuantity.parseInput(fields.quantity)
+            if (quantity != null) {
                 val ingredient = RecipeIngredient(
                     ingredientId = action.ingredientId,
                     ingredientDisplayName = action.name,
-                    quantity = fields.quantity.toDouble(),
+                    quantity = quantity,
                     unit = fields.unit.ifBlank { "unit" },
                     allergenName = null,
                     srcCategory = null,
