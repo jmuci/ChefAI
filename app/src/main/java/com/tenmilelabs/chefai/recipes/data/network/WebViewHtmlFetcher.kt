@@ -56,7 +56,11 @@ class WebViewHtmlFetcher @Inject constructor(
                 while (accepted == null) {
                     delay(SNAPSHOT_INTERVAL)
                     val html = webView.awaitRenderedHtml()
-                    if (html != null && runCatching { accept(html) }.getOrDefault(false)) {
+                    // accept() parses up to 4M chars of third-party HTML, so it runs off the main
+                    // thread: a slow-to-parse page must not freeze the UI into an ANR.
+                    val isAccepted = html != null &&
+                        withContext(Dispatchers.Default) { runCatching { accept(html) }.getOrDefault(false) }
+                    if (isAccepted) {
                         accepted = html
                     }
                 }

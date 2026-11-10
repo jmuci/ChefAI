@@ -47,6 +47,8 @@ class BrowserImportViewModel @Inject constructor(
         when (action) {
             is BrowserImportAction.SnapshotCaptured -> handleSnapshot(action.html)
 
+            is BrowserImportAction.PageCommitted -> _state.update { it.copy(currentHost = action.host) }
+
             BrowserImportAction.SettleTimeoutElapsed -> _state.update {
                 it.copy(phase = BrowserImportState.Phase.AWAITING_USER)
             }

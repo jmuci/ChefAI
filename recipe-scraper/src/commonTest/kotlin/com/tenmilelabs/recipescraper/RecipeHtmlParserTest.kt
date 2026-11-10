@@ -90,6 +90,30 @@ class RecipeHtmlParserTest {
     }
 
     @Test
+    fun `bounds how much of a hostile page's recipe is kept`() {
+        val overlongLine = "y".repeat(10_000)
+        val ingredients = (1..5000).joinToString(",") { "\"$it g flour\"" }
+        val html = """<script type="application/ld+json">{"@type":"Recipe","name":"${"x".repeat(100_000)}",""" +
+            """"recipeIngredient":["$overlongLine",$ingredients],""" +
+            """"recipeInstructions":["${"z".repeat(100_000)}"]}</script>"""
+
+        val recipe = assertIs<ScrapeResult.Success>(parser.parse(html, "https://example.com/r")).recipe
+
+        assertEquals(500, recipe.title.length)
+        assertEquals(300, recipe.ingredients.size)
+        assertEquals("1 g flour", recipe.ingredients.first().raw)
+        assertEquals(4_000, recipe.instructions.single().length)
+    }
+
+    @Test
+    fun `falls through to NoRecipeFound when every ingredient line is too long to keep`() {
+        val html = """<script type="application/ld+json">{"@type":"Recipe","name":"Soup",""" +
+            """"recipeIngredient":["${"y".repeat(10_000)}"]}</script>"""
+
+        assertEquals(ScrapeResult.NoRecipeFound, parser.parse(html, "https://example.com/r"))
+    }
+
+    @Test
     fun `records the caller-supplied sourceUrl, not anything read from the page`() {
         val result = parser.parse(JsonLdFixtures.PLAIN_OBJECT, "https://mysite.example/recipe/42")
 

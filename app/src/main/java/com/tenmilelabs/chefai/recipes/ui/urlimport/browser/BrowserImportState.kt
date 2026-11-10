@@ -10,6 +10,9 @@ sealed interface BrowserImportAction {
     /** The page has been up long enough that the user is probably being asked to do something. */
     data object SettleTimeoutElapsed : BrowserImportAction
 
+    /** The WebView committed a main-frame navigation to a page on [host] (`null` if it has none). */
+    data class PageCommitted(val host: String?) : BrowserImportAction
+
     /** Nothing readable ever appeared, after a generously long wait. */
     data object GiveUp : BrowserImportAction
 
@@ -19,6 +22,12 @@ sealed interface BrowserImportAction {
 
 data class BrowserImportState(
     val url: String = "",
+    /**
+     * Host of the page the WebView is showing right now — the only origin cue the user gets. The
+     * page is a third party's, rendered under this app's own top bar, and it can navigate anywhere
+     * after [url] loads, so this follows the WebView rather than being derived from [url].
+     */
+    val currentHost: String? = null,
     val phase: Phase = Phase.LOADING,
     /**
      * A snapshot is being parsed and mapped right now — a concurrency guard only, never surfaced

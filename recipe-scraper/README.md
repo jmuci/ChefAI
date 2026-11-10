@@ -103,6 +103,11 @@ Fetching the HTML (an `HttpClient` GET, URL validation, response size caps, etc.
 responsibility — in this repo, that's `com.tenmilelabs.chefai.recipes.data.repository.DefaultRecipeImporter`
 in `:app`.
 
+The result is bounded: at most 300 ingredients, 300 instruction steps and 300 keywords; titles and
+author names are cut at 500 characters, descriptions and steps at 4,000; an ingredient line over 500
+characters or an image URL over 2,048 is dropped. A real recipe never gets near these — they exist so
+a hostile page cannot hand the caller an arbitrarily large recipe.
+
 ## Testing
 
 All tests run on plain JVM (`kotlin.test`, no Robolectric or instrumentation). Fixtures are

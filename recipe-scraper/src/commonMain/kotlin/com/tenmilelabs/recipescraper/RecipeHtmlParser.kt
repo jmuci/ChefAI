@@ -41,11 +41,11 @@ class RecipeHtmlParser {
     fun parse(html: String, sourceUrl: String, contentLanguage: String? = null): ScrapeResult = try {
         val document = Ksoup.parse(html)
 
-        val jsonLd = extractJsonLdRecipe(document, sourceUrl)
+        val jsonLd = extractJsonLdRecipe(document, sourceUrl)?.bounded()
         if (jsonLd != null && jsonLd.isUsable()) {
             ScrapeResult.Success(jsonLd.withLanguage(document, contentLanguage), ExtractionSource.JSON_LD)
         } else {
-            val microdata = extractMicrodataRecipe(document, sourceUrl)
+            val microdata = extractMicrodataRecipe(document, sourceUrl)?.bounded()
             if (microdata != null && microdata.isUsable()) {
                 ScrapeResult.Success(microdata.withLanguage(document, contentLanguage), ExtractionSource.MICRODATA)
             } else {
@@ -59,6 +59,30 @@ class RecipeHtmlParser {
 
 private fun ScrapedRecipe.isUsable(): Boolean =
     title.isNotBlank() && ingredients.isNotEmpty()
+
+// Generous enough to admit any real recipe; the point is that a hostile page cannot hand the caller
+// hundreds of thousands of ingredients or a megabyte-long title to persist and sync.
+private const val MAX_ITEMS = 300
+private const val MAX_LINE_CHARS = 500
+private const val MAX_TEXT_CHARS = 4_000
+private const val MAX_URL_CHARS = 2_048
+
+/**
+ * Caps how much of a page's recipe is kept. Runs before [isUsable], so a recipe whose ingredient
+ * lines were all dropped as over-long falls through to the next tier rather than succeeding empty.
+ *
+ * An over-long ingredient line is dropped, not truncated: half a line would parse into a wrong
+ * quantity or name, where a missing line is at least visibly missing.
+ */
+private fun ScrapedRecipe.bounded(): ScrapedRecipe = copy(
+    title = title.take(MAX_LINE_CHARS),
+    description = description?.take(MAX_TEXT_CHARS),
+    imageUrl = imageUrl?.takeIf { it.length <= MAX_URL_CHARS },
+    ingredients = ingredients.asSequence().filter { it.raw.length <= MAX_LINE_CHARS }.take(MAX_ITEMS).toList(),
+    instructions = instructions.asSequence().map { it.take(MAX_TEXT_CHARS) }.take(MAX_ITEMS).toList(),
+    keywords = keywords.take(MAX_ITEMS),
+    author = author?.take(MAX_LINE_CHARS),
+)
 
 /**
  * Replaces the extractor's provisional [ScrapedRecipe.language] with the final verdict, then

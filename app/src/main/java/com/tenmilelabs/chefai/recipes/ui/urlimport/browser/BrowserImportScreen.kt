@@ -29,9 +29,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
@@ -155,6 +157,19 @@ private fun BrowserImportBanner(
                 )
             }
         } else {
+            if (state.currentHost != null) {
+                // Start-ellipsised: the end of a host is the part that says whose it is, and a
+                // long subdomain prefix ("accounts.google.com.evil.example") must not push it off.
+                Text(
+                    text = state.currentHost,
+                    modifier = Modifier.testTag("BrowserImportHost"),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.StartEllipsis,
+                )
+                Spacer(Modifier.height(4.dp))
+            }
             Text(
                 text = stringResource(hintRes),
                 style = MaterialTheme.typography.bodyMedium,
@@ -200,6 +215,7 @@ private fun RecipePageWebView(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val currentOnAction by rememberUpdatedState(onAction)
     val webView = remember(context) {
         WebView(context).apply {
             layoutParams = ViewGroup.LayoutParams(
@@ -207,7 +223,13 @@ private fun RecipePageWebView(
                 ViewGroup.LayoutParams.MATCH_PARENT,
             )
             applyScraperHardening()
-            webViewClient = ScraperWebViewClient()
+            webViewClient = object : ScraperWebViewClient() {
+                // Reported on commit, not on navigation start: the host shown must be the one
+                // whose content is on screen, never one the page has merely asked to go to.
+                override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+                    currentOnAction(BrowserImportAction.PageCommitted(url?.toUri()?.host))
+                }
+            }
         }
     }
 
@@ -226,7 +248,6 @@ private fun RecipePageWebView(
     }
 
     val currentIsPolling by rememberUpdatedState(isPolling)
-    val currentOnAction by rememberUpdatedState(onAction)
     LaunchedEffect(webView) {
         var elapsed = 0.seconds
         var settled = false
@@ -254,7 +275,7 @@ private fun RecipePageWebView(
 private fun BrowserImportLoadingLightPreview() {
     ChefAITheme(darkTheme = false) {
         BrowserImportScreen(
-            state = BrowserImportState(url = "https://example.com/recipe"),
+            state = BrowserImportState(url = "https://example.com/recipe", currentHost = "example.com"),
             onAction = {},
         )
     }
@@ -267,6 +288,7 @@ private fun BrowserImportAwaitingUserDarkPreview() {
         BrowserImportScreen(
             state = BrowserImportState(
                 url = "https://example.com/recipe",
+                currentHost = "accounts.google.com.a-very-long-subdomain-prefix.example.com",
                 phase = BrowserImportState.Phase.AWAITING_USER,
             ),
             onAction = {},
