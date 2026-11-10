@@ -1,10 +1,12 @@
 package com.tenmilelabs.chefai.recipes.data.network
 
+import android.os.Looper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.tenmilelabs.recipescraper.RecipeHtmlParser
 import com.tenmilelabs.recipescraper.model.ScrapeResult
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -68,6 +70,19 @@ class WebViewHtmlFetcherTest {
 
         assertNotNull(result)
         assertTrue("expected the injected markup, got: $result", result!!.contains("Late Recipe"))
+    }
+
+    @Test
+    fun runsTheAcceptCheckOffTheMainThread() = runTest {
+        // The check parses third-party HTML; on the main thread a slow page would ANR the app.
+        var ranOnMainThread: Boolean? = null
+
+        fetcher.fetchRenderedHtml(dataUrl("<html><body>x</body></html>"), budget = 10.seconds) { _ ->
+            ranOnMainThread = Looper.myLooper() == Looper.getMainLooper()
+            true
+        }
+
+        assertEquals(false, ranOnMainThread)
     }
 
     @Test

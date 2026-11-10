@@ -316,6 +316,36 @@ boundary.
 
 ---
 
+## Decision 8: Bounding what a hostile page can do to the app
+
+**Added November 2026**, from a security review of the import path (`docs/security-handover.md`).
+
+Decision 7 covers where the app can be made to connect. Three gaps were about what a hostile page
+can do once it has been fetched:
+
+- **Parsing off the main thread.** `WebViewHtmlFetcher` ran its `accept` check — a full
+  `RecipeHtmlParser.parse` of a snapshot up to 4M chars, every 500ms — inside
+  `withContext(Dispatchers.Main)`. It now hops to `Dispatchers.Default` for the check, so a
+  slow-to-parse page costs a spinner, not an ANR.
+- **Bounded results.** `RecipeHtmlParser` caps what it returns (300 ingredients/steps/keywords,
+  500-char titles and ingredient lines, 4,000-char descriptions and steps, 2,048-char image URLs —
+  see `recipe-scraper/README.md`). Without it a 3MB page could seed a draft with hundreds of
+  thousands of ingredients, which was then persisted and synced. This is the one place the module
+  departs from "reports what the page actually published"; the caps sit in the library rather than
+  in `ScrapedRecipeMapper` because language detection and the ingredient re-parse run inside it.
+- **An origin cue in the visible browser.** `BrowserImportScreen` renders a third party's page
+  under this app's own top bar, and the page chooses whether the user ends up there (a 403 is
+  enough). The banner now shows the host of the page the WebView has *committed*
+  (`doUpdateVisitedHistory`, not `onPageStarted`), start-ellipsised so the registrable domain stays
+  visible.
+
+Left open by the same review: the scraped `imageUrl` is stored and handed to Coil without the
+Decision 7 guard when caching fails; service-worker and WebSocket requests never reach
+`ScraperWebViewClient.shouldInterceptRequest`; NAT64 addresses are not judged by their embedded
+IPv4. All three lean on release builds denying cleartext traffic.
+
+---
+
 ## Consequences
 
 **Positive:**

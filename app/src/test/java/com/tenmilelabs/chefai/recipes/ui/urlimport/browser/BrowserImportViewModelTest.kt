@@ -60,6 +60,19 @@ class BrowserImportViewModelTest {
     }
 
     @Test
+    fun `shows no host until the browser has committed a page`() = runTest {
+        assertThat(viewModel.state.value.currentHost).isNull()
+    }
+
+    @Test
+    fun `follows the browser to whichever host it has committed, not the url it was opened on`() = runTest {
+        viewModel.dispatch(BrowserImportAction.PageCommitted("blocked.example.com"))
+        viewModel.dispatch(BrowserImportAction.PageCommitted("login.elsewhere.example.net"))
+
+        assertThat(viewModel.state.value.currentHost).isEqualTo("login.elsewhere.example.net")
+    }
+
+    @Test
     fun `a snapshot carrying a recipe persists a draft and hands off to the editor`() = runTest {
         val draftId = UUID.randomUUID()
         recipeImporter.result = RecipeImportResult.Success(
