@@ -12,6 +12,12 @@ sealed class SyncStatus {
     data class Synced(val lastSyncedAt: Long) : SyncStatus()
     data class Error(val message: String) : SyncStatus()
     data object Offline : SyncStatus()
+
+    /**
+     * The server refused this app's sync protocol (HTTP 426). Retrying cannot help; only an app
+     * update can. Cleared by the next sync attempt, which reports it again while it still applies.
+     */
+    data object UpdateRequired : SyncStatus()
 }
 
 @Singleton

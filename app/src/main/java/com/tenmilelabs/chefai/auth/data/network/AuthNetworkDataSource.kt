@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.auth.data.network
 
 import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
 import com.tenmilelabs.chefai.auth.data.network.dto.LoginRequest
+import com.tenmilelabs.chefai.auth.data.network.dto.LogoutRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RefreshTokenRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RegisterRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.TokenRefreshResponse
@@ -24,4 +25,10 @@ interface AuthNetworkDataSource {
      * Refreshes the access token using a refresh token.
      */
     suspend fun refreshToken(request: RefreshTokenRequest): TokenRefreshResponse
+
+    /**
+     * Revokes one session's refresh token server-side (`204` whether or not it existed). Throws
+     * [AuthHttpException] on any other status.
+     */
+    suspend fun logout(request: LogoutRequest)
 }

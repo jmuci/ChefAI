@@ -69,7 +69,13 @@ import javax.inject.Singleton
 
 data class SyncResult(
     val pushResult: PushResult,
-    val pullResult: PullResult
+    val pullResult: PullResult,
+    /**
+     * Rows were edited (or became dirty) while this sync ran, so this run did not send them. The
+     * caller should queue another sync; rows this run pushed and the server left `PENDING`
+     * (a retryable error) do not count, or a lasting server fault would loop.
+     */
+    val hasUnsentChanges: Boolean = false,
 )
 
 data class PushResult(
@@ -119,12 +125,39 @@ class SyncOrchestrator @Inject constructor(
         private const val PUSH_BATCH_SIZE = 50
         private const val COOK_EVENT_ID_TAKEN = "EVENT_ID_TAKEN"
         private const val SAVED_PLAN_ID_TAKEN = "SAVED_PLAN_ID_TAKEN"
+        private const val BOOKMARK_RECIPE_NOT_FOUND = "RECIPE_NOT_FOUND"
+        private const val GROCERY_MEAL_PLAN_NOT_ACCESSIBLE = "MEAL_PLAN_NOT_ACCESSIBLE"
+
+        /**
+         * Push error reasons for recipes, bookmarks, meal plans and grocery checks that a later
+         * resend can clear, so the row stays `PENDING`. Every other reason, including one this
+         * client does not know yet, parks the row as `CANCELLED` (skipped by `getAllDirty`) until
+         * the next local edit marks it `PENDING` again. Cook events and saved plans have their own
+         * handlers below.
+         */
+        private val RETRYABLE_PUSH_ERRORS: Set<String> = setOf("MEAL_PLAN_RECIPE_NOT_ACCESSIBLE", "INTERNAL_ERROR")
+
+        private fun parseUuidOrNull(value: String): UUID? = runCatching { UUID.fromString(value) }.getOrNull()
     }
 
     override suspend fun sync(): SyncResult = withContext(ioDispatcher) {
+        val dirtyBefore = dirtyVersions()
         val pushResult = push()
         val pullResult = pull()
-        SyncResult(pushResult, pullResult)
+        // A dirty version this run never saw: an edit made mid-sync, or a row the push re-keyed
+        // after an *_ID_TAKEN error.
+        val hasUnsentChanges = !dirtyBefore.containsAll(dirtyVersions())
+        SyncResult(pushResult, pullResult, hasUnsentChanges)
+    }
+
+    /** Every dirty row this device would push, keyed by table, id and `updatedAt`. */
+    private suspend fun dirtyVersions(): Set<Triple<String, Any, Long>> = buildSet {
+        recipeDao.getAllDirty().forEach { add(Triple("recipe", it.uuid, it.updatedAt)) }
+        dirtyBookmarksForCurrentUser().forEach { add(Triple("bookmark", it.userId to it.recipeId, it.updatedAt)) }
+        mealPlanDao.getAllDirty().forEach { add(Triple("mealPlan", it.uuid, it.updatedAt)) }
+        shoppingListCheckDao.getAllDirty().forEach { add(Triple("grocery", it.mealPlanId to it.itemKey, it.updatedAt)) }
+        recipeCookEventDao.getAllDirty().forEach { add(Triple("cookEvent", it.uuid, it.updatedAt)) }
+        savedMealPlanDao.getAllDirty().forEach { add(Triple("savedPlan", it.uuid, it.updatedAt)) }
     }
 
     override suspend fun pushPendingChanges(): PushResult = withContext(ioDispatcher) { push() }
@@ -326,9 +359,14 @@ class SyncOrchestrator @Inject constructor(
             }
         }
 
-        // Process errors: log and keep as PENDING for retry
+        // Process errors: retryable ones stay PENDING, the rest are parked so they stop resending
         for (error in response.errors) {
             Timber.w("Push error for ${error.uuid}: ${error.reason} - ${error.message}")
+            if (error.reason in RETRYABLE_PUSH_ERRORS) continue
+            val uuid = parseUuidOrNull(error.uuid) ?: continue
+            val pushedAt = pushedVersions.recipes[uuid] ?: continue
+            // Same version guard as an accept: an edit made mid-push stays PENDING.
+            recipeDao.updateSyncState(uuid, SyncState.CANCELLED, pushedAt, expectedUpdatedAt = pushedAt)
         }
 
         // Process accepted bookmarks
@@ -341,9 +379,15 @@ class SyncOrchestrator @Inject constructor(
             )
         }
 
-        // Log bookmark errors — keep them as PENDING for retry
         for (error in response.bookmarkErrors) {
             Timber.w("Bookmark push error for recipeId=${error.recipeId}: ${error.reason} - ${error.message}")
+            if (error.reason in RETRYABLE_PUSH_ERRORS) continue
+            val recipeId = parseUuidOrNull(error.recipeId) ?: continue
+            // A bookmark on a recipe this device has not got onto the server yet is refused as
+            // RECIPE_NOT_FOUND; it can succeed once the recipe does, so it is not parked.
+            if (error.reason == BOOKMARK_RECIPE_NOT_FOUND && recipeDao.getRecipeById(recipeId)?.syncState == SyncState.PENDING) continue
+            val (key, pushedAt) = pushedVersions.bookmarks.entries.firstOrNull { it.key.second == recipeId } ?: continue
+            bookmarkedRecipeDao.updateSyncState(key.first, recipeId, SyncState.CANCELLED, pushedAt, expectedUpdatedAt = pushedAt)
         }
 
         // Process accepted meal plans
@@ -355,14 +399,26 @@ class SyncOrchestrator @Inject constructor(
             )
         }
 
-        // Meal plan conflicts: server wins — next pull will overwrite
+        // Meal plan conflicts: server wins. A backend that sends the winning copy has it applied
+        // now; one that sends only ids leaves the row for the next pull.
         if (response.mealPlans.conflicts.isNotEmpty()) {
             Timber.w("MealPlan push conflicts: ${response.mealPlans.conflicts}")
         }
+        if (response.mealPlans.conflictVersions.isNotEmpty()) {
+            resolveMissingMealPlanRecipes(response.mealPlans.conflictVersions, idsArrivingThisPage = emptySet())
+            for (dto in response.mealPlans.conflictVersions) {
+                val uuid = UUID.fromString(dto.uuid)
+                if (editedDuringPush(mealPlanDao.getMealPlanById(uuid)?.updatedAt, pushedVersions.mealPlans[uuid])) continue
+                transactionRunner { applyPulledMealPlan(dto, serverDecided = true) }
+            }
+        }
 
-        // Meal plan errors: log, keep as PENDING for retry
         for (error in response.mealPlans.errors) {
             Timber.w("MealPlan push error for ${error.uuid}: ${error.reason} - ${error.message}")
+            if (error.reason in RETRYABLE_PUSH_ERRORS) continue
+            val uuid = parseUuidOrNull(error.uuid) ?: continue
+            val pushedAt = pushedVersions.mealPlans[uuid] ?: continue
+            mealPlanDao.updateSyncState(uuid, SyncState.CANCELLED, pushedAt, expectedUpdatedAt = pushedAt)
         }
 
         // Process accepted grocery items
@@ -377,14 +433,27 @@ class SyncOrchestrator @Inject constructor(
             )
         }
 
-        // Grocery item conflicts: server wins — next pull will overwrite
+        // Grocery item conflicts: server wins, applied now when the winning copy is sent (as for
+        // meal plans above)
         if (response.groceryListItems.conflicts.isNotEmpty()) {
             Timber.w("GroceryItem push conflicts: ${response.groceryListItems.conflicts}")
         }
+        for (dto in response.groceryListItems.conflictVersions) {
+            val mealPlanId = UUID.fromString(dto.mealPlanId)
+            val local = shoppingListCheckDao.getCheck(mealPlanId, dto.itemKey)
+            if (editedDuringPush(local?.updatedAt, pushedVersions.groceryItems[mealPlanId to dto.itemKey])) continue
+            applyPulledGroceryListItem(dto, serverDecided = true)
+        }
 
-        // Grocery item errors: log, keep as PENDING for retry
         for (error in response.groceryListItems.errors) {
             Timber.w("GroceryItem push error for ${error.mealPlanId}/${error.itemKey}: ${error.reason} - ${error.message}")
+            if (error.reason in RETRYABLE_PUSH_ERRORS) continue
+            val mealPlanId = parseUuidOrNull(error.mealPlanId) ?: continue
+            // A check on a plan the server has not accepted yet (the plan itself hit a retryable
+            // error above) is refused as MEAL_PLAN_NOT_ACCESSIBLE; it can succeed once the plan does.
+            if (error.reason == GROCERY_MEAL_PLAN_NOT_ACCESSIBLE && mealPlanDao.getMealPlanById(mealPlanId)?.syncState == SyncState.PENDING) continue
+            val pushedAt = pushedVersions.groceryItems[mealPlanId to error.itemKey] ?: continue
+            shoppingListCheckDao.updateSyncState(mealPlanId, error.itemKey, SyncState.CANCELLED, pushedAt, expectedUpdatedAt = pushedAt)
         }
 
         // Cook events: no conflicts list — a tombstone is final server-side and a re-mark mints a
@@ -410,16 +479,29 @@ class SyncOrchestrator @Inject constructor(
             )
         }
 
-        // Conflict: the server holds a newer copy. Like meal plans, leave the row alone — the
-        // next pull applies the server version (last-writer-wins on updatedAt).
+        // Conflict: the server holds a newer copy. Like meal plans, it is applied now when the
+        // response carries it, otherwise the next pull applies it (last-writer-wins on updatedAt).
         if (response.savedMealPlans.conflicts.isNotEmpty()) {
             Timber.w("SavedMealPlan push conflicts: ${response.savedMealPlans.conflicts}")
+        }
+        for (dto in response.savedMealPlans.conflictVersions) {
+            val uuid = UUID.fromString(dto.uuid)
+            if (editedDuringPush(savedMealPlanDao.getById(uuid)?.updatedAt, pushedVersions.savedPlans[uuid])) continue
+            applyPulledSavedMealPlan(dto, serverDecided = true)
         }
 
         for (error in response.savedMealPlans.errors) {
             handleSavedPlanPushError(error)
         }
     }
+
+    /**
+     * True when a row was edited after it was read for this push. A server decision about the
+     * pushed version (a conflict's winning copy) must not overwrite that newer edit; the next push
+     * carries it instead.
+     */
+    private fun editedDuringPush(localUpdatedAt: Long?, pushedUpdatedAt: Long?): Boolean =
+        localUpdatedAt != null && pushedUpdatedAt != null && localUpdatedAt != pushedUpdatedAt
 
     /**
      * A refused saved plan must not stay `PENDING`, or every sync would resend it forever.
@@ -550,13 +632,10 @@ class SyncOrchestrator @Inject constructor(
                 }
             }
 
-            // Advance cursor to max of all entity timestamps so no deltas are re-fetched. Cook
-            // events are deliberately left out: the server returns them unpaginated for every page
-            // of a pull, so they must not drive the cursor, and re-applying one is a no-op.
-            val bookmarkMaxTs = response.bookmarkedRecipes.maxOfOrNull { it.updatedAt } ?: 0L
-            val mealPlanMaxTs = response.mealPlans.maxOfOrNull { it.updatedAt } ?: 0L
-            val groceryMaxTs = response.groceryListItems.maxOfOrNull { it.updatedAt } ?: 0L
-            val newCursor = maxOf(response.serverTimestamp, bookmarkMaxTs, mealPlanMaxTs, groceryMaxTs)
+            // The server owns the cursor (sync-protocol.md, "Cursor stability guarantee"). Row
+            // `updatedAt`s are edit times on other devices' clocks; folding them in used to jump
+            // the cursor past recipes still waiting on a later page.
+            val newCursor = response.serverTimestamp
             val cursorAdvanced = newCursor > since
             syncMetadataDao.upsert(SyncMetadataEntity(ENTITY_TYPE_RECIPES, newCursor))
 
@@ -663,8 +742,9 @@ class SyncOrchestrator @Inject constructor(
             localRecipe.syncState == SyncState.SYNCED -> {
                 upsertRecipeAggregate(syncRecipe)
             }
-            // Local has unpushed changes
-            localRecipe.syncState == SyncState.PENDING -> {
+            // Local has unpushed changes, or a version the server refused (parked): either way only
+            // a newer server version replaces it
+            localRecipe.syncState == SyncState.PENDING || localRecipe.syncState == SyncState.CANCELLED -> {
                 if (syncRecipe.updatedAt > localRecipe.updatedAt) {
                     // Server wins
                     upsertRecipeAggregate(syncRecipe)
@@ -819,12 +899,16 @@ class SyncOrchestrator @Inject constructor(
         }
     }
 
-    private suspend fun applyPulledMealPlan(dto: SyncMealPlanDto) {
+    /**
+     * @param serverDecided true for a push conflict's winning copy: the server already compared
+     *   versions, so the local last-writer-wins check is skipped.
+     */
+    private suspend fun applyPulledMealPlan(dto: SyncMealPlanDto, serverDecided: Boolean = false) {
         val planUuid = UUID.fromString(dto.uuid)
         val localPlan = mealPlanDao.getMealPlanById(planUuid)
 
         // If local has unpushed changes and is newer, skip — push will send it next cycle
-        if (localPlan != null && localPlan.syncState == SyncState.PENDING && dto.updatedAt <= localPlan.updatedAt) {
+        if (!serverDecided && localPlan != null && localPlan.syncState == SyncState.PENDING && dto.updatedAt <= localPlan.updatedAt) {
             return
         }
 
@@ -858,12 +942,13 @@ class SyncOrchestrator @Inject constructor(
      * to) the local row loses, so an unpushed local edit isn't clobbered. The device-local photo
      * is never in the payload, so an existing row keeps its `heroImagePath`; a pulled tombstone
      * also removes the photo file. Like cook events, no foreign key to recipes, so nothing needs
-     * to have arrived first.
+     * to have arrived first. [serverDecided] skips the last-writer-wins check, as for
+     * [applyPulledMealPlan].
      */
-    private suspend fun applyPulledSavedMealPlan(dto: SyncSavedMealPlanDto) {
+    private suspend fun applyPulledSavedMealPlan(dto: SyncSavedMealPlanDto, serverDecided: Boolean = false) {
         val uuid = UUID.fromString(dto.uuid)
         val local = savedMealPlanDao.getById(uuid)
-        if (local != null && dto.updatedAt <= local.updatedAt) return
+        if (!serverDecided && local != null && dto.updatedAt <= local.updatedAt) return
 
         if (dto.deletedAt != null) {
             savedPlanImageStore.delete(uuid)
@@ -898,15 +983,16 @@ class SyncOrchestrator @Inject constructor(
      * `SQLiteConstraintException` and abort the whole pull transaction over a single row, same
      * shape as [applyPulledBookmark]'s guard. The same pull cycle usually delivers the plan too
      * (meal plans are applied first, above); if not, the next pull re-delivers this item.
+     * [serverDecided] skips the last-writer-wins check, as for [applyPulledMealPlan].
      */
-    private suspend fun applyPulledGroceryListItem(dto: SyncGroceryListItem) {
+    private suspend fun applyPulledGroceryListItem(dto: SyncGroceryListItem, serverDecided: Boolean = false) {
         val mealPlanId = UUID.fromString(dto.mealPlanId)
         if (mealPlanDao.getMealPlanById(mealPlanId) == null) {
             Timber.w("applyPulledGroceryListItem: unknown mealPlanId %s, skipping", mealPlanId)
             return
         }
         val local = shoppingListCheckDao.getCheck(mealPlanId, dto.itemKey)
-        if (local != null && local.syncState == SyncState.PENDING && local.updatedAt > dto.updatedAt) {
+        if (!serverDecided && local != null && local.syncState == SyncState.PENDING && local.updatedAt > dto.updatedAt) {
             return // local is newer — same LWW shape as applyPulledRecipe
         }
         shoppingListCheckDao.upsert(dto.toEntity())

@@ -98,6 +98,52 @@ class SyncWorkerTest {
     }
 
     @Test
+    fun `a sync that leaves edits made while it ran queues a follow-up sync`() = runTest {
+        val (sessionManager, _) = authenticatedSessionManager()
+        syncExecutor.hasUnsentChanges = true
+
+        buildWorker(sessionManager).doWork()
+
+        assertThat(syncScheduler.followUpSyncCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `a sync with nothing left to send queues no follow-up`() = runTest {
+        val (sessionManager, _) = authenticatedSessionManager()
+
+        buildWorker(sessionManager).doWork()
+
+        assertThat(syncScheduler.followUpSyncCount).isEqualTo(0)
+    }
+
+    @Test
+    fun `426 stops retrying and reports that an update is required`() = runTest {
+        // Given — the server no longer accepts this app's sync protocol
+        val (sessionManager, _) = authenticatedSessionManager()
+        syncExecutor.errorsToThrow.add(SyncHttpException("Push failed: 426 Upgrade Required", statusCode = 426))
+
+        // When
+        val result = buildWorker(sessionManager).doWork()
+
+        // Then
+        assertThat(result).isEqualTo(ListenableWorker.Result.failure())
+        assertThat(syncStatusHolder.syncStatus.value).isEqualTo(SyncStatus.UpdateRequired)
+        assertThat(syncScheduler.imageBackfillCount).isEqualTo(0)
+    }
+
+    @Test
+    fun `426 on the retry after a token refresh also stops retrying`() = runTest {
+        val (sessionManager, _) = authenticatedSessionManager()
+        syncExecutor.errorsToThrow.add(SyncHttpException("Unauthorized", statusCode = 401))
+        syncExecutor.errorsToThrow.add(SyncHttpException("Pull failed: 426 Upgrade Required", statusCode = 426))
+
+        val result = buildWorker(sessionManager).doWork()
+
+        assertThat(result).isEqualTo(ListenableWorker.Result.failure())
+        assertThat(syncStatusHolder.syncStatus.value).isEqualTo(SyncStatus.UpdateRequired)
+    }
+
+    @Test
     fun `anonymous session skips the sync and the image sweeps`() = runTest {
         // Given
         val (sessionManager, _) = createTestSessionManagerWithAuthSource(backgroundScope)

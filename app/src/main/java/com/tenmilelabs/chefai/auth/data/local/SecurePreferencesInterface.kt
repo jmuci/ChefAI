@@ -8,6 +8,11 @@ import java.util.UUID
  * Allows for easy testing with fake implementations.
  */
 interface SecurePreferencesInterface {
+    /**
+     * Stores the signed-in account in one write. [pendingUpgradeFrom] is the anonymous local user
+     * id whose rows this login still has to re-parent (null when there are none); it is written in
+     * the same edit as the tokens, so no process death can leave tokens without it.
+     */
     suspend fun saveAuthData(
         userUuid: UUID,
         displayName: String,
@@ -15,8 +20,15 @@ interface SecurePreferencesInterface {
         avatarUrl: String,
         accessToken: String,
         refreshToken: String,
-        tokenExpiry: Long
+        tokenExpiry: Long,
+        pendingUpgradeFrom: UUID? = null,
     )
+
+    /** The anonymous id an interrupted login still has to upgrade from, or null. See [saveAuthData]. */
+    fun getPendingUpgradeFrom(): Flow<UUID?>
+
+    /** Clears [getPendingUpgradeFrom] once the anonymous → account upgrade has committed. */
+    suspend fun clearPendingUpgradeFrom()
 
     fun getUserUuid(): Flow<UUID?>
     fun getDisplayName(): Flow<String?>

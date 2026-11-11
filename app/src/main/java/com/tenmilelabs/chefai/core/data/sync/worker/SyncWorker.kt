@@ -7,6 +7,7 @@ import androidx.work.WorkerParameters
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.core.data.sync.SyncExecutor
+import com.tenmilelabs.chefai.core.data.sync.SyncResult
 import com.tenmilelabs.chefai.core.data.sync.SyncStatus
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import com.tenmilelabs.chefai.core.data.sync.SyncStatusHolder
@@ -32,6 +33,7 @@ class SyncWorker @AssistedInject constructor(
     companion object {
         private const val MAX_RETRY_COUNT = 3
         private const val SESSION_LOAD_TIMEOUT_MS = 10_000L
+        private const val HTTP_UPGRADE_REQUIRED = 426
     }
 
     override suspend fun doWork(): Result {
@@ -51,7 +53,7 @@ class SyncWorker @AssistedInject constructor(
         return try {
             val result = syncExecutor.sync()
             Timber.d("SyncWorker: Sync completed — $result")
-            onSyncSucceeded()
+            onSyncSucceeded(result)
         } catch (e: SyncHttpException) {
             if (e.statusCode == 401) {
                 Timber.d("SyncWorker: 401 received, attempting token refresh...")
@@ -60,7 +62,7 @@ class SyncWorker @AssistedInject constructor(
                     return try {
                         val result = syncExecutor.sync()
                         Timber.d("SyncWorker: Sync after refresh completed — $result")
-                        onSyncSucceeded()
+                        onSyncSucceeded(result)
                     } catch (retryException: CancellationException) {
                         syncStatusHolder.emitStatus(SyncStatus.Idle)
                         throw retryException
@@ -88,8 +90,11 @@ class SyncWorker @AssistedInject constructor(
      * Shared by the first attempt and the post-refresh retry, so every successful sync enqueues the
      * image sweeps — the retry path used to skip them.
      */
-    private fun onSyncSucceeded(): Result {
+    private fun onSyncSucceeded(result: SyncResult): Result {
         syncStatusHolder.emitStatus(SyncStatus.Synced(System.currentTimeMillis()))
+        // An edit made while this run was in flight asked for a sync, but mutation sync's KEEP
+        // dropped that request because this work was still running.
+        if (result.hasUnsentChanges) syncScheduler.requestFollowUpSync()
         // A pull can bring in recipes whose image only exists on the device that imported them.
         // Enqueued rather than chained: backfill waits for a charger and unmetered data, and a
         // chain would hold this sync's slot until those were satisfied.
@@ -102,6 +107,13 @@ class SyncWorker @AssistedInject constructor(
     }
 
     private fun handleFailure(e: Exception): Result {
+        if (e is SyncHttpException && e.statusCode == HTTP_UPGRADE_REQUIRED) {
+            // The server no longer accepts this app's sync protocol: every retry would get the
+            // same answer, so stop here and say so.
+            Timber.w("SyncWorker: server requires an app update to sync (426)")
+            syncStatusHolder.emitStatus(SyncStatus.UpdateRequired)
+            return Result.failure()
+        }
         Timber.e(e, "SyncWorker: Sync failed (attempt ${runAttemptCount + 1})")
         syncStatusHolder.emitStatus(SyncStatus.Error(e.message ?: "Sync failed"))
         return if (runAttemptCount < MAX_RETRY_COUNT) Result.retry() else Result.failure()

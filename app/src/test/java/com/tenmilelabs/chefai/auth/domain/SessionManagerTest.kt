@@ -70,6 +70,7 @@ class SessionManagerTest {
     private lateinit var fakeSyncManager: FakeSyncManager
     private lateinit var mockDatabase: ChefAIDataBase
     private lateinit var accountSwitchHandler: AccountSwitchHandler
+    private lateinit var fakeSyncMetadataDao: FakeSyncMetadataDao
     private lateinit var testScope: TestScope
     private val testDispatcher = StandardTestDispatcher()
 
@@ -103,6 +104,7 @@ class SessionManagerTest {
         fakeHouseholdRepository = FakeHouseholdRepository()
         fakeSyncManager = FakeSyncManager()
         mockDatabase = mockk(relaxed = true)
+        fakeSyncMetadataDao = FakeSyncMetadataDao()
         accountSwitchHandler = AccountSwitchHandler(
             securePreferences = fakeSecurePreferences,
             database = mockDatabase,
@@ -113,7 +115,7 @@ class SessionManagerTest {
             savedMealPlanDao = FakeSavedMealPlanDao(),
             bookmarkedRecipeDao = FakeBookmarkedRecipeDao(),
             recipeCookEventDao = FakeRecipeCookEventDao(),
-            syncMetadataDao = FakeSyncMetadataDao(),
+            syncMetadataDao = fakeSyncMetadataDao,
             transactionRunner = FakeTransactionRunner(),
             recipeImageStore = mockk<RecipeImageStore>(relaxed = true),
         savedPlanImageStore = mockk<SavedPlanImageStore>(relaxed = true),
@@ -1254,5 +1256,223 @@ class SessionManagerTest {
         val session = newSessionManager.userSession.value
         assertThat(session).isInstanceOf(UserSession.Authenticated::class.java)
         assertThat((session as UserSession.Authenticated).user.uuid).isEqualTo(newUserId)
+    }
+
+    // --- Interrupted upgrade (pendingUpgradeFrom) ---
+
+    private fun coldStartSessionManager(): SessionManager = SessionManager(
+        securePreferences = fakeSecurePreferences,
+        authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
+        userDao = fakeUserDao,
+        accountSwitchHandler = accountSwitchHandler,
+        accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
+        syncSchedulerProvider = { FakeSyncManager() },
+        householdRepositoryProvider = { fakeHouseholdRepository },
+        applicationScope = testScope
+    ).apply { uuidGenerator = { UuidV7Generator.newId() } }
+
+    /** What login()/register() have written by the time they would call the upgrade. */
+    private suspend fun saveTokensWithPendingUpgrade(userId: UUID, anonymousUserId: UUID) {
+        fakeSecurePreferences.saveAuthData(
+            userUuid = userId,
+            displayName = "New User",
+            email = "new@example.com",
+            avatarUrl = "",
+            accessToken = "token",
+            refreshToken = "refresh",
+            tokenExpiry = System.currentTimeMillis() + 3_600_000,
+            pendingUpgradeFrom = anonymousUserId,
+        )
+    }
+
+    @Test
+    fun `login clears the pending upgrade marker once the upgrade commits`() = testScope.runTest {
+        // The marker is written with the tokens (the failed-upgrade test below shows it survives
+        // when the upgrade does not commit); a completed upgrade must leave nothing to redo.
+        sessionManager.loadSession()
+
+        sessionManager.login("test@example.com", "password123")
+
+        assertThat(fakeSecurePreferences.getPendingUpgradeFrom().first()).isNull()
+    }
+
+    @Test
+    fun `a failed upgrade keeps the pending upgrade marker for the next restore`() = testScope.runTest {
+        sessionManager.loadSession()
+        val throwingSessionManager = SessionManager(
+            securePreferences = fakeSecurePreferences,
+            authNetworkDataSource = Provider { fakeAuthNetworkDataSource },
+            userDao = fakeUserDao,
+            accountSwitchHandler = accountSwitchHandler,
+            accountUpgradeUseCaseProvider = Provider { throw RuntimeException("Upgrade failed") },
+            syncSchedulerProvider = { FakeSyncManager() },
+            householdRepositoryProvider = { fakeHouseholdRepository },
+            applicationScope = testScope
+        ).apply { uuidGenerator = { UuidV7Generator.newId() } }
+        advanceUntilIdle()
+        val anonUserId = (throwingSessionManager.userSession.first() as UserSession.Anonymous).localUserId
+
+        throwingSessionManager.login("test@example.com", "password123")
+
+        assertThat(fakeSecurePreferences.getPendingUpgradeFrom().first()).isEqualTo(anonUserId)
+    }
+
+    @Test
+    fun `process death between token save and upgrade leaves no anonymous-owned rows after restart`() =
+        testScope.runTest {
+            // Given: an anonymous session that owns a recipe, and a login that stored its tokens
+            // (with the marker) before the process died, so neither the account switch nor the
+            // upgrade ran.
+            sessionManager.loadSession()
+            val anonUserId = (sessionManager.userSession.first() as UserSession.Anonymous).localUserId
+            val recipe = createRecipeForUser(anonUserId)
+            fakeRecipeDao.seed(users = listOf(requireNotNull(fakeUserDao.getUserById(anonUserId))), recipes = listOf(recipe))
+            val newUserId = UuidV7Generator.newId()
+            saveTokensWithPendingUpgrade(newUserId, anonUserId)
+
+            // When: the app starts again
+            val restarted = coldStartSessionManager()
+            advanceUntilIdle()
+
+            // Then: the upgrade finished before the session became Authenticated
+            val session = restarted.userSession.value as UserSession.Authenticated
+            assertThat(session.user.uuid).isEqualTo(newUserId)
+            assertThat(fakeRecipeDao.countRecipesForUser(anonUserId)).isEqualTo(0)
+            assertThat(fakeRecipeDao.getRecipeById(recipe.uuid)?.creatorId).isEqualTo(newUserId)
+            assertThat(fakeRecipeDao.getRecipeById(recipe.uuid)?.syncState).isEqualTo(SyncState.PENDING)
+            assertThat(fakeSecurePreferences.getPendingUpgradeFrom().first()).isNull()
+        }
+
+    @Test
+    fun `an interrupted login into a different account keeps the anonymous rows instead of wiping the database`() =
+        testScope.runTest {
+            // Without the marker, the cold start's handleLogin sees an account switch with no
+            // anonymous data to keep and clears every table, the anonymous rows included.
+            sessionManager.loadSession()
+            val anonUserId = (sessionManager.userSession.first() as UserSession.Anonymous).localUserId
+            val recipe = createRecipeForUser(anonUserId)
+            fakeRecipeDao.seed(users = listOf(requireNotNull(fakeUserDao.getUserById(anonUserId))), recipes = listOf(recipe))
+            fakeSecurePreferences.setCurrentUserId(UuidV7Generator.newId()) // a previous account
+            val newUserId = UuidV7Generator.newId()
+            saveTokensWithPendingUpgrade(newUserId, anonUserId)
+
+            coldStartSessionManager()
+            advanceUntilIdle()
+
+            coVerify(exactly = 0) { mockDatabase.clearAllTables() }
+            assertThat(fakeRecipeDao.getRecipeById(recipe.uuid)?.creatorId).isEqualTo(newUserId)
+        }
+
+    @Test
+    fun `logging in again to the same account clears the pull cursor`() = testScope.runTest {
+        val sameUserId = UuidV7Generator.newId()
+        fakeSecurePreferences.setCurrentUserId(sameUserId)
+        fakeSyncMetadataDao.upsert(com.tenmilelabs.chefai.core.data.local.room.SyncMetadataEntity("recipes", 1_000L))
+        fakeAuthNetworkDataSource.authResponse = AuthResponse(
+            token = "fake_token",
+            refreshToken = "fake_refresh",
+            userId = sameUserId.toString(),
+            username = "sameuser",
+            email = "same@example.com",
+            expiresIn = 3600
+        )
+
+        sessionManager.login("same@example.com", "password123")
+
+        assertThat(fakeSyncMetadataDao.getLastSyncedAt("recipes")).isNull()
+    }
+
+    @Test
+    fun `a cold start session restore keeps the pull cursor`() = testScope.runTest {
+        val userId = UuidV7Generator.newId()
+        fakeSecurePreferences.setCurrentUserId(userId)
+        fakeSecurePreferences.saveAuthData(
+            userUuid = userId,
+            displayName = "User",
+            email = "user@example.com",
+            avatarUrl = "",
+            accessToken = "token",
+            refreshToken = "refresh",
+            tokenExpiry = System.currentTimeMillis() + 3_600_000,
+        )
+        fakeSyncMetadataDao.upsert(com.tenmilelabs.chefai.core.data.local.room.SyncMetadataEntity("recipes", 1_000L))
+
+        coldStartSessionManager()
+        advanceUntilIdle()
+
+        assertThat(fakeSyncMetadataDao.getLastSyncedAt("recipes")).isEqualTo(1_000L)
+    }
+
+    // --- Server-side logout and lost register responses ---
+
+    @Test
+    fun `logout revokes the refresh token on the server`() = testScope.runTest {
+        sessionManager.login("test@example.com", "password123")
+        val refreshToken = (sessionManager.userSession.value as UserSession.Authenticated).authToken.refreshToken
+
+        sessionManager.logout()
+        advanceUntilIdle()
+
+        assertThat(fakeAuthNetworkDataSource.logoutRequests.map { it.refreshToken }).containsExactly(refreshToken)
+    }
+
+    @Test
+    fun `logout completes locally when the server-side revoke fails`() = testScope.runTest {
+        sessionManager.login("test@example.com", "password123")
+        fakeAuthNetworkDataSource.logoutError = Exception("offline")
+
+        sessionManager.logout()
+        advanceUntilIdle()
+
+        assertThat(sessionManager.userSession.value).isInstanceOf(UserSession.Anonymous::class.java)
+        assertThat(fakeSecurePreferences.getAccessToken().first()).isNull()
+    }
+
+    @Test
+    fun `a 409 right after a timed-out register logs in with the same credentials`() = testScope.runTest {
+        sessionManager.loadSession()
+        fakeAuthNetworkDataSource.registerErrors.add(java.net.SocketTimeoutException("read timed out"))
+        fakeAuthNetworkDataSource.registerErrors.add(
+            com.tenmilelabs.chefai.auth.data.network.AuthHttpException("Email already registered", statusCode = 409)
+        )
+
+        val first = sessionManager.register("cook", "cook@example.com", "hunter22")
+        val retry = sessionManager.register("cook", "cook@example.com", "hunter22")
+
+        assertThat(first.isFailure).isTrue()
+        assertThat(retry.isSuccess).isTrue()
+        assertThat(fakeAuthNetworkDataSource.loginRequests.single().email).isEqualTo("cook@example.com")
+        assertThat(sessionManager.userSession.value).isInstanceOf(UserSession.Authenticated::class.java)
+    }
+
+    @Test
+    fun `a 409 without a timed-out attempt before it is reported as is`() = testScope.runTest {
+        sessionManager.loadSession()
+        fakeAuthNetworkDataSource.registerErrors.add(
+            com.tenmilelabs.chefai.auth.data.network.AuthHttpException("Email already registered", statusCode = 409)
+        )
+
+        val result = sessionManager.register("cook", "cook@example.com", "hunter22")
+
+        assertThat((result.exceptionOrNull() as? com.tenmilelabs.chefai.auth.data.network.AuthHttpException)?.statusCode).isEqualTo(409)
+        assertThat(fakeAuthNetworkDataSource.loginRequests).isEmpty()
+    }
+
+    @Test
+    fun `a 409 after a timeout whose login also fails reports the 409`() = testScope.runTest {
+        sessionManager.loadSession()
+        fakeAuthNetworkDataSource.registerErrors.add(java.net.SocketTimeoutException("read timed out"))
+        fakeAuthNetworkDataSource.registerErrors.add(
+            com.tenmilelabs.chefai.auth.data.network.AuthHttpException("Email already registered", statusCode = 409)
+        )
+        sessionManager.register("cook", "cook@example.com", "hunter22")
+        // Someone else's account: the password does not match.
+        fakeAuthNetworkDataSource.shouldThrowError = true
+
+        val retry = sessionManager.register("cook", "cook@example.com", "hunter22")
+
+        assertThat((retry.exceptionOrNull() as? com.tenmilelabs.chefai.auth.data.network.AuthHttpException)?.statusCode).isEqualTo(409)
+        assertThat(fakeAuthNetworkDataSource.loginRequests).hasSize(1)
+        assertThat(sessionManager.userSession.value).isInstanceOf(UserSession.Anonymous::class.java)
     }
 }

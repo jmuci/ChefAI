@@ -5,6 +5,7 @@ import com.tenmilelabs.chefai.collections.domain.model.RecipeBookmark
 import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.data.local.room.BookmarkedRecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.dao.BookmarkedRecipeDao
+import com.tenmilelabs.chefai.core.data.local.util.nextUpdatedAt
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -53,7 +54,8 @@ class DefaultCollectionsRepository @Inject constructor(
             BookmarkedRecipeEntity(
                 userId = userId,
                 recipeId = recipeId,
-                updatedAt = now,
+                // A revived tombstone's stamp must sort after the deletion it undoes.
+                updatedAt = nextUpdatedAt(dao.get(userId, recipeId)?.updatedAt, now),
                 deletedAt = null,
                 isStarred = starred,
             )

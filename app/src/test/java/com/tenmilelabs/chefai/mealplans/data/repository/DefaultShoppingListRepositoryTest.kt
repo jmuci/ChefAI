@@ -237,6 +237,47 @@ class DefaultShoppingListRepositoryTest {
         assertThat(repository.observeCheckedState(planId).first().checkedByUserIds).isEmpty()
     }
 
+    @Test
+    fun `setChecked stamps a row whose stored updatedAt is ahead of the device clock later than it`() = runTest {
+        // Stamped by another device, or by the server on accept, with a clock far ahead of this one.
+        val planId = UUID.randomUUID()
+        val ahead = System.currentTimeMillis() + 3_600_000L
+        checkDao.upsert(
+            ShoppingListCheckEntity(
+                mealPlanId = planId,
+                itemKey = "onion",
+                checkedAt = ahead,
+                checked = true,
+                updatedAt = ahead,
+                syncState = SyncState.SYNCED,
+            )
+        )
+
+        repository.setChecked(planId, "onion", checked = false)
+
+        assertThat(checkDao.getCheck(planId, "onion")?.updatedAt).isGreaterThan(ahead)
+    }
+
+    @Test
+    fun `clearChecks stamps each row later than its stored updatedAt`() = runTest {
+        val planId = UUID.randomUUID()
+        val ahead = System.currentTimeMillis() + 3_600_000L
+        checkDao.upsert(
+            ShoppingListCheckEntity(
+                mealPlanId = planId,
+                itemKey = "onion",
+                checkedAt = ahead,
+                checked = true,
+                updatedAt = ahead,
+                syncState = SyncState.SYNCED,
+            )
+        )
+
+        repository.clearChecks(planId)
+
+        assertThat(checkDao.getCheck(planId, "onion")?.updatedAt).isGreaterThan(ahead)
+    }
+
     // --- Helpers ---
 
     private fun recipe(servings: Int = 4) = RecipeEntity(

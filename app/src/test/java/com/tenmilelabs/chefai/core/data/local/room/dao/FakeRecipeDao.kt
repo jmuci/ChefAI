@@ -285,7 +285,7 @@ class FakeRecipeDao : RecipeDao {
             recipes[uuid] = it.copy(
                 deletedAt = deletedAt,
                 syncState = SyncState.DELETED,
-                updatedAt = deletedAt
+                updatedAt = maxOf(deletedAt, it.updatedAt + 1)
             )
         }
         triggerUpdate()

@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.mealplans.data.repository
 
 import com.tenmilelabs.chefai.core.data.local.room.dao.MealPlanDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.SavedMealPlanDao
+import com.tenmilelabs.chefai.core.data.local.util.nextUpdatedAt
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import com.tenmilelabs.chefai.mealplans.data.local.SavedPlanImageStore
 import com.tenmilelabs.chefai.mealplans.data.mapper.toDomain
@@ -70,7 +71,8 @@ class DefaultSavedMealPlanRepository @Inject constructor(
             },
             sourceMealPlanId = mealPlanId,
             createdAt = now,
-            updatedAt = now,
+            // A retried save reuses its id; the stamp must still sort after the stored version.
+            updatedAt = nextUpdatedAt(savedMealPlanDao.getById(savedPlanId)?.updatedAt, now),
         )
         savedMealPlanDao.upsert(snapshot.toEntity())
         syncScheduler.requestMutationSync()

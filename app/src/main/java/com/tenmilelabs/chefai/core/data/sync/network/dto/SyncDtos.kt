@@ -270,7 +270,13 @@ data class SyncMealPlanDayDto(
 data class MealPlanPushResults(
     val accepted: List<AcceptedEntityDto> = emptyList(),
     val conflicts: List<String> = emptyList(),
-    val errors: List<SyncErrorDto> = emptyList()
+    val errors: List<SyncErrorDto> = emptyList(),
+    /**
+     * The server's winning copy of each plan in [conflicts], applied at once so the row settles
+     * even when its winner is already behind the pull cursor. Empty from a backend that only
+     * sends ids; the client then waits for a pull, as before.
+     */
+    val conflictVersions: List<SyncMealPlanDto> = emptyList()
 )
 
 @Serializable
@@ -344,7 +350,9 @@ data class GroceryItemErrorDto(
 data class GroceryItemPushResults(
     val accepted: List<GroceryItemAcceptedDto> = emptyList(),
     val conflicts: List<GroceryItemIdentifierDto> = emptyList(),
-    val errors: List<GroceryItemErrorDto> = emptyList()
+    val errors: List<GroceryItemErrorDto> = emptyList(),
+    /** The server's winning copy of each item in [conflicts]; see [MealPlanPushResults.conflictVersions]. */
+    val conflictVersions: List<SyncGroceryListItem> = emptyList()
 )
 
 // --- Cook History Sync DTOs (ADR-017) ---
@@ -414,5 +422,7 @@ data class SyncSavedMealPlanDayDto(
 data class SavedMealPlanPushResults(
     val accepted: List<AcceptedEntityDto> = emptyList(),
     val conflicts: List<String> = emptyList(),
-    val errors: List<SyncErrorDto> = emptyList()
+    val errors: List<SyncErrorDto> = emptyList(),
+    /** The server's winning copy of each plan in [conflicts]; see [MealPlanPushResults.conflictVersions]. */
+    val conflictVersions: List<SyncSavedMealPlanDto> = emptyList()
 )

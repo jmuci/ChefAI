@@ -12,6 +12,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeLabelCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.TagDao
+import com.tenmilelabs.chefai.core.data.local.util.nextUpdatedAt
 import com.tenmilelabs.chefai.core.data.sync.RecipeFetchOutcome
 import com.tenmilelabs.chefai.core.data.sync.SyncOrchestrator
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
@@ -193,8 +194,11 @@ class DefaultRecipeRepository @Inject constructor(
     }
 
     private suspend fun writeUpdatedRecipe(recipe: Recipe) {
-        // Update the recipe entity
-        recipeDao.upsertRecipe(recipe.toRoomEntity())
+        // Update the recipe entity. The caller stamps the device clock, which may be behind the
+        // version this edit replaces (e.g. one stamped by the server on accept).
+        val entity = recipe.toRoomEntity()
+        val previousUpdatedAt = recipeDao.getRecipeById(recipe.uuid)?.updatedAt
+        recipeDao.upsertRecipe(entity.copy(updatedAt = nextUpdatedAt(previousUpdatedAt, entity.updatedAt)))
 
         // Replace steps: delete old, insert new
         recipeStepDao.deleteAllForRecipe(recipe.uuid)

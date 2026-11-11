@@ -16,6 +16,9 @@ class FakeSyncManager : SyncScheduler {
     var bookmarkSyncCount = 0
         private set
 
+    var followUpSyncCount = 0
+        private set
+
     var manualSyncCount = 0
         private set
 
@@ -43,6 +46,10 @@ class FakeSyncManager : SyncScheduler {
         bookmarkSyncCount++
     }
 
+    override fun requestFollowUpSync() {
+        followUpSyncCount++
+    }
+
     override fun requestManualSync() {
         manualSyncCount++
     }
@@ -67,6 +74,7 @@ class FakeSyncManager : SyncScheduler {
         immediateSyncCount = 0
         mutationSyncCount = 0
         bookmarkSyncCount = 0
+        followUpSyncCount = 0
         manualSyncCount = 0
         periodicSyncCount = 0
         imageBackfillCount = 0

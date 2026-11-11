@@ -50,11 +50,12 @@ interface ShoppingListCheckDao {
      * (`deletedAt` set): that item already left the list server-side, and unchecking it here would
      * push a `checked = false` update that resurrects it. `checkedAt` is bumped to [updatedAt] too,
      * matching [ShoppingListCheckEntity.checkedAt]'s "last ticked" contract the way a single-item
-     * uncheck (see the repository's `setChecked`) already does.
+     * uncheck (see the repository's `setChecked`) already does. `updatedAt` follows nextUpdatedAt,
+     * so each row's stamp sorts after the version it replaces.
      */
     @Query(
         "UPDATE shopping_list_checks SET checked = 0, checkedBy = NULL, checkedAt = :updatedAt, " +
-            "syncState = :state, updatedAt = :updatedAt " +
+            "syncState = :state, updatedAt = MAX(:updatedAt, updatedAt + 1) " +
             "WHERE mealPlanId = :mealPlanId AND checked = 1 AND deletedAt IS NULL"
     )
     suspend fun clearForPlan(mealPlanId: UUID, state: SyncState, updatedAt: Long)

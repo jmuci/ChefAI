@@ -53,6 +53,12 @@ data class RefreshTokenRequest(
     val refreshToken: String
 )
 
+/** Request body for `POST /auth/logout`: the refresh token of the session being ended. */
+@Serializable
+data class LogoutRequest(
+    val refreshToken: String
+)
+
 /**
  * Error response from the API.
  */

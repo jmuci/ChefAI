@@ -5,6 +5,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.ShoppingListCheckDao
 import com.tenmilelabs.chefai.core.data.local.room.ShoppingListCheckEntity
 import com.tenmilelabs.chefai.core.data.local.room.relations.PlanIngredientRow
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
+import com.tenmilelabs.chefai.core.data.local.util.nextUpdatedAt
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import com.tenmilelabs.chefai.mealplans.domain.repository.CheckedItemsState
 import com.tenmilelabs.chefai.mealplans.domain.repository.ShoppingListRepository
@@ -50,15 +51,15 @@ class DefaultShoppingListRepository @Inject constructor(
      */
     override suspend fun setChecked(mealPlanId: UUID, itemKey: String, checked: Boolean) {
         val now = System.currentTimeMillis()
-        val existingDeletedAt = shoppingListCheckDao.getCheck(mealPlanId, itemKey)?.deletedAt
+        val existing = shoppingListCheckDao.getCheck(mealPlanId, itemKey)
         shoppingListCheckDao.upsert(
             ShoppingListCheckEntity(
                 mealPlanId = mealPlanId,
                 itemKey = itemKey,
                 checkedAt = now,
                 checked = checked,
-                updatedAt = now,
-                deletedAt = existingDeletedAt,
+                updatedAt = nextUpdatedAt(existing?.updatedAt, now),
+                deletedAt = existing?.deletedAt,
                 syncState = SyncState.PENDING,
             )
         )

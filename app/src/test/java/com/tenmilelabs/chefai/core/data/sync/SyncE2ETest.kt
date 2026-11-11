@@ -385,7 +385,7 @@ class SyncE2ETest {
             SyncPushResponse(
                 accepted = emptyList(),
                 conflicts = emptyList(),
-                errors = listOf(SyncErrorDto(recipeId.toString(), "unavailable", "Retry later")),
+                errors = listOf(SyncErrorDto(recipeId.toString(), "INTERNAL_ERROR", "Retry later")),
                 serverTimestamp = 4000L
             )
         )

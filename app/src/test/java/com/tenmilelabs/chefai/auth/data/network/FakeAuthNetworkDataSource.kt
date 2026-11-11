@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.auth.data.network
 
 import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
 import com.tenmilelabs.chefai.auth.data.network.dto.LoginRequest
+import com.tenmilelabs.chefai.auth.data.network.dto.LogoutRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RefreshTokenRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RegisterRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.TokenRefreshResponse
@@ -49,7 +50,18 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
      */
     var refreshGate: CompletableDeferred<Unit>? = null
 
+    /** Thrown by [register], one per call and in order, before anything else is consulted. */
+    val registerErrors: ArrayDeque<Exception> = ArrayDeque()
+
+    /** Every [login] request, in order. */
+    val loginRequests = mutableListOf<LoginRequest>()
+
+    /** Every [logout] request, in order; [logoutError] is thrown after recording it. */
+    val logoutRequests = mutableListOf<LogoutRequest>()
+    var logoutError: Exception? = null
+
     override suspend fun register(request: RegisterRequest): AuthResponse {
+        registerErrors.removeFirstOrNull()?.let { throw it }
         if (networkDelayMs > 0) {
             delay(networkDelayMs)
         }
@@ -65,6 +77,7 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
     }
 
     override suspend fun login(request: LoginRequest): AuthResponse {
+        loginRequests += request
         if (networkDelayMs > 0) {
             delay(networkDelayMs)
         }
@@ -90,6 +103,11 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
         }
 
         return tokenRefreshResponse ?: createDefaultTokenRefreshResponse()
+    }
+
+    override suspend fun logout(request: LogoutRequest) {
+        logoutRequests += request
+        logoutError?.let { throw it }
     }
 
     /**

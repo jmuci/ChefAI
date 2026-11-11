@@ -8,6 +8,13 @@ package com.tenmilelabs.chefai.core.data.sync
 interface SyncScheduler {
     fun requestImmediateSync()
     fun requestMutationSync()
+
+    /**
+     * Queues one more sync to run after the one in progress, for changes made while it ran.
+     * [requestMutationSync] cannot do this from inside the running sync: its KEEP policy drops a
+     * request while the unique work is still running.
+     */
+    fun requestFollowUpSync()
     /**
      * Enqueues a bookmark-specific sync with a short initial delay, using REPLACE policy.
      * Each call resets the delay window, naturally batching rapid bookmark actions into

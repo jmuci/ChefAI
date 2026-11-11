@@ -71,7 +71,7 @@ The server responds with three buckets:
 |--------|--------------|
 | `accepted` | Mark recipe + all children as `SYNCED`, stamp `updatedAt = serverUpdatedAt` |
 | `conflicts` | Server version replaces local. Call `upsertRecipeAggregate(serverVersion)` |
-| `errors` | Log warning. Recipe stays `PENDING` and will retry on next sync cycle |
+| `errors` | Reason `INTERNAL_ERROR` or `MEAL_PLAN_RECIPE_NOT_ACCESSIBLE`: stays `PENDING`, retried next cycle. Any other reason, including an unknown one: parked as `CANCELLED` (skipped by `getAllDirty`) until the next local edit. Same rule for bookmarks, meal plans and grocery checks (ADR-006, Nov 2026 amendment) |
 
 ---
 
@@ -151,6 +151,11 @@ The aggregate is written atomically within the outer Room transaction:
 ```kotlin
 syncMetadataDao.upsert(SyncMetadataEntity("recipes", response.serverTimestamp))
 ```
+
+`serverTimestamp` is stored as-is. Bookmark, meal-plan and grocery `updatedAt`s are never folded
+in: they are edit times on other devices' clocks, and doing so skipped recipes still waiting on a
+later page. On the last page the value can be lower than `since` (the server keeps it 5 s behind
+its clock); that is expected.
 
 The loop repeats if `hasMore = true`.
 

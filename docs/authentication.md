@@ -188,7 +188,8 @@ When a user logs out (through `LogoutUseCase`, which wraps `SessionManager.logou
 
 - pending changes are pushed first with the still-valid token, best effort and capped at 4 s;
   offline with changes waiting, the profile menu asks before logging out (ADR-008)
-- auth tokens are cleared
+- auth tokens are cleared, and the refresh token is revoked with `POST /auth/logout` (best effort,
+  not awaited; ADR-008)
 - the app returns to an anonymous session
 - the anonymous `localUserId` is preserved
 - local data is not cleared

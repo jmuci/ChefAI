@@ -94,6 +94,17 @@ class SyncStatusViewModelTest {
     }
 
     @Test
+    fun `update required maps to UpdateRequired when online`() = runTest {
+        fakeConnectivity.setOnline(true)
+        syncStatusHolder.emitStatus(SyncStatus.UpdateRequired)
+
+        val viewModel = createViewModel()
+        val status = viewModel.displayStatus.first()
+
+        assertEquals(SyncDisplayStatus.UpdateRequired, status)
+    }
+
+    @Test
     fun `going offline during sync shows Offline`() = runTest {
         fakeConnectivity.setOnline(true)
         syncStatusHolder.emitStatus(SyncStatus.Syncing)

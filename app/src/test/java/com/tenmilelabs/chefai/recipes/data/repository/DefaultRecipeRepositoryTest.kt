@@ -434,6 +434,32 @@ class DefaultRecipeRepositoryTest {
     }
 
     @Test
+    fun `updateRecipe() stamps an edit later than a stored version that is ahead of the device clock`() = runTest {
+        // The server's accept time, or another device's edit, can sit ahead of this device's clock.
+        // The row is also parked (CANCELLED): the edit must queue it for push again.
+        val ahead = System.currentTimeMillis() + 3_600_000L
+        val stored = requireNotNull(recipeDao.getRecipeById(recipeId1))
+        recipeDao.upsertRecipe(stored.copy(updatedAt = ahead, syncState = SyncState.CANCELLED))
+        val original = requireNotNull(recipeRepository.getRecipeStream(recipeId1).first())
+
+        recipeRepository.updateRecipe(original.copy(title = "Edited on a slow clock", updatedAt = System.currentTimeMillis()))
+
+        val saved = requireNotNull(recipeDao.getRecipeById(recipeId1))
+        assertThat(saved.updatedAt).isGreaterThan(ahead)
+        assertThat(saved.syncState).isEqualTo(SyncState.PENDING)
+    }
+
+    @Test
+    fun `softDeleteRecipe() stamps the tombstone later than a stored version that is ahead of the clock`() = runTest {
+        val ahead = System.currentTimeMillis() + 3_600_000L
+        recipeDao.upsertRecipe(requireNotNull(recipeDao.getRecipeById(recipeId1)).copy(updatedAt = ahead))
+
+        recipeRepository.softDeleteRecipe(recipeId1)
+
+        assertThat(recipeDao.getRecipeById(recipeId1)?.updatedAt).isGreaterThan(ahead)
+    }
+
+    @Test
     fun `softDeleteRecipe() reclaims the cached image`() = runTest {
         // Nothing ever hard-deletes a soft-deleted row, so if the file isn't reclaimed here it never
         // is — up to MAX_IMAGE_BYTES retained per deleted recipe, forever.
