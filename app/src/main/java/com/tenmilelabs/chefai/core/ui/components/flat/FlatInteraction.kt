@@ -1,6 +1,8 @@
 package com.tenmilelabs.chefai.core.ui.components.flat
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -19,6 +21,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.tenmilelabs.chefai.core.ui.theme.chefColors
@@ -163,6 +168,34 @@ fun Modifier.flatToggleable(
         role = role,
         onValueChange = onCheckedChange,
     )
+
+/**
+ * [flatToggleable] that also answers a long press. `toggleable` has no long-press slot, so this is
+ * `combinedClickable` with the checked state published by hand — same role, same state reaching
+ * TalkBack, same flat tint. [onLongClickLabel] is what TalkBack offers as the long-press action.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun Modifier.flatToggleableWithLongClick(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    onLongClick: () -> Unit,
+    onLongClickLabel: String?,
+    enabled: Boolean = true,
+    role: Role = Role.Checkbox,
+    pressedTint: Color = MaterialTheme.chefColors.neutral.s200,
+    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+): Modifier = flatInteraction(pressedTint, enabled, interactionSource)
+    .combinedClickable(
+        enabled = enabled,
+        interactionSource = interactionSource,
+        indication = null,
+        role = role,
+        onLongClickLabel = onLongClickLabel,
+        onLongClick = onLongClick,
+        onClick = { onCheckedChange(!checked) },
+    )
+    .semantics { toggleableState = ToggleableState(checked) }
 
 /**
  * [flatClickable] for a row or control that is **one option of several** — a Settings radio row, a

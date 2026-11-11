@@ -177,6 +177,19 @@ sequence-diagram scenario (grocery-item LWW), added alongside the existing recip
 
 ---
 
+## Amendment: renaming and removing grocery items (November 2026)
+
+The list is derived from the plan's recipes, so a rename or removal cannot live on a list item —
+it would vanish on the next recompute. Both are stored as an overlay on the existing
+`shopping_list_checks` row, keyed by the original `itemKey`: `displayNameOverride` (display-only;
+key, section and quantity still come from the recipes) and `removed` (distinct from `deletedAt`,
+which means the item left the list because the plan changed). They travel on the same
+`SyncGroceryListItem` and so follow Decision 7's row-level last-writer-wins: a concurrent tick can
+overwrite a rename, and vice versa. A removed item stays hidden even if a later recipe edit changes
+its quantity.
+
+---
+
 ## Status
 
 Complete. PRs A1–A12 (`docs/archive/prompts/households-android-prompt.md` §9) and the follow-up fixes

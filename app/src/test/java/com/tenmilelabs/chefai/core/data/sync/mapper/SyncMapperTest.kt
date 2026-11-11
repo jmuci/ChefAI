@@ -506,6 +506,42 @@ class SyncMapperTest {
         assertThat(entity.checkedBy).isNull()
     }
 
+    @Test
+    fun `a rename and a removal survive the push and pull mappings`() {
+        val entity = ShoppingListCheckEntity(
+            mealPlanId = UUID.randomUUID(),
+            itemKey = "onion",
+            checkedAt = 1_000L,
+            checked = false,
+            displayNameOverride = "Red onions",
+            removed = true,
+        )
+
+        val dto = entity.toSyncDto()
+        val pulled = dto.toEntity()
+
+        assertThat(dto.displayNameOverride).isEqualTo("Red onions")
+        assertThat(dto.removed).isTrue()
+        assertThat(pulled.displayNameOverride).isEqualTo("Red onions")
+        assertThat(pulled.removed).isTrue()
+    }
+
+    @Test
+    fun `a pulled item from a server that predates edits reads as untouched`() {
+        val dto = SyncGroceryListItem(
+            mealPlanId = UUID.randomUUID().toString(),
+            itemKey = "onion",
+            checked = true,
+            updatedAt = 5_000L,
+            deletedAt = null,
+        )
+
+        val entity = dto.toEntity()
+
+        assertThat(entity.displayNameOverride).isNull()
+        assertThat(entity.removed).isFalse()
+    }
+
     // --- Language ---
 
     @Test

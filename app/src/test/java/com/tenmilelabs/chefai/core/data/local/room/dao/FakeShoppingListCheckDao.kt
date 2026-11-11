@@ -16,11 +16,14 @@ class FakeShoppingListCheckDao : ShoppingListCheckDao {
         trigger.value++
     }
 
-    override fun observeCheckedRows(mealPlanId: UUID): Flow<List<CheckedItemRow>> =
+    override fun observeItemStateRows(mealPlanId: UUID): Flow<List<CheckedItemRow>> =
         trigger.map {
             checks.values
-                .filter { it.mealPlanId == mealPlanId && it.checked && it.deletedAt == null }
-                .map { CheckedItemRow(it.itemKey, it.checkedBy) }
+                .filter {
+                    it.mealPlanId == mealPlanId && it.deletedAt == null &&
+                        (it.checked || it.removed || it.displayNameOverride != null)
+                }
+                .map { CheckedItemRow(it.itemKey, it.checked, it.checkedBy, it.displayNameOverride, it.removed) }
         }
 
     override suspend fun upsert(check: ShoppingListCheckEntity) {

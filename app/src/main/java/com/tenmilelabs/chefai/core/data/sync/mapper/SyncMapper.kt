@@ -294,6 +294,8 @@ fun ShoppingListCheckEntity.toSyncDto(): SyncGroceryListItem = SyncGroceryListIt
     // Server-derived from the pushing caller (see SyncGroceryListItem's doc) — this device
     // doesn't know who it is, so there's nothing honest to send.
     checkedBy = null,
+    displayNameOverride = displayNameOverride,
+    removed = removed,
     updatedAt = updatedAt,
     deletedAt = deletedAt,
 )
@@ -306,6 +308,8 @@ fun SyncGroceryListItem.toEntity(): ShoppingListCheckEntity = ShoppingListCheckE
     checkedAt = updatedAt,
     checked = checked,
     checkedBy = checkedBy?.let { UUID.fromString(it) },
+    displayNameOverride = displayNameOverride,
+    removed = removed,
     updatedAt = updatedAt,
     deletedAt = deletedAt,
     syncState = SyncState.SYNCED,

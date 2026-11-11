@@ -17,6 +17,9 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** The backend's limit on `displayNameOverride`; a longer rename would be rejected on push. */
+private const val MAX_NAME_LENGTH = 256
+
 @Singleton
 class DefaultShoppingListRepository @Inject constructor(
     private val recipeDao: RecipeDao,
@@ -30,12 +33,17 @@ class DefaultShoppingListRepository @Inject constructor(
     }
 
     override fun observeCheckedState(mealPlanId: UUID): Flow<CheckedItemsState> =
-        shoppingListCheckDao.observeCheckedRows(mealPlanId).map { rows ->
+        shoppingListCheckDao.observeItemStateRows(mealPlanId).map { rows ->
+            val checked = rows.filter { it.checked }
             CheckedItemsState(
-                checkedKeys = rows.map { it.itemKey }.toSet(),
-                checkedByUserIds = rows.mapNotNull { row ->
+                checkedKeys = checked.map { it.itemKey }.toSet(),
+                checkedByUserIds = checked.mapNotNull { row ->
                     row.checkedBy?.let { row.itemKey to it }
                 }.toMap(),
+                displayNameOverrides = rows.mapNotNull { row ->
+                    row.displayNameOverride?.let { row.itemKey to it }
+                }.toMap(),
+                removedKeys = rows.filter { it.removed }.map { it.itemKey }.toSet(),
             )
         }
 
@@ -47,19 +55,50 @@ class DefaultShoppingListRepository @Inject constructor(
      * checked/unchecked toggle must never resurrect an item a sync pull already marked as removed
      * from the plan server-side, even though [com.tenmilelabs.chefai.mealplans.domain.shoppinglist
      * .ShoppingListBuilder] can still be showing it (it derives the visible list from the plan's
-     * current ingredients, independently of this row's `deletedAt`).
+     * current ingredients, independently of this row's `deletedAt`). Likewise carries forward the
+     * row's rename and removal.
      */
     override suspend fun setChecked(mealPlanId: UUID, itemKey: String, checked: Boolean) {
         val now = System.currentTimeMillis()
+        upsertItem(mealPlanId, itemKey, now) { existing ->
+            existing.copy(checkedAt = now, checked = checked)
+        }
+    }
+
+    override suspend fun renameItem(mealPlanId: UUID, itemKey: String, displayName: String?) {
+        val name = displayName?.trim()?.take(MAX_NAME_LENGTH)?.takeIf { it.isNotEmpty() }
+        upsertItem(mealPlanId, itemKey, System.currentTimeMillis()) { existing ->
+            existing.copy(displayNameOverride = name)
+        }
+    }
+
+    override suspend fun setRemoved(mealPlanId: UUID, itemKey: String, removed: Boolean) {
+        upsertItem(mealPlanId, itemKey, System.currentTimeMillis()) { existing ->
+            existing.copy(removed = removed)
+        }
+    }
+
+    /**
+     * Read-modify-write of one item's row: [edit] sees the stored row, or an untouched unticked
+     * one when the item has never been edited, and everything it doesn't change is carried over.
+     * Stamps `updatedAt` after the version it replaces and queues a sync.
+     */
+    private suspend fun upsertItem(
+        mealPlanId: UUID,
+        itemKey: String,
+        now: Long,
+        edit: (ShoppingListCheckEntity) -> ShoppingListCheckEntity,
+    ) {
         val existing = shoppingListCheckDao.getCheck(mealPlanId, itemKey)
+        val base = existing ?: ShoppingListCheckEntity(
+            mealPlanId = mealPlanId,
+            itemKey = itemKey,
+            checkedAt = now,
+            checked = false,
+        )
         shoppingListCheckDao.upsert(
-            ShoppingListCheckEntity(
-                mealPlanId = mealPlanId,
-                itemKey = itemKey,
-                checkedAt = now,
-                checked = checked,
+            edit(base).copy(
                 updatedAt = nextUpdatedAt(existing?.updatedAt, now),
-                deletedAt = existing?.deletedAt,
                 syncState = SyncState.PENDING,
             )
         )

@@ -166,6 +166,111 @@ class ShoppingListViewModelTest {
     }
 
     @Test
+    fun `removing an item drops it from the list and emits ItemRemoved, undo brings it back`() = runTest {
+        mealPlanRepository.emitPlans(planWith(days = listOf(fullDay())))
+        shoppingListRepository.setIngredientsForRecipe(
+            recipeId,
+            listOf(
+                PlannedIngredient(recipeId, 2, "Onion", 1.0, "cup"),
+                PlannedIngredient(recipeId, 2, "Garlic", 2.0, "cloves"),
+            ),
+        )
+        val viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            val initial = awaitItem().let { if (it is ShoppingListUiState.Loading) awaitItem() else it }
+                as ShoppingListUiState.Success
+            val onion = initial.list.sections.flatMap { it.items }.first { it.key == "onion" }
+
+            viewModel.events.test {
+                viewModel.onDeleteItem(onion)
+                assertThat(awaitItem()).isEqualTo(ShoppingListEvent.ItemRemoved("onion", "Onion"))
+            }
+
+            val removed = awaitItem() as ShoppingListUiState.Success
+            assertThat(removed.list.sections.flatMap { it.items }.map { it.key }).containsExactly("garlic")
+            assertThat(removed.list.totalCount).isEqualTo(1)
+
+            viewModel.onUndoRemove("onion")
+
+            val restored = awaitItem() as ShoppingListUiState.Success
+            assertThat(restored.list.totalCount).isEqualTo(2)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `renaming an item changes its shown name but not its key or tick`() = runTest {
+        mealPlanRepository.emitPlans(planWith(days = listOf(fullDay())))
+        shoppingListRepository.setIngredientsForRecipe(
+            recipeId,
+            listOf(PlannedIngredient(recipeId, 2, "Onion", 1.0, "cup")),
+        )
+        val viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            val initial = awaitItem().let { if (it is ShoppingListUiState.Loading) awaitItem() else it }
+                as ShoppingListUiState.Success
+            val onion = initial.list.sections.single().items.single()
+            viewModel.onToggleItem(onion)
+            awaitItem()
+
+            viewModel.onRenameItem(onion, "  Red onions ")
+
+            val renamed = (awaitItem() as ShoppingListUiState.Success).list.sections.single().items.single()
+            assertThat(renamed.displayName).isEqualTo("Red onions")
+            assertThat(renamed.key).isEqualTo("onion")
+            assertThat(renamed.isChecked).isTrue()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `renaming to a blank or unchanged name does nothing`() = runTest {
+        mealPlanRepository.emitPlans(planWith(days = listOf(fullDay())))
+        shoppingListRepository.setIngredientsForRecipe(
+            recipeId,
+            listOf(PlannedIngredient(recipeId, 2, "Onion", 1.0, "cup")),
+        )
+        val viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            val initial = awaitItem().let { if (it is ShoppingListUiState.Loading) awaitItem() else it }
+                as ShoppingListUiState.Success
+            val onion = initial.list.sections.single().items.single()
+
+            viewModel.onRenameItem(onion, "   ")
+            viewModel.onRenameItem(onion, onion.displayName)
+
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `a failed removal emits an error and no ItemRemoved`() = runTest {
+        mealPlanRepository.emitPlans(planWith(days = listOf(fullDay())))
+        shoppingListRepository.setIngredientsForRecipe(
+            recipeId,
+            listOf(PlannedIngredient(recipeId, 2, "Onion", 1.0, "cup")),
+        )
+        shoppingListRepository.shouldThrowOnSetRemoved = true
+        val viewModel = createViewModel()
+        val onion = com.tenmilelabs.chefai.mealplans.domain.shoppinglist.ShoppingListItem(
+            key = "onion",
+            displayName = "Onion",
+            quantityLabel = null,
+            section = com.tenmilelabs.chefai.mealplans.domain.shoppinglist.GrocerySection.PRODUCE,
+            isChecked = false,
+        )
+
+        viewModel.events.test {
+            viewModel.onDeleteItem(onion)
+            assertThat(awaitItem()).isInstanceOf(ShoppingListEvent.ShowError::class.java)
+        }
+    }
+
+    @Test
     fun `onUncheckAll clears every tick`() = runTest {
         mealPlanRepository.emitPlans(planWith(days = listOf(fullDay())))
         shoppingListRepository.setIngredientsForRecipe(

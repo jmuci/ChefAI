@@ -321,6 +321,10 @@ data class SyncGroceryListItem(
     /** Whoever last checked/unchecked this item — server-derived on push, never trusted from a
      *  pushed payload; only meaningful on a pulled item. */
     val checkedBy: String? = null,
+    /** The user's own name for this line; null = no rename. Display-only, `itemKey` never changes. */
+    val displayNameOverride: String? = null,
+    /** The user removed this line from the list (not the same as [deletedAt]). */
+    val removed: Boolean = false,
     val updatedAt: Long,
     val deletedAt: Long?
 )

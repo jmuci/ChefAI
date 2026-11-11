@@ -12,12 +12,25 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -25,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.core.ui.components.flat.FlatField
 import com.tenmilelabs.chefai.core.ui.components.flat.RowRule
 import com.tenmilelabs.chefai.core.ui.components.flat.SectionRule
 import com.tenmilelabs.chefai.core.ui.navigation.ChefAITopAppBarSurface
@@ -37,6 +51,14 @@ import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.ShoppingList
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.ShoppingListItem
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.ShoppingListSection
 import com.tenmilelabs.chefai.mealplans.ui.shoppinglist.components.ShoppingListRow
+import com.tenmilelabs.chefai.mealplans.ui.shoppinglist.components.ShoppingListRowAction
+
+/** What the list's content asks of the ViewModel. */
+sealed interface ShoppingListAction {
+    data class Toggle(val item: ShoppingListItem) : ShoppingListAction
+    data class Rename(val item: ShoppingListItem, val newName: String) : ShoppingListAction
+    data class Remove(val item: ShoppingListItem) : ShoppingListAction
+}
 
 @Composable
 fun ShoppingListScreen(
@@ -45,11 +67,23 @@ fun ShoppingListScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val resources = LocalContext.current.resources
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
                 is ShoppingListEvent.ShowError -> snackbarHostState.showSnackbar(event.message)
+                // Launched, not awaited: a snackbar with an action suspends until it is dismissed,
+                // and the next event (another removal, an error) must not queue behind it.
+                is ShoppingListEvent.ItemRemoved -> launch {
+                    snackbarHostState.currentSnackbarData?.dismiss()
+                    val result = snackbarHostState.showSnackbar(
+                        message = resources.getString(R.string.shopping_list_item_removed, event.displayName),
+                        actionLabel = resources.getString(R.string.shopping_list_undo),
+                        withDismissAction = true,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) viewModel.onUndoRemove(event.itemKey)
+                }
             }
         }
     }
@@ -72,7 +106,13 @@ fun ShoppingListScreen(
         } else {
             ShoppingListContent(
                 list = state.list,
-                onToggleItem = viewModel::onToggleItem,
+                onAction = { action ->
+                    when (action) {
+                        is ShoppingListAction.Toggle -> viewModel.onToggleItem(action.item)
+                        is ShoppingListAction.Rename -> viewModel.onRenameItem(action.item, action.newName)
+                        is ShoppingListAction.Remove -> viewModel.onDeleteItem(action.item)
+                    }
+                },
                 modifier = modifier,
             )
         }
@@ -85,11 +125,30 @@ fun ShoppingListScreen(
  * ghost "Uncheck all" button live in the app shell's header, above this.
  */
 @Composable
-private fun ShoppingListContent(
+internal fun ShoppingListContent(
     list: ShoppingList,
-    onToggleItem: (ShoppingListItem) -> Unit,
+    onAction: (ShoppingListAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Which row shows its pencil/X, and which is being renamed — transient view state, keyed by
+    // item key so it survives rotation and the list recomputing underneath it.
+    var revealedKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var renamingKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val renaming = renamingKey?.let { key ->
+        list.sections.flatMap { it.items }.firstOrNull { it.key == key }
+    }
+
+    renaming?.let { item ->
+        RenameItemDialog(
+            initialName = item.displayName,
+            onConfirm = { newName ->
+                onAction(ShoppingListAction.Rename(item, newName))
+                renamingKey = null
+            },
+            onDismiss = { renamingKey = null },
+        )
+    }
+
     Column(modifier = modifier.fillMaxSize()) {
         ShoppingListProgressHeader(list = list)
 
@@ -114,13 +173,72 @@ private fun ShoppingListContent(
                         isApproximate = item.isApproximate,
                         isChecked = item.isChecked,
                         checkedByName = item.checkedByName,
-                        onToggle = { onToggleItem(item) },
+                        actionsVisible = revealedKey == item.key,
+                        onAction = { rowAction ->
+                            when (rowAction) {
+                                // With the pencil and X showing, a tap puts them away rather than
+                                // ticking the row — the way out of a long press by mistake.
+                                ShoppingListRowAction.Toggle ->
+                                    if (revealedKey == item.key) {
+                                        revealedKey = null
+                                    } else {
+                                        onAction(ShoppingListAction.Toggle(item))
+                                    }
+                                ShoppingListRowAction.LongPress ->
+                                    revealedKey = if (revealedKey == item.key) null else item.key
+                                ShoppingListRowAction.Rename -> {
+                                    revealedKey = null
+                                    renamingKey = item.key
+                                }
+                                ShoppingListRowAction.Remove -> {
+                                    revealedKey = null
+                                    onAction(ShoppingListAction.Remove(item))
+                                }
+                            }
+                        },
                     )
                 }
                 item(key = "rule-bottom-${section.section.name}") { SectionRule() }
             }
         }
     }
+}
+
+@Composable
+private fun RenameItemDialog(
+    initialName: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var name by rememberSaveable { mutableStateOf(initialName) }
+    val canSave = name.isNotBlank()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.shopping_list_rename_title)) },
+        text = {
+            FlatField(
+                value = name,
+                onValueChange = { name = it },
+                label = stringResource(R.string.shopping_list_rename_label),
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Sentences,
+                    imeAction = ImeAction.Done,
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = { if (canSave) onConfirm(name) },
+                ),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(name) }, enabled = canSave) {
+                Text(stringResource(R.string.save_button))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel_button)) }
+        },
+    )
 }
 
 @Composable
@@ -201,7 +319,7 @@ private fun ShoppingListContentLightPreview() {
     ChefAITheme(darkTheme = false) {
         ShoppingListContent(
             list = previewList(),
-            onToggleItem = {},
+            onAction = {},
         )
     }
 }
@@ -212,7 +330,7 @@ private fun ShoppingListContentDarkPreview() {
     ChefAITheme(darkTheme = true) {
         ShoppingListContent(
             list = previewList(),
-            onToggleItem = {},
+            onAction = {},
         )
     }
 }

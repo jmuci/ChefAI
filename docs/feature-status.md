@@ -132,6 +132,14 @@ screen (`ShoppingListScreen`).
 - In Metric/Imperial a volume and a weight of a known-density staple merge into one approximate
   total ([ADR-013](adrs/adr-013-measurement-unit-conversion.md)); a bare count beside a measure
   reads "6 whole".
+- Edits: long-press a row to reveal a pencil (rename) and an X (remove; snackbar with Undo).
+  The list is derived, not stored, so edits are an overlay on `shopping_list_checks`
+  (`displayNameOverride`, `removed`) keyed by the original `itemKey` — a rename never orphans a
+  tick and a plan rebuild never undoes an edit. They ride the existing grocery sync row
+  (row-level LWW, so a concurrent tick can overwrite a rename). Rename is display-only (section and
+  quantity stay as computed). A removed item stays hidden even if its quantity later changes.
+  Requires the backend's `displayNameOverride`/`removed` fields; until it deploys, edits stay
+  local and a pull of that row can overwrite them. The week view's item count ignores removals.
 - [`grocery-api-landscape.html`](grocery-api-landscape.html)'s delivery-partner research
   (Instacart/Albertsons/Kroger) is unrelated and unactioned. No ADR yet.
 

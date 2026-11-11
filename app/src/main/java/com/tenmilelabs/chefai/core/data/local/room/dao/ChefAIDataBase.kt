@@ -56,7 +56,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         TagEntity::class,
         UserEntity::class
     ],
-    version = 16,
+    version = 17,
     exportSchema = true
 )
 @TypeConverters(UuidConverters::class)
@@ -464,5 +464,16 @@ val MIGRATION_15_16 = object : Migration(15, 16) {
             "CREATE INDEX IF NOT EXISTS `index_saved_meal_plans_syncState_updatedAt` " +
                 "ON `saved_meal_plans` (`syncState`, `updatedAt`)"
         )
+    }
+}
+
+/**
+ * v16 → v17: `shopping_list_checks.displayNameOverride` / `removed`, the user's rename and removal
+ * of a shopping-list line. Both default to "untouched", so every existing line reads as before.
+ */
+val MIGRATION_16_17 = object : Migration(16, 17) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `shopping_list_checks` ADD COLUMN `displayNameOverride` TEXT")
+        db.execSQL("ALTER TABLE `shopping_list_checks` ADD COLUMN `removed` INTEGER NOT NULL DEFAULT 0")
     }
 }

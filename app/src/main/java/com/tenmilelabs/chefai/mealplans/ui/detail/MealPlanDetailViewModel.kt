@@ -121,16 +121,22 @@ class MealPlanDetailViewModel @Inject constructor(
                 val itemCount = if (recipeIds.isEmpty()) {
                     flowOf(0)
                 } else {
-                    runCatching { shoppingListRepository.observeIngredientsForRecipes(recipeIds) }
-                        .getOrElse { flowOf(emptyList()) }
-                        .map { ingredients ->
+                    runCatching {
+                        // The removed lines are subtracted, so the button agrees with the list it opens.
+                        combine(
+                            shoppingListRepository.observeIngredientsForRecipes(recipeIds),
+                            shoppingListRepository.observeCheckedState(mealPlan.uuid),
+                        ) { ingredients, itemState ->
                             ShoppingListBuilder.build(
                                 ingredients = ingredients,
                                 slotCountByRecipe = slotCounts,
                                 plannedServings = mealPlan.preferences.servingsPerMeal,
                                 checkedKeys = emptySet(),
+                                removedKeys = itemState.removedKeys,
                             ).totalCount
                         }
+                    }
+                        .getOrElse { flowOf(0) }
                         .catch { emit(0) }
                 }
 

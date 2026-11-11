@@ -20,6 +20,56 @@ class ShoppingListBuilderTest {
 
     private fun ShoppingList.allItems() = sections.flatMap { it.items }
 
+    // --- Edits: removals and renames ---
+
+    @Test
+    fun `a removed key is dropped and counts toward neither total nor progress`() {
+        val recipeId = UUID.randomUUID()
+        val ingredients = listOf(
+            ingredient(recipeId, 0, "onion", 1.0, "cup"),
+            ingredient(recipeId, 0, "garlic", 2.0, "cloves"),
+        )
+
+        val list = ShoppingListBuilder.build(
+            ingredients, mapOf(recipeId to 1), 0, checkedKeys = setOf("onion", "garlic"),
+            removedKeys = setOf("onion"),
+        )
+
+        assertThat(list.allItems().map { it.key }).containsExactly("garlic")
+        assertThat(list.totalCount).isEqualTo(1)
+        assertThat(list.checkedCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `a rename changes only the shown name — key, section, quantity and tick are untouched`() {
+        val recipeId = UUID.randomUUID()
+        val ingredients = listOf(ingredient(recipeId, 0, "onion", 2.0, ""))
+        val original = ShoppingListBuilder.build(ingredients, mapOf(recipeId to 1), 0, emptySet())
+            .allItems().single()
+
+        val renamed = ShoppingListBuilder.build(
+            ingredients, mapOf(recipeId to 1), 0, checkedKeys = setOf("onion"),
+            displayNameOverrides = mapOf("onion" to "Zzz red onions"),
+        ).allItems().single()
+
+        assertThat(renamed.displayName).isEqualTo("Zzz red onions")
+        assertThat(renamed.key).isEqualTo("onion")
+        assertThat(renamed.section).isEqualTo(original.section)
+        assertThat(renamed.quantityLabel).isEqualTo(original.quantityLabel)
+        assertThat(renamed.isChecked).isTrue()
+    }
+
+    @Test
+    fun `an override for a key no longer on the list is ignored`() {
+        val recipeId = UUID.randomUUID()
+        val list = ShoppingListBuilder.build(
+            listOf(ingredient(recipeId, 0, "onion", 1.0, "")), mapOf(recipeId to 1), 0, emptySet(),
+            displayNameOverrides = mapOf("ghost" to "Boo"), removedKeys = setOf("phantom"),
+        )
+
+        assertThat(list.allItems().map { it.key }).containsExactly("onion")
+    }
+
     // --- Measurement system ---
 
     @Test

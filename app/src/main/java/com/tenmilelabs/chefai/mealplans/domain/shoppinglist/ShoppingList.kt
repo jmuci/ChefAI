@@ -76,6 +76,10 @@ object ShoppingListBuilder {
      *   the caller against the cached household's members — this pure builder has no household
      *   concept of its own, mirroring how `ownerDisplayName` is resolved outside `ShoppingListBuilder`
      *   for shared-plan badges elsewhere.
+     * @param displayNameOverrides item key -> the name the user gave the line. Applied last, so the
+     *   key, section and quantity still come from the recipes; only what is shown changes.
+     * @param removedKeys item keys the user removed. Dropped from the result, so they count toward
+     *   neither the total nor the progress.
      */
     fun build(
         ingredients: List<PlannedIngredient>,
@@ -84,6 +88,8 @@ object ShoppingListBuilder {
         checkedKeys: Set<String>,
         measurementSystem: MeasurementSystem = MeasurementSystem.DEFAULT,
         checkedByNames: Map<String, String> = emptyMap(),
+        displayNameOverrides: Map<String, String> = emptyMap(),
+        removedKeys: Set<String> = emptySet(),
     ): ShoppingList {
         data class ScaledRow(
             // Without any parenthetical, serving or trailing preparation note: "garlic, peeled
@@ -142,6 +148,7 @@ object ShoppingListBuilder {
 
         val items = scaledRows
             .groupBy { nameKey(it.displayName) }
+            .filterKeys { it !in removedKeys }
             .map { (key, rows) ->
                 // The most common spelling; on a tie, the first one met. Synonyms share a key, so
                 // "Aubergine" and "Egg Plants" are one line shown under one of the two names.
@@ -187,7 +194,7 @@ object ShoppingListBuilder {
                 val isChecked = key in checkedKeys
                 ShoppingListItem(
                     key = key,
-                    displayName = displayName,
+                    displayName = displayNameOverrides[key] ?: displayName,
                     quantityLabel = quantityLabel,
                     // One estimated contributor — or a density used to merge — makes the whole
                     // total an estimate.

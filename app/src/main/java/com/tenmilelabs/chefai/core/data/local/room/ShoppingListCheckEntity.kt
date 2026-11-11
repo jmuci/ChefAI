@@ -19,7 +19,7 @@ import java.util.UUID
  * this row's identity is the composite key above, not a single `uuid`, which is exactly what
  * `SyncableEntity` requires and `SyncableCrossRef` does not.
  *
- * [checked] is the source of truth for a shared plan's list once it round-trips through sync —
+ * [checked], [displayNameOverride] and [removed] are the source of truth for a shared plan's list once it round-trips through sync —
  * toggling, individually or via "uncheck all", is always an upsert to this row, never a delete; see
  * [com.tenmilelabs.chefai.mealplans.data.repository.DefaultShoppingListRepository].
  */
@@ -49,6 +49,18 @@ data class ShoppingListCheckEntity(
      * to.
      */
     val checkedBy: UUID? = null,
+    /**
+     * The user's own name for this line, replacing the one the builder derives from the recipes.
+     * Display-only: [itemKey], the section and the quantity are untouched, so a rename never
+     * orphans the tick and a rebuild of the list never undoes it. Null = no rename.
+     */
+    val displayNameOverride: String? = null,
+    /**
+     * The user removed this line from the list. Distinct from [deletedAt], which means the item
+     * left the list because the plan changed (server-side tombstone). The row is kept, hidden, so
+     * "Undo" is a flag flip and the removal syncs to household members like any other edit.
+     */
+    val removed: Boolean = false,
     override val updatedAt: Long = checkedAt,
     override val deletedAt: Long? = null,
     override val syncState: SyncState = SyncState.PENDING,

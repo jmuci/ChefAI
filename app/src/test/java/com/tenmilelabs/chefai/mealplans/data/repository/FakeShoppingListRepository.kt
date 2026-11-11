@@ -18,6 +18,9 @@ class FakeShoppingListRepository : ShoppingListRepository {
 
     var shouldThrowOnObserveIngredients: Boolean = false
     var shouldThrowOnSetChecked: Boolean = false
+    var shouldThrowOnSetRemoved: Boolean = false
+    private val overrides = MutableStateFlow<Map<UUID, Map<String, String>>>(emptyMap())
+    private val removedKeys = MutableStateFlow<Map<UUID, Set<String>>>(emptyMap())
 
     /** Test seam: a real repository only learns this once a pull resolves who checked an item. */
     fun setCheckedBy(mealPlanId: UUID, itemKey: String, userId: UUID) {
@@ -39,10 +42,12 @@ class FakeShoppingListRepository : ShoppingListRepository {
     }
 
     override fun observeCheckedState(mealPlanId: UUID): Flow<CheckedItemsState> =
-        combine(checkedKeys, checkedByUserIds) { keys, byUser ->
+        combine(checkedKeys, checkedByUserIds, overrides, removedKeys) { keys, byUser, names, removed ->
             CheckedItemsState(
                 checkedKeys = keys[mealPlanId].orEmpty(),
                 checkedByUserIds = byUser[mealPlanId].orEmpty(),
+                displayNameOverrides = names[mealPlanId].orEmpty(),
+                removedKeys = removed[mealPlanId].orEmpty(),
             )
         }
 
@@ -55,5 +60,18 @@ class FakeShoppingListRepository : ShoppingListRepository {
 
     override suspend fun clearChecks(mealPlanId: UUID) {
         checkedKeys.value = checkedKeys.value + (mealPlanId to emptySet())
+    }
+
+    override suspend fun renameItem(mealPlanId: UUID, itemKey: String, displayName: String?) {
+        val current = overrides.value[mealPlanId].orEmpty()
+        val updated = if (displayName == null) current - itemKey else current + (itemKey to displayName)
+        overrides.value = overrides.value + (mealPlanId to updated)
+    }
+
+    override suspend fun setRemoved(mealPlanId: UUID, itemKey: String, removed: Boolean) {
+        if (shouldThrowOnSetRemoved) throw RuntimeException("Fake setRemoved error")
+        val current = removedKeys.value[mealPlanId].orEmpty()
+        val updated = if (removed) current + itemKey else current - itemKey
+        removedKeys.value = removedKeys.value + (mealPlanId to updated)
     }
 }
