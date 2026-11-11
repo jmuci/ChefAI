@@ -18,8 +18,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.tenmilelabs.chefai.R
 
 /**
  * Small sync-status icon displayed in the TopAppBar.
@@ -31,6 +33,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
  * | Synced   | CloudDone       | Static, primary colour     |
  * | Error    | SyncProblem     | Static, error colour       |
  * | Offline  | CloudOff        | Static, tertiary colour    |
+ * | UpdateRequired | SyncProblem | Static, error colour; the content description asks for an update |
  */
 @Composable
 fun SyncStatusIndicator(
@@ -71,6 +74,14 @@ fun SyncStatusIndicator(
                 imageVector = Icons.Default.CloudOff,
                 contentDescription = "Offline",
                 tint = MaterialTheme.colorScheme.tertiary,
+                modifier = modifier
+            )
+        }
+        is SyncDisplayStatus.UpdateRequired -> {
+            Icon(
+                imageVector = Icons.Default.SyncProblem,
+                contentDescription = stringResource(R.string.sync_status_update_required),
+                tint = MaterialTheme.colorScheme.error,
                 modifier = modifier
             )
         }

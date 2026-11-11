@@ -30,10 +30,10 @@ class FakeBookmarkedRecipeDao : BookmarkedRecipeDao {
     override suspend fun get(userId: UUID, recipeId: UUID): BookmarkedRecipeEntity? = store[userId to recipeId]
 
     override suspend fun setStarred(userId: UUID, recipeId: UUID, starred: Boolean, ts: Long): Int =
-        updateLive(userId, recipeId) { it.copy(isStarred = starred, updatedAt = ts, syncState = SyncState.PENDING) }
+        updateLive(userId, recipeId) { it.copy(isStarred = starred, updatedAt = maxOf(ts, it.updatedAt + 1), syncState = SyncState.PENDING) }
 
     override suspend fun setGoTo(userId: UUID, recipeId: UUID, goTo: Boolean, ts: Long): Int =
-        updateLive(userId, recipeId) { it.copy(isGoTo = goTo, updatedAt = ts, syncState = SyncState.PENDING) }
+        updateLive(userId, recipeId) { it.copy(isGoTo = goTo, updatedAt = maxOf(ts, it.updatedAt + 1), syncState = SyncState.PENDING) }
 
     private fun updateLive(userId: UUID, recipeId: UUID, change: (BookmarkedRecipeEntity) -> BookmarkedRecipeEntity): Int {
         val key = userId to recipeId
@@ -52,7 +52,7 @@ class FakeBookmarkedRecipeDao : BookmarkedRecipeDao {
         val key = userId to recipeId
         store[key]?.let {
             store[key] = it.copy(
-                deletedAt = ts, syncState = SyncState.DELETED, updatedAt = ts, isStarred = false, isGoTo = false,
+                deletedAt = ts, syncState = SyncState.DELETED, updatedAt = maxOf(ts, it.updatedAt + 1), isStarred = false, isGoTo = false,
             )
         }
         notifyChange()

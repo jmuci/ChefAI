@@ -78,6 +78,23 @@ collects meal plans, saved plans and cook events without a user filter (the old 
 rows went out under the new JWT). Keeping the old pull cursor also made the new account's first
 pull skip everything it had changed before that moment.
 
+### Amendment (Nov 2026): an interrupted upgrade is finished on restore
+
+`login()`/`register()` save the tokens before the account switch and the upgrade run, so a process
+death in between used to leave the anonymous rows owned by an id nothing reads (or, after an
+account switch, let the cold start's `handleLogin` wipe them as "nothing to preserve").
+
+- The anonymous id is written as `pendingUpgradeFrom` in the same DataStore edit as the tokens, and
+  cleared once `AccountUpgradeUseCase` commits. A failed upgrade leaves it set.
+- `loadSession()` finishes a pending upgrade (`handleLogin` with the anonymous id, then the
+  upgrade) before the session becomes `Authenticated`. Both steps are no-ops when repeated.
+- Every credential login (`isCredentialLogin = true`) clears the pull cursor, the same-account
+  branch included. A plain session restore does not, or every cold start would pull from 0.
+- Logout also calls `POST /auth/logout` with the refresh token, fire-and-forget on the
+  application scope; a failure is logged and the token expires on its own.
+- `register()` that answers 409 right after a timed-out attempt for the same email logs in with
+  the same credentials once; if that fails too, the 409 is reported.
+
 ### Amendment (Aug 2026): these rules cover on-disk files, not just Room tables
 
 The rules above were written purely in terms of the database, which left cached recipe images

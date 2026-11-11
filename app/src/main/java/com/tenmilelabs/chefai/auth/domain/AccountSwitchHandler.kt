@@ -48,14 +48,26 @@ class AccountSwitchHandler @Inject constructor(
     /**
      * Preserves current anonymous data when switching accounts from an anonymous session,
      * but removes stale data from the previous authenticated account.
+     *
+     * @param isCredentialLogin true when the caller just exchanged credentials for tokens (login,
+     *   register, or finishing one a process death interrupted), false on an ordinary session
+     *   restore. A credential login always starts the pull from 0, even for the same account.
      */
-    suspend fun handleLogin(newUserId: UUID, anonymousUserId: UUID? = null): AccountSwitchOutcome {
+    suspend fun handleLogin(
+        newUserId: UUID,
+        anonymousUserId: UUID? = null,
+        isCredentialLogin: Boolean = false,
+    ): AccountSwitchOutcome {
         val previousUserId = securePreferences.getStoredCurrentUserId().first()
         val isAccountSwitch = previousUserId != null && previousUserId != newUserId
 
         val outcome = when {
             !isAccountSwitch -> {
                 Timber.d("Authenticated account unchanged or first login, keeping local database for user: $newUserId")
+                // Any stored cursor predates this login, so a credential login pulls everything
+                // again (backend sync-design-review 3.1 step 4). Not on a plain restore: that would
+                // re-download the whole catalog on every cold start.
+                if (isCredentialLogin) syncMetadataDao.clear()
                 AccountSwitchOutcome.NO_CHANGE
             }
             anonymousUserId != null -> {

@@ -54,6 +54,7 @@ class SecurePreferences @Inject constructor(
         private val KEY_CURRENT_USER_ID = stringPreferencesKey("current_user_id")
         private val KEY_LAST_LOGIN_EMAIL = stringPreferencesKey("last_login_email")
         private val KEY_PENDING_INVITE_TOKEN = stringPreferencesKey("pending_invite_token")
+        private val KEY_PENDING_UPGRADE_FROM = stringPreferencesKey("pending_upgrade_from")
     }
 
     private val dataStore: DataStore<Preferences> = context.dataStore
@@ -115,10 +116,18 @@ class SecurePreferences @Inject constructor(
         avatarUrl: String,
         accessToken: String,
         refreshToken: String,
-        tokenExpiry: Long
+        tokenExpiry: Long,
+        pendingUpgradeFrom: UUID?,
     ) {
         try {
             dataStore.edit { prefs ->
+                // Plaintext for the same reason as KEY_LOCAL_USER_ID: it names rows, it is not a
+                // credential, and losing it to a failed decrypt would strand them.
+                if (pendingUpgradeFrom != null) {
+                    prefs[KEY_PENDING_UPGRADE_FROM] = pendingUpgradeFrom.toString()
+                } else {
+                    prefs.remove(KEY_PENDING_UPGRADE_FROM)
+                }
                 prefs[KEY_USER_UUID] = encrypt(userUuid.toString())
                 prefs[KEY_DISPLAY_NAME] = encrypt(displayName)
                 prefs[KEY_EMAIL] = encrypt(email)
@@ -130,6 +139,19 @@ class SecurePreferences @Inject constructor(
             Timber.d("Auth data saved securely (AES256-GCM encrypted) for user: $userUuid")
         } catch (e: Exception) {
             Timber.e(e, "Failed to save auth data")
+            throw e
+        }
+    }
+
+    override fun getPendingUpgradeFrom(): Flow<UUID?> = dataStore.data.map { prefs ->
+        prefs[KEY_PENDING_UPGRADE_FROM]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+    }
+
+    override suspend fun clearPendingUpgradeFrom() {
+        try {
+            dataStore.edit { prefs -> prefs.remove(KEY_PENDING_UPGRADE_FROM) }
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to clear pending upgrade marker")
             throw e
         }
     }
@@ -184,6 +206,9 @@ class SecurePreferences @Inject constructor(
                 prefs.remove(KEY_ACCESS_TOKEN)
                 prefs.remove(KEY_REFRESH_TOKEN)
                 prefs.remove(KEY_TOKEN_EXPIRY)
+                // An upgrade still pending at logout never re-parented anything: the rows are
+                // still the anonymous session's, which is where logout returns.
+                prefs.remove(KEY_PENDING_UPGRADE_FROM)
                 // KEY_LOCAL_USER_ID is intentionally preserved
             }
             Timber.d("Auth data cleared successfully (localUserId preserved)")

@@ -6,7 +6,9 @@ import com.tenmilelabs.chefai.auth.data.mapper.toUser
 import com.tenmilelabs.chefai.auth.data.network.AuthHttpException
 import com.tenmilelabs.chefai.auth.data.network.AuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.data.network.dto.LoginRequest
+import com.tenmilelabs.chefai.auth.data.network.dto.LogoutRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RefreshTokenRequest
+import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
 import com.tenmilelabs.chefai.auth.data.network.dto.RegisterRequest
 import com.tenmilelabs.chefai.auth.domain.model.AuthToken
 import com.tenmilelabs.chefai.auth.domain.model.AuthenticatedHousehold
@@ -34,6 +36,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+import java.net.SocketTimeoutException
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Provider
@@ -82,6 +85,13 @@ class SessionManager @Inject constructor(
      */
     private var householdRefreshJob: Job? = null
 
+    /**
+     * The email of the last [register] attempt whose response never arrived (a read timeout: the
+     * request may have reached the server and created the account). Lets the user's retry tell
+     * "that attempt worked, its response was lost" apart from an email that was already taken.
+     */
+    private var registerTimedOutFor: String? = null
+
     init {
         // Load session on initialization
         applicationScope.launch {
@@ -127,6 +137,15 @@ class SessionManager @Inject constructor(
                     email = email,
                     avatarUrl = avatarUrl
                 )
+
+                // login()/register() write this marker in the same edit as the tokens and clear it
+                // once the upgrade has committed. Still set means the process died in between:
+                // finish before the session counts as signed in, or the anonymous rows stay owned
+                // by an id nothing reads, and the handleLogin below, run without them, could take
+                // an interrupted account switch for one with no anonymous data to keep.
+                securePreferences.getPendingUpgradeFrom().first()?.let { anonymousUserId ->
+                    completePendingUpgrade(user, anonymousUserId)
+                }
 
                 _userSession.value = UserSession.Authenticated(
                     user = user,
@@ -182,6 +201,30 @@ class SessionManager @Inject constructor(
         } catch (e: Exception) {
             Timber.e(e, "Failed to load session, falling back to anonymous")
             enterAnonymousSession()
+        }
+    }
+
+    /**
+     * Finishes a login whose account switch and anonymous → account upgrade a process death
+     * interrupted (see the pendingUpgradeFrom marker in [login]). Both steps are no-ops when they
+     * already ran, so repeating them is safe. A failed upgrade keeps the marker and is tried again
+     * on the next restore, matching [login], where a failed upgrade does not fail the sign-in.
+     */
+    private suspend fun completePendingUpgrade(user: User, anonymousUserId: UUID) {
+        Timber.w("Completing an interrupted account upgrade: anon=$anonymousUserId -> auth=${user.uuid}")
+        // With an anonymous id, handleLogin never clears the database, so the upgrade always runs.
+        accountSwitchHandler.handleLogin(
+            newUserId = user.uuid,
+            anonymousUserId = anonymousUserId,
+            isCredentialLogin = true,
+        )
+        try {
+            accountUpgradeUseCaseProvider.get().execute(anonymousUserId, user)
+            securePreferences.clearPendingUpgradeFrom()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.e(e, "Interrupted account upgrade failed again; retrying on the next session restore")
         }
     }
 
@@ -317,6 +360,8 @@ class SessionManager @Inject constructor(
             // local ownership — the upgrade reassigns every anonymous recipe, bookmark and meal
             // plan to user.uuid — so a throw between them and this write used to leave the catch
             // dropping back to an anonymous session whose id no longer owns any of it.
+            // pendingUpgradeFrom rides in the same write so a process death before the upgrade
+            // commits is finished by the next loadSession (completePendingUpgrade).
             securePreferences.saveAuthData(
                 userUuid = user.uuid,
                 displayName = user.displayName,
@@ -324,12 +369,14 @@ class SessionManager @Inject constructor(
                 avatarUrl = user.avatarUrl,
                 accessToken = authToken.accessToken,
                 refreshToken = authToken.refreshToken,
-                tokenExpiry = authToken.expiresAt
+                tokenExpiry = authToken.expiresAt,
+                pendingUpgradeFrom = anonymousUserId,
             )
 
             val accountSwitchOutcome = accountSwitchHandler.handleLogin(
                 newUserId = user.uuid,
-                anonymousUserId = anonymousUserId
+                anonymousUserId = anonymousUserId,
+                isCredentialLogin = true,
             )
 
             // Run the anonymous → authenticated data upgrade if we had anonymous data
@@ -337,10 +384,12 @@ class SessionManager @Inject constructor(
                 try {
                     val upgraded = accountUpgradeUseCaseProvider.get()
                         .execute(anonymousUserId, user)
+                    securePreferences.clearPendingUpgradeFrom()
                     Timber.d("Upgraded $upgraded anonymous recipes to authenticated user")
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
+                    // The marker stays set, so the next session restore tries again.
                     Timber.e(e, "Account upgrade failed, but login succeeded. Recipes may not be transferred.")
                 }
             } else if (accountSwitchOutcome == AccountSwitchOutcome.CLEARED_DATABASE) {
@@ -392,9 +441,7 @@ class SessionManager @Inject constructor(
             _userSession.value = UserSession.Loading
 
             // Make API call to backend for registration
-            val response = authNetworkDataSource.get().register(
-                RegisterRequest(email = email, username = username, password = password)
-            )
+            val response = registerOrRecoverLostResponse(username, email, password)
 
             val authToken = response.toAuthToken()
             val responseUser = response.toUser()
@@ -405,7 +452,8 @@ class SessionManager @Inject constructor(
                 responseUser
             }
 
-            // Persisted before the upgrade below for the same reason as in [login].
+            // Persisted before the upgrade below, with pendingUpgradeFrom, for the same reasons as
+            // in [login].
             securePreferences.saveAuthData(
                 userUuid = user.uuid,
                 displayName = user.displayName,
@@ -413,12 +461,14 @@ class SessionManager @Inject constructor(
                 avatarUrl = user.avatarUrl,
                 accessToken = authToken.accessToken,
                 refreshToken = authToken.refreshToken,
-                tokenExpiry = authToken.expiresAt
+                tokenExpiry = authToken.expiresAt,
+                pendingUpgradeFrom = anonymousUserId,
             )
 
             val accountSwitchOutcome = accountSwitchHandler.handleLogin(
                 newUserId = user.uuid,
-                anonymousUserId = anonymousUserId
+                anonymousUserId = anonymousUserId,
+                isCredentialLogin = true,
             )
 
             // Run the anonymous → authenticated data upgrade if we had anonymous data
@@ -426,10 +476,12 @@ class SessionManager @Inject constructor(
                 try {
                     val upgraded = accountUpgradeUseCaseProvider.get()
                         .execute(anonymousUserId, user)
+                    securePreferences.clearPendingUpgradeFrom()
                     Timber.d("Upgraded $upgraded anonymous recipes to authenticated user")
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
+                    // The marker stays set, so the next session restore tries again.
                     Timber.e(e, "Account upgrade failed, but registration succeeded.")
                 }
             } else if (accountSwitchOutcome == AccountSwitchOutcome.CLEARED_DATABASE) {
@@ -474,6 +526,7 @@ class SessionManager @Inject constructor(
         try {
             val currentUser = getCurrentUser()
             Timber.d("Logging out user: ${currentUser?.uuid}")
+            val refreshTokenToRevoke = (_userSession.value as? UserSession.Authenticated)?.authToken?.refreshToken
 
             // Cancel any household refresh still in flight so a stale response for the departing
             // account can't land after we've moved on — see householdRefreshJob's doc.
@@ -494,6 +547,10 @@ class SessionManager @Inject constructor(
             // Return to anonymous state, reusing existing localUserId
             enterAnonymousSession()
 
+            // Revoke this device's refresh token so a copy of it stops working now rather than
+            // in 30 days. Best effort and never awaited: logout has already happened locally.
+            refreshTokenToRevoke?.let { token -> applicationScope.launch { revokeRefreshToken(token) } }
+
             Timber.d("Logout successful, now in anonymous mode")
         } catch (e: Exception) {
             Timber.e(e, "Error during logout")
@@ -505,6 +562,46 @@ class SessionManager @Inject constructor(
                 // Last resort: create anonymous session without Room
                 val fallbackId = uuidGenerator()
                 _userSession.value = UserSession.Anonymous(fallbackId)
+            }
+        }
+    }
+
+    private suspend fun revokeRefreshToken(refreshToken: String) {
+        try {
+            authNetworkDataSource.get().logout(LogoutRequest(refreshToken = refreshToken))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.w(e, "Logout: could not revoke the refresh token; it expires on its own")
+        }
+    }
+
+    /**
+     * Calls `POST /auth/register`. When the previous attempt for this email timed out and this one
+     * answers 409, the earlier attempt most likely created the account and only its response was
+     * lost, so this logs in with the same credentials once. If that login fails too, the original
+     * 409 is what the caller sees.
+     */
+    private suspend fun registerOrRecoverLostResponse(username: String, email: String, password: String): AuthResponse {
+        val previousTimedOut = registerTimedOutFor
+        registerTimedOutFor = null
+        return try {
+            authNetworkDataSource.get().register(
+                RegisterRequest(email = email, username = username, password = password)
+            )
+        } catch (e: SocketTimeoutException) {
+            registerTimedOutFor = email.trim().lowercase()
+            throw e
+        } catch (e: AuthHttpException) {
+            if (e.statusCode != HTTP_CONFLICT || previousTimedOut != email.trim().lowercase()) throw e
+            Timber.i("Register: 409 after a timed-out attempt, logging in with the same credentials")
+            try {
+                authNetworkDataSource.get().login(LoginRequest(email = email, password = password))
+            } catch (loginError: CancellationException) {
+                throw loginError
+            } catch (loginError: Exception) {
+                Timber.w(loginError, "Register: login after 409 failed, reporting the 409")
+                throw e
             }
         }
     }
@@ -656,6 +753,8 @@ class SessionManager @Inject constructor(
         return currentTime >= (session.authToken.expiresAt - bufferMillis)
     }
 }
+
+private const val HTTP_CONFLICT = 409
 
 /**
  * Whether a failed refresh means the server rejected the refresh token (4xx), as opposed to a

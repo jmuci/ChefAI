@@ -43,7 +43,7 @@ class FakeShoppingListCheckDao : ShoppingListCheckDao {
                     checkedBy = null,
                     checkedAt = updatedAt,
                     syncState = state,
-                    updatedAt = updatedAt,
+                    updatedAt = maxOf(updatedAt, it.updatedAt + 1),
                 )
             }
         notifyChange()

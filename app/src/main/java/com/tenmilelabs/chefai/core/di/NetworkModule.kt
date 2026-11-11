@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.core.di
 import com.tenmilelabs.chefai.BuildConfig
 import com.tenmilelabs.chefai.auth.data.network.AuthInterceptor
 import com.tenmilelabs.chefai.auth.domain.TokenProvider
+import com.tenmilelabs.chefai.core.data.sync.network.ClientVersionHeaders
 import com.tenmilelabs.chefai.developeroptions.data.network.ApiEnvironmentInterceptor
 import com.tenmilelabs.chefai.developeroptions.domain.model.ApiBaseUrls
 import com.tenmilelabs.chefai.developeroptions.domain.repository.ApiEnvironmentRepository
@@ -97,13 +98,21 @@ object NetworkModule {
             }
         }
 
+        val chefAiBaseUrls = listOfNotNull(
+            apiBaseUrls.local,
+            apiBaseUrls.remote.takeIf { apiBaseUrls.remoteConfigured },
+        )
+
         // Attaches the JWT only to requests bound for the ChefAI backend (local or remote base).
         install(AuthInterceptor) {
             this.tokenProvider = tokenProvider
-            allowedBaseUrls = listOfNotNull(
-                apiBaseUrls.local,
-                apiBaseUrls.remote.takeIf { apiBaseUrls.remoteConfigured },
-            )
+            allowedBaseUrls = chefAiBaseUrls
+        }
+
+        // X-Sync-Protocol / X-Client-Version, scoped to the same hosts as the JWT.
+        install(ClientVersionHeaders) {
+            allowedBaseUrls = chefAiBaseUrls
+            clientVersionCode = BuildConfig.VERSION_CODE
         }
 
         // No requestTimeoutMillis here deliberately: SyncApiService.pullRecipes pages ~100

@@ -42,7 +42,7 @@ class FakeMealPlanDao : MealPlanDao {
 
     override suspend fun softDelete(uuid: UUID, deletedAt: Long) {
         plans[uuid]?.let {
-            plans[uuid] = it.copy(deletedAt = deletedAt, syncState = SyncState.DELETED, updatedAt = deletedAt)
+            plans[uuid] = it.copy(deletedAt = deletedAt, syncState = SyncState.DELETED, updatedAt = maxOf(deletedAt, it.updatedAt + 1))
         }
         notifyChange()
     }

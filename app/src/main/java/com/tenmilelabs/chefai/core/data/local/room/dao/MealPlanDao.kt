@@ -24,7 +24,8 @@ interface MealPlanDao {
     @Upsert
     suspend fun upsertMealPlan(mealPlan: MealPlanEntity)
 
-    @Query("UPDATE meal_plans SET deletedAt = :deletedAt, syncState = 'DELETED', updatedAt = :deletedAt WHERE uuid = :uuid")
+    // The tombstone stamp sorts after the version it deletes even on a slow clock; see nextUpdatedAt.
+    @Query("UPDATE meal_plans SET deletedAt = :deletedAt, syncState = 'DELETED', updatedAt = MAX(:deletedAt, updatedAt + 1) WHERE uuid = :uuid")
     suspend fun softDelete(uuid: UUID, deletedAt: Long)
 
     @Query("SELECT * FROM meal_plans WHERE syncState IN ('PENDING', 'DELETED')")

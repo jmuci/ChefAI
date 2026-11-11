@@ -50,11 +50,17 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeTagDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
+import com.tenmilelabs.chefai.core.data.sync.mapper.toEntity
 import com.tenmilelabs.chefai.core.data.sync.mapper.toMealPlanEntity
 import com.tenmilelabs.chefai.core.data.sync.network.FakeSyncNetworkDataSource
 import com.tenmilelabs.chefai.core.data.sync.network.dto.ConflictEntityDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncBookmarkPullDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncCreatorDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.BookmarkErrorDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.GroceryItemErrorDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.GroceryItemIdentifierDto
+import com.tenmilelabs.chefai.core.data.sync.network.dto.MealPlanPushResults
+import com.tenmilelabs.chefai.core.data.sync.network.dto.GroceryItemPushResults
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncGroceryListItem
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDayDto
 import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncMealPlanDto
@@ -414,7 +420,7 @@ class SyncOrchestratorTest {
             SyncPushResponse(
                 accepted = emptyList(),
                 conflicts = emptyList(),
-                errors = listOf(SyncErrorDto(recipeId1.toString(), "server_error", "Internal error")),
+                errors = listOf(SyncErrorDto(recipeId1.toString(), "INTERNAL_ERROR", "Internal error")),
                 serverTimestamp = 5000L
             )
         )
@@ -658,7 +664,7 @@ class SyncOrchestratorTest {
             SyncPushResponse(
                 accepted = emptyList(),
                 conflicts = emptyList(),
-                errors = listOf(SyncErrorDto(recipeId1.toString(), "unavailable", "Retry later")),
+                errors = listOf(SyncErrorDto(recipeId1.toString(), "INTERNAL_ERROR", "Retry later")),
                 serverTimestamp = 4000L
             )
         )
@@ -2178,5 +2184,403 @@ class SyncOrchestratorTest {
         syncOrchestrator.sync()
 
         assertThat(syncMetadataDao.getLastSyncedAt(SyncOrchestrator.ENTITY_TYPE_RECIPES)).isEqualTo(5000L)
+    }
+
+    // ==================== PULL CURSOR OWNERSHIP AND ROWS THAT NEVER SETTLE ====================
+    // Target behaviour from the backend repo's docs/sync-design-review.md (F3 and section 3.4).
+
+    @Test
+    fun `pull asks for the next page from the server's cursor when a bookmark on the page is newer`() =
+        runTest(testDispatcher) {
+            val userId = UuidV7Generator.newId()
+            syncNetworkDataSource.pullResponses.addLast(
+                SyncPullResponse(
+                    recipes = listOf(createSyncRecipeDto(uuid = recipeId1, updatedAt = 1000L)),
+                    serverTimestamp = 1500L,
+                    hasMore = true,
+                    bookmarkedRecipes = listOf(
+                        SyncBookmarkPullDto(
+                            userId = userId.toString(),
+                            recipeId = recipeId1.toString(),
+                            updatedAt = 9000L,
+                            deletedAt = null,
+                        )
+                    ),
+                )
+            )
+            syncNetworkDataSource.pullResponses.addLast(
+                SyncPullResponse(
+                    recipes = listOf(createSyncRecipeDto(uuid = recipeId2, updatedAt = 2000L)),
+                    serverTimestamp = 2500L,
+                    hasMore = false,
+                )
+            )
+
+            syncOrchestrator.sync()
+
+            // Asking from 9000 instead would skip every recipe the server stamped between 1500 and 9000.
+            assertThat(syncNetworkDataSource.capturedPullCalls.map { it.first }).containsExactly(0L, 1500L).inOrder()
+        }
+
+    @Test
+    fun `a meal plan's edit time does not move the pull cursor`() = runTest(testDispatcher) {
+        // updatedAt on a pulled plan is the editing device's clock; the cursor is the server's.
+        syncNetworkDataSource.pullResponses.addLast(
+            SyncPullResponse(
+                recipes = emptyList(),
+                serverTimestamp = 5000L,
+                hasMore = false,
+                mealPlans = listOf(createSyncMealPlanDto(updatedAt = 99_000L)),
+            )
+        )
+
+        syncOrchestrator.sync()
+
+        assertThat(syncMetadataDao.getLastSyncedAt(SyncOrchestrator.ENTITY_TYPE_RECIPES)).isEqualTo(5000L)
+    }
+
+    @Test
+    fun `a recipe the server rejects for good is parked instead of resent on every sync`() = runTest(testDispatcher) {
+        recipeDao.upsertRecipe(createDirtyRecipe(uuid = recipeId1))
+        syncNetworkDataSource.pushResponses.addLast(
+            SyncPushResponse(
+                accepted = emptyList(),
+                conflicts = emptyList(),
+                errors = listOf(
+                    SyncErrorDto(recipeId1.toString(), "INVALID_TEXT", "text fields must not contain the NUL character (U+0000)")
+                ),
+                serverTimestamp = 5000L
+            )
+        )
+
+        syncOrchestrator.sync()
+        syncOrchestrator.sync()
+
+        assertThat(syncNetworkDataSource.capturedPushRequests).hasSize(1)
+        assertThat(recipeDao.getRecipeById(recipeId1)?.syncState).isEqualTo(SyncState.CANCELLED)
+    }
+
+    @Test
+    fun `a grocery check the server refuses as stale does not stay dirty`() = runTest(testDispatcher) {
+        val planId = UuidV7Generator.newId()
+        mealPlanDao.upsertMealPlan(createSyncMealPlanDto(uuid = planId).toMealPlanEntity())
+        shoppingListCheckDao.upsert(
+            ShoppingListCheckEntity(
+                mealPlanId = planId,
+                itemKey = "onion",
+                checkedAt = 1000L,
+                checked = false,
+                updatedAt = 1000L,
+                syncState = SyncState.PENDING,
+            )
+        )
+        // The server refuses the row and the pulls carry nothing: the winning row is already behind
+        // this device's cursor, so the conflict entry itself has to carry it.
+        val winner = createSyncGroceryListItem(mealPlanId = planId, itemKey = "onion", checked = true, updatedAt = 4000L)
+        val refused = SyncPushResponse(
+            accepted = emptyList(),
+            conflicts = emptyList(),
+            errors = emptyList(),
+            serverTimestamp = 5000L,
+            groceryListItems = GroceryItemPushResults(
+                conflicts = listOf(GroceryItemIdentifierDto(planId.toString(), "onion")),
+                conflictVersions = listOf(winner),
+            ),
+        )
+        syncNetworkDataSource.pushResponses.addLast(refused)
+
+        syncOrchestrator.sync()
+        syncOrchestrator.sync()
+
+        assertThat(shoppingListCheckDao.getCheck(planId, "onion")).isEqualTo(winner.toEntity())
+        assertThat(shoppingListCheckDao.getAllDirty()).isEmpty()
+        assertThat(syncNetworkDataSource.capturedPushRequests).hasSize(1)
+    }
+
+    @Test
+    fun `a grocery conflict without a winning row keeps today's behaviour and stays pending`() = runTest(testDispatcher) {
+        // A backend that sends only ids: nothing to apply, the row waits for a pull.
+        val planId = UuidV7Generator.newId()
+        mealPlanDao.upsertMealPlan(createSyncMealPlanDto(uuid = planId).toMealPlanEntity())
+        shoppingListCheckDao.upsert(pendingCheck(planId))
+        syncNetworkDataSource.pushResponses.addLast(
+            errorPush(groceryListItems = GroceryItemPushResults(conflicts = listOf(GroceryItemIdentifierDto(planId.toString(), "onion"))))
+        )
+
+        syncOrchestrator.sync()
+
+        assertThat(shoppingListCheckDao.getCheck(planId, "onion")?.syncState).isEqualTo(SyncState.PENDING)
+    }
+
+    @Test
+    fun `a meal plan conflict applies the server's winning plan and its days`() = runTest(testDispatcher) {
+        val local = pendingMealPlan(updatedAt = 3000L)
+        mealPlanDao.upsertMealPlan(local.copy(name = "Local edit"))
+        recipeDao.upsertRecipe(createDirtyRecipe(uuid = recipeId1, syncState = SyncState.SYNCED))
+        // Older than the local row: a pull would lose to it, but the server has already decided.
+        val winner = createSyncMealPlanDto(
+            uuid = local.uuid,
+            name = "Server plan",
+            updatedAt = 2000L,
+            days = listOf(createSyncMealPlanDayDto(dayIndex = 0, dinnerRecipeId = recipeId1)),
+        )
+        syncNetworkDataSource.pushResponses.addLast(
+            errorPush(mealPlans = MealPlanPushResults(conflicts = listOf(local.uuid.toString()), conflictVersions = listOf(winner)))
+        )
+
+        syncOrchestrator.sync()
+
+        val plan = requireNotNull(mealPlanDao.getMealPlanById(local.uuid))
+        assertThat(plan.name).isEqualTo("Server plan")
+        assertThat(plan.syncState).isEqualTo(SyncState.SYNCED)
+        assertThat(mealPlanDao.getDaysForMealPlan(local.uuid).single().dinnerRecipeId).isEqualTo(recipeId1)
+        assertThat(mealPlanDao.getAllDirty()).isEmpty()
+    }
+
+    @Test
+    fun `a meal plan edited while its conflicting push is in flight keeps the edit`() = runTest(testDispatcher) {
+        val local = pendingMealPlan(updatedAt = 3000L)
+        mealPlanDao.upsertMealPlan(local)
+        syncNetworkDataSource.onPush = { mealPlanDao.upsertMealPlan(local.copy(name = "Newer edit", updatedAt = 3500L)) }
+        val winner = createSyncMealPlanDto(uuid = local.uuid, name = "Server plan", updatedAt = 3200L)
+        syncNetworkDataSource.pushResponses.addLast(
+            errorPush(mealPlans = MealPlanPushResults(conflicts = listOf(local.uuid.toString()), conflictVersions = listOf(winner)))
+        )
+
+        syncOrchestrator.sync()
+
+        val plan = requireNotNull(mealPlanDao.getMealPlanById(local.uuid))
+        assertThat(plan.name).isEqualTo("Newer edit")
+        assertThat(plan.syncState).isEqualTo(SyncState.PENDING)
+    }
+
+    @Test
+    fun `a saved plan conflict applies the server's winning copy`() = runTest(testDispatcher) {
+        val local = savedPlan(title = "Local edit", updatedAt = 3000L, heroImagePath = "/data/photo")
+        savedPlanDao.upsert(local)
+        val winner = savedPlanDto(uuid = local.uuid, title = "Server title", updatedAt = 2000L)
+        syncNetworkDataSource.pushResponses.addLast(
+            savedPushOf(SavedMealPlanPushResults(conflicts = listOf(local.uuid.toString()), conflictVersions = listOf(winner)))
+        )
+
+        syncOrchestrator.sync()
+
+        val row = requireNotNull(savedPlanDao.getById(local.uuid))
+        assertThat(row).isEqualTo(winner.toEntity(heroImagePath = "/data/photo"))
+        assertThat(row.syncState).isEqualTo(SyncState.SYNCED)
+    }
+
+    // ==================== PERMANENT PUSH ERRORS ====================
+
+    private fun pendingMealPlan(uuid: UUID = UuidV7Generator.newId(), updatedAt: Long = 1000L) =
+        createSyncMealPlanDto(uuid = uuid, updatedAt = updatedAt).toMealPlanEntity()
+            .copy(syncState = SyncState.PENDING)
+
+    private fun pendingCheck(mealPlanId: UUID, updatedAt: Long = 1000L) = ShoppingListCheckEntity(
+        mealPlanId = mealPlanId,
+        itemKey = "onion",
+        checkedAt = updatedAt,
+        checked = true,
+        updatedAt = updatedAt,
+        syncState = SyncState.PENDING,
+    )
+
+    private fun errorPush(
+        mealPlans: MealPlanPushResults = MealPlanPushResults(),
+        groceryListItems: GroceryItemPushResults = GroceryItemPushResults(),
+        bookmarkErrors: List<BookmarkErrorDto> = emptyList(),
+    ) = SyncPushResponse(
+        accepted = emptyList(),
+        conflicts = emptyList(),
+        errors = emptyList(),
+        serverTimestamp = 5000L,
+        bookmarkErrors = bookmarkErrors,
+        mealPlans = mealPlans,
+        groceryListItems = groceryListItems,
+    )
+
+    @Test
+    fun `a recipe error code this client does not know parks the recipe`() = runTest(testDispatcher) {
+        recipeDao.upsertRecipe(createDirtyRecipe(uuid = recipeId1))
+        syncNetworkDataSource.pushResponses.addLast(
+            SyncPushResponse(
+                accepted = emptyList(),
+                conflicts = emptyList(),
+                errors = listOf(SyncErrorDto(recipeId1.toString(), "SOME_FUTURE_CODE", "new")),
+                serverTimestamp = 5000L
+            )
+        )
+
+        syncOrchestrator.sync()
+
+        assertThat(recipeDao.getRecipeById(recipeId1)?.syncState).isEqualTo(SyncState.CANCELLED)
+        assertThat(recipeDao.getAllDirty()).isEmpty()
+    }
+
+    @Test
+    fun `a recipe edited while its refused push is in flight stays pending`() = runTest(testDispatcher) {
+        recipeDao.upsertRecipe(createDirtyRecipe(uuid = recipeId1, updatedAt = 1000L))
+        syncNetworkDataSource.onPush = {
+            recipeDao.upsertRecipe(createDirtyRecipe(uuid = recipeId1, title = "Fixed", updatedAt = 2000L))
+        }
+        syncNetworkDataSource.pushResponses.addLast(
+            SyncPushResponse(
+                accepted = emptyList(),
+                conflicts = emptyList(),
+                errors = listOf(SyncErrorDto(recipeId1.toString(), "INVALID_TEXT", "bad")),
+                serverTimestamp = 5000L
+            )
+        )
+
+        syncOrchestrator.sync()
+
+        assertThat(recipeDao.getRecipeById(recipeId1)?.syncState).isEqualTo(SyncState.PENDING)
+    }
+
+    @Test
+    fun `pull replaces a parked recipe only with a newer server version`() = runTest(testDispatcher) {
+        recipeDao.upsertRecipe(createDirtyRecipe(uuid = recipeId1, syncState = SyncState.CANCELLED, updatedAt = 3000L))
+        syncNetworkDataSource.pullResponses.addLast(
+            SyncPullResponse(
+                recipes = listOf(createSyncRecipeDto(uuid = recipeId1, title = "Server", updatedAt = 4000L)),
+                serverTimestamp = 5000L,
+                hasMore = false
+            )
+        )
+
+        syncOrchestrator.sync()
+
+        val row = requireNotNull(recipeDao.getRecipeById(recipeId1))
+        assertThat(row.title).isEqualTo("Server")
+        assertThat(row.syncState).isEqualTo(SyncState.SYNCED)
+    }
+
+    @Test
+    fun `a meal plan refused for good is parked, a retryable refusal keeps it pending`() = runTest(testDispatcher) {
+        val parked = pendingMealPlan()
+        val retried = pendingMealPlan()
+        mealPlanDao.upsertMealPlan(parked)
+        mealPlanDao.upsertMealPlan(retried)
+        syncNetworkDataSource.pushResponses.addLast(
+            errorPush(
+                mealPlans = MealPlanPushResults(
+                    errors = listOf(
+                        SyncErrorDto(parked.uuid.toString(), "INVALID_HOUSEHOLD", "bad"),
+                        SyncErrorDto(retried.uuid.toString(), "MEAL_PLAN_RECIPE_NOT_ACCESSIBLE", "later"),
+                    )
+                )
+            )
+        )
+
+        syncOrchestrator.sync()
+
+        assertThat(mealPlanDao.getMealPlanById(parked.uuid)?.syncState).isEqualTo(SyncState.CANCELLED)
+        assertThat(mealPlanDao.getMealPlanById(retried.uuid)?.syncState).isEqualTo(SyncState.PENDING)
+    }
+
+    @Test
+    fun `a grocery check refused for good is parked`() = runTest(testDispatcher) {
+        val plan = createSyncMealPlanDto().toMealPlanEntity()
+        mealPlanDao.upsertMealPlan(plan)
+        shoppingListCheckDao.upsert(pendingCheck(plan.uuid))
+        syncNetworkDataSource.pushResponses.addLast(
+            errorPush(
+                groceryListItems = GroceryItemPushResults(
+                    errors = listOf(GroceryItemErrorDto(plan.uuid.toString(), "onion", "INVALID_ITEM_KEY", "bad"))
+                )
+            )
+        )
+
+        syncOrchestrator.sync()
+
+        assertThat(shoppingListCheckDao.getCheck(plan.uuid, "onion")?.syncState).isEqualTo(SyncState.CANCELLED)
+    }
+
+    @Test
+    fun `a grocery check whose plan is still waiting to be accepted is not parked`() = runTest(testDispatcher) {
+        // The plan hits a retryable error, so the server has no plan to attach the check to yet.
+        val plan = pendingMealPlan()
+        mealPlanDao.upsertMealPlan(plan)
+        shoppingListCheckDao.upsert(pendingCheck(plan.uuid))
+        syncNetworkDataSource.pushResponses.addLast(
+            errorPush(
+                mealPlans = MealPlanPushResults(
+                    errors = listOf(SyncErrorDto(plan.uuid.toString(), "INTERNAL_ERROR", "later"))
+                ),
+                groceryListItems = GroceryItemPushResults(
+                    errors = listOf(GroceryItemErrorDto(plan.uuid.toString(), "onion", "MEAL_PLAN_NOT_ACCESSIBLE", "no plan"))
+                ),
+            )
+        )
+
+        syncOrchestrator.sync()
+
+        assertThat(shoppingListCheckDao.getCheck(plan.uuid, "onion")?.syncState).isEqualTo(SyncState.PENDING)
+    }
+
+    @Test
+    fun `a bookmark refused for good is parked, one waiting on its recipe is not`() = runTest(testDispatcher) {
+        val userId = requireNotNull(sessionManager.getCurrentUserId()) { "test session should have a user" }
+        // recipeId1 is already on the server and the bookmark is refused for good; recipeId2 is a
+        // local recipe the server refused with a retryable error, so its bookmark can still land.
+        recipeDao.upsertRecipe(createDirtyRecipe(uuid = recipeId1, syncState = SyncState.SYNCED))
+        recipeDao.upsertRecipe(createDirtyRecipe(uuid = recipeId2))
+        bookmarkedRecipeDao.upsert(BookmarkedRecipeEntity(userId = userId, recipeId = recipeId1, updatedAt = 1000L, deletedAt = null))
+        bookmarkedRecipeDao.upsert(BookmarkedRecipeEntity(userId = userId, recipeId = recipeId2, updatedAt = 1000L, deletedAt = null))
+        syncNetworkDataSource.pushResponses.addLast(
+            errorPush(
+                bookmarkErrors = listOf(
+                    BookmarkErrorDto(recipeId1.toString(), "RECIPE_NOT_FOUND", "private"),
+                    BookmarkErrorDto(recipeId2.toString(), "RECIPE_NOT_FOUND", "not there yet"),
+                )
+            ).copy(errors = listOf(SyncErrorDto(recipeId2.toString(), "INTERNAL_ERROR", "later")))
+        )
+
+        syncOrchestrator.sync()
+
+        assertThat(bookmarkedRecipeDao.get(userId, recipeId1)?.syncState).isEqualTo(SyncState.CANCELLED)
+        assertThat(bookmarkedRecipeDao.get(userId, recipeId2)?.syncState).isEqualTo(SyncState.PENDING)
+    }
+
+    // ==================== EDITS MADE WHILE A SYNC RUNS ====================
+
+    @Test
+    fun `an edit made while the push is in flight is reported as unsent`() = runTest(testDispatcher) {
+        recipeDao.upsertRecipe(createDirtyRecipe(uuid = recipeId1, updatedAt = 1000L))
+        syncNetworkDataSource.onPush = {
+            recipeDao.upsertRecipe(createDirtyRecipe(uuid = recipeId1, title = "Edited mid-sync", updatedAt = 2000L))
+        }
+
+        val result = syncOrchestrator.sync()
+
+        assertThat(result.hasUnsentChanges).isTrue()
+    }
+
+    @Test
+    fun `a row the server left pending for a retry is not reported as unsent`() = runTest(testDispatcher) {
+        // Otherwise a lasting server fault would chain syncs back to back.
+        recipeDao.upsertRecipe(createDirtyRecipe(uuid = recipeId1))
+        syncNetworkDataSource.pushResponses.addLast(
+            SyncPushResponse(
+                accepted = emptyList(),
+                conflicts = emptyList(),
+                errors = listOf(SyncErrorDto(recipeId1.toString(), "INTERNAL_ERROR", "later")),
+                serverTimestamp = 5000L
+            )
+        )
+
+        val result = syncOrchestrator.sync()
+
+        assertThat(recipeDao.getRecipeById(recipeId1)?.syncState).isEqualTo(SyncState.PENDING)
+        assertThat(result.hasUnsentChanges).isFalse()
+    }
+
+    @Test
+    fun `a sync that sent everything reports nothing unsent`() = runTest(testDispatcher) {
+        recipeDao.upsertRecipe(createDirtyRecipe(uuid = recipeId1))
+
+        val result = syncOrchestrator.sync()
+
+        assertThat(result.hasUnsentChanges).isFalse()
     }
 }

@@ -94,6 +94,7 @@ the unique work name `recipe_sync`:
 | Bookmark change | `requestBookmarkSync()` | REPLACE | 5-second delay, reset by each tap |
 | Pull-to-refresh | `requestManualSync()` | REPLACE | Never silently dropped behind queued work |
 | Periodic | `schedulePeriodicSync()` | KEEP | Every **24 hours**, **charging + connected** only |
+| Edits made during a sync | `requestFollowUpSync()` | APPEND_OR_REPLACE | Queued after the running sync when `SyncResult.hasUnsentChanges` (mutation sync's KEEP drops a request while the work runs) |
 | Logout | `cancelAllSync()` | — | Cancels sync and both image sweeps |
 
 REPLACE cancels a *running* worker too, not just a queued one; `SyncWorker` treats that
@@ -112,6 +113,29 @@ foreground, mutation and pull-to-refresh triggers cover the interactive cases.
 - Mutation debounce avoids excessive sync traffic during rapid editing (e.g., adding multiple ingredients).
 - Periodic sync catches changes from other devices even when the app is backgrounded.
 - Exponential backoff avoids hammering a struggling server.
+
+### Amendment (Nov 2026): rows that never settled, the cursor, and the upgrade gate
+
+From the backend's `docs/sync-design-review.md` (sections 3.2-3.4, 4.3-4.8). Needs the matching
+backend release first (server-owned cursor, edit-time conflict check, `INTERNAL_ERROR`, 426 gate).
+
+- **The server owns the pull cursor.** The client stores `serverTimestamp` and computes nothing.
+- **Permanent push errors park the row.** Recipes, bookmarks, meal plans and grocery checks: a
+  reason in `{INTERNAL_ERROR, MEAL_PLAN_RECIPE_NOT_ACCESSIBLE}` stays `PENDING`; anything else,
+  including a reason this client does not know, sets `CANCELLED`, which `getAllDirty` skips and the
+  next local edit turns back into `PENDING`. Two dependency cases are not parked while the parent is
+  still `PENDING` locally: a bookmark refused `RECIPE_NOT_FOUND`, a grocery check refused
+  `MEAL_PLAN_NOT_ACCESSIBLE`. A pull still replaces a parked recipe when the server copy is newer.
+  Parked rows are not counted anywhere yet (not in the logout warning either).
+- **Non-recipe conflicts can carry the winner.** `conflictVersions` on the meal-plan, grocery and
+  saved-plan push results is applied at once, unconditionally, and marked `SYNCED`, unless the row
+  was edited while the push was in flight. Empty (today's backend) keeps the old wait-for-a-pull.
+- **Edit stamps are monotonic per row.** `nextUpdatedAt(previous, now)` = `max(now, previous + 1)`;
+  the DAO tombstone and bookmark-mark queries use `MAX(:ts, updatedAt + 1)`.
+- **Protocol headers and 426.** `X-Sync-Protocol: 1` and `X-Client-Version` go to the ChefAI hosts
+  only (`ClientVersionHeaders`, scoped like `AuthInterceptor`). A 426 from push or pull ends the
+  worker with `Result.failure()` and `SyncStatus.UpdateRequired`; the TopAppBar indicator shows the
+  error icon with an "update the app" content description. There is no update prompt yet.
 
 ---
 

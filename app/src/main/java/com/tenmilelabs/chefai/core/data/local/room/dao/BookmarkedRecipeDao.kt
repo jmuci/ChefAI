@@ -27,14 +27,14 @@ interface BookmarkedRecipeDao {
 
     /** Stars or unstars a live bookmark; a soft-deleted or missing row is left alone. */
     @Query(
-        "UPDATE bookmarked_recipes SET isStarred = :starred, updatedAt = :ts, syncState = 'PENDING' " +
+        "UPDATE bookmarked_recipes SET isStarred = :starred, updatedAt = MAX(:ts, updatedAt + 1), syncState = 'PENDING' " +
         "WHERE userId = :userId AND recipeId = :recipeId AND deletedAt IS NULL"
     )
     suspend fun setStarred(userId: UUID, recipeId: UUID, starred: Boolean, ts: Long): Int
 
     /** Marks or unmarks a live bookmark as go-to; a soft-deleted or missing row is left alone. */
     @Query(
-        "UPDATE bookmarked_recipes SET isGoTo = :goTo, updatedAt = :ts, syncState = 'PENDING' " +
+        "UPDATE bookmarked_recipes SET isGoTo = :goTo, updatedAt = MAX(:ts, updatedAt + 1), syncState = 'PENDING' " +
         "WHERE userId = :userId AND recipeId = :recipeId AND deletedAt IS NULL"
     )
     suspend fun setGoTo(userId: UUID, recipeId: UUID, goTo: Boolean, ts: Long): Int
@@ -42,9 +42,12 @@ interface BookmarkedRecipeDao {
     @Upsert
     suspend fun upsert(entity: BookmarkedRecipeEntity)
 
-    /** Removing a bookmark takes its star and go-to mark with it — both only exist on a bookmark. */
+    /**
+     * Removing a bookmark takes its star and go-to mark with it — both only exist on a bookmark.
+     * Like `setStarred`/`setGoTo`, the stamp sorts after the version it replaces (see nextUpdatedAt).
+     */
     @Query(
-        "UPDATE bookmarked_recipes SET deletedAt = :ts, syncState = 'DELETED', updatedAt = :ts, " +
+        "UPDATE bookmarked_recipes SET deletedAt = :ts, syncState = 'DELETED', updatedAt = MAX(:ts, updatedAt + 1), " +
         "isStarred = 0, isGoTo = 0 " +
         "WHERE userId = :userId AND recipeId = :recipeId"
     )

@@ -78,6 +78,20 @@ class SyncManager @Inject constructor(
     }
 
     /**
+     * Appended to the running sync rather than KEEP'd, which would drop it, or REPLACE'd, which
+     * would cancel the run that is asking. Same debounce as [requestMutationSync].
+     */
+    override fun requestFollowUpSync() {
+        val request = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setConstraints(connectedConstraints())
+            .setInitialDelay(5, TimeUnit.SECONDS)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_DELAY_SECONDS, TimeUnit.SECONDS)
+            .build()
+        WorkManager.getInstance(context)
+            .enqueueUniqueWork(SYNC_WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
+    }
+
+    /**
      * Enqueue a bookmark-specific sync with a short delay, using REPLACE policy.
      * Each call resets the delay window — rapid bookmark events within the delay window
      * are coalesced into a single sync. "Almost immediate" for the first action.

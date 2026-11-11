@@ -25,6 +25,7 @@ class FakeSecurePreferences : SecurePreferencesInterface {
         private const val KEY_CURRENT_USER_ID = "current_user_id"
         private const val KEY_LAST_LOGIN_EMAIL = "last_login_email"
         private const val KEY_PENDING_INVITE_TOKEN = "pending_invite_token"
+        private const val KEY_PENDING_UPGRADE_FROM = "pending_upgrade_from"
     }
 
     override suspend fun saveAuthData(
@@ -34,7 +35,8 @@ class FakeSecurePreferences : SecurePreferencesInterface {
         avatarUrl: String,
         accessToken: String,
         refreshToken: String,
-        tokenExpiry: Long
+        tokenExpiry: Long,
+        pendingUpgradeFrom: UUID?,
     ) {
         // Merge into the existing map to preserve other keys (e.g. KEY_LOCAL_USER_ID),
         // matching the behaviour of the real DataStore implementation which updates
@@ -47,6 +49,7 @@ class FakeSecurePreferences : SecurePreferencesInterface {
             put(KEY_ACCESS_TOKEN, accessToken)
             put(KEY_REFRESH_TOKEN, refreshToken)
             put(KEY_TOKEN_EXPIRY, tokenExpiry)
+            if (pendingUpgradeFrom != null) put(KEY_PENDING_UPGRADE_FROM, pendingUpgradeFrom.toString()) else remove(KEY_PENDING_UPGRADE_FROM)
             // KEY_LOCAL_USER_ID is preserved (not replaced)
         }
     }
@@ -94,8 +97,17 @@ class FakeSecurePreferences : SecurePreferencesInterface {
             remove(KEY_ACCESS_TOKEN)
             remove(KEY_REFRESH_TOKEN)
             remove(KEY_TOKEN_EXPIRY)
+            remove(KEY_PENDING_UPGRADE_FROM)
             // KEY_LOCAL_USER_ID is intentionally preserved
         }
+    }
+
+    override fun getPendingUpgradeFrom(): Flow<UUID?> = storage.map { prefs ->
+        (prefs[KEY_PENDING_UPGRADE_FROM] as? String)?.let { UUID.fromString(it) }
+    }
+
+    override suspend fun clearPendingUpgradeFrom() {
+        storage.value = storage.value.toMutableMap().apply { remove(KEY_PENDING_UPGRADE_FROM) }
     }
 
     override suspend fun updateAccessToken(accessToken: String, tokenExpiry: Long) {

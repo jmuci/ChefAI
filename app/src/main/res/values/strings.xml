@@ -221,6 +221,7 @@
     <string name="error_server_error">Server error. Please try again later.</string>
     <string name="status_banner_server_error">Server error. Try again.</string>
     <string name="status_banner_offline">You are offline</string>
+    <string name="sync_status_update_required">Update the app to keep syncing</string>
     <string name="status_banner_dismiss">Dismiss</string>
     <string name="error_login_failed">Login failed. Please try again.</string>
     <string name="error_registration_failed">Registration failed. Please try again.</string>

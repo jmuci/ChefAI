@@ -8,6 +8,7 @@ import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.MealPlanDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeCookEventDao
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
+import com.tenmilelabs.chefai.core.data.local.util.nextUpdatedAt
 import com.tenmilelabs.chefai.core.data.sync.SyncOrchestrator
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import com.tenmilelabs.chefai.mealplans.data.mapper.toDomain
@@ -144,7 +145,7 @@ class DefaultMealPlanRepository @Inject constructor(
                 existing.copy(
                     status = MealPlanStatus.READY.name,
                     syncState = SyncState.PENDING,
-                    updatedAt = System.currentTimeMillis(),
+                    updatedAt = nextUpdatedAt(existing.updatedAt, System.currentTimeMillis()),
                 )
             )
         }
@@ -233,7 +234,7 @@ class DefaultMealPlanRepository @Inject constructor(
             }
             mealPlanDao.upsertDays(listOf(updated))
             mealPlanDao.upsertMealPlan(
-                existing.copy(syncState = SyncState.PENDING, updatedAt = System.currentTimeMillis())
+                existing.copy(syncState = SyncState.PENDING, updatedAt = nextUpdatedAt(existing.updatedAt, System.currentTimeMillis()))
             )
         }
         syncScheduler.requestMutationSync()
@@ -280,7 +281,7 @@ class DefaultMealPlanRepository @Inject constructor(
 
             mealPlanDao.upsertDays(changed.values.toList())
             mealPlanDao.upsertMealPlan(
-                existing.copy(syncState = SyncState.PENDING, updatedAt = System.currentTimeMillis())
+                existing.copy(syncState = SyncState.PENDING, updatedAt = nextUpdatedAt(existing.updatedAt, System.currentTimeMillis()))
             )
         }
         syncScheduler.requestMutationSync()
@@ -320,7 +321,7 @@ class DefaultMealPlanRepository @Inject constructor(
                 existing.copy(
                     preferencesJson = preferences.copy(planLengthDays = newIndex + 1).toJson(),
                     syncState = SyncState.PENDING,
-                    updatedAt = System.currentTimeMillis(),
+                    updatedAt = nextUpdatedAt(existing.updatedAt, System.currentTimeMillis()),
                 )
             )
         }
@@ -342,7 +343,7 @@ class DefaultMealPlanRepository @Inject constructor(
                     }
                 )
                 mealPlanDao.upsertMealPlan(
-                    existing.copy(syncState = SyncState.PENDING, updatedAt = System.currentTimeMillis())
+                    existing.copy(syncState = SyncState.PENDING, updatedAt = nextUpdatedAt(existing.updatedAt, System.currentTimeMillis()))
                 )
                 moved = true
             }

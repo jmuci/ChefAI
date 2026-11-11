@@ -28,7 +28,7 @@ class FakeSavedMealPlanDao : SavedMealPlanDao {
     override suspend fun softDelete(uuid: UUID, deletedAt: Long) {
         val existing = rows.value[uuid] ?: return
         rows.value = rows.value + (
-            uuid to existing.copy(deletedAt = deletedAt, updatedAt = deletedAt, syncState = SyncState.PENDING)
+            uuid to existing.copy(deletedAt = deletedAt, updatedAt = maxOf(deletedAt, existing.updatedAt + 1), syncState = SyncState.PENDING)
             )
     }
 

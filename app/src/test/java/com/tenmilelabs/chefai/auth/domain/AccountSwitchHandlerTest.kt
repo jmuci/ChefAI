@@ -264,7 +264,7 @@ class AccountSwitchHandlerTest {
     }
 
     @Test
-    fun `same account logging in again keeps its plans, cook history and pull cursor`() = runTest {
+    fun `same account logging in again keeps its plans and cook history but pulls from the start`() = runTest {
         val userId = UuidV7Generator.newId()
         securePreferences.setCurrentUserId(userId)
         val plan = planFor(userId)
@@ -272,10 +272,23 @@ class AccountSwitchHandlerTest {
         recipeCookEventDao.insert(cookEventOn(plan.uuid))
         syncMetadataDao.upsert(SyncMetadataEntity(entityType = "recipes", lastSyncedAt = 1_000L))
 
-        handler.handleLogin(newUserId = userId, anonymousUserId = UuidV7Generator.newId())
+        handler.handleLogin(newUserId = userId, anonymousUserId = UuidV7Generator.newId(), isCredentialLogin = true)
 
         assertThat(mealPlanDao.getMealPlanById(plan.uuid)).isNotNull()
         assertThat(recipeCookEventDao.all).hasSize(1)
+        assertThat(syncMetadataDao.getLastSyncedAt("recipes")).isNull()
+    }
+
+    @Test
+    fun `a session restore for the same account keeps the pull cursor`() = runTest {
+        // SessionManager.loadSession runs handleLogin on every cold start; clearing the cursor
+        // there would re-download everything each time the app starts.
+        val userId = UuidV7Generator.newId()
+        securePreferences.setCurrentUserId(userId)
+        syncMetadataDao.upsert(SyncMetadataEntity(entityType = "recipes", lastSyncedAt = 1_000L))
+
+        handler.handleLogin(newUserId = userId)
+
         assertThat(syncMetadataDao.getLastSyncedAt("recipes")).isEqualTo(1_000L)
     }
 

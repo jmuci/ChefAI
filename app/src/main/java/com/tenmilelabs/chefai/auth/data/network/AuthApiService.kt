@@ -4,6 +4,7 @@ import com.tenmilelabs.chefai.BuildConfig
 import com.tenmilelabs.chefai.auth.data.network.dto.ApiErrorResponse
 import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
 import com.tenmilelabs.chefai.auth.data.network.dto.LoginRequest
+import com.tenmilelabs.chefai.auth.data.network.dto.LogoutRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RefreshTokenRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RegisterRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.TokenRefreshResponse
@@ -23,6 +24,7 @@ val AUTH_BASE_URL: String = BuildConfig.API_BASE_URL
 val REGISTER_ENDPOINT = "$AUTH_BASE_URL/auth/register"
 val LOGIN_ENDPOINT = "$AUTH_BASE_URL/auth/login"
 val REFRESH_ENDPOINT = "$AUTH_BASE_URL/auth/refresh"
+val LOGOUT_ENDPOINT = "$AUTH_BASE_URL/auth/logout"
 
 /**
  * Implementation of AuthNetworkDataSource using Ktor HTTP client.
@@ -84,6 +86,21 @@ class AuthApiService @Inject constructor(
         }
 
         return httpResponse.body()
+    }
+
+    override suspend fun logout(request: LogoutRequest) {
+        val httpResponse = client.post(LOGOUT_ENDPOINT) {
+            header("Content-Type", "application/json")
+            setBody(request)
+            expectSuccess = false
+        }
+
+        if (!httpResponse.status.isSuccess()) {
+            throw AuthHttpException(
+                message = "Logout failed: ${httpResponse.status}",
+                statusCode = httpResponse.status.value
+            )
+        }
     }
 }
 

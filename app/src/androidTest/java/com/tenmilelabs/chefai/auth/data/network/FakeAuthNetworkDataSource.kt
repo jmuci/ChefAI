@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.auth.data.network
 
 import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
 import com.tenmilelabs.chefai.auth.data.network.dto.LoginRequest
+import com.tenmilelabs.chefai.auth.data.network.dto.LogoutRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RefreshTokenRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RegisterRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.TokenRefreshResponse
@@ -91,6 +92,8 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
 
         return createTokenRefreshResponse()
     }
+
+    override suspend fun logout(request: LogoutRequest) = Unit
 
     /**
      * Creates a fake auth response for testing.

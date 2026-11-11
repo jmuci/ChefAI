@@ -21,6 +21,7 @@ sealed class SyncDisplayStatus {
     data class Synced(val lastSyncedAt: Long) : SyncDisplayStatus()
     data class Error(val message: String) : SyncDisplayStatus()
     data object Offline : SyncDisplayStatus()
+    data object UpdateRequired : SyncDisplayStatus()
 }
 
 /**
@@ -45,6 +46,7 @@ class SyncStatusViewModel @Inject constructor(
                     is SyncStatus.Synced -> SyncDisplayStatus.Synced(syncStatus.lastSyncedAt)
                     is SyncStatus.Error -> SyncDisplayStatus.Error(syncStatus.message)
                     is SyncStatus.Offline -> SyncDisplayStatus.Offline
+                    is SyncStatus.UpdateRequired -> SyncDisplayStatus.UpdateRequired
                 }
             }
         }.stateIn(
