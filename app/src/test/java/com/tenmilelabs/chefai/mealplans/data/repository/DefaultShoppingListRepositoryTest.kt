@@ -140,6 +140,83 @@ class DefaultShoppingListRepositoryTest {
         assertThat(syncScheduler.mutationSyncCount).isEqualTo(1)
     }
 
+    // --- renameItem / setRemoved ---
+
+    @Test
+    fun `renameItem is reflected in the item state without touching the tick`() = runTest {
+        val planId = UUID.randomUUID()
+        repository.setChecked(planId, "onion", checked = true)
+
+        repository.renameItem(planId, "onion", "  Red onions ")
+
+        val state = repository.observeCheckedState(planId).first()
+        assertThat(state.displayNameOverrides).containsExactly("onion", "Red onions")
+        assertThat(state.checkedKeys).containsExactly("onion")
+    }
+
+    @Test
+    fun `renameItem with null or blank restores the derived name`() = runTest {
+        val planId = UUID.randomUUID()
+        repository.renameItem(planId, "onion", "Red onions")
+
+        repository.renameItem(planId, "onion", "   ")
+
+        assertThat(checkDao.getCheck(planId, "onion")?.displayNameOverride).isNull()
+        assertThat(repository.observeCheckedState(planId).first().displayNameOverrides).isEmpty()
+    }
+
+    @Test
+    fun `renameItem on a never-ticked item creates an unticked PENDING row and requests a sync`() = runTest {
+        val planId = UUID.randomUUID()
+
+        repository.renameItem(planId, "onion", "Red onions")
+
+        val stored = checkDao.getCheck(planId, "onion")
+        assertThat(stored?.checked).isFalse()
+        assertThat(stored?.syncState).isEqualTo(SyncState.PENDING)
+        assertThat(syncScheduler.mutationSyncCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `setRemoved hides then restores an item, keeping its tick and rename`() = runTest {
+        val planId = UUID.randomUUID()
+        repository.setChecked(planId, "onion", checked = true)
+        repository.renameItem(planId, "onion", "Red onions")
+
+        repository.setRemoved(planId, "onion", removed = true)
+        assertThat(repository.observeCheckedState(planId).first().removedKeys).containsExactly("onion")
+
+        repository.setRemoved(planId, "onion", removed = false)
+        val restored = repository.observeCheckedState(planId).first()
+        assertThat(restored.removedKeys).isEmpty()
+        assertThat(restored.checkedKeys).containsExactly("onion")
+        assertThat(restored.displayNameOverrides).containsExactly("onion", "Red onions")
+    }
+
+    @Test
+    fun `setChecked carries forward an existing rename and removal`() = runTest {
+        val planId = UUID.randomUUID()
+        repository.renameItem(planId, "onion", "Red onions")
+        repository.setRemoved(planId, "onion", removed = true)
+
+        repository.setChecked(planId, "onion", checked = true)
+
+        val stored = checkDao.getCheck(planId, "onion")
+        assertThat(stored?.displayNameOverride).isEqualTo("Red onions")
+        assertThat(stored?.removed).isTrue()
+    }
+
+    @Test
+    fun `an edit bumps updatedAt past the version it replaces`() = runTest {
+        val planId = UUID.randomUUID()
+        repository.renameItem(planId, "onion", "Red onions")
+        val first = checkDao.getCheck(planId, "onion")?.updatedAt ?: error("row missing")
+
+        repository.setRemoved(planId, "onion", removed = true)
+
+        assertThat(checkDao.getCheck(planId, "onion")?.updatedAt).isGreaterThan(first)
+    }
+
     @Test
     fun `clearChecks empties only the given plan's ticks`() = runTest {
         val planA = UUID.randomUUID()

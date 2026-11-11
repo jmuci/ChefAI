@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,6 +24,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -30,8 +34,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatCheckbox
-import com.tenmilelabs.chefai.core.ui.components.flat.flatToggleable
+import com.tenmilelabs.chefai.core.ui.components.flat.flatToggleableWithLongClick
+import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
+
+/** What a row asks of its screen. One lambda, so the row's signature doesn't grow with each gesture. */
+sealed interface ShoppingListRowAction {
+    data object Toggle : ShoppingListRowAction
+    data object LongPress : ShoppingListRowAction
+    data object Rename : ShoppingListRowAction
+    data object Remove : ShoppingListRowAction
+}
 
 /** How much of its normal opacity a picked-up row keeps — "struck through at 50% ink". */
 private const val CHECKED_ALPHA = 0.5f
@@ -39,6 +52,9 @@ private const val STRIKE_ANIM_MS = 240
 
 /**
  * One line of the shopping list: an 18dp checkbox, the ingredient, a right-aligned quantity.
+ *
+ * A long press reveals a pencil and an X on the right, to rename or remove the line; the screen
+ * decides when to hide them again ([actionsVisible]).
  *
  * Ticking sweeps a strike-through across the name left-to-right and fades the row back, rather
  * than snapping to `TextDecoration.LineThrough` — the sweep is what makes a tick feel like
@@ -49,9 +65,10 @@ fun ShoppingListRow(
     name: String,
     quantityLabel: String?,
     isChecked: Boolean,
-    onToggle: () -> Unit,
+    onAction: (ShoppingListRowAction) -> Unit,
     isApproximate: Boolean = false,
     checkedByName: String? = null,
+    actionsVisible: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     // Held as State, not unwrapped with `by`: nothing else in the composition reads .value, so
@@ -75,12 +92,17 @@ fun ShoppingListRow(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 44.dp)
-            .flatToggleable(checked = isChecked, onCheckedChange = { onToggle() })
+            .flatToggleableWithLongClick(
+                checked = isChecked,
+                onCheckedChange = { onAction(ShoppingListRowAction.Toggle) },
+                onLongClick = { onAction(ShoppingListRowAction.LongPress) },
+                onLongClickLabel = stringResource(R.string.shopping_list_show_actions, name),
+            )
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // onCheckedChange = null: the row owns the click via flatToggleable, so the box must not
+        // onCheckedChange = null: the row owns the click via flatToggleableWithLongClick, so the box must not
         // register a second, competing semantics node.
         FlatCheckbox(checked = isChecked, onCheckedChange = null)
 
@@ -126,6 +148,29 @@ fun ShoppingListRow(
                 },
             )
         }
+
+        if (actionsVisible) {
+            IconButton(
+                onClick = { onAction(ShoppingListRowAction.Rename) },
+                modifier = Modifier.size(32.dp),
+            ) {
+                Icon(
+                    painter = painterResource(ChefAIIcons.Pencil),
+                    contentDescription = stringResource(R.string.shopping_list_edit_item, name),
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            IconButton(
+                onClick = { onAction(ShoppingListRowAction.Remove) },
+                modifier = Modifier.size(32.dp),
+            ) {
+                Icon(
+                    painter = painterResource(ChefAIIcons.X),
+                    contentDescription = stringResource(R.string.shopping_list_remove_item, name),
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
     }
 }
 
@@ -156,7 +201,7 @@ private fun ShoppingListRowToBuyPreview() {
             name = "Extra-virgin olive oil",
             quantityLabel = "2 tbsp",
             isChecked = false,
-            onToggle = {},
+            onAction = {},
         )
     }
 }
@@ -169,7 +214,7 @@ private fun ShoppingListRowCheckedPreview() {
             name = "Chicken breast",
             quantityLabel = "500 g",
             isChecked = true,
-            onToggle = {},
+            onAction = {},
         )
     }
 }
@@ -182,7 +227,7 @@ private fun ShoppingListRowToBuyDarkPreview() {
             name = "Baby spinach",
             quantityLabel = null,
             isChecked = false,
-            onToggle = {},
+            onAction = {},
         )
     }
 }
@@ -195,7 +240,7 @@ private fun ShoppingListRowCheckedDarkPreview() {
             name = "Greek yogurt",
             quantityLabel = "500 g",
             isChecked = true,
-            onToggle = {},
+            onAction = {},
         )
     }
 }
@@ -209,7 +254,7 @@ private fun ShoppingListRowApproximatePreview() {
             quantityLabel = "900 g",
             isApproximate = true,
             isChecked = false,
-            onToggle = {},
+            onAction = {},
         )
     }
 }
@@ -223,7 +268,7 @@ private fun ShoppingListRowCheckedByPreview() {
             quantityLabel = "500 g",
             isChecked = true,
             checkedByName = "Alex",
-            onToggle = {},
+            onAction = {},
         )
     }
 }
@@ -237,7 +282,35 @@ private fun ShoppingListRowCheckedByDarkPreview() {
             quantityLabel = "500 g",
             isChecked = true,
             checkedByName = "Alex",
-            onToggle = {},
+            onAction = {},
+        )
+    }
+}
+
+@Preview(name = "Actions revealed — Light", showBackground = true)
+@Composable
+private fun ShoppingListRowActionsLightPreview() {
+    ChefAITheme(darkTheme = false) {
+        ShoppingListRow(
+            name = "Extra-virgin olive oil",
+            quantityLabel = "2 tbsp",
+            isChecked = false,
+            actionsVisible = true,
+            onAction = {},
+        )
+    }
+}
+
+@Preview(name = "Actions revealed — Dark", showBackground = true)
+@Composable
+private fun ShoppingListRowActionsDarkPreview() {
+    ChefAITheme(darkTheme = true) {
+        ShoppingListRow(
+            name = "Extra-virgin olive oil",
+            quantityLabel = "2 tbsp",
+            isChecked = false,
+            actionsVisible = true,
+            onAction = {},
         )
     }
 }

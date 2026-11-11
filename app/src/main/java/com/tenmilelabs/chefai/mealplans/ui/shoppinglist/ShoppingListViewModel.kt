@@ -42,6 +42,9 @@ sealed interface ShoppingListUiState {
 
 sealed interface ShoppingListEvent {
     data class ShowError(val message: String) : ShoppingListEvent
+
+    /** A line was just removed; the screen offers an Undo that calls `onUndoRemove(itemKey)`. */
+    data class ItemRemoved(val itemKey: String, val displayName: String) : ShoppingListEvent
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -92,6 +95,8 @@ class ShoppingListViewModel @Inject constructor(
                             checkedByNames = checkedState.checkedByUserIds.mapNotNull { (itemKey, userId) ->
                                 members.firstOrNull { it.userId == userId }?.displayName?.let { itemKey to it }
                             }.toMap(),
+                            displayNameOverrides = checkedState.displayNameOverrides,
+                            removedKeys = checkedState.removedKeys,
                         ),
                         ownerDisplayName = if (plan.householdId != null) {
                             members.firstOrNull { it.userId == plan.userId }?.displayName
@@ -116,6 +121,46 @@ class ShoppingListViewModel @Inject constructor(
                 if (e is CancellationException) throw e
                 Timber.e(e, "onToggleItem: failed for item ${item.key}")
                 _events.emit(ShoppingListEvent.ShowError("Couldn't update this item"))
+            }
+        }
+    }
+
+    /** Blank or unchanged names are ignored; the item's tick is unaffected either way. */
+    fun onRenameItem(item: ShoppingListItem, newName: String) {
+        val name = newName.trim()
+        if (name.isEmpty() || name == item.displayName) return
+        viewModelScope.launch {
+            try {
+                shoppingListRepository.renameItem(mealPlanId, item.key, name)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "onRenameItem: failed for item ${item.key}")
+                _events.emit(ShoppingListEvent.ShowError("Couldn't rename this item"))
+            }
+        }
+    }
+
+    fun onDeleteItem(item: ShoppingListItem) {
+        viewModelScope.launch {
+            try {
+                shoppingListRepository.setRemoved(mealPlanId, item.key, removed = true)
+                _events.emit(ShoppingListEvent.ItemRemoved(item.key, item.displayName))
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "onDeleteItem: failed for item ${item.key}")
+                _events.emit(ShoppingListEvent.ShowError("Couldn't remove this item"))
+            }
+        }
+    }
+
+    fun onUndoRemove(itemKey: String) {
+        viewModelScope.launch {
+            try {
+                shoppingListRepository.setRemoved(mealPlanId, itemKey, removed = false)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "onUndoRemove: failed for item $itemKey")
+                _events.emit(ShoppingListEvent.ShowError("Couldn't restore this item"))
             }
         }
     }

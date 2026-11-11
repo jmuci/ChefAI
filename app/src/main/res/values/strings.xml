@@ -386,6 +386,13 @@
     <string name="shopping_list_empty_title">Nothing to buy yet</string>
     <string name="shopping_list_empty_subtitle">Build this plan first, or add ingredients to its recipes.</string>
     <string name="shopping_list_toggle_error">Couldn\'t update this item</string>
+    <string name="shopping_list_item_removed">Removed %1$s</string>
+    <string name="shopping_list_undo">Undo</string>
+    <string name="shopping_list_show_actions">Show actions for %1$s</string>
+    <string name="shopping_list_remove_item">Remove %1$s</string>
+    <string name="shopping_list_edit_item">Rename %1$s</string>
+    <string name="shopping_list_rename_title">Rename item</string>
+    <string name="shopping_list_rename_label">Name</string>
     <string name="shopping_list_clear_error">Couldn\'t clear the list</string>
 
     <!-- Meal Plan Wizard -->

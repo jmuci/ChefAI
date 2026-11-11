@@ -7,6 +7,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.ChefAIDataBase
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_13_14
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_14_15
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_15_16
+import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_16_17
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_1_2
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_2_3
 import com.tenmilelabs.chefai.core.data.local.room.dao.MIGRATION_3_4
@@ -687,15 +688,53 @@ class ChefAIDatabaseMigrationTest {
     }
 
     @Test
-    fun migrateAll1To16_succeeds() {
+    fun migrate16To17_addsEditColumns_existingChecksReadAsUntouched() {
+        val userId = UUID.randomUUID()
+        val planId = UUID.randomUUID()
+        helper.createDatabase(TEST_DB, 16).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO users (uuid, displayName, email, avatarUrl, updatedAt, deletedAt, syncState)
+                VALUES (?, 'Chef', 'c@t.com', '', 1, NULL, 'SYNCED')
+                """.trimIndent(),
+                arrayOf(userId.toBlob())
+            )
+            db.execSQL(
+                """
+                INSERT INTO meal_plans (uuid, userId, name, status, preferencesJson, createdAt, updatedAt, syncState)
+                VALUES (?, ?, 'Plan', 'READY', '{}', 1, 1, 'SYNCED')
+                """.trimIndent(),
+                arrayOf(planId.toBlob(), userId.toBlob())
+            )
+            db.execSQL(
+                """
+                INSERT INTO shopping_list_checks (mealPlanId, itemKey, checkedAt, checked, updatedAt, syncState)
+                VALUES (?, 'onion', 1, 1, 1, 'SYNCED')
+                """.trimIndent(),
+                arrayOf(planId.toBlob())
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 17, true, MIGRATION_16_17)
+
+        db.query("SELECT checked, displayNameOverride, removed FROM shopping_list_checks").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("the tick is kept", 1, cursor.getInt(0))
+            assertTrue("no rename", cursor.isNull(1))
+            assertEquals("not removed", 0, cursor.getInt(2))
+        }
+    }
+
+    @Test
+    fun migrateAll1To17_succeeds() {
         helper.createDatabase(TEST_DB, 1).close()
 
         helper.runMigrationsAndValidate(
-            TEST_DB, 16, true,
+            TEST_DB, 17, true,
             MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
             MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
             MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15,
-            MIGRATION_15_16,
+            MIGRATION_15_16, MIGRATION_16_17,
         )
     }
 }
