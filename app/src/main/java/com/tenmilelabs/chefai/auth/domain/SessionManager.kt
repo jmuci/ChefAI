@@ -166,18 +166,28 @@ class SessionManager @Inject constructor(
                 persistAuthenticatedUser(user)
                 attachHouseholdState(user)
 
-                // Check if token is expired
+                // An account deletion that may have reached the server forces a refresh even with a
+                // live access token: a rejected refresh is how this device learns the account is
+                // gone and the wipe the deletion started still has to run.
+                val accountWipePending = securePreferences.getPendingAccountWipe().first()
                 val currentTime = System.currentTimeMillis()
-                if (currentTime >= tokenExpiry) {
-                    Timber.d("Access token expired, attempting refresh...")
+                if (accountWipePending || currentTime >= tokenExpiry) {
+                    Timber.d("Access token expired or deletion pending, attempting refresh...")
                     val refreshResult = refreshToken()
                     if (refreshResult.isSuccess) {
                         Timber.d("Session refreshed successfully")
+                        // The account still exists, so whatever deletion was in flight didn't land.
+                        if (accountWipePending) securePreferences.setPendingAccountWipe(false)
                         syncSchedulerProvider.get().requestImmediateSync()
                         syncSchedulerProvider.get().schedulePeriodicSync()
                     } else if (refreshResult.exceptionOrNull().isRefreshRejection()) {
-                        Timber.w("Refresh token rejected, falling back to anonymous")
-                        enterAnonymousSession()
+                        if (accountWipePending) {
+                            Timber.w("Refresh rejected after an interrupted account deletion, wiping the device")
+                            endDeletedAccountSession()
+                        } else {
+                            Timber.w("Refresh token rejected, ending the stored session")
+                            endRejectedSession()
+                        }
                     } else {
                         // Offline / timeout / 5xx: the credentials are still good, only the access
                         // token is stale. Dropping to anonymous here would hide the account's data
@@ -196,6 +206,13 @@ class SessionManager @Inject constructor(
             } else {
                 // No stored auth session — enter anonymous mode
                 Timber.d("No stored session found, entering anonymous mode")
+                // endDeletedAccountSession clears the credentials before it wipes, so a process
+                // death in between leaves the marker with nothing to refresh: finish the wipe here.
+                if (securePreferences.getPendingAccountWipe().first()) {
+                    Timber.w("Finishing the interrupted wipe of a deleted account")
+                    accountSwitchHandler.clearAllLocalData()
+                    securePreferences.setPendingAccountWipe(false)
+                }
                 enterAnonymousSession()
             }
         } catch (e: Exception) {
@@ -523,10 +540,11 @@ class SessionManager @Inject constructor(
      * data continuity is maintained on the device (RFC-001 Section 7.3).
      */
     suspend fun logout(): Unit = sessionEndMutex.withLock {
+        // Read before anything can fail, so the error path below can still revoke it.
+        val refreshTokenToRevoke = (_userSession.value as? UserSession.Authenticated)?.authToken?.refreshToken
         try {
             val currentUser = getCurrentUser()
             Timber.d("Logging out user: ${currentUser?.uuid}")
-            val refreshTokenToRevoke = (_userSession.value as? UserSession.Authenticated)?.authToken?.refreshToken
 
             // Cancel any household refresh still in flight so a stale response for the departing
             // account can't land after we've moved on — see householdRefreshJob's doc.
@@ -537,6 +555,9 @@ class SessionManager @Inject constructor(
 
             // Clear auth data (preserves localUserId)
             securePreferences.clearAuthData()
+            // Leaving normally means no deletion is being finished: a marker left by an ambiguous
+            // delete attempt must not wipe the device on the next cold start.
+            securePreferences.setPendingAccountWipe(false)
 
             // The household cache has no per-user scoping (ADR-014) — clear it here too, not only
             // on the next login's account-switch cleanup, so nothing that reads it directly during
@@ -554,6 +575,14 @@ class SessionManager @Inject constructor(
             Timber.d("Logout successful, now in anonymous mode")
         } catch (e: Exception) {
             Timber.e(e, "Error during logout")
+            // The UI is about to show an anonymous session; the stored one must not come back on
+            // the next cold start, and the refresh token must stop working either way.
+            try {
+                securePreferences.clearAuthData()
+            } catch (clearError: Exception) {
+                Timber.e(clearError, "Logout: the stored session could not be cleared")
+            }
+            refreshTokenToRevoke?.let { token -> applicationScope.launch { revokeRefreshToken(token) } }
             // Still try to enter anonymous mode even if clear fails
             try {
                 enterAnonymousSession()
@@ -623,9 +652,38 @@ class SessionManager @Inject constructor(
         securePreferences.clearAuthData()
         try {
             accountSwitchHandler.clearAllLocalData()
+            securePreferences.setPendingAccountWipe(false)
         } finally {
             enterAnonymousSession()
         }
+    }
+
+    /**
+     * Records that an account deletion is about to be sent (`true`) or definitively didn't happen
+     * (`false`). While set, [loadSession] treats a rejected refresh as "the account is gone" and
+     * finishes the wipe [endDeletedAccountSession] would have run, so a process death between the
+     * server deleting the account and this device wiping it can't leave the data behind.
+     */
+    suspend fun setAccountDeletionPending(pending: Boolean) {
+        securePreferences.setPendingAccountWipe(pending)
+    }
+
+    /** Whether [setAccountDeletionPending] is still set. */
+    suspend fun isAccountDeletionPending(): Boolean = securePreferences.getPendingAccountWipe().first()
+
+    /**
+     * Ends a stored session whose refresh token the server rejected. The credentials are dead, so
+     * they are cleared rather than retried on every cold start; anything created from here on is
+     * the anonymous session's and reaches the account through the normal upgrade at the next
+     * sign-in. `current_user_id` is kept, so signing back in to the same account isn't treated as
+     * an account switch.
+     */
+    private suspend fun endRejectedSession(): Unit = sessionEndMutex.withLock {
+        householdRefreshJob?.cancel()
+        syncSchedulerProvider.get().cancelAllSync()
+        securePreferences.clearAuthData()
+        householdRepositoryProvider.get().clearLocalCache()
+        enterAnonymousSession()
     }
 
     /**
@@ -678,15 +736,11 @@ class SessionManager @Inject constructor(
                     return Result.failure(IllegalStateException("Session ended during token refresh"))
                 }
 
-                // Update secure storage with new tokens
-                securePreferences.updateAccessToken(
+                // One edit: the backend rotates refresh tokens, so the old one is already spent.
+                securePreferences.updateTokens(
                     accessToken = newAuthToken.accessToken,
-                    tokenExpiry = newAuthToken.expiresAt
-                )
-
-                // Note: In token rotation, we also need to update the refresh token
-                securePreferences.updateRefreshToken(
-                    refreshToken = newAuthToken.refreshToken
+                    refreshToken = newAuthToken.refreshToken,
+                    tokenExpiry = newAuthToken.expiresAt,
                 )
 
                 // Update session state. `.copy()` of the *latest* session, not a fresh
@@ -757,8 +811,15 @@ class SessionManager @Inject constructor(
 private const val HTTP_CONFLICT = 409
 
 /**
- * Whether a failed refresh means the server rejected the refresh token (4xx), as opposed to a
- * transient failure — offline, timeout, 5xx — after which the stored credentials are still valid.
+ * Whether a failed refresh means the server rejected the refresh token, as opposed to a transient
+ * failure after which the stored credentials are still valid.
+ *
+ * Only 401/403 count. The backend answers an invalid, expired, reused or orphaned refresh token
+ * with 401; a 429 is a rate limit (backend F1 shares one bucket across clients behind the proxy),
+ * and the backend's catch-all for unexpected errors is a 400. Treating either as a rejection would
+ * sign users out for a server-side hiccup.
  */
-private fun Throwable?.isRefreshRejection(): Boolean =
-    this is AuthHttpException && statusCode in 400..499
+internal fun Throwable?.isRefreshRejection(): Boolean =
+    this is AuthHttpException && statusCode in REFRESH_REJECTION_STATUSES
+
+private val REFRESH_REJECTION_STATUSES = setOf(401, 403)

@@ -1475,4 +1475,160 @@ class SessionManagerTest {
         assertThat(fakeAuthNetworkDataSource.loginRequests).hasSize(1)
         assertThat(sessionManager.userSession.value).isInstanceOf(UserSession.Anonymous::class.java)
     }
+
+    // --- Cold-start refresh outcomes (security review A2, A10) ---
+
+    private suspend fun storeSession(userId: UUID, tokenExpiry: Long) {
+        fakeSecurePreferences.setCurrentUserId(userId)
+        fakeSecurePreferences.saveAuthData(
+            userUuid = userId,
+            displayName = "Ana",
+            email = "ana@example.com",
+            avatarUrl = "",
+            accessToken = "access",
+            refreshToken = "refresh",
+            tokenExpiry = tokenExpiry,
+        )
+    }
+
+    @Test
+    fun `a rate-limited refresh at cold start keeps the session authenticated`() = testScope.runTest {
+        // Given a stored session whose access token has expired, and a refresh that is rate limited
+        val userId = UuidV7Generator.newId()
+        storeSession(userId, tokenExpiry = 0L)
+        fakeAuthNetworkDataSource.refreshError =
+            com.tenmilelabs.chefai.auth.data.network.AuthHttpException("Too many requests", statusCode = 429)
+
+        // When the app cold-starts
+        val manager = coldStartSessionManager()
+        advanceUntilIdle()
+
+        // Then the user stays signed in and keeps the stored credentials
+        val session = manager.userSession.value
+        assertThat(session).isInstanceOf(UserSession.Authenticated::class.java)
+        assertThat((session as UserSession.Authenticated).user.uuid).isEqualTo(userId)
+        assertThat(fakeSecurePreferences.getRefreshToken().first()).isEqualTo("refresh")
+    }
+
+    @Test
+    fun `a 400 from refresh at cold start is transient, not a rejection`() = testScope.runTest {
+        // The backend's catch-all for unexpected errors on /auth/refresh is a 400.
+        storeSession(UuidV7Generator.newId(), tokenExpiry = 0L)
+        fakeAuthNetworkDataSource.refreshError =
+            com.tenmilelabs.chefai.auth.data.network.AuthHttpException("Invalid request format", statusCode = 400)
+
+        val manager = coldStartSessionManager()
+        advanceUntilIdle()
+
+        assertThat(manager.userSession.value).isInstanceOf(UserSession.Authenticated::class.java)
+    }
+
+    @Test
+    fun `a rejected refresh at cold start ends the stored session`() = testScope.runTest {
+        // Given a stored session whose refresh token the server rejects
+        val userId = UuidV7Generator.newId()
+        storeSession(userId, tokenExpiry = 0L)
+        fakeAuthNetworkDataSource.refreshError =
+            com.tenmilelabs.chefai.auth.data.network.AuthHttpException("Invalid refresh token", statusCode = 401)
+
+        // When the app cold-starts
+        val manager = coldStartSessionManager()
+        advanceUntilIdle()
+
+        // Then the session is anonymous, no token is left to retry with, and the account is still
+        // remembered so signing back in is not treated as an account switch
+        assertThat(manager.userSession.value).isInstanceOf(UserSession.Anonymous::class.java)
+        assertThat(fakeSecurePreferences.getRefreshToken().first()).isNull()
+        assertThat(fakeSecurePreferences.getAccessToken().first()).isNull()
+        assertThat(fakeSecurePreferences.getStoredCurrentUserId().first()).isEqualTo(userId)
+        coVerify(exactly = 0) { mockDatabase.clearAllTables() }
+    }
+
+    @Test
+    fun `a pending account wipe and a rejected refresh finish wiping the deleted account`() = testScope.runTest {
+        // Given the process died after the server deleted the account, with a still-live access token
+        storeSession(UuidV7Generator.newId(), tokenExpiry = System.currentTimeMillis() + 3_600_000)
+        fakeSecurePreferences.setPendingAccountWipe(true)
+        fakeAuthNetworkDataSource.refreshError =
+            com.tenmilelabs.chefai.auth.data.network.AuthHttpException("Invalid refresh token", statusCode = 401)
+
+        // When the app cold-starts
+        val manager = coldStartSessionManager()
+        advanceUntilIdle()
+
+        // Then the refresh is forced, the device is wiped and the marker is spent
+        coVerify(exactly = 1) { mockDatabase.clearAllTables() }
+        assertThat(manager.userSession.value).isInstanceOf(UserSession.Anonymous::class.java)
+        assertThat(fakeSecurePreferences.getPendingAccountWipe().first()).isFalse()
+        assertThat(fakeSecurePreferences.getAccessToken().first()).isNull()
+    }
+
+    @Test
+    fun `a pending account wipe is dropped when the account still exists`() = testScope.runTest {
+        // Given a deletion attempt whose outcome never reached the device, for an account that survived
+        storeSession(UuidV7Generator.newId(), tokenExpiry = System.currentTimeMillis() + 3_600_000)
+        fakeSecurePreferences.setPendingAccountWipe(true)
+
+        // When the app cold-starts and the forced refresh succeeds
+        val manager = coldStartSessionManager()
+        advanceUntilIdle()
+
+        // Then nothing is wiped and the marker is cleared
+        coVerify(exactly = 0) { mockDatabase.clearAllTables() }
+        assertThat(manager.userSession.value).isInstanceOf(UserSession.Authenticated::class.java)
+        assertThat(fakeSecurePreferences.getPendingAccountWipe().first()).isFalse()
+    }
+
+    @Test
+    fun `a pending account wipe with no stored session finishes the wipe`() = testScope.runTest {
+        // Given endDeletedAccountSession cleared the credentials but died before wiping
+        fakeSecurePreferences.setPendingAccountWipe(true)
+
+        // When the app cold-starts
+        coldStartSessionManager()
+        advanceUntilIdle()
+
+        // Then the wipe runs once
+        coVerify(exactly = 1) { mockDatabase.clearAllTables() }
+        assertThat(fakeSecurePreferences.getPendingAccountWipe().first()).isFalse()
+    }
+
+    @Test
+    fun `a token refresh stores the rotated refresh token with the access token`() = testScope.runTest {
+        sessionManager.login("test@example.com", "password123")
+
+        sessionManager.refreshToken()
+
+        val session = sessionManager.userSession.value as UserSession.Authenticated
+        assertThat(fakeSecurePreferences.getAccessToken().first()).isEqualTo(session.authToken.accessToken)
+        assertThat(fakeSecurePreferences.getRefreshToken().first()).isEqualTo(session.authToken.refreshToken)
+    }
+
+    @Test
+    fun `logout clears a pending account wipe`() = testScope.runTest {
+        sessionManager.login("test@example.com", "password123")
+        fakeSecurePreferences.setPendingAccountWipe(true)
+
+        sessionManager.logout()
+        advanceUntilIdle()
+
+        assertThat(fakeSecurePreferences.getPendingAccountWipe().first()).isFalse()
+    }
+
+    @Test
+    fun `a logout whose first clear fails still clears the stored session and revokes the token`() = testScope.runTest {
+        // Given a signed-in user and a storage error on the first clear
+        sessionManager.login("test@example.com", "password123")
+        val refreshToken = (sessionManager.userSession.value as UserSession.Authenticated).authToken.refreshToken
+        fakeSecurePreferences.clearAuthDataFailures = 1
+
+        // When they log out
+        sessionManager.logout()
+        advanceUntilIdle()
+
+        // Then no token survives for the next cold start, and the server-side token is revoked
+        assertThat(sessionManager.userSession.value).isInstanceOf(UserSession.Anonymous::class.java)
+        assertThat(fakeSecurePreferences.getRefreshToken().first()).isNull()
+        assertThat(fakeAuthNetworkDataSource.logoutRequests.map { it.refreshToken }).containsExactly(refreshToken)
+    }
 }
