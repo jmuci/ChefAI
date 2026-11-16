@@ -1416,6 +1416,16 @@ class SessionManagerTest {
     }
 
     @Test
+    fun `logout drops a pending household invite so the next person to sign in is not sent to it`() = testScope.runTest {
+        sessionManager.login("test@example.com", "password123")
+        fakeSecurePreferences.savePendingInviteToken("someone-elses-invite")
+
+        sessionManager.logout()
+
+        assertThat(fakeSecurePreferences.getPendingInviteToken().first()).isNull()
+    }
+
+    @Test
     fun `logout completes locally when the server-side revoke fails`() = testScope.runTest {
         sessionManager.login("test@example.com", "password123")
         fakeAuthNetworkDataSource.logoutError = Exception("offline")
@@ -1473,15 +1483,5 @@ class SessionManagerTest {
         assertThat((retry.exceptionOrNull() as? com.tenmilelabs.chefai.auth.data.network.AuthHttpException)?.statusCode).isEqualTo(409)
         assertThat(fakeAuthNetworkDataSource.loginRequests).hasSize(1)
         assertThat(sessionManager.userSession.value).isInstanceOf(UserSession.Anonymous::class.java)
-    }
-
-    @Test
-    fun `logout drops a pending household invite so the next person to sign in is not sent to it`() = testScope.runTest {
-        sessionManager.login("test@example.com", "password123")
-        fakeSecurePreferences.savePendingInviteToken("someone-elses-invite")
-
-        sessionManager.logout()
-
-        assertThat(fakeSecurePreferences.getPendingInviteToken().first()).isNull()
     }
 }

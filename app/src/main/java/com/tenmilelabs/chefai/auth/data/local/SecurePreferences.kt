@@ -55,8 +55,8 @@ class SecurePreferences @Inject constructor(
         private val KEY_CURRENT_USER_ID = stringPreferencesKey("current_user_id")
         private val KEY_LAST_LOGIN_EMAIL = stringPreferencesKey("last_login_email")
         private val KEY_PENDING_INVITE_TOKEN = stringPreferencesKey("pending_invite_token")
-        private val KEY_PENDING_UPGRADE_FROM = stringPreferencesKey("pending_upgrade_from")
         private val KEY_PENDING_INVITE_SAVED_AT = longPreferencesKey("pending_invite_saved_at")
+        private val KEY_PENDING_UPGRADE_FROM = stringPreferencesKey("pending_upgrade_from")
     }
 
     private val dataStore: DataStore<Preferences> = context.dataStore
@@ -388,14 +388,3 @@ class SecurePreferences @Inject constructor(
         }
     }
 }
-
-/**
- * How long a previewed invite waits for its sign-in. Long enough for a sign-up round trip, short
- * enough that a token opened by one person can't walk someone who signs in later into that
- * household.
- */
-internal const val PENDING_INVITE_TTL_MS: Long = 30 * 60 * 1000L
-
-/** [token] while it is younger than [PENDING_INVITE_TTL_MS]; a token with no timestamp is stale. */
-internal fun freshPendingInviteToken(token: String?, savedAt: Long?, now: Long): String? =
-    token?.takeIf { savedAt != null && now - savedAt in 0..PENDING_INVITE_TTL_MS }
