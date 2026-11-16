@@ -337,6 +337,70 @@ class MealPlanWeekTest {
 
     // --- Helpers ---
 
+    // --- Open slots: gaps a removed meal leaves ---
+
+    @Test
+    fun `a slot a plan leaves empty becomes an open slot for that plan`() {
+        // Given a lunch + dinner plan whose day-0 dinner was removed
+        val lunch = UUID.randomUUID()
+        val base = plan(createdAt = monday, days = listOf(day(0, lunch = lunch)))
+        val plan = base.copy(preferences = base.preferences.copy(mealType = MealType.DINNER_AND_LUNCH))
+
+        // When projected
+        val monday0 = project(plans = listOf(plan)).days.first()
+
+        // Then lunch stays a meal and dinner is a gap that fills this plan's day 0
+        assertThat(monday0.meals.map { it.slot }).containsExactly(MealSlot.LUNCH)
+        assertThat(monday0.openSlots).containsExactly(
+            OpenWeekSlot(plan.uuid, plan.name, dayIndex = 0, slot = MealSlot.DINNER, date = monday),
+        )
+    }
+
+    @Test
+    fun `a dinner-only plan never offers a lunch gap`() {
+        val plan = plan(createdAt = monday, days = listOf(day(0)))
+
+        val monday0 = project(plans = listOf(plan)).days.first()
+
+        assertThat(monday0.openSlots.map { it.slot }).containsExactly(MealSlot.DINNER)
+    }
+
+    @Test
+    fun `a gap another plan fills is not offered`() {
+        val emptied = plan(createdAt = monday, days = listOf(day(0)), name = "Old")
+        val other = plan(
+            createdAt = monday,
+            days = listOf(day(0, dinner = UUID.randomUUID())),
+            name = "New",
+            createdAtOffsetMillis = 1_000L,
+        )
+
+        val monday0 = project(plans = listOf(emptied, other)).days.first()
+
+        assertThat(monday0.meals).hasSize(1)
+        assertThat(monday0.openSlots).isEmpty()
+    }
+
+    @Test
+    fun `a gap two plans leave appears once, for the older plan`() {
+        val older = plan(createdAt = monday, days = listOf(day(0)), name = "Older")
+        val newer = plan(createdAt = monday, days = listOf(day(0)), name = "Newer", createdAtOffsetMillis = 1_000L)
+
+        val monday0 = project(plans = listOf(newer, older)).days.first()
+
+        assertThat(monday0.openSlots.map { it.planId }).containsExactly(older.uuid)
+    }
+
+    @Test
+    fun `a plan never generated offers no gaps`() {
+        val plan = plan(createdAt = monday, days = emptyList())
+            .let { it.copy(preferences = it.preferences.copy(planLengthDays = 3)) }
+
+        val week = project(plans = listOf(plan))
+
+        assertThat(week.days.all { it.openSlots.isEmpty() }).isTrue()
+    }
+
     private fun project(
         plans: List<MealPlan>,
         weekStart: LocalDate = monday,

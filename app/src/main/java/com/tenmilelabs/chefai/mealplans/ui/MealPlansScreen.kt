@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.Text
@@ -46,6 +47,7 @@ import com.tenmilelabs.chefai.core.util.LoadingContent
 import com.tenmilelabs.chefai.core.util.EmptyContent
 import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.week.MealPlanWeek
+import com.tenmilelabs.chefai.mealplans.domain.week.OpenWeekSlot
 import com.tenmilelabs.chefai.mealplans.domain.week.PlannedWeekMeal
 import com.tenmilelabs.chefai.mealplans.domain.week.WeekDay
 import com.tenmilelabs.chefai.mealplans.domain.summary.MealPlanSummary
@@ -58,6 +60,7 @@ import com.tenmilelabs.chefai.mealplans.ui.detail.DeleteMealPlanDialog
 import com.tenmilelabs.chefai.mealplans.ui.components.WeekDayRow
 import com.tenmilelabs.chefai.mealplans.ui.components.rememberWeekMealDragState
 import com.tenmilelabs.chefai.mealplans.ui.components.WeekNavigator
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.util.UUID
 
@@ -91,6 +94,7 @@ fun MealPlansScreen(
     val listState by viewModel.listState.collectAsStateWithLifecycle()
     val viewMode by viewModel.viewMode.collectAsStateWithLifecycle()
     val addMealDate by viewModel.addMealDate.collectAsStateWithLifecycle()
+    val addToSlot by viewModel.addToSlot.collectAsStateWithLifecycle()
     val addMealQuery by viewModel.addMealQuery.collectAsStateWithLifecycle()
     val addMealRecipes by viewModel.addMealRecipes.collectAsStateWithLifecycle()
     val pendingDeletePlanId by viewModel.pendingDeletePlanId.collectAsStateWithLifecycle()
@@ -110,6 +114,20 @@ fun MealPlansScreen(
                 is MealPlansEvent.NavigateToPlan -> {
                     onPlanClick(event.planId)
                     onPlanRepeated(event.overlappingPlanName)
+                }
+
+                // Launched, not awaited: a snackbar with an action suspends until it is dismissed,
+                // and the next event (another removal, an error) must not queue behind it.
+                is MealPlansEvent.MealRemoved -> launch {
+                    snackbarHostState.currentSnackbarData?.dismiss()
+                    val result = snackbarHostState.showSnackbar(
+                        message = event.recipeTitle
+                            ?.let { context.getString(R.string.meal_plan_meal_removed, it) }
+                            ?: context.getString(R.string.meal_plan_meal_removed_unnamed),
+                        actionLabel = context.getString(R.string.meal_plan_undo),
+                        withDismissAction = true,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) viewModel.onUndoRemoveMeal(event.removed)
                 }
             }
         }
@@ -131,6 +149,19 @@ fun MealPlansScreen(
                 onNewRecipe(date, slot)
             },
             onDismiss = viewModel::onAddMealDismissed,
+        )
+    }
+
+    addToSlot?.let { open ->
+        AddMealSheet(
+            date = open.date,
+            query = addMealQuery,
+            recipes = addMealRecipes,
+            onQueryChange = viewModel::onAddMealQueryChange,
+            onRecipePicked = { _, recipeId -> viewModel.onAddToSlotPicked(recipeId) },
+            onNewRecipe = null,
+            onDismiss = viewModel::onAddToSlotDismissed,
+            fixedSlot = open.slot,
         )
     }
 
@@ -175,6 +206,8 @@ fun MealPlansScreen(
         onMealClick = onMealClick,
         onAddMeal = viewModel::onAddMeal,
         onMoveMeal = viewModel::onMoveMeal,
+        onRemoveMeal = viewModel::onRemoveMeal,
+        onAddToSlot = viewModel::onAddToSlot,
         onGenerateGroceryList = onShoppingListClick,
         modifier = modifier,
     )
@@ -197,6 +230,8 @@ private fun MealPlansContent(
     onMoveMeal: (PlannedWeekMeal, PlannedWeekMeal) -> Unit,
     onGenerateGroceryList: (UUID) -> Unit,
     modifier: Modifier = Modifier,
+    onRemoveMeal: (PlannedWeekMeal) -> Unit = {},
+    onAddToSlot: (OpenWeekSlot) -> Unit = {},
 ) {
     if (viewMode == MealPlansViewMode.PLANS) {
         PlanListContent(
@@ -228,6 +263,8 @@ private fun MealPlansContent(
             onMealClick = onMealClick,
             onAddMeal = onAddMeal,
             onMoveMeal = onMoveMeal,
+            onRemoveMeal = onRemoveMeal,
+            onAddToSlot = onAddToSlot,
             onGenerateGroceryList = onGenerateGroceryList,
             modifier = modifier,
         )
@@ -395,6 +432,8 @@ private fun WeekContent(
     onMoveMeal: (PlannedWeekMeal, PlannedWeekMeal) -> Unit,
     onGenerateGroceryList: (UUID) -> Unit,
     modifier: Modifier = Modifier,
+    onRemoveMeal: (PlannedWeekMeal) -> Unit = {},
+    onAddToSlot: (OpenWeekSlot) -> Unit = {},
 ) {
     val dragState = rememberWeekMealDragState()
     Column(
@@ -423,6 +462,8 @@ private fun WeekContent(
                 onAddMeal = onAddMeal,
                 dragState = dragState,
                 onMoveMeal = onMoveMeal,
+                onRemoveMeal = onRemoveMeal,
+                onAddToSlot = onAddToSlot,
                 // zIndex only orders siblings, so the day holding the lifted meal must itself rise
                 // above the days after it, or the dragged row slides under their backgrounds.
                 modifier = Modifier.zIndex(if (day.meals.any(dragState::isDragged)) 1f else 0f),

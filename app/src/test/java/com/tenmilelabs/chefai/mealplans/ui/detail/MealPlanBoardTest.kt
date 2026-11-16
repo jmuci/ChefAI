@@ -145,6 +145,69 @@ class MealPlanBoardTest {
         assertThat(board.meals.single().slot).isEqualTo(MealSlot.DINNER)
     }
 
+    // --- Slots: what the screen draws, gaps included ---
+
+    @Test
+    fun `a full plan has one filled slot per meal and no gaps`() {
+        val board = MealPlanBoard.from(twoFullDays(), recipes)
+
+        assertThat(board.slots).hasSize(4)
+        assertThat(board.slots.all { it is BoardSlot.Filled }).isTrue()
+    }
+
+    @Test
+    fun `a removed lunch leaves an open slot in its place, before that day's dinner`() {
+        // Given a lunch + dinner plan whose day 0 lunch was removed
+        val plan = plan(
+            listOf(
+                day(0, dinner = dinner0),
+                day(1, lunch = lunch1, dinner = dinner1),
+            ),
+        )
+
+        // When it is laid out
+        val board = MealPlanBoard.from(plan, recipes)
+
+        // Then the gap sits where the lunch was, and is not counted as a meal
+        assertThat(board.slots.map { Triple(it.dayIndex, it.slot, it is BoardSlot.Open) }).containsExactly(
+            Triple(0, MealSlot.LUNCH, true),
+            Triple(0, MealSlot.DINNER, false),
+            Triple(1, MealSlot.LUNCH, false),
+            Triple(1, MealSlot.DINNER, false),
+        ).inOrder()
+        assertThat(board.totalCount).isEqualTo(3)
+    }
+
+    @Test
+    fun `a dinner-only plan offers no lunch gaps`() {
+        val plan = plan(listOf(day(0, dinner = dinner0), day(1)), mealType = MealType.DINNER)
+
+        val board = MealPlanBoard.from(plan, recipes)
+
+        assertThat(board.slots.map { it.dayIndex to it.slot }).containsExactly(
+            0 to MealSlot.DINNER,
+            1 to MealSlot.DINNER,
+        ).inOrder()
+        assertThat(board.slots[1]).isInstanceOf(BoardSlot.Open::class.java)
+    }
+
+    @Test
+    fun `days the plan covers but has no row for still show their gaps`() {
+        val plan = plan(listOf(day(0, dinner = dinner0)), mealType = MealType.DINNER)
+            .let { it.copy(preferences = it.preferences.copy(planLengthDays = 3)) }
+
+        val board = MealPlanBoard.from(plan, recipes)
+
+        assertThat(board.slots.filterIsInstance<BoardSlot.Open>().map { it.dayIndex }).containsExactly(1, 2)
+    }
+
+    @Test
+    fun `a plan never generated has no slots, so the screen can offer generation`() {
+        val board = MealPlanBoard.from(plan(emptyList()), recipes)
+
+        assertThat(board.slots).isEmpty()
+    }
+
     @Test
     fun `a recipe missing from the device still yields a row that can be ticked off`() {
         val board = MealPlanBoard.from(twoFullDays(), recipeMap = emptyMap())

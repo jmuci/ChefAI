@@ -10,12 +10,14 @@ import com.tenmilelabs.chefai.household.domain.repository.HouseholdRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
+import com.tenmilelabs.chefai.mealplans.domain.model.RemovedMeal
 import com.tenmilelabs.chefai.mealplans.domain.print.MealPlanPrintDocument
 import com.tenmilelabs.chefai.mealplans.domain.print.MealPlanPrintDocumentBuilder
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.repository.ShoppingListRepository
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.ShoppingListBuilder
 import com.tenmilelabs.chefai.mealplans.domain.usecase.GenerateMealPlanUseCase
+import com.tenmilelabs.chefai.mealplans.domain.usecase.ObserveSavedRecipesUseCase
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -27,6 +29,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -70,6 +73,12 @@ sealed interface MealPlanDetailEvent {
 
     /** The plan was soft-deleted; the screen should leave. */
     data object Deleted : MealPlanDetailEvent
+
+    /**
+     * A meal was taken out of the plan; the screen offers an Undo that calls `onUndoRemoveMeal`.
+     * [recipeTitle] is `null` when the recipe is not on this device.
+     */
+    data class MealRemoved(val removed: RemovedMeal, val recipeTitle: String?) : MealPlanDetailEvent
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -81,6 +90,7 @@ class MealPlanDetailViewModel @Inject constructor(
     private val generateMealPlanUseCase: GenerateMealPlanUseCase,
     private val shoppingListRepository: ShoppingListRepository,
     private val householdRepository: HouseholdRepository,
+    private val observeSavedRecipes: ObserveSavedRecipesUseCase,
 ) : ViewModel() {
 
     private val mealPlanId: UUID = UUID.fromString(
@@ -167,6 +177,93 @@ class MealPlanDetailViewModel @Inject constructor(
                 if (e is CancellationException) throw e
                 Timber.e(e, "onMoveMeal: failed for plan $mealPlanId")
                 _events.emit(MealPlanDetailEvent.ShowError("Couldn't move this meal"))
+            }
+        }
+    }
+
+    /** Empties [meal]'s slot, leaving an "Add recipe" gap, and offers an Undo via [events]. */
+    fun onRemoveMeal(meal: PlannedMeal) {
+        viewModelScope.launch {
+            try {
+                val removed = mealPlanRepository.removeMeal(mealPlanId, meal.dayId, meal.slot) ?: return@launch
+                _events.emit(MealPlanDetailEvent.MealRemoved(removed, meal.recipe?.title))
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "onRemoveMeal: failed for day ${meal.dayId} slot ${meal.slot}")
+                _events.emit(MealPlanDetailEvent.ShowError("Couldn't remove this meal"))
+            }
+        }
+    }
+
+    /** Puts a meal [onRemoveMeal] took out back; a no-op if the gap was filled in the meantime. */
+    fun onUndoRemoveMeal(removed: RemovedMeal) {
+        viewModelScope.launch {
+            try {
+                mealPlanRepository.restoreMeal(removed)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "onUndoRemoveMeal: failed for day ${removed.dayId} slot ${removed.slot}")
+                _events.emit(MealPlanDetailEvent.ShowError("Couldn't restore this meal"))
+            }
+        }
+    }
+
+    // --- "Add recipe" in an empty slot: pick one of the user's saved recipes for it ---
+
+    private val _addRecipeSlot = MutableStateFlow<BoardSlot.Open?>(null)
+
+    /** The gap whose recipe picker is open, or `null` while it is closed. */
+    val addRecipeSlot: StateFlow<BoardSlot.Open?> = _addRecipeSlot
+
+    private val _addRecipeQuery = MutableStateFlow("")
+
+    /** What the user has typed into the picker's search field. */
+    val addRecipeQuery: StateFlow<String> = _addRecipeQuery
+
+    /** Saved recipes matching [addRecipeQuery] by title; queried only while the picker is open. */
+    val addRecipeRecipes: StateFlow<List<RecipePreview>> = _addRecipeSlot
+        .map { it != null }
+        .distinctUntilChanged()
+        .flatMapLatest { open -> if (open) observeSavedRecipes() else flowOf(emptyList()) }
+        .combine(_addRecipeQuery) { recipes, query ->
+            val needle = query.trim()
+            if (needle.isEmpty()) recipes else recipes.filter { it.title.contains(needle, ignoreCase = true) }
+        }
+        .catch { e ->
+            if (e is CancellationException) throw e
+            Timber.e(e, "addRecipeRecipes: failed to load saved recipes")
+            emit(emptyList())
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList(),
+        )
+
+    fun onAddRecipe(slot: BoardSlot.Open) {
+        _addRecipeQuery.value = ""
+        _addRecipeSlot.value = slot
+    }
+
+    fun onAddRecipeQueryChange(query: String) {
+        _addRecipeQuery.value = query
+    }
+
+    fun onAddRecipeDismissed() {
+        _addRecipeSlot.value = null
+    }
+
+    /** Fills the open gap with [recipeId] and closes the picker. */
+    fun onAddRecipePicked(recipeId: UUID) {
+        val target = _addRecipeSlot.value ?: return
+        _addRecipeSlot.value = null
+        viewModelScope.launch {
+            try {
+                mealPlanRepository.assignRecipeToSlot(mealPlanId, target.dayIndex, target.slot, recipeId)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "onAddRecipePicked: failed for day ${target.dayIndex} slot ${target.slot}")
+                _events.emit(MealPlanDetailEvent.ShowError("Couldn't add this recipe"))
             }
         }
     }

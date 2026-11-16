@@ -37,6 +37,7 @@ import com.tenmilelabs.chefai.core.ui.components.flat.flatClickable
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.core.ui.theme.chefColors
 import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
+import com.tenmilelabs.chefai.mealplans.domain.week.OpenWeekSlot
 import com.tenmilelabs.chefai.mealplans.domain.week.PlannedWeekMeal
 import com.tenmilelabs.chefai.mealplans.domain.week.WeekDay
 import java.time.LocalDate
@@ -48,9 +49,11 @@ import java.util.UUID
  * One day of the week: a fixed date column, then whatever is planned on it.
  *
  * A day can hold both a lunch and a dinner ([com.tenmilelabs.chefai.mealplans.domain.model.MealType.DINNER_AND_LUNCH]),
- * so the meals **stack** beside a single date column rather than the row being one meal wide.
- * Dropping the second to keep a literal one-line-per-day reading would hide planned data. The same
- * goes for overlapping plans: a slot two plans fill shows both, each tagged with its plan's name.
+ * so the meals **stack** beside a single date column rather than the row being one meal wide,
+ * separated by a hairline that stops at the date column ([SameDaySlotRule]) so the stack reads as
+ * one day. Dropping the second to keep a literal one-line-per-day reading would hide planned data.
+ * The same goes for overlapping plans: a slot two plans fill shows both, each tagged with its plan's
+ * name. A slot a plan leaves empty ([WeekDay.openSlots]) stacks in its place as an "Add recipe" gap.
  */
 @Composable
 fun WeekDayRow(
@@ -61,6 +64,8 @@ fun WeekDayRow(
     modifier: Modifier = Modifier,
     dragState: WeekMealDragState? = null,
     onMoveMeal: (from: PlannedWeekMeal, to: PlannedWeekMeal) -> Unit = { _, _ -> },
+    onRemoveMeal: (PlannedWeekMeal) -> Unit = {},
+    onAddToSlot: (OpenWeekSlot) -> Unit = {},
 ) {
     Row(
         modifier = modifier
@@ -71,23 +76,51 @@ fun WeekDayRow(
     ) {
         DateColumn(date = day.date, isToday = isToday)
         Spacer(Modifier.width(8.dp))
-        if (day.meals.isEmpty()) {
+        if (day.meals.isEmpty() && day.openSlots.isEmpty()) {
             AddMealLink(onClick = { onAddMeal(day.date) })
         } else {
             val sharedSlots = day.sharedSlots
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                day.meals.forEach { meal ->
-                    MealLine(
-                        meal = meal,
-                        showSlotLabel = day.meals.size > 1,
-                        showPlanName = meal.slot in sharedSlots,
-                        onClick = { onMealClick(meal) },
-                        dragState = dragState,
-                        onMoveMeal = onMoveMeal,
-                    )
+            // Meals and gaps interleave by slot, so a removed lunch leaves its gap above dinner.
+            // Stable sort: a slot's meals keep their plan order.
+            val entries = (day.meals.map(DayEntry::Meal) + day.openSlots.map(DayEntry::Gap))
+                .sortedBy { it.slot.ordinal }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                entries.forEachIndexed { index, entry ->
+                    if (index > 0) SameDaySlotRule(start = 0.dp, end = 0.dp)
+                    when (entry) {
+                        is DayEntry.Meal -> MealLine(
+                            meal = entry.meal,
+                            showSlotLabel = entries.size > 1,
+                            showPlanName = entry.slot in sharedSlots,
+                            onClick = { onMealClick(entry.meal) },
+                            onRemove = { onRemoveMeal(entry.meal) },
+                            dragState = dragState,
+                            onMoveMeal = onMoveMeal,
+                        )
+                        is DayEntry.Gap -> AddRecipeToSlotLink(
+                            slotLabel = entry.slot.label,
+                            onClick = { onAddToSlot(entry.open) },
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+/** What one line of a day holds: a planned meal, or a gap a plan leaves for one. */
+private sealed interface DayEntry {
+    val slot: MealSlot
+
+    data class Meal(val meal: PlannedWeekMeal) : DayEntry {
+        override val slot: MealSlot get() = meal.slot
+    }
+
+    data class Gap(val open: OpenWeekSlot) : DayEntry {
+        override val slot: MealSlot get() = open.slot
     }
 }
 
@@ -140,6 +173,7 @@ private fun MealLine(
     showSlotLabel: Boolean,
     showPlanName: Boolean,
     onClick: () -> Unit,
+    onRemove: () -> Unit,
     dragState: WeekMealDragState? = null,
     onMoveMeal: (from: PlannedWeekMeal, to: PlannedWeekMeal) -> Unit = { _, _ -> },
 ) {
@@ -246,6 +280,7 @@ private fun MealLine(
                 )
             }
         }
+        MealRemoveButton(recipeTitle = recipe?.title, onClick = onRemove)
         if (draggable) {
             MealDragHandle(
                 modifier = Modifier.reorderDrag(
@@ -334,6 +369,17 @@ private fun WeekDayRowPreview() {
                         previewMeal("Avocado Toast with Egg", "breakfast", 10, MealSlot.LUNCH),
                         previewMeal("Hearty Beef Chilli", "comfort food", 80, cooked = true),
                     ),
+                ),
+                isToday = false,
+                onMealClick = {},
+                onAddMeal = {},
+            )
+            // Dinner was removed: its gap stacks under lunch, ruled off past the date only.
+            WeekDayRow(
+                day = WeekDay(
+                    date = LocalDate.of(2026, 8, 16),
+                    meals = listOf(previewMeal("Avocado Toast with Egg", "breakfast", 10, MealSlot.LUNCH)),
+                    openSlots = listOf(OpenWeekSlot(UUID.randomUUID(), "5-day meal plan", 5, MealSlot.DINNER, LocalDate.of(2026, 8, 16))),
                 ),
                 isToday = false,
                 onMealClick = {},

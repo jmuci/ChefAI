@@ -609,6 +609,74 @@ class DefaultMealPlanRepositoryTest {
         assertThat(mealPlanDao.getDaysForMealPlan(plan.uuid).single().dinnerCookedAt).isNull()
     }
 
+    // --- removeMeal / restoreMeal ---
+
+    @Test
+    fun `removeMeal empties only that slot, keeps the day and dirties the plan`() = runTest {
+        // Given a plan with a cooked dinner
+        val plan = planWithOneDay()
+        repository.createMealPlan(plan)
+        val day = plan.days.single()
+        repository.setMealCooked(day.uuid, MealSlot.DINNER, cooked = true)
+        val syncCountBefore = syncScheduler.mutationSyncCount
+
+        // When the dinner is removed
+        val removed = repository.removeMeal(plan.uuid, day.uuid, MealSlot.DINNER)
+
+        // Then the slot is empty, lunch is untouched, and the change will sync
+        assertThat(removed?.recipeId).isEqualTo(day.dinnerRecipeId)
+        assertThat(removed?.cookedAt).isNotNull()
+        val stored = mealPlanDao.getDaysForMealPlan(plan.uuid).single()
+        assertThat(stored.dinnerRecipeId).isNull()
+        assertThat(stored.dinnerCookedAt).isNull()
+        assertThat(stored.lunchRecipeId).isEqualTo(day.lunchRecipeId)
+        assertThat(mealPlanDao.getMealPlanById(plan.uuid)?.syncState).isEqualTo(SyncState.PENDING)
+        assertThat(syncScheduler.mutationSyncCount).isGreaterThan(syncCountBefore)
+    }
+
+    @Test
+    fun `removeMeal on an empty slot or unknown day changes nothing`() = runTest {
+        val plan = planWithOneDay()
+        repository.createMealPlan(plan)
+        val day = plan.days.single()
+        repository.removeMeal(plan.uuid, day.uuid, MealSlot.LUNCH)
+
+        assertThat(repository.removeMeal(plan.uuid, day.uuid, MealSlot.LUNCH)).isNull()
+        assertThat(repository.removeMeal(plan.uuid, UUID.randomUUID(), MealSlot.DINNER)).isNull()
+        assertThat(repository.removeMeal(UUID.randomUUID(), day.uuid, MealSlot.DINNER)).isNull()
+    }
+
+    @Test
+    fun `restoreMeal puts the meal back with its cooked mark`() = runTest {
+        val plan = planWithOneDay()
+        repository.createMealPlan(plan)
+        val day = plan.days.single()
+        repository.setMealCooked(day.uuid, MealSlot.DINNER, cooked = true)
+        val removed = requireNotNull(repository.removeMeal(plan.uuid, day.uuid, MealSlot.DINNER))
+
+        val ok = repository.restoreMeal(removed)
+
+        assertThat(ok).isTrue()
+        val stored = mealPlanDao.getDaysForMealPlan(plan.uuid).single()
+        assertThat(stored.dinnerRecipeId).isEqualTo(day.dinnerRecipeId)
+        assertThat(stored.dinnerCookedAt).isEqualTo(removed.cookedAt)
+    }
+
+    @Test
+    fun `restoreMeal does not overwrite a slot that was refilled since`() = runTest {
+        val plan = planWithOneDay()
+        repository.createMealPlan(plan)
+        val day = plan.days.single()
+        val removed = requireNotNull(repository.removeMeal(plan.uuid, day.uuid, MealSlot.DINNER))
+        val replacement = UUID.randomUUID()
+        repository.assignRecipeToSlot(plan.uuid, day.dayIndex, MealSlot.DINNER, replacement)
+
+        val ok = repository.restoreMeal(removed)
+
+        assertThat(ok).isFalse()
+        assertThat(mealPlanDao.getDaysForMealPlan(plan.uuid).single().dinnerRecipeId).isEqualTo(replacement)
+    }
+
     // --- Helpers ---
 
     private fun planWithOneDay(userId: UUID = UUID.randomUUID()) =

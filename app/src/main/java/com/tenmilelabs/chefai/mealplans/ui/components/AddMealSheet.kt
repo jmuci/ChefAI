@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -61,6 +62,11 @@ import java.util.UUID
  *
  * The slot is a sheet-local choice (dinner by default, kept across rotation) because it is
  * meaningless until a recipe is chosen.
+ *
+ * @param fixedSlot set when the sheet fills one known gap ("Add recipe" in an existing plan): the
+ *   slot chips are hidden and every pick goes to this slot.
+ * @param onNewRecipe `null` hides "Add a New Recipe" — the import hand-off ([com.tenmilelabs.chefai.mealplans.ui.AddMealRequest])
+ *   only knows how to seed a new plan, not fill a slot of an existing one.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,9 +76,10 @@ fun AddMealSheet(
     recipes: List<RecipePreview>,
     onQueryChange: (String) -> Unit,
     onRecipePicked: (MealSlot, UUID) -> Unit,
-    onNewRecipe: (MealSlot) -> Unit,
+    onNewRecipe: ((MealSlot) -> Unit)?,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    fixedSlot: MealSlot? = null,
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -86,6 +93,7 @@ fun AddMealSheet(
             onQueryChange = onQueryChange,
             onRecipePicked = onRecipePicked,
             onNewRecipe = onNewRecipe,
+            fixedSlot = fixedSlot,
             modifier = Modifier.fillMaxHeight(SheetHeightFraction),
         )
     }
@@ -98,34 +106,44 @@ private fun AddMealSheetContent(
     recipes: List<RecipePreview>,
     onQueryChange: (String) -> Unit,
     onRecipePicked: (MealSlot, UUID) -> Unit,
-    onNewRecipe: (MealSlot) -> Unit,
+    onNewRecipe: ((MealSlot) -> Unit)?,
     modifier: Modifier = Modifier,
+    fixedSlot: MealSlot? = null,
 ) {
-    var slot by rememberSaveable { mutableStateOf(MealSlot.DINNER) }
+    var chosenSlot by rememberSaveable { mutableStateOf(MealSlot.DINNER) }
+    val slot = fixedSlot ?: chosenSlot
 
     // The sheet's default insets stop at the navigation bar; the keyboard is ours to clear, or it
     // would cover the results the user is typing to find.
     Column(modifier = modifier.navigationBarsPadding().imePadding()) {
+        val formattedDate = date.format(
+            DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.getDefault()),
+        )
         Text(
-            text = stringResource(
-                R.string.meal_plans_add_meal_sheet_title,
-                date.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.getDefault())),
-            ),
+            text = if (fixedSlot != null) {
+                stringResource(R.string.meal_plan_add_recipe_sheet_title, fixedSlot.label, formattedDate)
+            } else {
+                stringResource(R.string.meal_plans_add_meal_sheet_title, formattedDate)
+            },
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(horizontal = 16.dp),
         )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-        ) {
-            MealSlot.entries.forEach { option ->
-                FlatChip(
-                    label = option.label,
-                    selected = option == slot,
-                    onClick = { slot = option },
-                    singleSelect = true,
-                )
+        if (fixedSlot == null) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            ) {
+                MealSlot.entries.forEach { option ->
+                    FlatChip(
+                        label = option.label,
+                        selected = option == slot,
+                        onClick = { chosenSlot = option },
+                        singleSelect = true,
+                    )
+                }
             }
+        } else {
+            Spacer(Modifier.height(12.dp))
         }
         RowRule()
         FlatField(
@@ -142,18 +160,21 @@ private fun AddMealSheetContent(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
         )
         RowRule()
-        SheetOption(
-            icon = ChefAIIcons.Plus,
-            label = stringResource(R.string.meal_plans_add_meal_new),
-            onClick = { onNewRecipe(slot) },
-        )
-        RowRule()
+        if (onNewRecipe != null) {
+            SheetOption(
+                icon = ChefAIIcons.Plus,
+                label = stringResource(R.string.meal_plans_add_meal_new),
+                onClick = { onNewRecipe(slot) },
+            )
+            RowRule()
+        }
         if (recipes.isEmpty()) {
             Text(
-                text = if (query.isBlank()) {
-                    stringResource(R.string.meal_plans_add_meal_no_saved)
-                } else {
-                    stringResource(R.string.meal_plans_add_meal_no_match, query.trim())
+                text = when {
+                    query.isNotBlank() -> stringResource(R.string.meal_plans_add_meal_no_match, query.trim())
+                    // Without the "Add a New Recipe" row, pointing at it would be a dead end.
+                    onNewRecipe == null -> stringResource(R.string.meal_plan_add_recipe_no_saved)
+                    else -> stringResource(R.string.meal_plans_add_meal_no_saved)
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
