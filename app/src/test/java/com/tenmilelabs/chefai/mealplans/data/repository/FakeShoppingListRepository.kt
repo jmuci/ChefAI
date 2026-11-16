@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.mealplans.data.repository
 
 import com.tenmilelabs.chefai.mealplans.domain.repository.CheckedItemsState
 import com.tenmilelabs.chefai.mealplans.domain.repository.ShoppingListRepository
+import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.CustomShoppingItem
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.PlannedIngredient
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,6 +20,10 @@ class FakeShoppingListRepository : ShoppingListRepository {
     var shouldThrowOnObserveIngredients: Boolean = false
     var shouldThrowOnSetChecked: Boolean = false
     var shouldThrowOnSetRemoved: Boolean = false
+    var shouldThrowOnAddCustomItem: Boolean = false
+
+    /** Hand-added lines with whether each is removed — a removed one stays here so Undo can restore it. */
+    private val customItems = MutableStateFlow<List<Pair<CustomShoppingItem, Boolean>>>(emptyList())
     private val overrides = MutableStateFlow<Map<UUID, Map<String, String>>>(emptyMap())
     private val removedKeys = MutableStateFlow<Map<UUID, Set<String>>>(emptyMap())
 
@@ -60,6 +65,43 @@ class FakeShoppingListRepository : ShoppingListRepository {
 
     override suspend fun clearChecks(mealPlanId: UUID) {
         checkedKeys.value = checkedKeys.value + (mealPlanId to emptySet())
+        updateCustom({ it.mealPlanId == mealPlanId }) { (item, removed) -> item.copy(isChecked = false) to removed }
+    }
+
+    override fun observeCustomItems(mealPlanId: UUID): Flow<List<CustomShoppingItem>> =
+        customItems.map { items -> items.filter { (item, removed) -> item.mealPlanId == mealPlanId && !removed }.map { it.first } }
+
+    override suspend fun addCustomItem(mealPlanId: UUID, name: String, addedByUserId: UUID?, addedByName: String?) {
+        if (shouldThrowOnAddCustomItem) throw RuntimeException("Fake addCustomItem error")
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        customItems.value += CustomShoppingItem(
+            id = UUID.randomUUID(),
+            mealPlanId = mealPlanId,
+            name = trimmed,
+            isChecked = false,
+            addedByUserId = addedByUserId,
+            addedByName = addedByName,
+        ) to false
+    }
+
+    override suspend fun setCustomItemChecked(itemId: UUID, checked: Boolean) {
+        updateCustom({ it.id == itemId }) { (item, removed) -> item.copy(isChecked = checked) to removed }
+    }
+
+    override suspend fun renameCustomItem(itemId: UUID, name: String) {
+        updateCustom({ it.id == itemId }) { (item, removed) -> item.copy(name = name.trim()) to removed }
+    }
+
+    override suspend fun setCustomItemRemoved(itemId: UUID, removed: Boolean) {
+        updateCustom({ it.id == itemId }) { (item, _) -> item to removed }
+    }
+
+    private fun updateCustom(
+        match: (CustomShoppingItem) -> Boolean,
+        transform: (Pair<CustomShoppingItem, Boolean>) -> Pair<CustomShoppingItem, Boolean>,
+    ) {
+        customItems.value = customItems.value.map { if (match(it.first)) transform(it) else it }
     }
 
     override suspend fun renameItem(mealPlanId: UUID, itemKey: String, displayName: String?) {

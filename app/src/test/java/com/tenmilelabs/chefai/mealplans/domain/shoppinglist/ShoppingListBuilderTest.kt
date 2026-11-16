@@ -844,4 +844,76 @@ class ShoppingListBuilderTest {
             assertWithMessage("system $system").that(list.allItems()).hasSize(4)
         }
     }
+
+    // --- Custom items ---
+
+    private fun custom(name: String, isChecked: Boolean = false, addedByName: String? = "Jose Mucientes") =
+        CustomShoppingItem(
+            id = UUID.randomUUID(),
+            mealPlanId = UUID.randomUUID(),
+            name = name,
+            isChecked = isChecked,
+            addedByUserId = null,
+            addedByName = addedByName,
+        )
+
+    @Test
+    fun `a custom item lands in the section its name classifies to`() {
+        val list = ShoppingListBuilder.build(
+            ingredients = emptyList(), slotCountByRecipe = emptyMap(), plannedServings = 0,
+            checkedKeys = emptySet(), customItems = listOf(custom("Milk"), custom("Paper towels")),
+        )
+
+        val bySection = list.sections.associate { it.section to it.items.map { item -> item.displayName } }
+        assertThat(bySection[GrocerySection.DAIRY_AND_EGGS]).containsExactly("Milk")
+        assertThat(bySection[GrocerySection.OTHER]).containsExactly("Paper towels")
+    }
+
+    @Test
+    fun `a custom item carries who added it and is flagged custom`() {
+        val item = custom("Lemons", addedByName = "Ana Muci")
+
+        val built = ShoppingListBuilder.build(
+            emptyList(), emptyMap(), 0, emptySet(), customItems = listOf(item),
+        ).allItems().single()
+
+        assertThat(built.isCustom).isTrue()
+        assertThat(built.customItemId).isEqualTo(item.id)
+        assertThat(built.addedByName).isEqualTo("Ana Muci")
+        assertThat(built.quantityLabel).isNull()
+    }
+
+    @Test
+    fun `a custom item is never merged with a recipe line of the same name`() {
+        val recipe = UUID.randomUUID()
+        val list = ShoppingListBuilder.build(
+            ingredients = listOf(ingredient(recipe, 0, "Milk", 1.0, "cup")),
+            slotCountByRecipe = mapOf(recipe to 1), plannedServings = 0, checkedKeys = emptySet(),
+            customItems = listOf(custom("Milk")),
+        )
+
+        val items = list.allItems()
+        assertThat(items).hasSize(2)
+        assertThat(items.count { it.isCustom }).isEqualTo(1)
+    }
+
+    @Test
+    fun `custom items count toward progress`() {
+        val list = ShoppingListBuilder.build(
+            emptyList(), emptyMap(), 0, emptySet(),
+            customItems = listOf(custom("Milk", isChecked = true), custom("Eggs")),
+        )
+
+        assertThat(list.totalCount).isEqualTo(2)
+        assertThat(list.checkedCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `a blank custom item is dropped`() {
+        val list = ShoppingListBuilder.build(
+            emptyList(), emptyMap(), 0, emptySet(), customItems = listOf(custom("  ")),
+        )
+
+        assertThat(list.isEmpty).isTrue()
+    }
 }

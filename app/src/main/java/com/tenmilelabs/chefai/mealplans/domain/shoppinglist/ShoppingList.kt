@@ -32,6 +32,29 @@ data class ShoppingListItem(
     val isApproximate: Boolean = false,
     /** Display name of whoever checked this off, when [isChecked] and the checker is known. */
     val checkedByName: String? = null,
+    /** Set for a line a person typed in, rather than one derived from the plan's recipes. */
+    val customItemId: UUID? = null,
+    /** Display name of whoever typed a [customItemId] line in; null when unknown (anonymous session). */
+    val addedByName: String? = null,
+) {
+    val isCustom: Boolean get() = customItemId != null
+}
+
+/**
+ * A line a person added to a plan's list by hand. Its section is deliberately not stored: it is
+ * classified from [name] each time the list is built, so it improves with the classifier and
+ * follows a rename.
+ *
+ * @property addedByName who added it, as a display name resolved by the caller; null when the
+ *   adder is unknown (an anonymous session has no name).
+ */
+data class CustomShoppingItem(
+    val id: UUID,
+    val mealPlanId: UUID,
+    val name: String,
+    val isChecked: Boolean,
+    val addedByUserId: UUID?,
+    val addedByName: String?,
 )
 
 /** One aisle's worth of items, alphabetical. */
@@ -80,6 +103,9 @@ object ShoppingListBuilder {
      *   key, section and quantity still come from the recipes; only what is shown changes.
      * @param removedKeys item keys the user removed. Dropped from the result, so they count toward
      *   neither the total nor the progress.
+     * @param customItems lines added by hand. Never merged with a recipe-derived line, even of the
+     *   same name: they are a person's own note, keyed `custom-<id>`. [displayNameOverrides] and
+     *   [removedKeys] don't apply to them — they are renamed and removed on their own row.
      */
     fun build(
         ingredients: List<PlannedIngredient>,
@@ -90,6 +116,7 @@ object ShoppingListBuilder {
         checkedByNames: Map<String, String> = emptyMap(),
         displayNameOverrides: Map<String, String> = emptyMap(),
         removedKeys: Set<String> = emptySet(),
+        customItems: List<CustomShoppingItem> = emptyList(),
     ): ShoppingList {
         data class ScaledRow(
             // Without any parenthetical, serving or trailing preparation note: "garlic, peeled
@@ -205,7 +232,21 @@ object ShoppingListBuilder {
                 )
             }
 
-        val sections = items
+        val customLines = customItems
+            .filter { it.name.isNotBlank() }
+            .map { custom ->
+                ShoppingListItem(
+                    key = "$CUSTOM_KEY_PREFIX${custom.id}",
+                    displayName = custom.name,
+                    quantityLabel = null,
+                    section = GrocerySectionClassifier.classify(custom.name),
+                    isChecked = custom.isChecked,
+                    customItemId = custom.id,
+                    addedByName = custom.addedByName,
+                )
+            }
+
+        val sections = (items + customLines)
             .groupBy { it.section }
             .toList()
             .sortedBy { (section, _) -> section.ordinal }
@@ -225,6 +266,16 @@ object ShoppingListBuilder {
      * "eggplant"). Expects a name already stripped of notes, as [build] passes it.
      */
     fun nameKey(displayName: String): String = ShoppingItemNames.key(displayName)
+
+    /** The id of a hand-added line from its list key, or null for a recipe-derived line. */
+    fun customItemId(key: String): UUID? =
+        if (key.startsWith(CUSTOM_KEY_PREFIX)) {
+            runCatching { UUID.fromString(key.removePrefix(CUSTOM_KEY_PREFIX)) }.getOrNull()
+        } else {
+            null
+        }
+
+    private const val CUSTOM_KEY_PREFIX = "custom-"
 
     private fun bucketKey(unit: String): String =
         UnitNormalizer.normalize(unit)?.canonical

@@ -9,12 +9,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -32,6 +35,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -41,6 +45,7 @@ import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatField
 import com.tenmilelabs.chefai.core.ui.components.flat.RowRule
 import com.tenmilelabs.chefai.core.ui.components.flat.SectionRule
+import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
 import com.tenmilelabs.chefai.core.ui.navigation.ChefAITopAppBarSurface
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.core.ui.theme.chefColors
@@ -52,12 +57,15 @@ import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.ShoppingListItem
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.ShoppingListSection
 import com.tenmilelabs.chefai.mealplans.ui.shoppinglist.components.ShoppingListRow
 import com.tenmilelabs.chefai.mealplans.ui.shoppinglist.components.ShoppingListRowAction
+import java.util.UUID
 
 /** What the list's content asks of the ViewModel. */
 sealed interface ShoppingListAction {
     data class Toggle(val item: ShoppingListItem) : ShoppingListAction
     data class Rename(val item: ShoppingListItem, val newName: String) : ShoppingListAction
     data class Remove(val item: ShoppingListItem) : ShoppingListAction
+    data class DraftChanged(val text: String) : ShoppingListAction
+    data object AddDraftItem : ShoppingListAction
 }
 
 @Composable
@@ -67,6 +75,7 @@ fun ShoppingListScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val draft by viewModel.draft.collectAsStateWithLifecycle()
     val resources = LocalContext.current.resources
 
     LaunchedEffect(Unit) {
@@ -96,26 +105,20 @@ fun ShoppingListScreen(
             noRecipesIconRes = R.drawable.ic_skillet_cooktop_24dp,
             modifier = modifier,
         )
-        is ShoppingListUiState.Success -> if (state.list.isEmpty) {
-            EmptyContent(
-                title = R.string.shopping_list_empty_title,
-                subtitle = R.string.shopping_list_empty_subtitle,
-                noRecipesIconRes = R.drawable.ic_skillet_cooktop_24dp,
-                modifier = modifier,
-            )
-        } else {
-            ShoppingListContent(
-                list = state.list,
-                onAction = { action ->
-                    when (action) {
-                        is ShoppingListAction.Toggle -> viewModel.onToggleItem(action.item)
-                        is ShoppingListAction.Rename -> viewModel.onRenameItem(action.item, action.newName)
-                        is ShoppingListAction.Remove -> viewModel.onDeleteItem(action.item)
-                    }
-                },
-                modifier = modifier,
-            )
-        }
+        is ShoppingListUiState.Success -> ShoppingListContent(
+            list = state.list,
+            draft = draft,
+            onAction = { action ->
+                when (action) {
+                    is ShoppingListAction.Toggle -> viewModel.onToggleItem(action.item)
+                    is ShoppingListAction.Rename -> viewModel.onRenameItem(action.item, action.newName)
+                    is ShoppingListAction.Remove -> viewModel.onDeleteItem(action.item)
+                    is ShoppingListAction.DraftChanged -> viewModel.onDraftChanged(action.text)
+                    is ShoppingListAction.AddDraftItem -> viewModel.onAddDraftItem()
+                }
+            },
+            modifier = modifier,
+        )
     }
 }
 
@@ -127,6 +130,7 @@ fun ShoppingListScreen(
 @Composable
 internal fun ShoppingListContent(
     list: ShoppingList,
+    draft: String,
     onAction: (ShoppingListAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -149,10 +153,20 @@ internal fun ShoppingListContent(
         )
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
-        ShoppingListProgressHeader(list = list)
+    Column(modifier = modifier.fillMaxSize().imePadding()) {
+        if (list.isEmpty) {
+            // No recipes feeding the list yet, but the person can still write their own.
+            EmptyContent(
+                title = R.string.shopping_list_empty_title,
+                subtitle = R.string.shopping_list_empty_subtitle,
+                noRecipesIconRes = R.drawable.ic_skillet_cooktop_24dp,
+                modifier = Modifier.weight(1f),
+            )
+        } else {
+            ShoppingListProgressHeader(list = list)
+        }
 
-        LazyColumn(
+        if (!list.isEmpty) LazyColumn(
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(bottom = 16.dp),
         ) {
@@ -174,6 +188,8 @@ internal fun ShoppingListContent(
                         isChecked = item.isChecked,
                         checkedByName = item.checkedByName,
                         actionsVisible = revealedKey == item.key,
+                        isCustom = item.isCustom,
+                        addedByName = item.addedByName,
                         onAction = { rowAction ->
                             when (rowAction) {
                                 // With the pencil and X showing, a tap puts them away rather than
@@ -201,7 +217,44 @@ internal fun ShoppingListContent(
                 item(key = "rule-bottom-${section.section.name}") { SectionRule() }
             }
         }
+
+        AddItemBar(
+            draft = draft,
+            onDraftChange = { onAction(ShoppingListAction.DraftChanged(it)) },
+            onAdd = { onAction(ShoppingListAction.AddDraftItem) },
+        )
     }
+}
+
+/** The "add an item" box, pinned under the list. Done on the keyboard adds, same as the button. */
+@Composable
+private fun AddItemBar(
+    draft: String,
+    onDraftChange: (String) -> Unit,
+    onAdd: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FlatField(
+        value = draft,
+        onValueChange = onDraftChange,
+        label = stringResource(R.string.shopping_list_add_label),
+        placeholder = stringResource(R.string.shopping_list_add_placeholder),
+        keyboardOptions = KeyboardOptions(
+            capitalization = KeyboardCapitalization.Sentences,
+            imeAction = ImeAction.Done,
+        ),
+        keyboardActions = KeyboardActions(onDone = { onAdd() }),
+        trailing = {
+            IconButton(onClick = onAdd, enabled = draft.isNotBlank()) {
+                Icon(
+                    painter = painterResource(ChefAIIcons.Plus),
+                    contentDescription = stringResource(R.string.shopping_list_add_action),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        },
+        modifier = modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+    )
 }
 
 @Composable
@@ -293,6 +346,10 @@ private fun previewList(): ShoppingList = ShoppingList(
             items = listOf(
                 ShoppingListItem("broccoli", "Broccoli", "2 heads", GrocerySection.PRODUCE, isChecked = true, checkedByName = "Ana"),
                 ShoppingListItem("garlic", "Garlic", "1 bulb", GrocerySection.PRODUCE, isChecked = false),
+                ShoppingListItem(
+                    "custom-1", "Lemons", null, GrocerySection.PRODUCE, isChecked = false,
+                    customItemId = UUID.randomUUID(), addedByName = "Jose Mucientes",
+                ),
                 ShoppingListItem("dill", "Fresh dill", "1 bunch", GrocerySection.PRODUCE, isChecked = false),
             ),
         ),
@@ -319,6 +376,7 @@ private fun ShoppingListContentLightPreview() {
     ChefAITheme(darkTheme = false) {
         ShoppingListContent(
             list = previewList(),
+            draft = "",
             onAction = {},
         )
     }
@@ -330,6 +388,7 @@ private fun ShoppingListContentDarkPreview() {
     ChefAITheme(darkTheme = true) {
         ShoppingListContent(
             list = previewList(),
+            draft = "",
             onAction = {},
         )
     }

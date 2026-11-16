@@ -140,6 +140,14 @@ screen (`ShoppingListScreen`).
   quantity stay as computed). A removed item stays hidden even if its quantity later changes.
   Requires the backend's `displayNameOverride`/`removed` fields; until it deploys, edits stay
   local and a pull of that row can overwrite them. The week view's item count ignores removals.
+- **Hand-added items** (`shopping_list_custom_items`, migration 17→18): an "Add an item" box under
+  the list. A typed line is classified into a section by `GrocerySectionClassifier`, never merged
+  with a recipe line, set in italic with the adder's initials (`SquareAvatar`) between checkbox and
+  name, and ticks, renames, removes (with Undo) and "Uncheck all"s like any line — rename/remove
+  act on its own row, not the `shopping_list_checks` overlay. **Local-only** — no sync field
+  exists, so on a shared plan other members don't see them yet; syncing needs a backend
+  `SyncGroceryListItem` variant plus `syncState`/`updatedAt`/`deletedAt` on the entity. An anonymous
+  session has no display name, so its lines are italic without initials.
 - [`grocery-api-landscape.html`](grocery-api-landscape.html)'s delivery-partner research
   (Instacart/Albertsons/Kroger) is unrelated and unactioned. No ADR yet.
 
