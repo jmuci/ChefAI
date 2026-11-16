@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.recipes.data.repository
 
 import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.core.data.local.room.RecipeLabelCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.RecipeTagCrossRef
 import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
@@ -12,6 +13,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeLabelCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeStepDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeTagCrossRefDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.TagDao
+import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeWithDetails
 import com.tenmilelabs.chefai.core.data.local.util.nextUpdatedAt
 import com.tenmilelabs.chefai.core.data.sync.RecipeFetchOutcome
 import com.tenmilelabs.chefai.core.data.sync.SyncOrchestrator
@@ -25,13 +27,17 @@ import com.tenmilelabs.chefai.recipes.data.mapper.toRecipePreviewDomain
 import com.tenmilelabs.chefai.recipes.data.mapper.toRoomEntity
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipeFetchResult
 import com.tenmilelabs.chefai.recipes.domain.repository.RecipesRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import timber.log.Timber
 import java.util.UUID
 import javax.inject.Inject
@@ -55,14 +61,31 @@ class DefaultRecipeRepository @Inject constructor(
 ) : RecipesRepository {
 
     override fun getRecipesPreviewStream(): Flow<List<RecipePreview>> {
-        // TODO pass the userId to only show recipes from the user when filtering.
-        // val userId = sessionManager.getCurrentUser()?.uuid
-        return recipeDao.observeRecipesWithDetails().map { recipes ->
+        return visibleRecipes().map { recipes ->
             recipes.toRecipePreviewDomain()
         }.catch { e ->
             logAndReThrow(e, emptyList())
         }
     }
+
+    /**
+     * Recipes the current session may see (its own, PUBLIC ones, and its household's), re-queried
+     * whenever the session changes so a list collected before a logout or account switch can't
+     * keep showing the previous account's rows. Waits out [UserSession.Loading] rather than
+     * emitting an empty list, so a one-shot `first()` reads the real catalog.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun visibleRecipes(): Flow<List<RecipeWithDetails>> =
+        sessionManager.userSession
+            .mapNotNull { session ->
+                when (session) {
+                    is UserSession.Anonymous -> session.localUserId
+                    is UserSession.Authenticated -> session.user.uuid
+                    UserSession.Loading -> null
+                }
+            }
+            .distinctUntilChanged()
+            .flatMapLatest { userId -> recipeDao.observeVisibleRecipesWithDetails(userId) }
 
     override fun getRecipesPreviewStreamForUser(userUuid: UUID): Flow<List<RecipePreview>> {
         return recipeDao.observeRecipesWithDetailsForUser(userUuid).map { recipes ->
@@ -81,7 +104,7 @@ class DefaultRecipeRepository @Inject constructor(
     }
 
     override fun getRecipesStream(): Flow<List<Recipe>> =
-        recipeDao.observeRecipesWithDetails().map { recipes ->
+        visibleRecipes().map { recipes ->
             recipes.toDomain()
         }.catch { e ->
             // TODO try to recover by potentially wiping the DB, recreating and re-syncing
@@ -258,8 +281,11 @@ class DefaultRecipeRepository @Inject constructor(
 
     override fun getRecipePreviewsByIds(ids: List<UUID>): Flow<List<RecipePreview>> {
         if (ids.isEmpty()) return flowOf(emptyList())
-        val idSet = ids.toHashSet()
-        return getRecipesPreviewStream().map { all -> all.filter { it.uuid in idSet } }
+        return recipeDao.observeRecipesWithDetailsByIds(ids.distinct()).map { recipes ->
+            recipes.toRecipePreviewDomain()
+        }.catch { e ->
+            logAndReThrow(e, emptyList())
+        }
     }
 
     override suspend fun deleteRecipe(recipeId: UUID) {

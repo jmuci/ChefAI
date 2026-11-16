@@ -61,7 +61,10 @@ class DefaultRecipeSearchRepository @Inject constructor(
         )
 
     private suspend fun localFallback(query: String, limit: Int): RecipeSearchOutcome {
-        val rows = recipeDao.searchRecipesWithDetails(query, limit)
+        // Scoped to what this session may see: Room still holds the rows of accounts that signed
+        // out on this device. No session yet means nothing to show, not everything.
+        val userId = sessionManager.getCurrentUserId()
+        val rows = if (userId == null) emptyList() else recipeDao.searchRecipesWithDetails(query, limit, userId)
         return RecipeSearchOutcome(
             results = rows.toRecipePreviewDomain(),
             hasMore = false,

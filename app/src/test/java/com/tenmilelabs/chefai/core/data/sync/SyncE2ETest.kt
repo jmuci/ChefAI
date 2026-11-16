@@ -80,7 +80,8 @@ class SyncE2ETest {
     private val testDispatcher = StandardTestDispatcher()
 
     // Stable test IDs
-    private val creatorId = UuidV7Generator.newId()
+    // The signed-in (here: anonymous) session's own id: push only sends rows the current user owns.
+    private val creatorId: UUID by lazy { requireNotNull(sessionManager.getCurrentUserId()) }
     private val ingredientId1 = UuidV7Generator.newId()
     private val ingredientId2 = UuidV7Generator.newId()
     private val tagId1 = UuidV7Generator.newId()

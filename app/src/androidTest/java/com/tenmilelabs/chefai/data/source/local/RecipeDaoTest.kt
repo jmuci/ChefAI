@@ -1,6 +1,9 @@
 
 package com.tenmilelabs.chefai.data.source.local
 
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
+import com.tenmilelabs.chefai.core.data.local.room.HouseholdMemberEntity
+import com.tenmilelabs.chefai.core.data.local.room.HouseholdEntity
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider.getApplicationContext
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -165,9 +168,43 @@ class RecipeDaoTest {
         database.recipeDao().softDelete(recipe1.uuid, System.currentTimeMillis())
 
         // THEN - only recipe2 remains in the details stream
-        val recipes = database.recipeDao().observeRecipesWithDetails().first()
+        val recipes = database.recipeDao().observeVisibleRecipesWithDetails(testUser.uuid).first()
         assertEquals(1, recipes.size)
         assertEquals(recipe2.uuid, recipes.first().recipe.uuid)
+    }
+
+    @Test
+    fun observeVisibleRecipes_showsOwnPublicAndHouseholdRecipes_hidesOtherAccountsPrivateOnes() = runTest {
+        // GIVEN - the viewer's private recipe, another account's private and public recipes, and a
+        // household member's private recipe
+        val otherUser = testUser.copy(uuid = UuidV7Generator.newId(), email = "other@test.com")
+        val householdMember = testUser.copy(uuid = UuidV7Generator.newId(), email = "member@test.com")
+        database.userDao().upsertUser(otherUser)
+        database.userDao().upsertUser(householdMember)
+        val own = recipe1.copy(privacy = RecipePrivacy.PRIVATE)
+        val othersPrivate = recipe2.copy(uuid = UuidV7Generator.newId(), creatorId = otherUser.uuid, privacy = RecipePrivacy.PRIVATE)
+        val othersPublic = recipe2.copy(uuid = UuidV7Generator.newId(), creatorId = otherUser.uuid, privacy = RecipePrivacy.PUBLIC)
+        val membersPrivate = recipe2.copy(uuid = UuidV7Generator.newId(), creatorId = householdMember.uuid, privacy = RecipePrivacy.PRIVATE)
+        listOf(own, othersPrivate, othersPublic, membersPrivate).forEach { database.recipeDao().upsertRecipe(it) }
+        val householdId = UuidV7Generator.newId()
+        database.householdDao().upsertHousehold(
+            HouseholdEntity(uuid = householdId, name = "Home", ownerId = testUser.uuid, createdAt = 0L, updatedAt = 0L)
+        )
+        database.householdDao().upsertMembers(
+            listOf(
+                HouseholdMemberEntity(householdId, testUser.uuid, "Test User", "", "OWNER", 0L),
+                HouseholdMemberEntity(householdId, householdMember.uuid, "Member", "", "MEMBER", 0L),
+            )
+        )
+
+        // WHEN - the viewer's catalog and local search are read
+        val visible = database.recipeDao().observeVisibleRecipesWithDetails(testUser.uuid).first().map { it.recipe.uuid }
+        val searched = database.recipeDao().searchRecipesWithDetails("", 50, testUser.uuid).map { it.recipe.uuid }
+
+        // THEN - the other account's private recipe is in neither
+        val expected = setOf(own.uuid, othersPublic.uuid, membersPrivate.uuid)
+        assertEquals(expected, visible.toSet())
+        assertEquals(expected, searched.toSet())
     }
 
     @Test

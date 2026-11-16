@@ -776,7 +776,7 @@ class SessionManagerTest {
     }
 
     @Test
-    fun `login as different user after logout preserves new anonymous data and removes previous authenticated recipes but keeps user entity`() = testScope.runTest {
+    fun `login as different user after logout preserves new anonymous data and removes the previous account's recipes and user row`() = testScope.runTest {
         sessionManager.loadSession()
         val initialAnonymousSession = sessionManager.userSession.first() as UserSession.Anonymous
 
@@ -823,10 +823,9 @@ class SessionManagerTest {
         coVerify(exactly = 0) { mockDatabase.clearAllTables() }
         val authSession = sessionManager.userSession.first() as UserSession.Authenticated
         assertThat(fakeRecipeDao.getRecipeById(user1Recipe.uuid)).isNull()
-        // User entity is preserved so their meal plans survive an account switch and are
-        // available again when they log back in. Queries already filter by userId so the
-        // entity is invisible to the current user.
-        assertThat(fakeUserDao.getUserById(user1Id)).isNotNull()
+        // The departing account's user row (name, email) goes too: its plans and recipes are already
+        // gone, and the server restores all of it when that account signs in again.
+        assertThat(fakeUserDao.getUserById(user1Id)).isNull()
         assertThat(fakeRecipeDao.getRecipeById(anonymousRecipe.uuid)?.creatorId).isEqualTo(authSession.user.uuid)
     }
 
@@ -1414,6 +1413,16 @@ class SessionManagerTest {
         advanceUntilIdle()
 
         assertThat(fakeAuthNetworkDataSource.logoutRequests.map { it.refreshToken }).containsExactly(refreshToken)
+    }
+
+    @Test
+    fun `logout drops a pending household invite so the next person to sign in is not sent to it`() = testScope.runTest {
+        sessionManager.login("test@example.com", "password123")
+        fakeSecurePreferences.savePendingInviteToken("someone-elses-invite")
+
+        sessionManager.logout()
+
+        assertThat(fakeSecurePreferences.getPendingInviteToken().first()).isNull()
     }
 
     @Test

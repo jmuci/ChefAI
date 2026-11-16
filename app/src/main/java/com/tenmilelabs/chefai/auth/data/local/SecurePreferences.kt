@@ -8,6 +8,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -55,6 +56,7 @@ class SecurePreferences @Inject constructor(
         private val KEY_CURRENT_USER_ID = stringPreferencesKey("current_user_id")
         private val KEY_LAST_LOGIN_EMAIL = stringPreferencesKey("last_login_email")
         private val KEY_PENDING_INVITE_TOKEN = stringPreferencesKey("pending_invite_token")
+        private val KEY_PENDING_INVITE_SAVED_AT = longPreferencesKey("pending_invite_saved_at")
         private val KEY_PENDING_UPGRADE_FROM = stringPreferencesKey("pending_upgrade_from")
         private val KEY_PENDING_ACCOUNT_WIPE = booleanPreferencesKey("pending_account_wipe")
     }
@@ -211,6 +213,10 @@ class SecurePreferences @Inject constructor(
                 // An upgrade still pending at logout never re-parented anything: the rows are
                 // still the anonymous session's, which is where logout returns.
                 prefs.remove(KEY_PENDING_UPGRADE_FROM)
+                // A pending invite belongs to whoever opened it; the next person to sign in on
+                // this device must not be walked into that household.
+                prefs.remove(KEY_PENDING_INVITE_TOKEN)
+                prefs.remove(KEY_PENDING_INVITE_SAVED_AT)
                 // KEY_LOCAL_USER_ID is intentionally preserved
             }
             Timber.d("Auth data cleared successfully (localUserId preserved)")
@@ -292,7 +298,10 @@ class SecurePreferences @Inject constructor(
     override suspend fun setCurrentUserId(userId: UUID) {
         try {
             dataStore.edit { prefs ->
-                prefs[KEY_CURRENT_USER_ID] = encrypt(userId.toString())
+                // Plaintext, like KEY_LOCAL_USER_ID: an id, not a credential. Encrypted, it read as
+                // null after a backup restore (the Keystore key doesn't travel), and the next login
+                // then looked like a first login on a device still holding another account's rows.
+                prefs[KEY_CURRENT_USER_ID] = userId.toString()
             }
             Timber.d("Current authenticated user ID saved securely")
         } catch (e: Exception) {
@@ -301,13 +310,19 @@ class SecurePreferences @Inject constructor(
         }
     }
 
+    /**
+     * Reads the plaintext id, falling back to decrypting one written by a build that encrypted it.
+     * Those migrate on the next login or session restore, which re-saves the id.
+     */
     override fun getStoredCurrentUserId(): Flow<UUID?> = dataStore.data.map { prefs ->
-        prefs[KEY_CURRENT_USER_ID]?.let { encrypted ->
-            try {
-                UUID.fromString(decrypt(encrypted))
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to read current authenticated user ID from preferences")
-                null
+        prefs[KEY_CURRENT_USER_ID]?.let { stored ->
+            runCatching { UUID.fromString(stored) }.getOrElse {
+                try {
+                    UUID.fromString(decrypt(stored))
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to read current authenticated user ID from preferences")
+                    null
+                }
             }
         }
     }
@@ -330,6 +345,7 @@ class SecurePreferences @Inject constructor(
         try {
             dataStore.edit { prefs ->
                 prefs[KEY_PENDING_INVITE_TOKEN] = encrypt(token)
+                prefs[KEY_PENDING_INVITE_SAVED_AT] = System.currentTimeMillis()
             }
             Timber.d("Pending invite token saved")
         } catch (e: Exception) {
@@ -338,13 +354,18 @@ class SecurePreferences @Inject constructor(
     }
 
     override fun getPendingInviteToken(): Flow<String?> = dataStore.data.map { prefs ->
-        prefs[KEY_PENDING_INVITE_TOKEN]?.let { runCatching { decrypt(it) }.getOrNull() }
+        freshPendingInviteToken(
+            token = prefs[KEY_PENDING_INVITE_TOKEN]?.let { runCatching { decrypt(it) }.getOrNull() },
+            savedAt = prefs[KEY_PENDING_INVITE_SAVED_AT],
+            now = System.currentTimeMillis(),
+        )
     }
 
     override suspend fun clearPendingInviteToken() {
         try {
             dataStore.edit { prefs ->
                 prefs.remove(KEY_PENDING_INVITE_TOKEN)
+                prefs.remove(KEY_PENDING_INVITE_SAVED_AT)
             }
             Timber.d("Pending invite token cleared")
         } catch (e: Exception) {

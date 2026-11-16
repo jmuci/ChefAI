@@ -190,6 +190,36 @@ its quantity.
 
 ---
 
+## Amendment: household members see each other's recipes (November 2026)
+
+**Supersedes the last sentence of Decision 1** ("A user's recipe library, search results, and
+bookmarks are **not** shared"). Decided 2026-11-16 alongside the Android security review
+(`docs/security-review-android.md`, A1).
+
+A1 found that Room still holds the rows of accounts that signed out on the device, and that local
+search and the catalog stream read the whole `recipes` table. The fix filters every recipe list by
+who may see it, and that forced the question of what a household member may see. The answer is the
+member's own recipes, every PUBLIC recipe, and **every recipe, PRIVATE included, authored by a
+member of their household**. A household is a family or flatshare (a handful of people), so this
+doesn't turn into a large pool.
+
+- **Android (done):** `RecipeDao`'s `VISIBLE_TO_USER` predicate is
+  `creatorId = :userId OR privacy = 'PUBLIC' OR creatorId IN (SELECT userId FROM household_members)`.
+  It is used by the catalog stream (`DefaultRecipeRepository.getRecipesPreviewStream` /
+  `getRecipesStream`) and the offline search fallback. `household_members` caches only the
+  current account's household and is cleared on logout and account switch, so a former household
+  can't leak in. Reads by id (`observeRecipesWithDetailsByIds`) stay unfiltered, because their
+  ids come from surfaces already scoped to the user, and a shared plan must keep showing a recipe
+  whose author has left.
+- **Backend (outstanding, jmuci/Chef.ai_Backend#130):** today a member's PRIVATE recipe reaches other members only through
+  the gap clause, when it is assigned to a shared plan. For members' whole libraries to appear,
+  `/sync/pull` and server-side search need the same household clause. Until then the Android
+  predicate simply has fewer rows to show.
+- **Bookmarks** stay per user. The Recipes tab lists the user's own bookmarks, so household
+  recipes show up in search, plan generation and plan views, not in someone else's collection.
+
+---
+
 ## Status
 
 Complete. PRs A1–A12 (`docs/archive/prompts/households-android-prompt.md` §9) and the follow-up fixes

@@ -27,6 +27,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSyncMetadataDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeTagDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeIngredient
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.core.data.sync.FakeSyncManager
 import com.tenmilelabs.chefai.core.data.sync.RecipeFetchOutcome
@@ -294,7 +295,7 @@ class DefaultRecipeRepositoryTest {
     }
 
     @Test
-    fun `getRecipesPreviewStream returns recipes created by anonymous user`() = runTest {
+    fun `getRecipesPreviewStream hides another account's private recipes`() = runTest {
         // Given: A recipe created with an anonymous user's creatorId
         val anonymousUserId = UuidV7Generator.newId()
         val anonymousUser = UserEntity(
@@ -317,6 +318,7 @@ class DefaultRecipeRepositoryTest {
             servings = 2,
             creatorId = anonymousUserId,
             recipeExternalUrl = null,
+            privacy = RecipePrivacy.PRIVATE,
             updatedAt = System.currentTimeMillis(),
             deletedAt = null,
             syncState = SyncState.PENDING
@@ -334,13 +336,15 @@ class DefaultRecipeRepositoryTest {
             recipeTags = emptyList()
         )
 
-        // When: Loading all recipes (no user filtering)
+        // When: The signed-in test user loads the catalog
         val previews = recipeRepository.getRecipesPreviewStream().first()
 
-        // Then: The anonymous user's recipe is included
-        val anonymousPreview = previews.find { it.title == "Anonymous Recipe" }
-        assertThat(anonymousPreview).isNotNull()
-        assertThat(anonymousPreview?.creatorId).isEqualTo(anonymousUserId)
+        // Then: Another account's private recipe left on the device is not shown (security
+        // review A1), while a household member's would be
+        assertThat(previews.map { it.title }).doesNotContain("Anonymous Recipe")
+        recipeDao.householdMemberIds = setOf(anonymousUserId)
+        assertThat(recipeRepository.getRecipesPreviewStream().first().map { it.title })
+            .contains("Anonymous Recipe")
     }
 
     @Test

@@ -123,7 +123,8 @@ class SyncOrchestratorTest {
     private val testDispatcher = StandardTestDispatcher()
 
     // Test data
-    private val creatorId = UuidV7Generator.newId()
+    // The signed-in (here: anonymous) session's own id: push only sends rows the current user owns.
+    private val creatorId: UUID by lazy { requireNotNull(sessionManager.getCurrentUserId()) }
     private val recipeId1 = UuidV7Generator.newId()
     private val recipeId2 = UuidV7Generator.newId()
     private val stepId1 = UuidV7Generator.newId()
@@ -1935,7 +1936,7 @@ class SyncOrchestratorTest {
 
     // ==================== SAVED MEAL PLAN SYNC ====================
 
-    private val savedOwnerId = UuidV7Generator.newId()
+    private val savedOwnerId: UUID by lazy { requireNotNull(sessionManager.getCurrentUserId()) }
 
     /** A session that reports an authenticated user, which the saved-plan pull requires. */
     private fun signedInSession(): SessionManager = mockk<SessionManager>(relaxed = true).also {

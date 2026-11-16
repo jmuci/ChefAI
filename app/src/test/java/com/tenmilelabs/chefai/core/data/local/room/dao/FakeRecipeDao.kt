@@ -166,8 +166,27 @@ class FakeRecipeDao : RecipeDao {
         return trigger.map { recipes[uuid]?.takeIf { it.deletedAt == null }?.let { assembleRecipeWithDetails(it) } }
     }
 
-    override fun observeRecipesWithDetails(): Flow<List<RecipeWithDetails>> {
-        return trigger.map { recipes.values.filter { it.deletedAt == null }.map { assembleRecipeWithDetails(it) } }
+    /** Stands in for the `household_members` table the real visibility predicate reads. */
+    var householdMemberIds: Set<UUID> = emptySet()
+
+    private fun RecipeEntity.isVisibleTo(userId: UUID): Boolean =
+        creatorId == userId || privacy == RecipePrivacy.PUBLIC || creatorId in householdMemberIds
+
+    override fun observeVisibleRecipesWithDetails(userId: UUID): Flow<List<RecipeWithDetails>> {
+        return trigger.map {
+            recipes.values
+                .filter { it.deletedAt == null && it.isVisibleTo(userId) }
+                .map { assembleRecipeWithDetails(it) }
+        }
+    }
+
+    override fun observeRecipesWithDetailsByIds(ids: List<UUID>): Flow<List<RecipeWithDetails>> {
+        val idSet = ids.toSet()
+        return trigger.map {
+            recipes.values
+                .filter { it.deletedAt == null && it.uuid in idSet }
+                .map { assembleRecipeWithDetails(it) }
+        }
     }
 
     override fun observeRecipesWithDetailsForUser(creatorId: UUID): Flow<List<RecipeWithDetails>> {
@@ -192,28 +211,10 @@ class FakeRecipeDao : RecipeDao {
         return RecipeWithTags(recipe, tags.values.filter { it.uuid in tagIds })
     }
 
-    override fun observeRecipesWithTags(): Flow<List<RecipeWithTags>> {
-        return trigger.map {
-            recipes.values.filter { it.deletedAt == null }.map { recipe ->
-                val tagIds = recipeTags.filter { it.recipeId == recipe.uuid }.map { it.tagId }
-                RecipeWithTags(recipe, tags.values.filter { it.uuid in tagIds })
-            }
-        }
-    }
-
     override suspend fun getRecipeWithLabels(uuid: UUID): RecipeWithLabels? {
         val recipe = recipes[uuid]?.takeIf { it.deletedAt == null } ?: return null
         val labelIds = recipeLabels.filter { it.recipeId == uuid }.map { it.labelId }
         return RecipeWithLabels(recipe, labels.values.filter { it.uuid in labelIds })
-    }
-
-    override fun observeRecipesWithLabels(): Flow<List<RecipeWithLabels>> {
-        return trigger.map {
-            recipes.values.filter { it.deletedAt == null }.map { recipe ->
-                val labelIds = recipeLabels.filter { it.recipeId == recipe.uuid }.map { it.labelId }
-                RecipeWithLabels(recipe, labels.values.filter { it.uuid in labelIds })
-            }
-        }
     }
 
     override suspend fun deleteRecipe(uuid: UUID) {
@@ -359,6 +360,19 @@ class FakeRecipeDao : RecipeDao {
         triggerUpdate()
     }
 
+    override suspend fun getPrivateRecipeIdsNotOwnedBy(keepOwnedBy: UUID): List<UUID> =
+        recipes.values.filter { it.creatorId != keepOwnedBy && it.privacy != RecipePrivacy.PUBLIC }.map { it.uuid }
+
+    override suspend fun deletePrivateNotOwnedBy(keepOwnedBy: UUID) {
+        val ids = getPrivateRecipeIdsNotOwnedBy(keepOwnedBy).toSet()
+        recipes.keys.removeAll(ids)
+        steps.values.removeAll { it.recipeId in ids }
+        recipeIngredients.removeAll { it.recipeId in ids }
+        recipeLabels.removeAll { it.recipeId in ids }
+        recipeTags.removeAll { it.recipeId in ids }
+        triggerUpdate()
+    }
+
     override suspend fun getRecipeIdsForUser(creatorId: UUID): List<UUID> {
         return recipes.values.filter { it.creatorId == creatorId }.map { it.uuid }
     }
@@ -370,9 +384,9 @@ class FakeRecipeDao : RecipeDao {
     // --- Search (offline/anonymous fallback) ---
 
     /** Mirrors the real `LIKE`-based query's semantics: title OR an active tag/label match. */
-    override suspend fun searchRecipesWithDetails(query: String, limit: Int): List<RecipeWithDetails> {
+    override suspend fun searchRecipesWithDetails(query: String, limit: Int, userId: UUID): List<RecipeWithDetails> {
         return recipes.values
-            .filter { it.deletedAt == null }
+            .filter { it.deletedAt == null && it.isVisibleTo(userId) }
             .filter { recipe ->
                 recipe.title.contains(query, ignoreCase = true) ||
                     recipeTags.any {
