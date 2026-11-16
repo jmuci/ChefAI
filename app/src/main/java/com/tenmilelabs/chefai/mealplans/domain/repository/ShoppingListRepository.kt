@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.mealplans.domain.repository
 
+import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.CustomShoppingItem
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.PlannedIngredient
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
@@ -18,6 +19,24 @@ interface ShoppingListRepository {
 
     suspend fun setChecked(mealPlanId: UUID, itemKey: String, checked: Boolean)
 
+    /** Every line added by hand to the plan's list, oldest first. */
+    fun observeCustomItems(mealPlanId: UUID): Flow<List<CustomShoppingItem>>
+
+    /**
+     * Adds [name] (trimmed) to the plan's list, attributed to [addedByUserId]/[addedByName].
+     * A blank name is ignored.
+     */
+    suspend fun addCustomItem(mealPlanId: UUID, name: String, addedByUserId: UUID?, addedByName: String?)
+
+    suspend fun setCustomItemChecked(itemId: UUID, checked: Boolean)
+
+    /** Renames a hand-added line; blank names are ignored. Its section follows the new name. */
+    suspend fun renameCustomItem(itemId: UUID, name: String)
+
+    /** Hides ([removed] = true) or restores a hand-added line. */
+    suspend fun setCustomItemRemoved(itemId: UUID, removed: Boolean)
+
+    /** Unticks every item on the plan, hand-added ones included. */
     suspend fun clearChecks(mealPlanId: UUID)
 
     /**

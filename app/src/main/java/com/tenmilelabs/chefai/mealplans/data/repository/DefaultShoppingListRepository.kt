@@ -1,5 +1,8 @@
 package com.tenmilelabs.chefai.mealplans.data.repository
 
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
+import com.tenmilelabs.chefai.core.data.local.room.CustomShoppingItemEntity
+import com.tenmilelabs.chefai.core.data.local.room.dao.CustomShoppingItemDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.ShoppingListCheckDao
 import com.tenmilelabs.chefai.core.data.local.room.ShoppingListCheckEntity
@@ -9,6 +12,7 @@ import com.tenmilelabs.chefai.core.data.local.util.nextUpdatedAt
 import com.tenmilelabs.chefai.core.data.sync.SyncScheduler
 import com.tenmilelabs.chefai.mealplans.domain.repository.CheckedItemsState
 import com.tenmilelabs.chefai.mealplans.domain.repository.ShoppingListRepository
+import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.CustomShoppingItem
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.PlannedIngredient
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -24,6 +28,7 @@ private const val MAX_NAME_LENGTH = 256
 class DefaultShoppingListRepository @Inject constructor(
     private val recipeDao: RecipeDao,
     private val shoppingListCheckDao: ShoppingListCheckDao,
+    private val customShoppingItemDao: CustomShoppingItemDao,
     private val syncScheduler: SyncScheduler,
 ) : ShoppingListRepository {
 
@@ -105,11 +110,55 @@ class DefaultShoppingListRepository @Inject constructor(
         syncScheduler.requestMutationSync()
     }
 
+    override fun observeCustomItems(mealPlanId: UUID): Flow<List<CustomShoppingItem>> =
+        customShoppingItemDao.observeForPlan(mealPlanId).map { rows -> rows.map { it.toDomain() } }
+
+    override suspend fun addCustomItem(mealPlanId: UUID, name: String, addedByUserId: UUID?, addedByName: String?) {
+        val trimmed = name.trim().replace(WHITESPACE_RUN, " ")
+        if (trimmed.isEmpty()) return
+        customShoppingItemDao.insert(
+            CustomShoppingItemEntity(
+                uuid = UuidV7Generator.newId(),
+                mealPlanId = mealPlanId,
+                name = trimmed,
+                addedByUserId = addedByUserId,
+                addedByName = addedByName,
+                createdAt = System.currentTimeMillis(),
+            )
+        )
+    }
+
+    override suspend fun setCustomItemChecked(itemId: UUID, checked: Boolean) {
+        customShoppingItemDao.setChecked(itemId, checked)
+    }
+
+    override suspend fun renameCustomItem(itemId: UUID, name: String) {
+        val trimmed = name.trim().replace(WHITESPACE_RUN, " ")
+        if (trimmed.isEmpty()) return
+        customShoppingItemDao.rename(itemId, trimmed)
+    }
+
+    override suspend fun setCustomItemRemoved(itemId: UUID, removed: Boolean) {
+        customShoppingItemDao.setRemoved(itemId, removed)
+    }
+
     override suspend fun clearChecks(mealPlanId: UUID) {
+        customShoppingItemDao.uncheckAllForPlan(mealPlanId)
         shoppingListCheckDao.clearForPlan(mealPlanId, state = SyncState.PENDING, updatedAt = System.currentTimeMillis())
         syncScheduler.requestMutationSync()
     }
 }
+
+private val WHITESPACE_RUN = Regex("\\s+")
+
+private fun CustomShoppingItemEntity.toDomain() = CustomShoppingItem(
+    id = uuid,
+    mealPlanId = mealPlanId,
+    name = name,
+    isChecked = checked,
+    addedByUserId = addedByUserId,
+    addedByName = addedByName,
+)
 
 private fun PlanIngredientRow.toDomain() = PlannedIngredient(
     recipeId = recipeId,

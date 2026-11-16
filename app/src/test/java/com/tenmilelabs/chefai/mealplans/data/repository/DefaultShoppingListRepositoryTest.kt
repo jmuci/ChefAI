@@ -8,6 +8,7 @@ import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
 import com.tenmilelabs.chefai.core.data.local.room.RecipeIngredientEntity
 import com.tenmilelabs.chefai.core.data.local.room.ShoppingListCheckEntity
 import com.tenmilelabs.chefai.core.data.local.room.UserEntity
+import com.tenmilelabs.chefai.core.data.local.room.dao.FakeCustomShoppingItemDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeShoppingListCheckDao
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
@@ -24,6 +25,7 @@ class DefaultShoppingListRepositoryTest {
 
     private lateinit var recipeDao: FakeRecipeDao
     private lateinit var checkDao: FakeShoppingListCheckDao
+    private lateinit var customItemDao: FakeCustomShoppingItemDao
     private lateinit var syncScheduler: FakeSyncManager
     private lateinit var repository: DefaultShoppingListRepository
 
@@ -40,8 +42,9 @@ class DefaultShoppingListRepositoryTest {
     fun setup() {
         recipeDao = FakeRecipeDao()
         checkDao = FakeShoppingListCheckDao()
+        customItemDao = FakeCustomShoppingItemDao()
         syncScheduler = FakeSyncManager()
-        repository = DefaultShoppingListRepository(recipeDao, checkDao, syncScheduler)
+        repository = DefaultShoppingListRepository(recipeDao, checkDao, customItemDao, syncScheduler)
     }
 
     // --- observeIngredientsForRecipes ---
@@ -371,6 +374,74 @@ class DefaultShoppingListRepositoryTest {
         updatedAt = 0L,
         deletedAt = null,
     )
+
+    // --- custom items ---
+
+    @Test
+    fun `addCustomItem stores a trimmed, whitespace-collapsed name with its adder`() = runTest {
+        val planId = UUID.randomUUID()
+        val adder = UUID.randomUUID()
+
+        repository.addCustomItem(planId, "  paper   towels ", adder, "Jose Mucientes")
+
+        val item = repository.observeCustomItems(planId).first().single()
+        assertThat(item.name).isEqualTo("paper towels")
+        assertThat(item.isChecked).isFalse()
+        assertThat(item.addedByUserId).isEqualTo(adder)
+        assertThat(item.addedByName).isEqualTo("Jose Mucientes")
+    }
+
+    @Test
+    fun `addCustomItem ignores a blank name`() = runTest {
+        val planId = UUID.randomUUID()
+
+        repository.addCustomItem(planId, "   ", null, null)
+
+        assertThat(repository.observeCustomItems(planId).first()).isEmpty()
+    }
+
+    @Test
+    fun `custom items are scoped to their plan`() = runTest {
+        val planA = UUID.randomUUID()
+        val planB = UUID.randomUUID()
+
+        repository.addCustomItem(planA, "Milk", null, null)
+
+        assertThat(repository.observeCustomItems(planB).first()).isEmpty()
+    }
+
+    @Test
+    fun `setCustomItemChecked, rename and remove-then-restore update the list`() = runTest {
+        val planId = UUID.randomUUID()
+        repository.addCustomItem(planId, "Milk", null, null)
+        val id = repository.observeCustomItems(planId).first().single().id
+
+        repository.setCustomItemChecked(id, checked = true)
+        assertThat(repository.observeCustomItems(planId).first().single().isChecked).isTrue()
+
+        repository.renameCustomItem(id, "  Oat   milk ")
+        assertThat(repository.observeCustomItems(planId).first().single().name).isEqualTo("Oat milk")
+
+        repository.setCustomItemRemoved(id, removed = true)
+        assertThat(repository.observeCustomItems(planId).first()).isEmpty()
+
+        repository.setCustomItemRemoved(id, removed = false)
+        val restored = repository.observeCustomItems(planId).first().single()
+        assertThat(restored.name).isEqualTo("Oat milk")
+        assertThat(restored.isChecked).isTrue()
+    }
+
+    @Test
+    fun `clearChecks also unticks custom items`() = runTest {
+        val planId = UUID.randomUUID()
+        repository.addCustomItem(planId, "Milk", null, null)
+        val id = repository.observeCustomItems(planId).first().single().id
+        repository.setCustomItemChecked(id, checked = true)
+
+        repository.clearChecks(planId)
+
+        assertThat(repository.observeCustomItems(planId).first().single().isChecked).isFalse()
+    }
 
     private fun ingredient(name: String) = IngredientEntity(
         uuid = UuidV7Generator.newId(),

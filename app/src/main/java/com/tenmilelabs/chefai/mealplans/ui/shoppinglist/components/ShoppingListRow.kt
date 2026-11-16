@@ -28,12 +28,15 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatCheckbox
+import com.tenmilelabs.chefai.core.ui.components.flat.SquareAvatar
+import com.tenmilelabs.chefai.core.ui.components.flat.avatarInitials
 import com.tenmilelabs.chefai.core.ui.components.flat.flatToggleableWithLongClick
 import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
@@ -59,6 +62,10 @@ private const val STRIKE_ANIM_MS = 240
  * Ticking sweeps a strike-through across the name left-to-right and fades the row back, rather
  * than snapping to `TextDecoration.LineThrough` — the sweep is what makes a tick feel like
  * crossing something off a paper list.
+ *
+ * A line somebody typed in ([isCustom]) is set in italic so it reads as different from one the plan
+ * derived, and — when [addedByName] is known — carries that person's initials between the checkbox
+ * and the name, so on a household list you can see who asked for it.
  */
 @Composable
 fun ShoppingListRow(
@@ -69,6 +76,8 @@ fun ShoppingListRow(
     isApproximate: Boolean = false,
     checkedByName: String? = null,
     actionsVisible: Boolean = false,
+    isCustom: Boolean = false,
+    addedByName: String? = null,
     modifier: Modifier = Modifier,
 ) {
     // Held as State, not unwrapped with `by`: nothing else in the composition reads .value, so
@@ -106,6 +115,10 @@ fun ShoppingListRow(
         // register a second, competing semantics node.
         FlatCheckbox(checked = isChecked, onCheckedChange = null)
 
+        if (isCustom && addedByName != null) {
+            SquareAvatar(initials = avatarInitials(addedByName), size = AddedByAvatarSize)
+        }
+
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -115,6 +128,7 @@ fun ShoppingListRow(
             Text(
                 text = name,
                 style = MaterialTheme.typography.bodyLarge,
+                fontStyle = if (isCustom) FontStyle.Italic else null,
                 color = contentColor,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -173,6 +187,8 @@ fun ShoppingListRow(
         }
     }
 }
+
+private val AddedByAvatarSize = 28.dp
 
 /** Draws a line through the content, sweeping left-to-right as [progress] runs 0 to 1. */
 private fun Modifier.sweepingStrikeThrough(
@@ -310,6 +326,36 @@ private fun ShoppingListRowActionsDarkPreview() {
             quantityLabel = "2 tbsp",
             isChecked = false,
             actionsVisible = true,
+            onAction = {},
+        )
+    }
+}
+
+@Preview(name = "Added by user — Light", showBackground = true)
+@Composable
+private fun ShoppingListRowCustomPreview() {
+    ChefAITheme(darkTheme = false) {
+        ShoppingListRow(
+            name = "Paper towels",
+            quantityLabel = null,
+            isChecked = false,
+            isCustom = true,
+            addedByName = "Jose Mucientes",
+            onAction = {},
+        )
+    }
+}
+
+@Preview(name = "Added by user — Dark", showBackground = true)
+@Composable
+private fun ShoppingListRowCustomDarkPreview() {
+    ChefAITheme(darkTheme = true) {
+        ShoppingListRow(
+            name = "Paper towels",
+            quantityLabel = null,
+            isChecked = true,
+            isCustom = true,
+            addedByName = "Jose Mucientes",
             onAction = {},
         )
     }

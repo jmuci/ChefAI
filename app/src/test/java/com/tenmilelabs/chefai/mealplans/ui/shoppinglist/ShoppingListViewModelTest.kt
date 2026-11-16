@@ -3,7 +3,9 @@ package com.tenmilelabs.chefai.mealplans.ui.shoppinglist
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.core.data.repository.FakeUserPreferencesRepository
+import com.tenmilelabs.chefai.core.testutil.createTestSessionManager
 import com.tenmilelabs.chefai.core.domain.model.HouseholdRole
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.core.util.MainCoroutineRule
@@ -20,7 +22,9 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
+import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.GrocerySection
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.PlannedIngredient
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -38,6 +42,7 @@ class ShoppingListViewModelTest {
     private lateinit var shoppingListRepository: FakeShoppingListRepository
     private lateinit var userPreferencesRepository: FakeUserPreferencesRepository
     private lateinit var householdRepository: FakeHouseholdRepository
+    private lateinit var sessionManager: SessionManager
 
     private val planId = UUID.randomUUID()
     private val recipeId = UUID.randomUUID()
@@ -48,6 +53,7 @@ class ShoppingListViewModelTest {
         shoppingListRepository = FakeShoppingListRepository()
         userPreferencesRepository = FakeUserPreferencesRepository()
         householdRepository = FakeHouseholdRepository()
+        sessionManager = createTestSessionManager(CoroutineScope(mainCoroutineRule.testDispatcher))
     }
 
     @Test
@@ -295,6 +301,112 @@ class ShoppingListViewModelTest {
     }
 
     @Test
+    fun `adding a typed item puts it on the list as custom and clears the draft`() = runTest {
+        mealPlanRepository.emitPlans(planWith(days = emptyList()))
+        val viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            awaitItem().let { if (it is ShoppingListUiState.Loading) awaitItem() else it }
+
+            viewModel.onDraftChanged("  Lemons ")
+            assertThat(viewModel.draft.value).isEqualTo("  Lemons ")
+            viewModel.onAddDraftItem()
+
+            val updated = awaitItem() as ShoppingListUiState.Success
+            val item = updated.list.sections.single().items.single()
+            assertThat(item.displayName).isEqualTo("Lemons")
+            assertThat(item.isCustom).isTrue()
+            assertThat(item.section).isEqualTo(GrocerySection.PRODUCE)
+            assertThat(viewModel.draft.value).isEmpty()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `adding a blank draft does nothing`() = runTest {
+        mealPlanRepository.emitPlans(planWith(days = emptyList()))
+        val viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            awaitItem().let { if (it is ShoppingListUiState.Loading) awaitItem() else it }
+
+            viewModel.onDraftChanged("   ")
+            viewModel.onAddDraftItem()
+
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `a failed add restores the draft and surfaces an error`() = runTest {
+        mealPlanRepository.emitPlans(planWith(days = emptyList()))
+        shoppingListRepository.shouldThrowOnAddCustomItem = true
+        val viewModel = createViewModel()
+
+        viewModel.onDraftChanged("Lemons")
+        viewModel.events.test {
+            viewModel.onAddDraftItem()
+            assertThat(awaitItem()).isInstanceOf(ShoppingListEvent.ShowError::class.java)
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertThat(viewModel.draft.value).isEqualTo("Lemons")
+    }
+
+    @Test
+    fun `a custom item shows the household member's current name over the stored one`() = runTest {
+        val adderId = UUID.randomUUID()
+        val householdId = UUID.randomUUID()
+        mealPlanRepository.emitPlans(planWith(days = emptyList(), householdId = householdId))
+        householdRepository.seedHousehold(
+            Household(
+                uuid = householdId,
+                name = "The Test Kitchen",
+                ownerId = adderId,
+                members = listOf(HouseholdMember(adderId, "Alex Renamed", "", HouseholdRole.OWNER)),
+            )
+        )
+        shoppingListRepository.addCustomItem(planId, "Lemons", adderId, "Alex Old")
+
+        createViewModel().uiState.test {
+            val state = awaitItem().let { if (it is ShoppingListUiState.Loading) awaitItem() else it }
+                as ShoppingListUiState.Success
+            assertThat(state.list.sections.single().items.single().addedByName).isEqualTo("Alex Renamed")
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `ticking, renaming, removing and undoing a custom item go through the custom path`() = runTest {
+        mealPlanRepository.emitPlans(planWith(days = emptyList()))
+        shoppingListRepository.addCustomItem(planId, "Lemons", null, null)
+        val viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            val initial = awaitItem().let { if (it is ShoppingListUiState.Loading) awaitItem() else it }
+                as ShoppingListUiState.Success
+            val item = initial.list.sections.single().items.single()
+
+            viewModel.onToggleItem(item)
+            val ticked = awaitItem() as ShoppingListUiState.Success
+            assertThat(ticked.list.checkedCount).isEqualTo(1)
+
+            viewModel.onRenameItem(item, "Limes")
+            val renamed = awaitItem() as ShoppingListUiState.Success
+            assertThat(renamed.list.sections.single().items.single().displayName).isEqualTo("Limes")
+
+            viewModel.onDeleteItem(renamed.list.sections.single().items.single())
+            val removed = awaitItem() as ShoppingListUiState.Success
+            assertThat(removed.list.isEmpty).isTrue()
+
+            viewModel.onUndoRemove(item.key)
+            val restored = awaitItem() as ShoppingListUiState.Success
+            assertThat(restored.list.sections.single().items.single().displayName).isEqualTo("Limes")
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun `a repository failure surfaces an error event`() = runTest {
         mealPlanRepository.emitPlans(planWith(days = listOf(fullDay())))
         shoppingListRepository.setIngredientsForRecipe(
@@ -329,6 +441,7 @@ class ShoppingListViewModelTest {
         shoppingListRepository = shoppingListRepository,
         userPreferencesRepository = userPreferencesRepository,
         householdRepository = householdRepository,
+        sessionManager = sessionManager,
     )
 
     private fun fullDay() = MealPlanDay(

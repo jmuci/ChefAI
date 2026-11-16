@@ -184,7 +184,7 @@ for areas without one — update those, not this table, when behaviour changes.
 | Recipe images | Done — [ADR-012](docs/adrs/adr-012-recipe-image-upload.md) | No real thumbnails; delete not undoable (server copy kept 30 days); #144 at ~50 users |
 | Recipe delete | Soft delete from details — [feature-status](docs/feature-status.md#recipe-delete) | No undo, no swipe-to-delete |
 | Starred & go-to | Done (Android) — [feature-status](docs/feature-status.md#starred--go-to-recipes) | Backend doesn't store the flags yet |
-| Shopping lists | Done, per plan — [feature-status](docs/feature-status.md#shopping-lists) | No ADR; no delivery-partner integration |
+| Shopping lists | Done, per plan — [feature-status](docs/feature-status.md#shopping-lists) | No ADR; no delivery-partner integration; hand-added items are local-only (no sync) |
 | Measurement units | Done — [ADR-013](docs/adrs/adr-013-measurement-unit-conversion.md) | Step text (incl. temperatures) not converted; no per-recipe override |
 | Recipe step timer | Core done — [feature-status](docs/feature-status.md#recipe-step-timer) | One timer at a time; no process-death survival; notification late across deep sleep |
 

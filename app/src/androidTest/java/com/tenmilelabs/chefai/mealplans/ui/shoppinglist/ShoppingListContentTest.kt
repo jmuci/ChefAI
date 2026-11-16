@@ -38,7 +38,7 @@ class ShoppingListContentTest {
     private fun setContent() {
         actions.clear()
         composeTestRule.setContent {
-            ChefAITheme { ShoppingListContent(list = list, onAction = { actions += it }) }
+            ChefAITheme { ShoppingListContent(list = list, draft = "", onAction = { actions += it }) }
         }
     }
 

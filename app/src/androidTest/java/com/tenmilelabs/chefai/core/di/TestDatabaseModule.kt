@@ -92,6 +92,9 @@ object TestDatabaseModule {
     fun provideShoppingListCheckDao(database: ChefAIDataBase) = database.shoppingListCheckDao()
 
     @Provides
+    fun provideCustomShoppingItemDao(database: ChefAIDataBase) = database.customShoppingItemDao()
+
+    @Provides
     fun provideHouseholdDao(database: ChefAIDataBase) = database.householdDao()
 
     @Provides

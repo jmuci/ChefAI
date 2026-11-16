@@ -3,6 +3,8 @@ package com.tenmilelabs.chefai.mealplans.ui.shoppinglist
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.core.domain.repository.UserPreferencesRepository
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs
 import com.tenmilelabs.chefai.household.domain.repository.HouseholdRepository
@@ -15,10 +17,12 @@ import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.ShoppingListItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -55,6 +59,7 @@ class ShoppingListViewModel @Inject constructor(
     private val shoppingListRepository: ShoppingListRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
     private val householdRepository: HouseholdRepository,
+    private val sessionManager: SessionManager,
 ) : ViewModel() {
 
     private val mealPlanId: UUID = UUID.fromString(
@@ -64,6 +69,11 @@ class ShoppingListViewModel @Inject constructor(
 
     private val _events = MutableSharedFlow<ShoppingListEvent>()
     val events: SharedFlow<ShoppingListEvent> = _events.asSharedFlow()
+
+    private val _draft = MutableStateFlow("")
+
+    /** The text in the "add an item" box. Kept out of [uiState] so typing doesn't rebuild the list. */
+    val draft: StateFlow<String> = _draft.asStateFlow()
 
     val uiState: StateFlow<ShoppingListUiState> = mealPlanRepository.observeMealPlan(mealPlanId)
         .flatMapLatest { plan ->
@@ -82,7 +92,8 @@ class ShoppingListViewModel @Inject constructor(
                     shoppingListRepository.observeCheckedState(mealPlanId),
                     userPreferencesRepository.measurementSystem,
                     householdRepository.observeMyHousehold(),
-                ) { ingredients, checkedState, measurementSystem, household ->
+                    shoppingListRepository.observeCustomItems(mealPlanId),
+                ) { ingredients, checkedState, measurementSystem, household, customItems ->
                     val members = household?.members.orEmpty()
                     ShoppingListUiState.Success(
                         planName = plan.name,
@@ -97,6 +108,12 @@ class ShoppingListViewModel @Inject constructor(
                             }.toMap(),
                             displayNameOverrides = checkedState.displayNameOverrides,
                             removedKeys = checkedState.removedKeys,
+                            // The household's current name wins over the one stored when the
+                            // item was added, so a rename shows up on old lines too.
+                            customItems = customItems.map { item ->
+                                val memberName = members.firstOrNull { it.userId == item.addedByUserId }?.displayName
+                                if (memberName != null) item.copy(addedByName = memberName) else item
+                            },
                         ),
                         ownerDisplayName = if (plan.householdId != null) {
                             members.firstOrNull { it.userId == plan.userId }?.displayName
@@ -113,10 +130,42 @@ class ShoppingListViewModel @Inject constructor(
             initialValue = ShoppingListUiState.Loading,
         )
 
+    fun onDraftChanged(text: String) {
+        _draft.value = text
+    }
+
+    /** Adds the draft as a hand-added line, credited to the signed-in user. A blank draft is ignored. */
+    fun onAddDraftItem() {
+        val name = _draft.value.trim()
+        if (name.isEmpty()) return
+        // Cleared up front so a double-tap on "add" can't add the same line twice.
+        _draft.value = ""
+        val (userId, userName) = when (val session = sessionManager.userSession.value) {
+            is UserSession.Authenticated -> session.user.uuid to session.user.displayName.ifBlank { session.user.email }
+            is UserSession.Anonymous -> session.localUserId to null
+            is UserSession.Loading -> null to null
+        }
+        viewModelScope.launch {
+            try {
+                shoppingListRepository.addCustomItem(mealPlanId, name, userId, userName)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "onAddDraftItem: failed for plan $mealPlanId")
+                _draft.value = name
+                _events.emit(ShoppingListEvent.ShowError("Couldn't add this item"))
+            }
+        }
+    }
+
     fun onToggleItem(item: ShoppingListItem) {
         viewModelScope.launch {
             try {
-                shoppingListRepository.setChecked(mealPlanId, item.key, checked = !item.isChecked)
+                val customId = item.customItemId
+                if (customId != null) {
+                    shoppingListRepository.setCustomItemChecked(customId, checked = !item.isChecked)
+                } else {
+                    shoppingListRepository.setChecked(mealPlanId, item.key, checked = !item.isChecked)
+                }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 Timber.e(e, "onToggleItem: failed for item ${item.key}")
@@ -131,7 +180,12 @@ class ShoppingListViewModel @Inject constructor(
         if (name.isEmpty() || name == item.displayName) return
         viewModelScope.launch {
             try {
-                shoppingListRepository.renameItem(mealPlanId, item.key, name)
+                val customId = item.customItemId
+                if (customId != null) {
+                    shoppingListRepository.renameCustomItem(customId, name)
+                } else {
+                    shoppingListRepository.renameItem(mealPlanId, item.key, name)
+                }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 Timber.e(e, "onRenameItem: failed for item ${item.key}")
@@ -143,7 +197,7 @@ class ShoppingListViewModel @Inject constructor(
     fun onDeleteItem(item: ShoppingListItem) {
         viewModelScope.launch {
             try {
-                shoppingListRepository.setRemoved(mealPlanId, item.key, removed = true)
+                setRemoved(item.key, removed = true)
                 _events.emit(ShoppingListEvent.ItemRemoved(item.key, item.displayName))
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
@@ -156,12 +210,22 @@ class ShoppingListViewModel @Inject constructor(
     fun onUndoRemove(itemKey: String) {
         viewModelScope.launch {
             try {
-                shoppingListRepository.setRemoved(mealPlanId, itemKey, removed = false)
+                setRemoved(itemKey, removed = false)
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 Timber.e(e, "onUndoRemove: failed for item $itemKey")
                 _events.emit(ShoppingListEvent.ShowError("Couldn't restore this item"))
             }
+        }
+    }
+
+    /** Routes by key: a hand-added line has its own row; a recipe-derived one is an overlay. */
+    private suspend fun setRemoved(itemKey: String, removed: Boolean) {
+        val customId = ShoppingListBuilder.customItemId(itemKey)
+        if (customId != null) {
+            shoppingListRepository.setCustomItemRemoved(customId, removed)
+        } else {
+            shoppingListRepository.setRemoved(mealPlanId, itemKey, removed)
         }
     }
 

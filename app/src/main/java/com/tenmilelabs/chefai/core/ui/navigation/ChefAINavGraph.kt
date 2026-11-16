@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.core.ui.navigation
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
@@ -782,7 +783,9 @@ fun ChefAINavGraph(
                 currentRoute == AppDestinations.ACCEPT_INVITE.route ||
                 currentRoute in wizardRoutes
 
-            Row(modifier = Modifier.padding(innerPadding)) {
+            // Consumed as well as applied, so a screen's own imePadding() only adds the part of
+            // the keyboard that overlaps past the bottom bar instead of the whole keyboard height.
+            Row(modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)) {
                 if (isExpanded && !hideNav) {
                     NavigationRailBar(navController)
                 }

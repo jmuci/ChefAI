@@ -7,6 +7,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.tenmilelabs.chefai.core.data.local.room.AllergenEntity
 import com.tenmilelabs.chefai.core.data.local.room.BookmarkedRecipeEntity
+import com.tenmilelabs.chefai.core.data.local.room.CustomShoppingItemEntity
 import com.tenmilelabs.chefai.core.data.local.room.HouseholdEntity
 import com.tenmilelabs.chefai.core.data.local.room.HouseholdInviteEntity
 import com.tenmilelabs.chefai.core.data.local.room.HouseholdMemberEntity
@@ -34,6 +35,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
     entities = [
         AllergenEntity::class,
         BookmarkedRecipeEntity::class,
+        CustomShoppingItemEntity::class,
         HouseholdEntity::class,
         HouseholdMemberEntity::class,
         HouseholdInviteEntity::class,
@@ -56,7 +58,7 @@ import com.tenmilelabs.chefai.core.data.local.room.UuidConverters
         TagEntity::class,
         UserEntity::class
     ],
-    version = 17,
+    version = 18,
     exportSchema = true
 )
 @TypeConverters(UuidConverters::class)
@@ -80,6 +82,7 @@ abstract class ChefAIDataBase : RoomDatabase() {
     abstract fun mealPlanDao(): MealPlanDao
     abstract fun savedMealPlanDao(): SavedMealPlanDao
     abstract fun shoppingListCheckDao(): ShoppingListCheckDao
+    abstract fun customShoppingItemDao(): CustomShoppingItemDao
     abstract fun householdDao(): HouseholdDao
 }
 
@@ -475,5 +478,29 @@ val MIGRATION_16_17 = object : Migration(16, 17) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE `shopping_list_checks` ADD COLUMN `displayNameOverride` TEXT")
         db.execSQL("ALTER TABLE `shopping_list_checks` ADD COLUMN `removed` INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
+/**
+ * Adds `shopping_list_custom_items` — lines a person typed onto a meal plan's shopping list,
+ * with who added them. Local-only; see [com.tenmilelabs.chefai.core.data.local.room.CustomShoppingItemEntity].
+ */
+val MIGRATION_17_18 = object : Migration(17, 18) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `shopping_list_custom_items` (
+                `uuid` BLOB NOT NULL, `mealPlanId` BLOB NOT NULL, `name` TEXT NOT NULL,
+                `checked` INTEGER NOT NULL, `removed` INTEGER NOT NULL, `addedByUserId` BLOB,
+                `addedByName` TEXT, `createdAt` INTEGER NOT NULL,
+                PRIMARY KEY(`uuid`),
+                FOREIGN KEY(`mealPlanId`) REFERENCES `meal_plans`(`uuid`) ON UPDATE NO ACTION ON DELETE CASCADE
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_shopping_list_custom_items_mealPlanId` " +
+                "ON `shopping_list_custom_items` (`mealPlanId`)"
+        )
     }
 }
