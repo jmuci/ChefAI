@@ -192,7 +192,7 @@ interface RecipeDao {
     @Query(
         """
         SELECT r.uuid AS recipeId, r.imageUrl AS imageUrl, r.localImagePath AS localImagePath,
-               r.imageBlobId AS imageBlobId
+               r.imageBlobId AS imageBlobId, r.creatorId AS creatorId
         FROM recipes r
         LEFT JOIN recipe_image_state s ON s.recipeId = r.uuid
         WHERE r.deletedAt IS NULL

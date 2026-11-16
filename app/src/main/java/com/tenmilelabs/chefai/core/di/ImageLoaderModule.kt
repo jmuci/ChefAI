@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.core.di
 
 import android.content.Context
+import com.tenmilelabs.chefai.BuildConfig
 import coil3.ImageLoader
 import coil3.disk.DiskCache
 import coil3.intercept.Interceptor
@@ -53,10 +54,22 @@ object ImageLoaderModule {
             }
         }
 
+        val appFilesDir = context.filesDir.path
         return ImageLoader.Builder(context)
             .components {
                 // Add OkHttp network engine for image loading
                 add(OkHttpNetworkFetcherFactory())
+                // Image URLs arrive over sync from any author (PUBLIC recipes), unvalidated. Only
+                // https and this app's own files are loaded; see isAllowedImageModel.
+                add(object : Interceptor {
+                    override suspend fun intercept(chain: Interceptor.Chain): coil3.request.ImageResult {
+                        val data = chain.request.data
+                        if (!isAllowedImageModel(data, appFilesDir, allowCleartext = BuildConfig.DEBUG)) {
+                            throw SecurityException("Blocked image source: ${data.toString().substringBefore(':')}")
+                        }
+                        return chain.proceed()
+                    }
+                })
                 add(object : Interceptor {
                     override suspend fun intercept(chain: Interceptor.Chain): coil3.request.ImageResult {
                         val request = chain.request
@@ -105,4 +118,31 @@ object ImageLoaderModule {
             .build()
             .also { Timber.d("ImageLoader created via DI with logging enabled: $it") }
     }
+}
+
+/**
+ * Which Coil models the app loads (security review A7).
+ *
+ * String models are allowed only as `https://` URLs (plus `http://` when [allowCleartext], i.e. a
+ * debug build talking to a local backend), or as files inside [appFilesDir], with or without a
+ * `file://` scheme. Recipe image URLs come over sync from whoever authored the recipe, so without
+ * this a server-supplied `content://`, `android.resource://` or `file:///sdcard/...` value would
+ * be handed straight to Coil's local fetchers. Paths are normalised first, so `..` can't climb out
+ * of [appFilesDir].
+ *
+ * Non-string models (`Uri`, `File`, drawables) are only ever built by the app itself and pass.
+ */
+internal fun isAllowedImageModel(data: Any?, appFilesDir: String, allowCleartext: Boolean): Boolean {
+    if (data !is String) return true
+    val lower = data.lowercase()
+    if (lower.startsWith("https://")) return true
+    if (lower.startsWith("http://")) return allowCleartext
+    val path = when {
+        lower.startsWith("file://") -> data.substring("file://".length)
+        data.startsWith("/") -> data
+        else -> return false
+    }
+    val normalized = runCatching { java.nio.file.Paths.get(path).normalize().toString() }.getOrNull()
+        ?: return false
+    return normalized.startsWith(appFilesDir.trimEnd('/') + "/")
 }

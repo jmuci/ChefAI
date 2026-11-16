@@ -18,12 +18,17 @@ class RecipeImageBackfillTest {
         localImagePath: String? = null,
         imageUrl: String = REMOTE_URL,
         imageBlobId: String? = null,
+        creatorId: UUID = me,
     ) = RecipeImageCandidate(
         recipeId = UUID.randomUUID(),
         imageUrl = imageUrl,
         localImagePath = localImagePath,
         imageBlobId = imageBlobId,
+        creatorId = creatorId,
     )
+
+    private val me = UUID.randomUUID()
+    private val someoneElse = UUID.randomUUID()
 
     /** Stands in for the filesystem: every listed path exists, nothing else does. */
     private fun existing(vararg paths: String): (String) -> Boolean = { it in paths }
@@ -104,5 +109,27 @@ class RecipeImageBackfillTest {
         val batch = candidates.needingBackfill(existing()).take(IMAGE_BACKFILL_BATCH)
 
         assertThat(batch).hasSize(IMAGE_BACKFILL_BATCH)
+    }
+
+    // --- Whose image URLs may be fetched (security review A3) ---
+
+    @Test
+    fun `the url ladder is used only for recipes the current user owns`() {
+        assertThat(mayFetchImageFromUrl("https://attacker.example/x.png", someoneElse, me)).isFalse()
+        assertThat(mayFetchImageFromUrl("https://attacker.example/x.png", someoneElse, null)).isFalse()
+        assertThat(mayFetchImageFromUrl(REMOTE_URL, me, null)).isFalse()
+        assertThat(mayFetchImageFromUrl(REMOTE_URL, me, me)).isTrue()
+        assertThat(mayFetchImageFromUrl("", me, me)).isFalse()
+    }
+
+    @Test
+    fun `another user's recipe is fetchable only through its backend blob`() {
+        val ownUrl = candidate()
+        val othersUrl = candidate(creatorId = someoneElse)
+        val othersBlob = candidate(creatorId = someoneElse, imageBlobId = "blob-1")
+
+        val result = listOf(ownUrl, othersUrl, othersBlob).fetchableBy(me)
+
+        assertThat(result).containsExactly(ownUrl, othersBlob)
     }
 }
