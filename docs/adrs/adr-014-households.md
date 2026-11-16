@@ -246,8 +246,11 @@ Complete. PRs A1–A12 (`docs/archive/prompts/households-android-prompt.md` §9)
   .CONFLICT` exists in the enum but is unused here, same as everywhere else in this codebase.
 - ~~**No "who checked this" attribution** in the UI~~ — done: the shopping list shows who ticked
   an item (`ShoppingListRow`), from `checkedBy`. Not yet exercised with two live accounts.
-- **`assetlinks.json` hosting is outside this repository.** App Links verification silently falls
-  back to a disambiguation dialog until `https://pocket-chef.app/.well-known/assetlinks.json` is served
-  with this app's signing cert fingerprint — a deploy-pipeline dependency, not something fixed by
-  an app-side change. `android:autoVerify="true"` is already set on the intent filter; it has
-  nothing to verify against until that file exists.
+- **`assetlinks.json` hosting is outside this repository.** It is served
+  (checked 2026-11-16), but it lists a single SHA-256 fingerprint: one developer machine's debug
+  keystore. Builds signed with any other key fail verification. The shared emulator's install
+  reports `pocket-chef.app: 1024` (failed) under a different signature. On Android 12+ an
+  unverified link opens in the browser; on 9–11 another app declaring the same filter can appear in
+  the chooser and receive the invite token (security review A12). **Before a release:** add the
+  release or Play App Signing fingerprint (and any CI debug key) to the file, then check
+  `adb shell pm get-app-links com.tenmilelabs.chefai` reports `verified`.

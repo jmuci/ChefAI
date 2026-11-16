@@ -2,7 +2,6 @@ package com.tenmilelabs.chefai.auth.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.tenmilelabs.chefai.BuildConfig
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.data.local.SecurePreferencesInterface
 import com.tenmilelabs.chefai.auth.data.network.AuthHttpException
@@ -71,16 +70,8 @@ class LoginViewModel @Inject constructor(
     private val connectivity: ConnectivityObserver,
 ) : ViewModel() {
 
-    private val testAccounts: List<EmailSuggestion> = if (BuildConfig.DEBUG) {
-        // TODO Move those to the repository layer.
-        listOf(
-            EmailSuggestion("test1@ex.com", "test123!"),
-            EmailSuggestion("test2@ex.com", "test123!"),
-            EmailSuggestion("test3@ex.com", "test123!")
-        )
-    } else {
-        emptyList()
-    }
+    // Debug source set only; release gets an empty list (see DebugTestAccounts.kt).
+    private val testAccounts: List<EmailSuggestion> = debugTestAccounts()
 
     private var savedEmail: String? = null
 

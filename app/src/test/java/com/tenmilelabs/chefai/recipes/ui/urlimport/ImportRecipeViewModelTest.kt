@@ -237,4 +237,49 @@ class ImportRecipeViewModelTest {
     fun `starts with an empty url when there is no PREFILL_URL_ARG`() = runTest {
         assertThat(viewModel.state.value.url).isEqualTo("")
     }
+
+    // --- Shared URLs and the visible browser (security review A6) ---
+
+    @Test
+    fun `a shared url that needs the browser asks first instead of opening it`() = runTest {
+        // Given a shared page whose site refuses automated fetches
+        recipeImporter.result = RecipeImportResult.NeedsBrowser("https://blocked.example.com/recipe")
+
+        // When the screen opens from the share sheet
+        val prefilled = createViewModel(prefillUrl = "https://blocked.example.com/recipe")
+
+        // Then nothing navigates; the user is asked, with the host named
+        prefilled.effects.test { expectNoEvents() }
+        assertThat(prefilled.state.value.browserConfirmUrl).isEqualTo("https://blocked.example.com/recipe")
+        assertThat(prefilled.state.value.browserConfirmHost).isEqualTo("blocked.example.com")
+    }
+
+    @Test
+    fun `confirming opens the in-app browser`() = runTest {
+        recipeImporter.result = RecipeImportResult.NeedsBrowser("https://blocked.example.com/recipe")
+        val prefilled = createViewModel(prefillUrl = "https://blocked.example.com/recipe")
+
+        prefilled.effects.test {
+            prefilled.dispatch(ImportAction.ConfirmOpenBrowser)
+
+            assertThat(awaitItem()).isEqualTo(ImportEffect.NavigateToBrowserImport("https://blocked.example.com/recipe"))
+        }
+        assertThat(prefilled.state.value.browserConfirmUrl).isNull()
+    }
+
+    @Test
+    fun `declining keeps the url, and a tap on Import then goes straight to the browser`() = runTest {
+        recipeImporter.result = RecipeImportResult.NeedsBrowser("https://blocked.example.com/recipe")
+        val prefilled = createViewModel(prefillUrl = "https://blocked.example.com/recipe")
+
+        prefilled.dispatch(ImportAction.DismissOpenBrowser)
+        assertThat(prefilled.state.value.browserConfirmUrl).isNull()
+        assertThat(prefilled.state.value.url).isEqualTo("https://blocked.example.com/recipe")
+
+        prefilled.effects.test {
+            prefilled.dispatch(ImportAction.Import)
+
+            assertThat(awaitItem()).isEqualTo(ImportEffect.NavigateToBrowserImport("https://blocked.example.com/recipe"))
+        }
+    }
 }

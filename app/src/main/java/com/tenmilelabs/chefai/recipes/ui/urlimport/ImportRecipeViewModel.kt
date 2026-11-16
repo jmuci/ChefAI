@@ -51,10 +51,21 @@ class ImportRecipeViewModel @Inject constructor(
             ImportAction.Import -> import()
             ImportAction.ClearError -> _state.update { it.copy(errorRes = null, showManualEntryOption = false) }
             ImportAction.EnterManually -> viewModelScope.launch { _effects.send(ImportEffect.NavigateToManualEditor) }
+            ImportAction.ConfirmOpenBrowser -> {
+                val url = _state.value.browserConfirmUrl ?: return
+                _state.update { it.copy(browserConfirmUrl = null) }
+                viewModelScope.launch { _effects.send(ImportEffect.NavigateToBrowserImport(url)) }
+            }
+            ImportAction.DismissOpenBrowser -> _state.update { it.copy(browserConfirmUrl = null) }
         }
     }
 
-    private fun import() {
+    /**
+     * @param fromShare true only for the automatic import of a URL another app shared in. That
+     *   import runs without a tap, so it must not also open a third party's page in the visible
+     *   browser without one; a tap on Import is consent and goes straight through.
+     */
+    private fun import(fromShare: Boolean = false) {
         if (!_state.value.canImport) return
         val url = _state.value.url
 
@@ -70,7 +81,9 @@ class ImportRecipeViewModel @Inject constructor(
 
                 // The site refused every automated fetch — hand it to a browser the user can see
                 // and interact with, which is the only thing that gets past an interactive check.
-                is RecipeImportResult.NeedsBrowser -> {
+                is RecipeImportResult.NeedsBrowser -> if (fromShare) {
+                    _state.update { it.copy(isImporting = false, browserConfirmUrl = result.url) }
+                } else {
                     _state.update { it.copy(isImporting = false) }
                     _effects.send(ImportEffect.NavigateToBrowserImport(result.url))
                 }
@@ -103,7 +116,7 @@ class ImportRecipeViewModel @Inject constructor(
     private fun autoImportSharedUrl() {
         if (prefillUrl == null || savedStateHandle.get<Boolean>(AUTO_IMPORT_STARTED_KEY) == true) return
         savedStateHandle[AUTO_IMPORT_STARTED_KEY] = true
-        import()
+        import(fromShare = true)
     }
 
     private fun failWith(@StringRes messageRes: Int) {

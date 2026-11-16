@@ -11,9 +11,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -149,6 +151,33 @@ fun ImportRecipeScreen(
             }
         }
     }
+
+    state.browserConfirmHost?.let { host ->
+        OpenBrowserConfirmationDialog(host = host, onAction = onAction)
+    }
+}
+
+/** Asks before a URL another app shared in opens in the visible in-app browser. */
+@Composable
+private fun OpenBrowserConfirmationDialog(host: String, onAction: (ImportAction) -> Unit) {
+    AlertDialog(
+        onDismissRequest = { onAction(ImportAction.DismissOpenBrowser) },
+        title = { Text(stringResource(R.string.import_recipe_browser_confirm_title)) },
+        text = { Text(stringResource(R.string.import_recipe_browser_confirm_message, host)) },
+        confirmButton = {
+            TextButton(
+                onClick = { onAction(ImportAction.ConfirmOpenBrowser) },
+                modifier = Modifier.testTag("ImportOpenBrowserConfirm"),
+            ) {
+                Text(stringResource(R.string.import_recipe_browser_confirm_button))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { onAction(ImportAction.DismissOpenBrowser) }) {
+                Text(stringResource(R.string.cancel_button))
+            }
+        },
+    )
 }
 
 /**
@@ -226,6 +255,28 @@ private fun ImportRecipeScreenErrorDarkPreview() {
                 url = "not a url",
                 errorRes = R.string.import_recipe_invalid_url,
             ),
+            onAction = {},
+        )
+    }
+}
+
+@Preview(name = "Confirm browser — Light", showBackground = true)
+@Composable
+private fun ImportRecipeScreenConfirmBrowserLightPreview() {
+    ChefAITheme {
+        ImportRecipeScreen(
+            state = ImportRecipeState(url = "https://www.seriouseats.com/pasta", browserConfirmUrl = "https://www.seriouseats.com/pasta"),
+            onAction = {},
+        )
+    }
+}
+
+@Preview(name = "Confirm browser — Dark", showBackground = true, uiMode = UI_MODE_NIGHT_YES)
+@Composable
+private fun ImportRecipeScreenConfirmBrowserDarkPreview() {
+    ChefAITheme(darkTheme = true) {
+        ImportRecipeScreen(
+            state = ImportRecipeState(url = "https://www.seriouseats.com/pasta", browserConfirmUrl = "https://www.seriouseats.com/pasta"),
             onAction = {},
         )
     }
