@@ -33,22 +33,29 @@ class DefaultRecipeSearchRepositoryTest {
 
     private fun repository() = DefaultRecipeSearchRepository(fakeApiService, fakeRecipeDao, sessionManager)
 
+    private val currentUserId: UUID = UUID.randomUUID()
+
     private fun anonymousSession() {
-        every { sessionManager.userSession } returns MutableStateFlow(UserSession.Anonymous(UUID.randomUUID()))
+        every { sessionManager.userSession } returns MutableStateFlow(UserSession.Anonymous(currentUserId))
+        every { sessionManager.getCurrentUserId() } returns currentUserId
     }
 
     private fun authenticatedSession() {
         every { sessionManager.userSession } returns MutableStateFlow(
             UserSession.Authenticated(
-                user = User(UUID.randomUUID(), "Test", "t@example.com", ""),
+                user = User(currentUserId, "Test", "t@example.com", ""),
                 authToken = AuthToken("token", "refresh", Long.MAX_VALUE),
             )
         )
+        every { sessionManager.getCurrentUserId() } returns currentUserId
     }
 
-    private fun seedLocalRecipe(title: String): UUID {
+    private fun seedLocalRecipe(
+        title: String,
+        creatorId: UUID = UUID.randomUUID(),
+        privacy: RecipePrivacy = RecipePrivacy.PUBLIC,
+    ): UUID {
         val recipeId = UUID.randomUUID()
-        val creatorId = UUID.randomUUID()
         fakeRecipeDao.seed(
             users = listOf(UserEntity(creatorId, "Owner", "o@example.com", "", 0L, null, SyncState.SYNCED)),
             recipes = listOf(
@@ -63,7 +70,7 @@ class DefaultRecipeSearchRepositoryTest {
                     servings = 1,
                     creatorId = creatorId,
                     recipeExternalUrl = null,
-                    privacy = RecipePrivacy.PUBLIC,
+                    privacy = privacy,
                     updatedAt = 0L,
                     deletedAt = null,
                     syncState = SyncState.SYNCED,
@@ -220,4 +227,24 @@ class DefaultRecipeSearchRepositoryTest {
             coVerify(exactly = 1) { sessionManager.refreshToken() }
             coVerify(exactly = 2) { fakeApiService.search(any(), any(), any()) }
         }
+
+    @Test
+    fun `the local fallback only returns recipes this session may see`() = runTest {
+        // Given an offline device holding a signed-out account's private recipe, the user's own
+        // private recipe, a household member's private recipe and a public one
+        authenticatedSession()
+        coEvery { fakeApiService.search(any(), any(), any()) } returns RecipeSearchNetworkResult.Error("offline")
+        val householdMemberId = UUID.randomUUID()
+        fakeRecipeDao.householdMemberIds = setOf(householdMemberId)
+        seedLocalRecipe("Chicken from a signed-out account", privacy = RecipePrivacy.PRIVATE)
+        val own = seedLocalRecipe("My chicken", creatorId = currentUserId, privacy = RecipePrivacy.PRIVATE)
+        val household = seedLocalRecipe("Household chicken", creatorId = householdMemberId, privacy = RecipePrivacy.PRIVATE)
+        val public = seedLocalRecipe("Public chicken")
+
+        // When searching
+        val outcome = repository().search("chicken", 20, 0)
+
+        // Then the other account's private recipe is not among the results
+        assertThat(outcome.results.map { it.uuid }).containsExactly(own, household, public)
+    }
 }

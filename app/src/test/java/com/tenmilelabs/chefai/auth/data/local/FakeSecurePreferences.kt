@@ -98,6 +98,7 @@ class FakeSecurePreferences : SecurePreferencesInterface {
             remove(KEY_REFRESH_TOKEN)
             remove(KEY_TOKEN_EXPIRY)
             remove(KEY_PENDING_UPGRADE_FROM)
+            remove(KEY_PENDING_INVITE_TOKEN)
             // KEY_LOCAL_USER_ID is intentionally preserved
         }
     }

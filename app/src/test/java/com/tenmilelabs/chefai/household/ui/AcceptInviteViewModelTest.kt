@@ -205,7 +205,7 @@ class AcceptInviteViewModelTest {
     }
 
     @Test
-    fun `onAccept leaves the pending invite token stored when the join fails`() = runTest {
+    fun `onAccept leaves the pending invite token stored when the join hits a network error`() = runTest {
         householdRepository.previewInviteResult = Result.success(preview)
         householdRepository.joinWithTokenResult = HouseholdJoinOutcome.NetworkError
         securePreferences.savePendingInviteToken("abc")
@@ -258,5 +258,38 @@ class AcceptInviteViewModelTest {
         viewModel.onRetry()
 
         assertThat(viewModel.uiState.value).isEqualTo(AcceptInviteUiState.EnterCode())
+    }
+
+    @Test
+    fun `onAccept clears the pending invite token when the server says it is invalid`() = runTest {
+        householdRepository.previewInviteResult = Result.success(preview)
+        householdRepository.joinWithTokenResult = HouseholdJoinOutcome.InvalidOrExpired
+        securePreferences.savePendingInviteToken("abc")
+        val viewModel = createViewModel(token = "abc")
+
+        viewModel.onAccept()
+
+        assertThat(securePreferences.getPendingInviteToken().first()).isNull()
+    }
+
+    @Test
+    fun `an unknown token at preview clears the pending invite token`() = runTest {
+        householdRepository.previewInviteResult =
+            Result.failure(HouseholdApiException("Invite not found or no longer usable", 404))
+        securePreferences.savePendingInviteToken("bad-token")
+
+        createViewModel(token = "bad-token")
+
+        assertThat(securePreferences.getPendingInviteToken().first()).isNull()
+    }
+
+    @Test
+    fun `a transient preview failure keeps the pending invite token`() = runTest {
+        householdRepository.previewInviteResult = Result.failure(RuntimeException("boom"))
+        securePreferences.savePendingInviteToken("abc")
+
+        createViewModel(token = "abc")
+
+        assertThat(securePreferences.getPendingInviteToken().first()).isEqualTo("abc")
     }
 }

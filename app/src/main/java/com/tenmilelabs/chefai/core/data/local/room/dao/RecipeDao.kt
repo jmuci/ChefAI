@@ -18,6 +18,18 @@ import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
 /**
+ * Which recipe rows the user [userId] may see in lists and local search: their own, every PUBLIC
+ * recipe, and the recipes of the members of their household. `household_members` caches only the
+ * current account's household and is cleared on logout and account switch, so the household arm
+ * can't reach a previous account's household.
+ *
+ * Room keeps rows of accounts that signed out on this device (logout keeps local data, ADR-008),
+ * so every read that lists recipes has to go through this rather than the whole table.
+ */
+private const val VISIBLE_TO_USER =
+    "(creatorId = :userId OR privacy = 'PUBLIC' OR creatorId IN (SELECT userId FROM household_members))"
+
+/**
  * Data Access Object for the recipes table.
  */
 @Dao
@@ -89,9 +101,20 @@ interface RecipeDao {
     @Query("SELECT * FROM recipes WHERE uuid = :uuid AND deletedAt IS NULL")
     fun observeRecipeWithDetails(uuid: UUID): Flow<RecipeWithDetails?>
 
+    /** Every live recipe [userId] may see — see [VISIBLE_TO_USER]. */
     @Transaction
-    @Query("SELECT * FROM recipes WHERE deletedAt IS NULL")
-    fun observeRecipesWithDetails(): Flow<List<RecipeWithDetails>>
+    @Query("SELECT * FROM recipes WHERE deletedAt IS NULL AND $VISIBLE_TO_USER")
+    fun observeVisibleRecipesWithDetails(userId: UUID): Flow<List<RecipeWithDetails>>
+
+    /**
+     * Live recipes by id, with no visibility filter: callers pass ids that come from a surface
+     * already scoped to the current user (their bookmarks, their or their household's meal plans,
+     * the home layout), and a shared plan must keep showing a recipe whose author has since left
+     * the household.
+     */
+    @Transaction
+    @Query("SELECT * FROM recipes WHERE uuid IN (:ids) AND deletedAt IS NULL")
+    fun observeRecipesWithDetailsByIds(ids: List<UUID>): Flow<List<RecipeWithDetails>>
 
     @Transaction
     @Query("SELECT * FROM recipes WHERE creatorId = :creatorId AND deletedAt IS NULL")
@@ -105,17 +128,11 @@ interface RecipeDao {
     @Query("SELECT * FROM recipes WHERE uuid = :uuid AND deletedAt IS NULL")
     suspend fun getRecipeWithTags(uuid: UUID): RecipeWithTags?
 
-    @Transaction
-    @Query("SELECT * FROM recipes WHERE deletedAt IS NULL")
-    fun observeRecipesWithTags(): Flow<List<RecipeWithTags>>
 
     @Transaction
     @Query("SELECT * FROM recipes WHERE uuid = :uuid AND deletedAt IS NULL")
     suspend fun getRecipeWithLabels(uuid: UUID): RecipeWithLabels?
 
-    @Transaction
-    @Query("SELECT * FROM recipes WHERE deletedAt IS NULL")
-    fun observeRecipesWithLabels(): Flow<List<RecipeWithLabels>>
 
     @Query("DELETE FROM recipes WHERE uuid = :uuid")
     suspend fun deleteRecipe(uuid: UUID)
@@ -125,6 +142,13 @@ interface RecipeDao {
 
     @Query("DELETE FROM recipes WHERE creatorId = :creatorId")
     suspend fun deleteRecipesForUser(creatorId: UUID)
+
+    /** Non-PUBLIC recipes authored by anyone but [keepOwnedBy]: what an account switch must not hand over. */
+    @Query("SELECT uuid FROM recipes WHERE creatorId != :keepOwnedBy AND privacy != 'PUBLIC'")
+    suspend fun getPrivateRecipeIdsNotOwnedBy(keepOwnedBy: UUID): List<UUID>
+
+    @Query("DELETE FROM recipes WHERE creatorId != :keepOwnedBy AND privacy != 'PUBLIC'")
+    suspend fun deletePrivateNotOwnedBy(keepOwnedBy: UUID)
 
     @Upsert
     suspend fun upsertRecipe(recipe: RecipeEntity)
@@ -291,6 +315,7 @@ interface RecipeDao {
         """
         SELECT * FROM recipes r
         WHERE r.deletedAt IS NULL
+          AND $VISIBLE_TO_USER
           AND (
             r.title LIKE '%' || :query || '%'
             OR EXISTS (
@@ -308,6 +333,6 @@ interface RecipeDao {
         LIMIT :limit
         """
     )
-    suspend fun searchRecipesWithDetails(query: String, limit: Int): List<RecipeWithDetails>
+    suspend fun searchRecipesWithDetails(query: String, limit: Int, userId: UUID): List<RecipeWithDetails>
 
 }

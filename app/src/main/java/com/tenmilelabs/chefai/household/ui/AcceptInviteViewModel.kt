@@ -88,8 +88,10 @@ class AcceptInviteViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = AcceptInviteUiState.Loading
             val outcome = householdRepository.joinWithToken(current.token)
-            if (outcome is HouseholdJoinOutcome.Joined) {
-                // Only once the join itself succeeds — a crash mid-join resumes on next launch.
+            if (outcome !is HouseholdJoinOutcome.NetworkError) {
+                // Any answer from the server settles the token: joined, invalid, or already in a
+                // household. Only a network error keeps it, so a crash mid-join resumes on next
+                // launch. Left in place, a dead token would reopen this screen after every sign-in.
                 securePreferences.clearPendingInviteToken()
             }
             _uiState.value = when (outcome) {
@@ -107,7 +109,11 @@ class AcceptInviteViewModel @Inject constructor(
         viewModelScope.launch {
             householdRepository.previewInvite(token)
                 .onSuccess { preview -> _uiState.value = resolveAfterPreview(token, preview) }
-                .onFailure { error -> _uiState.value = mapPreviewFailure(error) }
+                .onFailure { error ->
+                    // A token the server doesn't recognise will never work; forget it.
+                    if (error.isInviteNotFound()) securePreferences.clearPendingInviteToken()
+                    _uiState.value = mapPreviewFailure(error)
+                }
         }
     }
 
@@ -130,8 +136,10 @@ class AcceptInviteViewModel @Inject constructor(
         else -> AcceptInviteUiState.Preview(preview, token)
     }
 
+    private fun Throwable.isInviteNotFound(): Boolean = (this as? HouseholdApiException)?.statusCode == 404
+
     private fun mapPreviewFailure(error: Throwable): AcceptInviteUiState =
-        if ((error as? HouseholdApiException)?.statusCode == 404) {
+        if (error.isInviteNotFound()) {
             AcceptInviteUiState.InvalidOrExpired
         } else {
             AcceptInviteUiState.Error("Couldn't load that invite")

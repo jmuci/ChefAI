@@ -20,6 +20,7 @@ import com.tenmilelabs.chefai.core.data.local.room.dao.FakeRecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSavedMealPlanDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeSyncMetadataDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.FakeUserDao
+import com.tenmilelabs.chefai.core.data.local.util.RecipePrivacy
 import com.tenmilelabs.chefai.core.data.local.util.SyncState
 import com.tenmilelabs.chefai.mealplans.data.local.SavedPlanImageStore
 import com.tenmilelabs.chefai.recipes.data.local.RecipeImageStore
@@ -162,6 +163,27 @@ class AccountSwitchHandlerTest {
         coVerify(exactly = 1) { recipeImageStore.delete(departingRecipe.uuid) }
         coVerify(exactly = 0) { recipeImageStore.delete(anonymousRecipe.uuid) }
         coVerify(exactly = 0) { recipeImageStore.deleteAll() }
+    }
+
+    @Test
+    fun `switching away drops private recipes the departing account received from other creators`() = runTest {
+        // Given the departing account held a household member's private recipe and someone's public one
+        val previousUserId = UuidV7Generator.newId()
+        val anonymousUserId = UuidV7Generator.newId()
+        securePreferences.setCurrentUserId(previousUserId)
+        val receivedPrivate = recipeFor(UuidV7Generator.newId()).copy(privacy = RecipePrivacy.PRIVATE)
+        val othersPublic = recipeFor(UuidV7Generator.newId()).copy(privacy = RecipePrivacy.PUBLIC)
+        val anonymousPrivate = recipeFor(anonymousUserId).copy(privacy = RecipePrivacy.PRIVATE)
+        listOf(receivedPrivate, othersPublic, anonymousPrivate).forEach { recipeDao.upsertRecipe(it) }
+
+        // When another account signs in from the anonymous session
+        handler.handleLogin(newUserId = UuidV7Generator.newId(), anonymousUserId = anonymousUserId)
+
+        // Then the received private recipe and its image are gone; public and anonymous rows stay
+        assertThat(recipeDao.getRecipeById(receivedPrivate.uuid)).isNull()
+        coVerify(exactly = 1) { recipeImageStore.delete(receivedPrivate.uuid) }
+        assertThat(recipeDao.getRecipeById(othersPublic.uuid)).isNotNull()
+        assertThat(recipeDao.getRecipeById(anonymousPrivate.uuid)).isNotNull()
     }
 
     @Test

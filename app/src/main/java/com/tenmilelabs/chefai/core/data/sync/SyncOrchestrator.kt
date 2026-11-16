@@ -10,6 +10,7 @@ import com.tenmilelabs.chefai.core.data.sync.network.dto.SyncSavedMealPlanDto
 import com.tenmilelabs.chefai.mealplans.data.local.SavedPlanImageStore
 import com.tenmilelabs.chefai.core.data.local.room.carryForwardCookedMarks
 import com.tenmilelabs.chefai.core.data.local.room.RecipeEntity
+import com.tenmilelabs.chefai.core.data.local.room.SavedMealPlanEntity
 import com.tenmilelabs.chefai.core.data.local.room.SyncMetadataEntity
 import com.tenmilelabs.chefai.core.data.local.room.TransactionRunner
 import com.tenmilelabs.chefai.core.data.local.room.dao.AllergenDao
@@ -152,23 +153,45 @@ class SyncOrchestrator @Inject constructor(
 
     /** Every dirty row this device would push, keyed by table, id and `updatedAt`. */
     private suspend fun dirtyVersions(): Set<Triple<String, Any, Long>> = buildSet {
-        recipeDao.getAllDirty().forEach { add(Triple("recipe", it.uuid, it.updatedAt)) }
+        dirtyRecipesForCurrentUser().forEach { add(Triple("recipe", it.uuid, it.updatedAt)) }
         dirtyBookmarksForCurrentUser().forEach { add(Triple("bookmark", it.userId to it.recipeId, it.updatedAt)) }
         mealPlanDao.getAllDirty().forEach { add(Triple("mealPlan", it.uuid, it.updatedAt)) }
         shoppingListCheckDao.getAllDirty().forEach { add(Triple("grocery", it.mealPlanId to it.itemKey, it.updatedAt)) }
         recipeCookEventDao.getAllDirty().forEach { add(Triple("cookEvent", it.uuid, it.updatedAt)) }
-        savedMealPlanDao.getAllDirty().forEach { add(Triple("savedPlan", it.uuid, it.updatedAt)) }
+        dirtySavedPlansForCurrentUser().forEach { add(Triple("savedPlan", it.uuid, it.updatedAt)) }
     }
 
     override suspend fun pushPendingChanges(): PushResult = withContext(ioDispatcher) { push() }
 
     override suspend fun countPendingChanges(): Int = withContext(ioDispatcher) {
-        recipeDao.getAllDirty().size +
+        dirtyRecipesForCurrentUser().size +
             dirtyBookmarksForCurrentUser().size +
             mealPlanDao.getAllDirty().size +
             shoppingListCheckDao.getAllDirty().size +
             recipeCookEventDao.getAllDirty().size +
-            savedMealPlanDao.getAllDirty().size
+            dirtySavedPlansForCurrentUser().size
+    }
+
+    /**
+     * Only the current user's own recipes are pushed. Room can hold another account's PENDING rows
+     * (left by a sign-out, or carried in by a backup restore), and pushing them would send that
+     * account's data under this one's token. Meal plans can't be filtered the same way — household
+     * members push plans they don't own — so the backend enforces those.
+     */
+    private suspend fun dirtyRecipesForCurrentUser(): List<RecipeEntity> =
+        ownedByCurrentUser("recipe", recipeDao.getAllDirty()) { it.creatorId }
+
+    /** Saved plans are never shared (ADR-018), so the same rule as recipes applies. */
+    private suspend fun dirtySavedPlansForCurrentUser(): List<SavedMealPlanEntity> =
+        ownedByCurrentUser("saved plan", savedMealPlanDao.getAllDirty()) { it.userId }
+
+    private fun <T> ownedByCurrentUser(kind: String, rows: List<T>, ownerOf: (T) -> UUID): List<T> {
+        val currentUserId = sessionManager.getCurrentUserId() ?: return emptyList()
+        val (owned, foreign) = rows.partition { ownerOf(it) == currentUserId }
+        if (foreign.isNotEmpty()) {
+            Timber.w("Push: skipping ${foreign.size} $kind row(s) owned by another account")
+        }
+        return owned
     }
 
     /**
@@ -191,7 +214,7 @@ class SyncOrchestrator @Inject constructor(
     }
 
     private suspend fun push(): PushResult {
-        val dirtyRecipes = recipeDao.getAllDirty()
+        val dirtyRecipes = dirtyRecipesForCurrentUser()
         val dirtyBookmarks = dirtyBookmarksForCurrentUser()
 
         val dirtyMealPlans = mealPlanDao.getAllDirty()
@@ -206,7 +229,7 @@ class SyncOrchestrator @Inject constructor(
         val dirtyCookEvents = recipeCookEventDao.getAllDirty()
         val syncCookEvents = dirtyCookEvents.map { it.toSyncDto() }
 
-        val dirtySavedPlans = savedMealPlanDao.getAllDirty()
+        val dirtySavedPlans = dirtySavedPlansForCurrentUser()
         val syncSavedPlans = dirtySavedPlans.map { it.toSyncDto() }
 
         if (dirtyRecipes.isEmpty() && dirtyBookmarks.isEmpty() && dirtyMealPlans.isEmpty() &&

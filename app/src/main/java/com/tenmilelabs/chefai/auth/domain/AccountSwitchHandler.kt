@@ -88,10 +88,15 @@ class AccountSwitchHandler @Inject constructor(
                 // is no way to tell which image files belonged to the departing account.
                 // deleteAll() would be wrong here, since this branch exists precisely to preserve
                 // the anonymous session's own images.
+                // Non-PUBLIC recipes the departing account received from other creators (household
+                // members, shared plans) go too: they were visible to that account, not to the
+                // incoming one. Its user row (name, email) goes last, once nothing references it.
                 val (departingRecipeIds, departingSavedPlanIds) = transactionRunner {
-                    val recipeIds = recipeDao.getRecipeIdsForUser(previousUserId)
+                    val recipeIds = recipeDao.getRecipeIdsForUser(previousUserId) +
+                        recipeDao.getPrivateRecipeIdsNotOwnedBy(anonymousUserId)
                     val savedPlanIds = savedMealPlanDao.getIdsNotOwnedBy(anonymousUserId)
                     recipeDao.deleteRecipesForUser(previousUserId)
+                    recipeDao.deletePrivateNotOwnedBy(anonymousUserId)
                     recipeCookEventDao.deleteAllNotOnPlansOf(anonymousUserId)
                     mealPlanDao.deleteAllNotOwnedBy(anonymousUserId)
                     savedMealPlanDao.deleteAllNotOwnedBy(anonymousUserId)
@@ -99,7 +104,8 @@ class AccountSwitchHandler @Inject constructor(
                     // The pull cursor is the departing account's: kept, the incoming account's
                     // first pull would skip everything it changed before that moment.
                     syncMetadataDao.clear()
-                    recipeIds to savedPlanIds
+                    userDao.deleteUser(previousUserId)
+                    recipeIds.distinct() to savedPlanIds
                 }
                 departingRecipeIds.forEach { recipeImageStore.delete(it) }
                 departingSavedPlanIds.forEach { savedPlanImageStore.delete(it) }
