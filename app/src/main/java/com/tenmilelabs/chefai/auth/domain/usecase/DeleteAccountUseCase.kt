@@ -38,9 +38,21 @@ class DeleteAccountUseCase @Inject constructor(
             null
         }
 
+        // Set before the request: if the process dies after the server deletes the account but
+        // before endLocalSession runs, the next cold start finishes the wipe (SessionManager).
+        sessionManager.setAccountDeletionPending(true)
         val result = accountRepository.deleteAccount(password, disposition)
-        if (result == DeleteAccountResult.Deleted) {
-            endLocalSession()
+        when (result) {
+            DeleteAccountResult.Deleted -> endLocalSession()
+            // The server answered and didn't delete: nothing to finish later.
+            DeleteAccountResult.WrongPassword,
+            DeleteAccountResult.Conflict,
+            DeleteAccountResult.RateLimited,
+            DeleteAccountResult.SessionExpired,
+            is DeleteAccountResult.PublicRecipeChoiceRequired -> sessionManager.setAccountDeletionPending(false)
+            // No answer, so the server may have deleted it. Kept: the next cold start forces a
+            // refresh and only wipes if the account is really gone.
+            DeleteAccountResult.Failed -> Unit
         }
         return result
     }

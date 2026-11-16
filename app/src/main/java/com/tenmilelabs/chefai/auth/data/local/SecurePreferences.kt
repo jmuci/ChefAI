@@ -6,6 +6,7 @@ import android.security.keystore.KeyProperties
 import android.util.Base64
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -55,6 +56,7 @@ class SecurePreferences @Inject constructor(
         private val KEY_LAST_LOGIN_EMAIL = stringPreferencesKey("last_login_email")
         private val KEY_PENDING_INVITE_TOKEN = stringPreferencesKey("pending_invite_token")
         private val KEY_PENDING_UPGRADE_FROM = stringPreferencesKey("pending_upgrade_from")
+        private val KEY_PENDING_ACCOUNT_WIPE = booleanPreferencesKey("pending_account_wipe")
     }
 
     private val dataStore: DataStore<Preferences> = context.dataStore
@@ -218,33 +220,16 @@ class SecurePreferences @Inject constructor(
         }
     }
 
-    /**
-     * Updates only the access token and expiry (used during token refresh).
-     */
-    override suspend fun updateAccessToken(accessToken: String, tokenExpiry: Long) {
+    override suspend fun updateTokens(accessToken: String, refreshToken: String, tokenExpiry: Long) {
         try {
             dataStore.edit { prefs ->
                 prefs[KEY_ACCESS_TOKEN] = encrypt(accessToken)
+                prefs[KEY_REFRESH_TOKEN] = encrypt(refreshToken)
                 prefs[KEY_TOKEN_EXPIRY] = encrypt(tokenExpiry.toString())
             }
-            Timber.d("Access token updated successfully (encrypted)")
+            Timber.d("Tokens updated successfully (encrypted)")
         } catch (e: Exception) {
-            Timber.e(e, "Failed to update access token")
-            throw e
-        }
-    }
-
-    /**
-     * Updates only the refresh token (used during token rotation).
-     */
-    override suspend fun updateRefreshToken(refreshToken: String) {
-        try {
-            dataStore.edit { prefs ->
-                prefs[KEY_REFRESH_TOKEN] = encrypt(refreshToken)
-            }
-            Timber.d("Refresh token updated successfully (encrypted)")
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to update refresh token")
+            Timber.e(e, "Failed to update tokens")
             throw e
         }
     }
@@ -365,5 +350,16 @@ class SecurePreferences @Inject constructor(
         } catch (e: Exception) {
             Timber.e(e, "Failed to clear pending invite token")
         }
+    }
+
+    /** Plaintext: a flag, not a credential, and it must survive a Keystore that can't decrypt. */
+    override suspend fun setPendingAccountWipe(pending: Boolean) {
+        dataStore.edit { prefs ->
+            if (pending) prefs[KEY_PENDING_ACCOUNT_WIPE] = true else prefs.remove(KEY_PENDING_ACCOUNT_WIPE)
+        }
+    }
+
+    override fun getPendingAccountWipe(): Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_PENDING_ACCOUNT_WIPE] ?: false
     }
 }

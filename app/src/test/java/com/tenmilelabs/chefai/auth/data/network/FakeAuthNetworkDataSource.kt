@@ -50,6 +50,9 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
      */
     var refreshGate: CompletableDeferred<Unit>? = null
 
+    /** When set, [refreshToken] throws it, e.g. an `AuthHttpException` carrying a status code. */
+    var refreshError: Exception? = null
+
     /** Thrown by [register], one per call and in order, before anything else is consulted. */
     val registerErrors: ArrayDeque<Exception> = ArrayDeque()
 
@@ -97,6 +100,7 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
             delay(networkDelayMs)
         }
         refreshGate?.await()
+        refreshError?.let { throw it }
 
         if (shouldThrowError) {
             throw Exception("Simulated network error during token refresh")

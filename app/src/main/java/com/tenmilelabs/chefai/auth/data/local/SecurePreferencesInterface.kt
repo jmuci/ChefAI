@@ -38,8 +38,14 @@ interface SecurePreferencesInterface {
     fun getRefreshToken(): Flow<String?>
     fun getTokenExpiry(): Flow<Long?>
     suspend fun clearAuthData()
-    suspend fun updateAccessToken(accessToken: String, tokenExpiry: Long)
-    suspend fun updateRefreshToken(refreshToken: String)
+
+    /**
+     * Writes a refreshed token pair in one edit. The backend rotates refresh tokens, so the new one
+     * must land in the same write as the access token: two separate edits leave the old, already
+     * spent refresh token on disk if the process dies between them, and the next refresh then
+     * presents a reused token, which the backend treats as theft.
+     */
+    suspend fun updateTokens(accessToken: String, refreshToken: String, tokenExpiry: Long)
 
     /** Stores the anonymous local user ID (persists across app restarts). */
     suspend fun saveLocalUserId(uuid: UUID)
@@ -73,4 +79,14 @@ interface SecurePreferencesInterface {
 
     /** Clears the pending invite token once its join succeeds or is explicitly declined. */
     suspend fun clearPendingInviteToken()
+
+    /**
+     * Marks an account deletion that may have reached the server, so a cold start can finish
+     * wiping the device if the process died before the wipe ran. Not cleared by [clearAuthData]:
+     * it has to outlive the credentials it guards.
+     */
+    suspend fun setPendingAccountWipe(pending: Boolean)
+
+    /** Whether an account deletion may have succeeded without the local wipe completing. */
+    fun getPendingAccountWipe(): Flow<Boolean>
 }

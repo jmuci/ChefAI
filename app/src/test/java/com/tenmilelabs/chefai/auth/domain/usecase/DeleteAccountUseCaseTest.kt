@@ -80,4 +80,34 @@ class DeleteAccountUseCaseTest {
         assertThat(result).isEqualTo(DeleteAccountResult.WrongPassword)
         assertThat(sessionManager.userSession.value).isInstanceOf(UserSession.Authenticated::class.java)
     }
+
+    @Test
+    fun `a deletion with no answer leaves the wipe marker for the next cold start`() = runTest {
+        val deleteAccount = signedInUseCase()
+        repository.deleteResult = DeleteAccountResult.Failed
+
+        deleteAccount("hunter2", noPublicRecipes, null)
+
+        assertThat(sessionManager.isAccountDeletionPending()).isTrue()
+    }
+
+    @Test
+    fun `a deletion the server refused clears the wipe marker`() = runTest {
+        val deleteAccount = signedInUseCase()
+        repository.deleteResult = DeleteAccountResult.WrongPassword
+
+        deleteAccount("wrong", noPublicRecipes, null)
+
+        assertThat(sessionManager.isAccountDeletionPending()).isFalse()
+    }
+
+    @Test
+    fun `a completed deletion clears the wipe marker`() = runTest {
+        val deleteAccount = signedInUseCase()
+        repository.deleteResult = DeleteAccountResult.Deleted
+
+        deleteAccount("hunter2", noPublicRecipes, null)
+
+        assertThat(sessionManager.isAccountDeletionPending()).isFalse()
+    }
 }

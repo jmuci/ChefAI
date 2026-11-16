@@ -26,6 +26,7 @@ class FakeSecurePreferences : SecurePreferencesInterface {
         private const val KEY_LAST_LOGIN_EMAIL = "last_login_email"
         private const val KEY_PENDING_INVITE_TOKEN = "pending_invite_token"
         private const val KEY_PENDING_UPGRADE_FROM = "pending_upgrade_from"
+        private const val KEY_PENDING_ACCOUNT_WIPE = "pending_account_wipe"
     }
 
     override suspend fun saveAuthData(
@@ -107,16 +108,11 @@ class FakeSecurePreferences : SecurePreferencesInterface {
         storage.value = storage.value.toMutableMap().apply { remove(KEY_PENDING_UPGRADE_FROM) }
     }
 
-    override suspend fun updateAccessToken(accessToken: String, tokenExpiry: Long) {
+    override suspend fun updateTokens(accessToken: String, refreshToken: String, tokenExpiry: Long) {
         storage.value = storage.value.toMutableMap().apply {
             put(KEY_ACCESS_TOKEN, accessToken)
-            put(KEY_TOKEN_EXPIRY, tokenExpiry)
-        }
-    }
-
-    override suspend fun updateRefreshToken(refreshToken: String) {
-        storage.value = storage.value.toMutableMap().apply {
             put(KEY_REFRESH_TOKEN, refreshToken)
+            put(KEY_TOKEN_EXPIRY, tokenExpiry)
         }
     }
 
@@ -182,5 +178,15 @@ class FakeSecurePreferences : SecurePreferencesInterface {
         storage.value = storage.value.toMutableMap().apply {
             remove(KEY_PENDING_INVITE_TOKEN)
         }
+    }
+
+    override suspend fun setPendingAccountWipe(pending: Boolean) {
+        storage.value = storage.value.toMutableMap().apply {
+            if (pending) put(KEY_PENDING_ACCOUNT_WIPE, true) else remove(KEY_PENDING_ACCOUNT_WIPE)
+        }
+    }
+
+    override fun getPendingAccountWipe(): Flow<Boolean> = storage.map { prefs ->
+        prefs[KEY_PENDING_ACCOUNT_WIPE] as? Boolean ?: false
     }
 }
