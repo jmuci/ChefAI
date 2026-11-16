@@ -16,9 +16,16 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.ChefAITheme"
         tools:targetApi="31">
+        <!--
+            taskAffinity="": no other app can declare an activity with this task's affinity and
+            have it slotted into Pocket Chef's task, which on Android 9-10 lets a malicious app show
+            its own screen (e.g. a fake login) when the user opens Pocket Chef. Platform-fixed
+            from Android 11; minSdk is 28.
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:taskAffinity=""
             android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

@@ -457,6 +457,9 @@
     <string name="import_recipe_browser_hint">This site checks that you\'re human. Complete the check and the recipe will import itself.</string>
     <string name="import_recipe_browser_gave_up">We still couldn\'t read a recipe from that page</string>
     <string name="import_recipe_browser_cancel">Cancel</string>
+    <string name="import_recipe_browser_confirm_title">Open this site?</string>
+    <string name="import_recipe_browser_confirm_message">%1$s blocks automatic import. Open it in Pocket Chef\'s browser to finish importing?</string>
+    <string name="import_recipe_browser_confirm_button">Open site</string>
 
     <!-- Developer options (debug builds only) -->
     <string name="developer_options_link">Developer options</string>
