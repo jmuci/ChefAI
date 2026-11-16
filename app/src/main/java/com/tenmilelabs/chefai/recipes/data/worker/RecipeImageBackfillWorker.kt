@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeDao
 import com.tenmilelabs.chefai.core.data.local.room.dao.RecipeImageStateDao
 import com.tenmilelabs.chefai.core.data.local.room.relations.RecipeImageCandidate
@@ -14,6 +15,7 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import timber.log.Timber
 import java.io.File
+import java.util.UUID
 
 /** How many times a single recipe's image is retried before it is given up on for good. */
 internal const val MAX_IMAGE_BACKFILL_ATTEMPTS = 3
@@ -54,12 +56,15 @@ class RecipeImageBackfillWorker @AssistedInject constructor(
     private val cacheRecipeImage: CacheRecipeImage,
     private val fetchRecipeImageFromBackend: FetchRecipeImageFromBackend,
     private val syncScheduler: SyncScheduler,
+    private val sessionManager: SessionManager,
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
+        val currentUserId = sessionManager.getCurrentUserId()
         val candidates = recipeDao
             .getImageBackfillCandidates(MAX_IMAGE_BACKFILL_ATTEMPTS, IMAGE_BACKFILL_SCAN_LIMIT)
             .needingBackfill()
+            .fetchableBy(currentUserId)
 
         if (candidates.isEmpty()) {
             Timber.d("Image backfill: nothing to do")
@@ -78,7 +83,7 @@ class RecipeImageBackfillWorker @AssistedInject constructor(
                 candidate.recipeId, System.currentTimeMillis()
             )
 
-            val storedPath = fetchImage(candidate)
+            val storedPath = fetchImage(candidate, currentUserId)
             if (storedPath != null) {
                 recipeDao.updateLocalImagePath(candidate.recipeId, storedPath)
                 recipeImageStateDao.delete(candidate.recipeId)
@@ -108,12 +113,12 @@ class RecipeImageBackfillWorker @AssistedInject constructor(
      * so in the window before that, or if the upload was refused, re-deriving from the source is
      * what keeps the image appearing at all.
      */
-    private suspend fun fetchImage(candidate: RecipeImageCandidate): String? {
+    private suspend fun fetchImage(candidate: RecipeImageCandidate, currentUserId: UUID?): String? {
         if (candidate.imageBlobId != null) {
             fetchRecipeImageFromBackend(candidate.recipeId)?.let { return it }
             Timber.d("Backend image unavailable for %s, falling back", candidate.recipeId)
         }
-        if (candidate.imageUrl.isEmpty()) return null
+        if (!mayFetchImageFromUrl(candidate.imageUrl, candidate.creatorId, currentUserId)) return null
         return cacheRecipeImage(candidate.recipeId, candidate.imageUrl)
     }
 
@@ -133,3 +138,23 @@ internal fun List<RecipeImageCandidate>.needingBackfill(
     val path = candidate.localImagePath
     path == null || !fileExists(path)
 }
+
+/**
+ * Keeps only candidates this device may actually fetch: anything with a backend blob, and
+ * otherwise only the current user's own recipes (see [mayFetchImageFromUrl]). Applied before
+ * batching so recipes that can never be fetched don't take batch slots or burn retry attempts.
+ */
+internal fun List<RecipeImageCandidate>.fetchableBy(currentUserId: UUID?): List<RecipeImageCandidate> =
+    filter { it.imageBlobId != null || mayFetchImageFromUrl(it.imageUrl, it.creatorId, currentUserId) }
+
+/**
+ * Whether the backfill may fetch [imageUrl] through [CacheRecipeImage]'s HTTP-then-WebView ladder.
+ *
+ * Only for the current user's own recipes. `imageUrl` arrives over sync unvalidated, and pulled
+ * PUBLIC recipes are authored by anyone: following other people's URLs would let any account make
+ * every syncing device fetch, and render in a WebView, a page of its choosing, with no user
+ * action (security review A3). Other people's recipes get the backend blob or nothing; the UI
+ * still hotlinks `imageUrl` through Coil when it is displayed.
+ */
+internal fun mayFetchImageFromUrl(imageUrl: String, creatorId: UUID, currentUserId: UUID?): Boolean =
+    imageUrl.isNotEmpty() && currentUserId != null && creatorId == currentUserId

@@ -17,6 +17,8 @@ data class RecipeImageCandidate(
      * user's own photo has no source to re-derive from.
      */
     val imageBlobId: String?,
+    /** Decides whether [imageUrl] may be fetched at all — see `mayFetchImageFromUrl`. */
+    val creatorId: UUID,
 )
 
 /**

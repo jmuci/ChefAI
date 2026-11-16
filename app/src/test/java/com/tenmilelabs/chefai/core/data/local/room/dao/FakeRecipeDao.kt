@@ -301,7 +301,7 @@ class FakeRecipeDao : RecipeDao {
         .filter { it.deletedAt == null && (it.imageUrl.isNotEmpty() || it.imageBlobId != null) }
         .sortedWith(compareByDescending<RecipeEntity> { it.localImagePath == null }.thenByDescending { it.updatedAt })
         .take(scanLimit)
-        .map { RecipeImageCandidate(it.uuid, it.imageUrl, it.localImagePath, it.imageBlobId) }
+        .map { RecipeImageCandidate(it.uuid, it.imageUrl, it.localImagePath, it.imageBlobId, it.creatorId) }
 
     override suspend fun updateLocalImagePath(uuid: UUID, localImagePath: String?) {
         recipes[uuid]?.let { recipes[uuid] = it.copy(localImagePath = localImagePath) }
