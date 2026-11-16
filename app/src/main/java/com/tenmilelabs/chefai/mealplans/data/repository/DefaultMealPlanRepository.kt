@@ -21,6 +21,7 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
 import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
+import com.tenmilelabs.chefai.mealplans.domain.model.RemovedMeal
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.usecase.MealPlanReorder
 import com.tenmilelabs.chefai.mealplans.domain.usecase.MealRef
@@ -351,4 +352,47 @@ class DefaultMealPlanRepository @Inject constructor(
         if (moved) syncScheduler.requestMutationSync()
         return moved
     }
+
+    override suspend fun removeMeal(planId: UUID, dayId: UUID, slot: MealSlot): RemovedMeal? {
+        val existing = mealPlanDao.getMealPlanById(planId) ?: return null
+        val removed = transactionRunner {
+            val day = mealPlanDao.getDayById(dayId)?.takeIf { it.mealPlanId == planId }
+            val recipeId = day?.recipeIn(slot)
+            if (day == null || recipeId == null) {
+                null
+            } else {
+                mealPlanDao.upsertDays(listOf(day.withSlot(slot, recipeId = null, cookedAt = null)))
+                mealPlanDao.upsertMealPlan(
+                    existing.copy(syncState = SyncState.PENDING, updatedAt = nextUpdatedAt(existing.updatedAt, System.currentTimeMillis()))
+                )
+                RemovedMeal(planId, dayId, slot, recipeId, day.cookedAtIn(slot))
+            }
+        }
+        if (removed != null) syncScheduler.requestMutationSync()
+        return removed
+    }
+
+    override suspend fun restoreMeal(meal: RemovedMeal): Boolean {
+        val existing = mealPlanDao.getMealPlanById(meal.planId) ?: return false
+        val restored = transactionRunner {
+            val day = mealPlanDao.getDayById(meal.dayId)?.takeIf { it.mealPlanId == meal.planId }
+            if (day == null || day.recipeIn(meal.slot) != null) {
+                false
+            } else {
+                mealPlanDao.upsertDays(listOf(day.withSlot(meal.slot, meal.recipeId, meal.cookedAt)))
+                mealPlanDao.upsertMealPlan(
+                    existing.copy(syncState = SyncState.PENDING, updatedAt = nextUpdatedAt(existing.updatedAt, System.currentTimeMillis()))
+                )
+                true
+            }
+        }
+        if (restored) syncScheduler.requestMutationSync()
+        return restored
+    }
+
+    private fun MealPlanDayEntity.withSlot(slot: MealSlot, recipeId: UUID?, cookedAt: Long?): MealPlanDayEntity =
+        when (slot) {
+            MealSlot.LUNCH -> copy(lunchRecipeId = recipeId, lunchCookedAt = cookedAt)
+            MealSlot.DINNER -> copy(dinnerRecipeId = recipeId, dinnerCookedAt = cookedAt)
+        }
 }

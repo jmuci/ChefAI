@@ -32,14 +32,34 @@ data class PlannedWeekMeal(
     val isCooked: Boolean,
 )
 
+/**
+ * A slot a plan expects a meal in on this date but holds none — usually one the user removed. The
+ * week view draws it as an "Add recipe" gap that fills *this* plan's slot, rather than the
+ * "+ Add meal" row, which seeds a new plan.
+ */
+data class OpenWeekSlot(
+    val planId: UUID,
+    val planName: String,
+    val dayIndex: Int,
+    val slot: MealSlot,
+    val date: LocalDate,
+)
+
 /** One row of the week: a date, and whatever is planned on it. */
 data class WeekDay(
     val date: LocalDate,
     /**
-     * Empty means nothing is planned — the design's "+ Add meal" row. Ordered by slot, then by
-     * plan; a slot that overlapping plans both fill appears once per plan (ADR-015 Decision 3).
+     * Empty means nothing is planned — the design's "+ Add meal" row, unless [openSlots] has gaps.
+     * Ordered by slot, then by plan; a slot that overlapping plans both fill appears once per plan
+     * (ADR-015 Decision 3).
      */
     val meals: List<PlannedWeekMeal>,
+    /**
+     * Slots a plan covering this date leaves empty, ordered by slot. Only slots no plan fills on
+     * this date, each at most once (the oldest plan's), so a gap never sits beside a meal for the
+     * same slot.
+     */
+    val openSlots: List<OpenWeekSlot> = emptyList(),
 ) {
     /** Slots on this date that more than one plan fills — the meals that need a plan label. */
     val sharedSlots: Set<MealSlot>
@@ -137,11 +157,20 @@ object MealPlanWeekProjector {
         // two plans filling one slot both appear under it. Picking one silently hid the other
         // plan's meal *and* its cooked mark (ADR-015 Decision 3).
         val mealsByDate = candidates
-            .sortedWith(compareBy<Candidate> { it.meal.slot.ordinal }.then(PLAN_ORDER))
+            .sortedWith(compareBy<Candidate> { it.meal.slot.ordinal }.then(compareBy(PLAN_ORDER) { it.plan }))
             .groupBy(keySelector = { it.date }, valueTransform = { it.meal })
 
+        val filledPositions = candidates.map { it.date to it.meal.slot }.toSet()
+        val openByDate = plans
+            .filter { it.status != MealPlanStatus.ARCHIVED && it.days.isNotEmpty() }
+            .flatMap { plan -> openCandidates(plan, window, zone) }
+            .filter { (it.date to it.open.slot) !in filledPositions }
+            .sortedWith(compareBy<OpenCandidate> { it.open.slot.ordinal }.then(compareBy(PLAN_ORDER) { it.plan }))
+            .distinctBy { it.date to it.open.slot }
+            .groupBy(keySelector = { it.date }, valueTransform = { it.open })
+
         val days = dates.map { date ->
-            WeekDay(date = date, meals = mealsByDate[date].orEmpty())
+            WeekDay(date = date, meals = mealsByDate[date].orEmpty(), openSlots = openByDate[date].orEmpty())
         }
 
         return MealPlanWeek(
@@ -151,10 +180,32 @@ object MealPlanWeekProjector {
         )
     }
 
+    /**
+     * Every slot [plan]'s meal type expects inside [window] that it leaves empty. A plan with no
+     * days has never been generated, so the caller skips it rather than offering a week of gaps.
+     */
+    private fun openCandidates(plan: MealPlan, window: Set<LocalDate>, zone: ZoneId): List<OpenCandidate> {
+        val daysByIndex = plan.days.associateBy { it.dayIndex }
+        val lastDayIndex = maxOf(plan.preferences.planLengthDays - 1, plan.days.maxOf { it.dayIndex })
+        return (0..lastDayIndex).flatMap { dayIndex ->
+            val date = plan.dateOf(dayIndex, zone)
+            if (date !in window) return@flatMap emptyList()
+            plan.preferences.mealType.slots
+                .filter { slot -> daysByIndex[dayIndex]?.recipeIdFor(slot) == null }
+                .map { slot -> OpenCandidate(date, plan, OpenWeekSlot(plan.uuid, plan.name, dayIndex, slot, date)) }
+        }
+    }
+
     private data class Candidate(
         val date: LocalDate,
         val plan: MealPlan,
         val meal: PlannedWeekMeal,
+    )
+
+    private data class OpenCandidate(
+        val date: LocalDate,
+        val plan: MealPlan,
+        val open: OpenWeekSlot,
     )
 
     /**
@@ -162,9 +213,9 @@ object MealPlanWeekProjector {
      * plan bumps it, and rows that reshuffle after an unrelated edit read as something having moved.
      * `uuid` makes the order total when two plans share a creation instant.
      */
-    private val PLAN_ORDER: Comparator<Candidate> = compareBy(
-        { it.plan.createdAt },
-        { it.plan.uuid },
+    private val PLAN_ORDER: Comparator<MealPlan> = compareBy(
+        { it.createdAt },
+        { it.uuid },
     )
 }
 

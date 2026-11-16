@@ -19,12 +19,14 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
+import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import com.tenmilelabs.chefai.mealplans.domain.model.MealType
 import com.tenmilelabs.chefai.mealplans.domain.model.RecipeSource
 import com.tenmilelabs.chefai.mealplans.domain.model.SavedMealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.SavedMealPlanDay
 import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.PlannedIngredient
+import com.tenmilelabs.chefai.mealplans.domain.usecase.ObserveSavedRecipesUseCase
 import com.tenmilelabs.chefai.mealplans.domain.usecase.RepeatSavedMealPlanUseCase
 import com.tenmilelabs.chefai.mealplans.domain.week.weekStartFor
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
@@ -95,7 +97,7 @@ class MealPlansViewModelTest {
         mealPlanRepository = repository,
         savedMealPlanRepository = savedRepository,
         recipesRepository = recipesRepository,
-        collectionsRepository = collectionsRepository,
+        observeSavedRecipes = ObserveSavedRecipesUseCase(sessionManager, collectionsRepository, recipesRepository),
         shoppingListRepository = shoppingListRepository,
         householdRepository = householdRepository,
         userPreferencesRepository = preferences,
@@ -220,6 +222,59 @@ class MealPlansViewModelTest {
             val state = awaitSuccess { it.mealCount == 1 }
             val meal = state.week.days.first().meals.single()
             assertThat(meal.recipe?.title).isEqualTo("Classic Spaghetti Carbonara")
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // --- Removing a meal and refilling its gap ---
+
+    @Test
+    fun `removing a meal turns its slot into a gap and offers an undo that restores it`() = runTest {
+        // Given a week with one planned dinner
+        val userId = requireNotNull(sessionManager.getCurrentUserId())
+        val recipe = preview("Classic Spaghetti Carbonara")
+        recipesRepository.setRecipePreviewsToEmit(listOf(recipe))
+        val plan = makePlan(userId, createdAt = weekStart, days = listOf(day(0, dinner = recipe.uuid)))
+        repository.emitPlans(plan)
+
+        viewModel.uiState.test {
+            val meal = awaitSuccess { it.mealCount == 1 }.week.days.first().meals.single()
+
+            // When it is removed
+            viewModel.onRemoveMeal(meal)
+
+            // Then the day shows a gap for that plan's dinner, and an undo is offered
+            val emptied = awaitSuccess { it.mealCount == 0 }.week.days.first()
+            assertThat(emptied.openSlots.map { it.planId to it.slot }).containsExactly(plan.uuid to MealSlot.DINNER)
+            val event = viewModel.events.first() as MealPlansEvent.MealRemoved
+            assertThat(event.recipeTitle).isEqualTo("Classic Spaghetti Carbonara")
+
+            // And undo puts the meal back
+            viewModel.onUndoRemoveMeal(event.removed)
+            assertThat(awaitSuccess { it.mealCount == 1 }.week.days.first().openSlots).isEmpty()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `picking a recipe for a gap fills that plan's slot`() = runTest {
+        val userId = requireNotNull(sessionManager.getCurrentUserId())
+        val recipe = preview("Tofu Veggie Bowl")
+        recipesRepository.setRecipePreviewsToEmit(listOf(recipe))
+        val plan = makePlan(userId, createdAt = weekStart, days = listOf(day(0)))
+        repository.emitPlans(plan)
+
+        viewModel.uiState.test {
+            val gap = awaitSuccess { it.week.days.first().openSlots.isNotEmpty() }.week.days.first().openSlots.single()
+
+            viewModel.onAddToSlot(gap)
+            assertThat(viewModel.addToSlot.value).isEqualTo(gap)
+            viewModel.onAddToSlotPicked(recipe.uuid)
+
+            assertThat(viewModel.addToSlot.value).isNull()
+            val filled = awaitSuccess { it.mealCount == 1 }.week.days.first()
+            assertThat(filled.meals.single().recipeId).isEqualTo(recipe.uuid)
+            assertThat(filled.meals.single().planId).isEqualTo(plan.uuid)
             cancelAndIgnoreRemainingEvents()
         }
     }

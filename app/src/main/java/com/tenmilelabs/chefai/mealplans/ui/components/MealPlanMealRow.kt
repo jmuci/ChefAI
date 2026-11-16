@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.mealplans.ui.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -19,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
@@ -50,6 +52,9 @@ private const val COOKED_ALPHA = 0.5f
  *   label would be the same on every row and only adds noise.
  * @param dragHandle trailing reorder grip ([MealDragHandle]), or `null` for a row that cannot move
  *   (a cooked meal is pinned in place).
+ * @param showDate `false` for a day's second slot: the date column keeps its width but stays blank,
+ *   so the day's date is printed once and both slots line up beside it.
+ * @param onRemove shows a trailing [MealRemoveButton] that takes the meal out of its slot.
  */
 @Composable
 fun MealPlanMealRow(
@@ -63,13 +68,9 @@ fun MealPlanMealRow(
     modifier: Modifier = Modifier,
     slotLabel: String? = null,
     dragHandle: (@Composable () -> Unit)? = null,
+    showDate: Boolean = true,
+    onRemove: (() -> Unit)? = null,
 ) {
-    val dayColor = if (isToday) {
-        MaterialTheme.chefColors.accentText
-    } else {
-        MaterialTheme.colorScheme.onBackground
-    }
-
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -83,21 +84,12 @@ fun MealPlanMealRow(
             onCheckedChange = { onToggleCooked() },
         )
 
-        Column(
-            modifier = Modifier.width(40.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(
-                text = dayAbbreviation,
-                style = MaterialTheme.typography.labelSmall,
-                color = dayColor,
-            )
-            Text(
-                text = dayNumber,
-                style = MaterialTheme.typography.titleLarge,
-                color = dayColor,
-            )
-        }
+        DayColumn(
+            dayAbbreviation = dayAbbreviation,
+            dayNumber = dayNumber,
+            isToday = isToday,
+            showDate = showDate,
+        )
 
         Column(
             modifier = Modifier
@@ -137,9 +129,90 @@ fun MealPlanMealRow(
             }
         }
 
+        if (onRemove != null) {
+            MealRemoveButton(recipeTitle = recipe?.title, onClick = onRemove)
+        }
         dragHandle?.invoke()
     }
 }
+
+/**
+ * A slot the plan expects a meal in but holds none — typically one the user just removed. Laid out
+ * on the same grid as [MealPlanMealRow] (a blank where the checkbox goes, then the day column) so a
+ * day with one filled and one open slot still reads as one day.
+ */
+@Composable
+fun MealPlanOpenSlotRow(
+    dayAbbreviation: String,
+    dayNumber: String,
+    isToday: Boolean,
+    onAddRecipe: () -> Unit,
+    modifier: Modifier = Modifier,
+    slotLabel: String? = null,
+    showDate: Boolean = true,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 44.dp)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Spacer(Modifier.width(CheckboxWidth))
+        DayColumn(
+            dayAbbreviation = dayAbbreviation,
+            dayNumber = dayNumber,
+            isToday = isToday,
+            showDate = showDate,
+        )
+        AddRecipeToSlotLink(
+            slotLabel = slotLabel,
+            onClick = onAddRecipe,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+    }
+}
+
+@Composable
+private fun DayColumn(
+    dayAbbreviation: String,
+    dayNumber: String,
+    isToday: Boolean,
+    showDate: Boolean,
+) {
+    val dayColor = if (isToday) {
+        MaterialTheme.chefColors.accentText
+    } else {
+        MaterialTheme.colorScheme.onBackground
+    }
+    Column(
+        modifier = Modifier.width(DayColumnWidth),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        if (showDate) {
+            Text(
+                text = dayAbbreviation,
+                style = MaterialTheme.typography.labelSmall,
+                color = dayColor,
+            )
+            Text(
+                text = dayNumber,
+                style = MaterialTheme.typography.titleLarge,
+                color = dayColor,
+            )
+        }
+    }
+}
+
+private val CheckboxWidth = 18.dp
+private val DayColumnWidth = 40.dp
+
+/**
+ * Where a row's meal column starts, from the row's outer edge, given the 16dp start inset the plan
+ * detail list applies: inset + checkbox + gap + day column + gap. [SameDaySlotRule] starts here.
+ */
+val MealPlanMealColumnStart: Dp = 16.dp + CheckboxWidth + 12.dp + DayColumnWidth + 12.dp
 
 /** "25 min · Serves 4", dropping either half when the recipe does not carry it. */
 private fun RecipePreview.metaLine(): String {
@@ -232,6 +305,47 @@ private fun MealPlanMealRowCookedDarkPreview() {
             modifier = Modifier.padding(horizontal = 16.dp),
         )
     }
+}
+
+@Composable
+private fun SameDayPairPreviewContent() {
+    Column {
+        MealPlanMealRow(
+            recipe = previewRecipe("Lemon Dill Salmon"),
+            dayAbbreviation = "THU",
+            dayNumber = "14",
+            isToday = false,
+            isCooked = false,
+            slotLabel = MealSlot.LUNCH.label,
+            onClick = {},
+            onToggleCooked = {},
+            onRemove = {},
+            dragHandle = { MealDragHandle() },
+            modifier = Modifier.padding(start = 16.dp, end = 2.dp),
+        )
+        SameDaySlotRule(start = MealPlanMealColumnStart)
+        MealPlanOpenSlotRow(
+            dayAbbreviation = "THU",
+            dayNumber = "14",
+            isToday = false,
+            slotLabel = MealSlot.DINNER.label,
+            showDate = false,
+            onAddRecipe = {},
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+    }
+}
+
+@Preview(name = "Same day, lunch + gap — Light", showBackground = true)
+@Composable
+private fun MealPlanMealRowSameDayPreview() {
+    ChefAITheme(darkTheme = false) { SameDayPairPreviewContent() }
+}
+
+@Preview(name = "Same day, lunch + gap — Dark", showBackground = true)
+@Composable
+private fun MealPlanMealRowSameDayDarkPreview() {
+    ChefAITheme(darkTheme = true) { SameDayPairPreviewContent() }
 }
 
 @Preview(name = "Recipe missing — Light", showBackground = true)

@@ -5,6 +5,7 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanStatus
 import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
+import com.tenmilelabs.chefai.mealplans.domain.model.RemovedMeal
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -173,6 +174,36 @@ class FakeMealPlanRepository : MealPlanRepository {
             if (it.uuid != planId) it else it.copy(days = it.days.map { d -> changed[d.uuid] ?: d })
         }
         return true
+    }
+
+    var shouldThrowOnRemove: Boolean = false
+
+    override suspend fun removeMeal(planId: UUID, dayId: UUID, slot: MealSlot): RemovedMeal? {
+        if (shouldThrowOnRemove) throw RuntimeException("Fake remove error")
+        val day = plans.value.firstOrNull { it.uuid == planId }?.days?.firstOrNull { it.uuid == dayId } ?: return null
+        val recipeId = day.recipeIdFor(slot) ?: return null
+        val removed = RemovedMeal(planId, dayId, slot, recipeId, day.cookedAtFor(slot))
+        updateDay(planId, dayId) { it.withSlot(slot, recipeId = null, cookedAt = null) }
+        return removed
+    }
+
+    override suspend fun restoreMeal(meal: RemovedMeal): Boolean {
+        val day = plans.value.firstOrNull { it.uuid == meal.planId }?.days?.firstOrNull { it.uuid == meal.dayId }
+        if (day == null || day.recipeIdFor(meal.slot) != null) return false
+        updateDay(meal.planId, meal.dayId) { it.withSlot(meal.slot, meal.recipeId, meal.cookedAt) }
+        return true
+    }
+
+    private fun updateDay(planId: UUID, dayId: UUID, transform: (MealPlanDay) -> MealPlanDay) {
+        plans.value = plans.value.map { plan ->
+            if (plan.uuid != planId) plan
+            else plan.copy(days = plan.days.map { if (it.uuid == dayId) transform(it) else it })
+        }
+    }
+
+    private fun MealPlanDay.withSlot(slot: MealSlot, recipeId: UUID?, cookedAt: Long?): MealPlanDay = when (slot) {
+        MealSlot.LUNCH -> copy(lunchRecipeId = recipeId, lunchCookedAt = cookedAt)
+        MealSlot.DINNER -> copy(dinnerRecipeId = recipeId, dinnerCookedAt = cookedAt)
     }
 
     fun emitPlans(vararg mealPlans: MealPlan) {

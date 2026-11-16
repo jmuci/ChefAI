@@ -28,6 +28,19 @@ durable cook history is [ADR-017](adrs/adr-017-cook-history-sync.md); saved plan
   shows only when details is opened from a meal-plan slot. The `MEAL_PLAN_RECIPE_DETAIL` route
   carries `mealPlanDayId`/`mealPlanSlot` alongside the recipe id — a recipe can fill several slots
   in a week, so the day+slot pair, not the recipe id, is what the toggle acts on.
+- **One day, several slots:** a lunch + dinner day prints its date once; the second slot is ruled
+  off by a hairline inset past the date column (`SameDaySlotRule`) rather than a full-bleed rule,
+  so the pair reads as one day. Same in the week view (`WeekDayRow`). This is the one deliberate
+  exception to the full-bleed rule rhythm in `docs/design/modernist.md`.
+- **Removing a meal:** every meal line (detail screen and week view) has a trash button that
+  empties the slot (`MealPlanRepository.removeMeal`, dirties the plan so it syncs) with an Undo
+  snackbar (`restoreMeal`, which brings the cooked mark back and refuses if the slot was refilled).
+  Cook history (ADR-017) is left alone — the cooking happened. The emptied slot becomes an
+  **"Add recipe"** gap (`BoardSlot.Open` / `WeekDay.openSlots`) for each slot the plan's meal type
+  expects; tapping it opens the saved-recipe picker (`AddMealSheet` with `fixedSlot`) and fills that
+  plan's slot directly — unlike the week view's "+ Add meal", which seeds a new plan. Gaps are not
+  offered for never-generated plans (no days) or for a slot another plan already fills that date.
+  **Gap:** the picker has no "Add a New Recipe" path — the import hand-off only seeds new plans.
 - **Cooked marks are per slot** (`meal_plan_days.dinnerCookedAt`/`lunchCookedAt`, DB v6,
   `MIGRATION_5_6`) and **local-only**: the sync payload has no field for them, so
   `SyncOrchestrator.applyPulledMealPlan` carries marks forward by `dayIndex`, and only while the slot

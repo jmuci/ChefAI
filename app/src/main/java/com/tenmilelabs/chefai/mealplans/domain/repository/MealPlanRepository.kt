@@ -4,6 +4,7 @@ import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanDay
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlanPreferences
 import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
+import com.tenmilelabs.chefai.mealplans.domain.model.RemovedMeal
 import com.tenmilelabs.chefai.mealplans.domain.usecase.MealRef
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
@@ -92,4 +93,20 @@ interface MealPlanRepository {
      * @return `false` if nothing changed — unknown plan, unknown or cooked meal, or [from] == [to].
      */
     suspend fun moveMeal(planId: UUID, from: MealRef, to: MealRef): Boolean
+
+    /**
+     * Empties [slot] of day [dayId] in [planId], leaving a gap the user can fill again. The day row
+     * itself stays, so the plan keeps its length. Dirties the plan so the change syncs.
+     *
+     * @return what was removed, for [restoreMeal]; `null` if nothing changed — unknown plan or day,
+     *   or the slot was already empty.
+     */
+    suspend fun removeMeal(planId: UUID, dayId: UUID, slot: MealSlot): RemovedMeal?
+
+    /**
+     * Undoes [removeMeal]: puts [meal] back with its cooked mark. Dirties the plan so it syncs.
+     *
+     * @return `false` if nothing changed — the plan or day is gone, or the slot was refilled since.
+     */
+    suspend fun restoreMeal(meal: RemovedMeal): Boolean
 }

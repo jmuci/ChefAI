@@ -6,21 +6,23 @@ import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
-import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.domain.model.RecipePreview
 import com.tenmilelabs.chefai.core.domain.repository.UserPreferencesRepository
 import com.tenmilelabs.chefai.core.util.WhileUiSubscribed
 import com.tenmilelabs.chefai.household.domain.model.Household
 import com.tenmilelabs.chefai.household.domain.repository.HouseholdRepository
 import com.tenmilelabs.chefai.mealplans.domain.model.MealPlan
+import com.tenmilelabs.chefai.mealplans.domain.model.RemovedMeal
 import com.tenmilelabs.chefai.mealplans.domain.model.SavedMealPlan
 import com.tenmilelabs.chefai.mealplans.domain.repository.MealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.repository.SavedMealPlanRepository
 import com.tenmilelabs.chefai.mealplans.domain.usecase.MealRef
+import com.tenmilelabs.chefai.mealplans.domain.usecase.ObserveSavedRecipesUseCase
 import com.tenmilelabs.chefai.mealplans.domain.usecase.RepeatSavedMealPlanUseCase
 import com.tenmilelabs.chefai.mealplans.domain.week.MealPlanOverlap
 import com.tenmilelabs.chefai.mealplans.domain.week.defaultMealPlanStartDate
 import kotlinx.coroutines.flow.first
+import com.tenmilelabs.chefai.mealplans.domain.week.OpenWeekSlot
 import com.tenmilelabs.chefai.mealplans.domain.week.PlannedWeekMeal
 import com.tenmilelabs.chefai.mealplans.domain.repository.ShoppingListRepository
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.ShoppingListBuilder
@@ -89,6 +91,12 @@ sealed interface MealPlansEvent {
      * dates collide with, if any — a non-blocking notice, computed before the plan was created.
      */
     data class NavigateToPlan(val planId: UUID, val overlappingPlanName: String?) : MealPlansEvent
+
+    /**
+     * A meal was taken out of its plan; the screen offers an Undo that calls `onUndoRemoveMeal`.
+     * [recipeTitle] is `null` when the recipe is not on this device.
+     */
+    data class MealRemoved(val removed: RemovedMeal, val recipeTitle: String?) : MealPlansEvent
 }
 
 sealed interface MealPlansUiState {
@@ -119,7 +127,7 @@ class MealPlansViewModel @Inject constructor(
     private val mealPlanRepository: MealPlanRepository,
     private val savedMealPlanRepository: SavedMealPlanRepository,
     private val recipesRepository: RecipesRepository,
-    private val collectionsRepository: CollectionsRepository,
+    private val observeSavedRecipes: ObserveSavedRecipesUseCase,
     shoppingListRepository: ShoppingListRepository,
     householdRepository: HouseholdRepository,
     userPreferencesRepository: UserPreferencesRepository,
@@ -295,15 +303,24 @@ class MealPlansViewModel @Inject constructor(
     /** What the user has typed into the sheet's search field. */
     val addMealQuery: StateFlow<String> = _addMealQuery
 
+    private val _addToSlot = MutableStateFlow<OpenWeekSlot?>(null)
+
+    /**
+     * The plan gap whose "Add recipe" sheet is open, or `null` while it is closed. Unlike
+     * [addMealDate], a pick fills this slot of the existing plan instead of seeding a new one.
+     */
+    val addToSlot: StateFlow<OpenWeekSlot?> = _addToSlot
+
     /**
      * The user's saved recipes matching [addMealQuery], by title — every saved recipe while the
      * query is blank. The same set the Recipes tab shows (bookmarks), never the public catalog.
-     * Queried only while the sheet is open; empty otherwise.
+     * Queried only while either sheet is open; empty otherwise.
      */
-    val addMealRecipes: StateFlow<List<RecipePreview>> = _addMealDate
-        .map { it != null }
+    val addMealRecipes: StateFlow<List<RecipePreview>> = combine(_addMealDate, _addToSlot) { date, slot ->
+        date != null || slot != null
+    }
         .distinctUntilChanged()
-        .flatMapLatest { open -> if (open) savedRecipes() else flowOf(emptyList()) }
+        .flatMapLatest { open -> if (open) observeSavedRecipes() else flowOf(emptyList()) }
         .combine(_addMealQuery) { recipes, query ->
             val needle = query.trim()
             if (needle.isEmpty()) recipes else recipes.filter { it.title.contains(needle, ignoreCase = true) }
@@ -321,17 +338,6 @@ class MealPlansViewModel @Inject constructor(
 
     private val _events = Channel<MealPlansEvent>(Channel.BUFFERED)
     val events: Flow<MealPlansEvent> = _events.receiveAsFlow()
-
-    private fun savedRecipes(): Flow<List<RecipePreview>> = sessionManager.userSession
-        .flatMapLatest { session ->
-            when (session) {
-                is UserSession.Loading -> emptyFlow()
-                is UserSession.Anonymous -> collectionsRepository.observeBookmarkedRecipeIds(session.localUserId)
-                is UserSession.Authenticated -> collectionsRepository.observeBookmarkedRecipeIds(session.user.uuid)
-            }
-        }
-        .flatMapLatest { ids -> recipesRepository.getRecipePreviewsByIds(ids.toList()) }
-        .map { recipes -> recipes.sortedBy { it.title.lowercase() } }
 
     fun onAddMeal(date: LocalDate) {
         _addMealQuery.value = ""
@@ -360,6 +366,62 @@ class MealPlansViewModel @Inject constructor(
             } catch (e: Exception) {
                 Timber.e(e, "onMoveMeal: failed for plan ${from.planId}")
                 _events.send(MealPlansEvent.ShowMessage(R.string.meal_plans_move_failed))
+            }
+        }
+    }
+
+    // --- Removing a meal, and refilling the gap it leaves ---
+
+    /** Empties [meal]'s slot in its plan, leaving an "Add recipe" gap, and offers an Undo. */
+    fun onRemoveMeal(meal: PlannedWeekMeal) {
+        viewModelScope.launch {
+            try {
+                val removed = mealPlanRepository.removeMeal(meal.planId, meal.dayId, meal.slot) ?: return@launch
+                _events.send(MealPlansEvent.MealRemoved(removed, meal.recipe?.title))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "onRemoveMeal: failed for plan ${meal.planId}")
+                _events.send(MealPlansEvent.ShowMessage(R.string.meal_plans_remove_failed))
+            }
+        }
+    }
+
+    /** Puts a meal [onRemoveMeal] took out back; a no-op if the gap was filled in the meantime. */
+    fun onUndoRemoveMeal(removed: RemovedMeal) {
+        viewModelScope.launch {
+            try {
+                mealPlanRepository.restoreMeal(removed)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "onUndoRemoveMeal: failed for plan ${removed.planId}")
+                _events.send(MealPlansEvent.ShowMessage(R.string.meal_plans_remove_failed))
+            }
+        }
+    }
+
+    fun onAddToSlot(slot: OpenWeekSlot) {
+        _addMealQuery.value = ""
+        _addToSlot.value = slot
+    }
+
+    fun onAddToSlotDismissed() {
+        _addToSlot.value = null
+    }
+
+    /** Fills the open gap with [recipeId] and closes the sheet. */
+    fun onAddToSlotPicked(recipeId: UUID) {
+        val target = _addToSlot.value ?: return
+        _addToSlot.value = null
+        viewModelScope.launch {
+            try {
+                mealPlanRepository.assignRecipeToSlot(target.planId, target.dayIndex, target.slot, recipeId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "onAddToSlotPicked: failed for plan ${target.planId}")
+                _events.send(MealPlansEvent.ShowMessage(R.string.meal_plans_add_recipe_failed))
             }
         }
     }

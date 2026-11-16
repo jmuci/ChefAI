@@ -31,6 +31,7 @@ import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
 import com.tenmilelabs.chefai.mealplans.domain.shoppinglist.PlannedIngredient
 import com.tenmilelabs.chefai.mealplans.domain.usecase.GenerateMealPlanUseCase
 import com.tenmilelabs.chefai.mealplans.domain.usecase.LocalMealPlanGenerator
+import com.tenmilelabs.chefai.mealplans.domain.usecase.ObserveSavedRecipesUseCase
 import com.tenmilelabs.chefai.recipes.data.repository.FakeRecipesRepository
 import io.mockk.every
 import io.mockk.mockk
@@ -56,6 +57,7 @@ class MealPlanDetailViewModelTest {
     private lateinit var shoppingListRepository: FakeShoppingListRepository
     private lateinit var householdRepository: FakeHouseholdRepository
     private lateinit var sessionManager: SessionManager
+    private val collectionsRepository = FakeCollectionsRepository()
 
     private val planId = UUID.randomUUID()
     private val dayId = UUID.randomUUID()
@@ -467,6 +469,107 @@ class MealPlanDetailViewModelTest {
         assertThat(mealPlanRepository.observeMealPlan(planId).first()).isNotNull()
     }
 
+    // --- Removing a meal and refilling the gap ---
+
+    @Test
+    fun `removing a meal leaves an open slot and offers an undo`() = runTest {
+        // Given a day with lunch and dinner
+        mealPlanRepository.emitPlans(planWith(fullDay()))
+        val viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            val initial = awaitItem()
+                .let { if (it is MealPlanDetailUiState.Loading) awaitItem() else it }
+                as MealPlanDetailUiState.Success
+            val lunch = initial.meals.first { it.slot == MealSlot.LUNCH }
+
+            viewModel.events.test {
+                // When the lunch is removed
+                viewModel.onRemoveMeal(lunch)
+
+                // Then an undo is offered for exactly that meal
+                val event = awaitItem() as MealPlanDetailEvent.MealRemoved
+                assertThat(event.removed.slot).isEqualTo(MealSlot.LUNCH)
+                assertThat(event.removed.recipeId).isEqualTo(recipePreview1.uuid)
+                assertThat(event.recipeTitle).isEqualTo(recipePreview1.title)
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            // And the slot is now a gap rather than a meal
+            val updated = awaitItem() as MealPlanDetailUiState.Success
+            assertThat(updated.meals.map { it.slot }).containsExactly(MealSlot.DINNER)
+            assertThat(updated.board.slots.first()).isEqualTo(BoardSlot.Open(dayIndex = 0, slot = MealSlot.LUNCH))
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `undoing a removal restores the meal with its cooked mark`() = runTest {
+        mealPlanRepository.emitPlans(planWith(fullDay(lunchCookedAt = 42L)))
+        val viewModel = createViewModel()
+        val lunch = (viewModel.uiState.first { it is MealPlanDetailUiState.Success } as MealPlanDetailUiState.Success)
+            .meals.first { it.slot == MealSlot.LUNCH }
+
+        viewModel.events.test {
+            viewModel.onRemoveMeal(lunch)
+            val event = awaitItem() as MealPlanDetailEvent.MealRemoved
+            viewModel.onUndoRemoveMeal(event.removed)
+            advanceUntilIdle()
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        val day = mealPlanRepository.observeMealPlan(planId).first()?.days?.single()
+        assertThat(day?.lunchRecipeId).isEqualTo(recipePreview1.uuid)
+        assertThat(day?.lunchCookedAt).isEqualTo(42L)
+    }
+
+    @Test
+    fun `a failed removal reports an error`() = runTest {
+        mealPlanRepository.emitPlans(planWith(fullDay()))
+        mealPlanRepository.shouldThrowOnRemove = true
+        val viewModel = createViewModel()
+        val lunch = (viewModel.uiState.first { it is MealPlanDetailUiState.Success } as MealPlanDetailUiState.Success)
+            .meals.first { it.slot == MealSlot.LUNCH }
+
+        viewModel.events.test {
+            viewModel.onRemoveMeal(lunch)
+            assertThat(awaitItem()).isInstanceOf(MealPlanDetailEvent.ShowError::class.java)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `picking a recipe for an open slot fills it and closes the picker`() = runTest {
+        // Given a plan whose day 0 lunch is empty
+        mealPlanRepository.emitPlans(planWith(fullDay().copy(lunchRecipeId = null)))
+        val viewModel = createViewModel()
+        val gap = BoardSlot.Open(dayIndex = 0, slot = MealSlot.LUNCH)
+
+        // When the user opens the picker on it and picks a recipe
+        viewModel.onAddRecipe(gap)
+        assertThat(viewModel.addRecipeSlot.value).isEqualTo(gap)
+        viewModel.onAddRecipePicked(recipePreview2.uuid)
+        advanceUntilIdle()
+
+        // Then the slot holds the recipe and the picker is closed
+        assertThat(viewModel.addRecipeSlot.value).isNull()
+        val day = mealPlanRepository.observeMealPlan(planId).first()?.days?.single()
+        assertThat(day?.lunchRecipeId).isEqualTo(recipePreview2.uuid)
+    }
+
+    @Test
+    fun `dismissing the picker fills nothing`() = runTest {
+        mealPlanRepository.emitPlans(planWith(fullDay().copy(lunchRecipeId = null)))
+        val viewModel = createViewModel()
+
+        viewModel.onAddRecipe(BoardSlot.Open(dayIndex = 0, slot = MealSlot.LUNCH))
+        viewModel.onAddRecipeDismissed()
+        viewModel.onAddRecipePicked(recipePreview2.uuid)
+        advanceUntilIdle()
+
+        assertThat(mealPlanRepository.observeMealPlan(planId).first()?.days?.single()?.lunchRecipeId).isNull()
+    }
+
     // --- Helpers ---
 
     private fun createViewModel(): MealPlanDetailViewModel {
@@ -485,6 +588,7 @@ class MealPlanDetailViewModelTest {
             generateMealPlanUseCase = generateMealPlanUseCase,
             shoppingListRepository = shoppingListRepository,
             householdRepository = householdRepository,
+            observeSavedRecipes = ObserveSavedRecipesUseCase(sessionManager, collectionsRepository, recipesRepository),
         )
     }
 

@@ -22,6 +22,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -72,7 +73,11 @@ import com.tenmilelabs.chefai.mealplans.domain.model.VarietyPreference
 import com.tenmilelabs.chefai.mealplans.ui.components.DraggedElevation
 import com.tenmilelabs.chefai.mealplans.ui.components.DropTargetAlpha
 import com.tenmilelabs.chefai.mealplans.ui.components.MealDragHandle
+import com.tenmilelabs.chefai.mealplans.ui.components.AddMealSheet
+import com.tenmilelabs.chefai.mealplans.ui.components.MealPlanMealColumnStart
 import com.tenmilelabs.chefai.mealplans.ui.components.MealPlanMealRow
+import com.tenmilelabs.chefai.mealplans.ui.components.MealPlanOpenSlotRow
+import com.tenmilelabs.chefai.mealplans.ui.components.SameDaySlotRule
 import com.tenmilelabs.chefai.mealplans.ui.components.reorderDrag
 import com.tenmilelabs.chefai.mealplans.ui.detail.print.printMealPlan
 import java.time.LocalDate
@@ -80,6 +85,7 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 import java.util.UUID
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 @Composable
@@ -92,6 +98,9 @@ fun MealPlanDetailScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val addRecipeSlot by viewModel.addRecipeSlot.collectAsStateWithLifecycle()
+    val addRecipeQuery by viewModel.addRecipeQuery.collectAsStateWithLifecycle()
+    val addRecipeRecipes by viewModel.addRecipeRecipes.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     LaunchedEffect(Unit) {
@@ -100,8 +109,36 @@ fun MealPlanDetailScreen(
                 is MealPlanDetailEvent.ShowError -> snackbarHostState.showSnackbar(event.message)
                 is MealPlanDetailEvent.PrintReady -> printMealPlan(context, event.document)
                 is MealPlanDetailEvent.Deleted -> onDeleted()
+                // Launched, not awaited: a snackbar with an action suspends until it is dismissed,
+                // and the next event (another removal, an error) must not queue behind it.
+                is MealPlanDetailEvent.MealRemoved -> launch {
+                    snackbarHostState.currentSnackbarData?.dismiss()
+                    val result = snackbarHostState.showSnackbar(
+                        message = event.recipeTitle
+                            ?.let { context.getString(R.string.meal_plan_meal_removed, it) }
+                            ?: context.getString(R.string.meal_plan_meal_removed_unnamed),
+                        actionLabel = context.getString(R.string.meal_plan_undo),
+                        withDismissAction = true,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) viewModel.onUndoRemoveMeal(event.removed)
+                }
             }
         }
+    }
+
+    val successState = uiState as? MealPlanDetailUiState.Success
+    val openSlot = addRecipeSlot
+    if (successState != null && openSlot != null) {
+        AddMealSheet(
+            date = mealPlanDateFor(successState.mealPlan, openSlot.dayIndex),
+            query = addRecipeQuery,
+            recipes = addRecipeRecipes,
+            onQueryChange = viewModel::onAddRecipeQueryChange,
+            onRecipePicked = { _, recipeId -> viewModel.onAddRecipePicked(recipeId) },
+            onNewRecipe = null,
+            onDismiss = viewModel::onAddRecipeDismissed,
+            fixedSlot = openSlot.slot,
+        )
     }
 
     when (val state = uiState) {
@@ -117,6 +154,8 @@ fun MealPlanDetailScreen(
             onMealClick = onMealClick,
             onToggleCooked = viewModel::onToggleCooked,
             onMoveMeal = viewModel::onMoveMeal,
+            onRemoveMeal = viewModel::onRemoveMeal,
+            onAddRecipe = viewModel::onAddRecipe,
             onGenerate = viewModel::onGenerate,
             onShoppingListClick = onShoppingListClick,
             modifier = modifier,
@@ -133,6 +172,8 @@ private fun MealPlanDetailContent(
     onGenerate: () -> Unit,
     onShoppingListClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onRemoveMeal: (PlannedMeal) -> Unit = {},
+    onAddRecipe: (BoardSlot.Open) -> Unit = {},
     preferencesInitiallyExpanded: Boolean = false,
 ) {
     // Preferences start collapsed: they were chosen moments ago in the wizard, so the week itself
@@ -176,19 +217,39 @@ private fun MealPlanDetailContent(
                 isGenerating -> item(key = "generating") {
                     GeneratingState(modifier = Modifier.padding(horizontal = 16.dp))
                 }
-                state.totalCount == 0 -> item(key = "empty") {
+                state.board.slots.isEmpty() -> item(key = "empty") {
                     EmptyPlanState(onGenerate = onGenerate, modifier = Modifier.padding(horizontal = 16.dp))
                 }
                 else -> {
                     item(key = "rule-top") { SectionRule() }
                     itemsIndexed(
-                        items = state.meals,
-                        key = { _, meal -> meal.dragKey() },
-                    ) { index, meal ->
-                        if (index > 0) RowRule()
-                        val date = remember(meal.dayIndex, state.mealPlan.startDate, state.mealPlan.createdAt) {
-                            mealPlanDateFor(state.mealPlan, meal.dayIndex)
+                        items = state.board.slots,
+                        key = { _, slot -> slot.key() },
+                    ) { index, boardSlot ->
+                        // A day's slots share one date: the second is ruled off only past the date
+                        // column and leaves its own date blank, so the pair reads as one day.
+                        val startsDay = state.board.slots.getOrNull(index - 1)?.dayIndex != boardSlot.dayIndex
+                        if (index > 0) {
+                            if (startsDay) RowRule() else SameDaySlotRule(start = MealPlanMealColumnStart)
                         }
+                        val date = remember(boardSlot.dayIndex, state.mealPlan.startDate, state.mealPlan.createdAt) {
+                            mealPlanDateFor(state.mealPlan, boardSlot.dayIndex)
+                        }
+                        if (boardSlot is BoardSlot.Open) {
+                            MealPlanOpenSlotRow(
+                                dayAbbreviation = date.shortDayName(),
+                                dayNumber = date.dayOfMonth.toString(),
+                                isToday = date == LocalDate.now(),
+                                slotLabel = if (state.showsSlotLabels) boardSlot.slot.label else null,
+                                showDate = startsDay,
+                                onAddRecipe = { onAddRecipe(boardSlot) },
+                                modifier = Modifier
+                                    .background(MaterialTheme.colorScheme.background)
+                                    .padding(horizontal = 16.dp),
+                            )
+                            return@itemsIndexed
+                        }
+                        val meal = (boardSlot as BoardSlot.Filled).meal
                         val mealKey = meal.dragKey()
                         val isDragged = draggedKey == mealKey
                         val isTarget = targetKey == mealKey
@@ -256,6 +317,8 @@ private fun MealPlanDetailContent(
                             slotLabel = if (state.showsSlotLabels) meal.slot.label else null,
                             onClick = { onMealClick(meal) },
                             onToggleCooked = { onToggleCooked(meal) },
+                            showDate = startsDay,
+                            onRemove = { onRemoveMeal(meal) },
                             dragHandle = if (meal.isCooked) {
                                 null
                             } else {
@@ -286,9 +349,9 @@ private fun MealPlanDetailContent(
                                         MaterialTheme.colorScheme.background
                                     },
                                 )
-                                // The trailing grip brings its own 48dp target, so the end inset shrinks
-                                // to keep the icon on the 16dp content edge.
-                                .padding(start = 16.dp, end = if (meal.isCooked) 16.dp else 2.dp),
+                                // The trailing trash (and grip) bring their own 48dp targets, so the end
+                                // inset shrinks to keep the icon on the 16dp content edge.
+                                .padding(start = 16.dp, end = 2.dp),
                         )
                     }
                     item(key = "rule-bottom") { SectionRule() }
@@ -320,6 +383,11 @@ private fun MealPlanDetailContent(
 
 /** Stable across reorders: a (day, slot) position, not the recipe that currently fills it. */
 private fun PlannedMeal.dragKey(): String = "meal-$dayId-$slot"
+
+private fun BoardSlot.key(): String = when (this) {
+    is BoardSlot.Filled -> meal.dragKey()
+    is BoardSlot.Open -> "open-$dayIndex-$slot"
+}
 
 private fun LocalDate.shortDayName(): String =
     dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()).uppercase()
