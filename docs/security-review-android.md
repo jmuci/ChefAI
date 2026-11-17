@@ -4,6 +4,34 @@ Reviewed 2026-11-16 against `4428ce0c`, from `docs/security-handover-android.md`
 file reads (listed at the end). Line numbers are those of the handover's §9 unless a file is named
 that the handover does not include.
 
+## Status
+
+All 13 findings are fixed on the client and merged to `main`. Two still depend on work outside this
+repo.
+
+| Finding | PR | Notes |
+|---------|----|-------|
+| A1 — logout leaves data readable | #352 | Backend half of household visibility: jmuci/Chef.ai_Backend#132 |
+| A2 — refresh 4xx strands the user as anonymous | #351 | |
+| A3 — zero-click fetch of synced `imageUrl` | #353 | |
+| A4 — restore defeats switch detection; push not owner-filtered | #352 | |
+| A5 — pending invite token planted, never expires | #352 | |
+| A6 — share intent opens the in-app browser with no tap | #354 | |
+| A7 — Coil loads any host and scheme | #353 | **Tracking-pixel half pending** jmuci/Chef.ai_Backend#131 (blob or proxy serving of other users' images) |
+| A8 — failed logout resurrects the session | #351 | |
+| A9 — rotated refresh token written in a separate edit | #351 | |
+| A10 — process death after account deletion | #351 | |
+| A11 — task hijacking on Android 9–10 | #354 | |
+| A12 — invite App Link verification unconfirmed | #354 | **Pending a hosting change:** `assetlinks.json` lists only a debug fingerprint; the release (or Play App Signing) fingerprint must be added before release |
+| A13 — debug test credentials in the release dex | #354 | |
+
+Verified on an emulator against a local backend on 2026-11-17: the previously unrun instrumented
+tests (`RecipeDaoTest`'s household visibility test, `AccountSwitchHandlerDatabaseTest`,
+`WebViewHtmlFetcherTest.runsTheAcceptCheckOffTheMainThread`) pass, and manual checks of A1
+(signed-out search, list and home), A6 (host-naming dialog, Cancel keeps the URL), A11 (share from
+Chrome and the invite link land in the app's own task), A7 (no legitimate image blocked) and
+household visibility all passed.
+
 ## 1. Verdict
 
 The token and transport basics are sound: Keystore AES-GCM is used correctly, the bearer token is
