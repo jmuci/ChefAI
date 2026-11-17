@@ -107,6 +107,10 @@ language detection is [ADR-016](adrs/adr-016-recipe-language.md). The share-targ
   `app_name`).
 - A shared URL is **imported straight away**, with no Import tap, once per destination:
   `autoImportStarted` lives in the `SavedStateHandle`, so process death doesn't re-import.
+- If that silent fetch returns `NeedsBrowser`, a shared URL **does not** open the in-app browser on
+  its own: an "Open this site?" dialog names the host (`ImportRecipeState.browserConfirmUrl`), and
+  Cancel leaves the URL in the field. A typed URL still goes straight to the browser
+  (security review A6, #354).
 - Shared text with no link shows a toast.
 
 ## Recipe delete

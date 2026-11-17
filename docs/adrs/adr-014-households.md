@@ -211,10 +211,21 @@ doesn't turn into a large pool.
   can't leak in. Reads by id (`observeRecipesWithDetailsByIds`) stay unfiltered, because their
   ids come from surfaces already scoped to the user, and a shared plan must keep showing a recipe
   whose author has left.
-- **Backend (outstanding, jmuci/Chef.ai_Backend#130):** today a member's PRIVATE recipe reaches other members only through
-  the gap clause, when it is assigned to a shared plan. For members' whole libraries to appear,
-  `/sync/pull` and server-side search need the same household clause. Until then the Android
-  predicate simply has fewer rows to show.
+- **Backend (done, jmuci/Chef.ai_Backend#132, closes #130):** one shared rule,
+  `creator_id = me OR privacy = 'PUBLIC' OR creator_id IN (active co-members)`, applied to
+  `/sync/pull` (co-member recipes and their tombstones ride the normal paged delta) and to
+  server-side search. For consistency it also widens `GET /api/v1/recipes/{id}`, the bookmark-push
+  gate, the library bookmark list, meal-plan reference validation and meal-plan recipe cards, so a
+  search hit never 404s on detail or fails to bookmark.
+  - **Joining:** for each pair of members, sharing starts at the later of their two `joined_at`
+    times. A co-member's older non-PUBLIC recipe is reported as changed at that moment, so devices
+    with a pre-join cursor pick it up on the next pull, in both directions, without a cursor reset.
+  - **Leaving:** the clause drops both ways and no tombstone is sent. The Android predicate hides
+    the rows, since the departed author is no longer in the cached `household_members`.
+  - **Push:** unchanged. A recipe whose `creatorId` isn't the JWT subject is still rejected with
+    `CREATOR_MISMATCH`, so a member can't overwrite another member's recipe.
+  - Verified on an emulator against a local backend (2026-11-17): account B, in A's household,
+    finds A's PRIVATE recipe in search both online and offline after a sync.
 - **Bookmarks** stay per user. The Recipes tab lists the user's own bookmarks, so household
   recipes show up in search, plan generation and plan views, not in someone else's collection.
 
