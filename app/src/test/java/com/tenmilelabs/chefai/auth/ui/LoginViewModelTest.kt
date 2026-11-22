@@ -5,6 +5,7 @@ import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
 import com.tenmilelabs.chefai.auth.data.network.AuthHttpException
+import com.tenmilelabs.chefai.auth.ui.google.GoogleIdTokenResult
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.domain.AccountSwitchHandler
 import com.tenmilelabs.chefai.auth.domain.SessionManager
@@ -565,5 +566,117 @@ class LoginViewModelTest {
         advanceUntilIdle()
 
         assertThat(statusBanner.message.value).isNull()
+    }
+
+
+    // --- Sign in with Google (ADR-019) ---
+
+    @Test
+    fun `google success signs in and navigates to home`() = testScope.runTest {
+        viewModel.uiEvents.test {
+            viewModel.onGoogleResult(GoogleIdTokenResult.Success("id-token"))
+            advanceUntilIdle()
+
+            assertThat(awaitItem()).isEqualTo(LoginUiEvent.NavigateToHome)
+        }
+        assertThat(fakeAuthNetworkDataSource.googleSignInRequests.map { it.idToken }).containsExactly("id-token")
+        assertThat(sessionManager.userSession.value).isInstanceOf(UserSession.Authenticated::class.java)
+        assertThat(viewModel.uiState.value.isLoading).isFalse()
+    }
+
+    @Test
+    fun `google success with a pending invite resumes the join instead of home`() = testScope.runTest {
+        fakeSecurePreferences.savePendingInviteToken("invite-token-abc")
+
+        viewModel.uiEvents.test {
+            viewModel.onGoogleResult(GoogleIdTokenResult.Success("id-token"))
+            advanceUntilIdle()
+
+            assertThat(awaitItem()).isEqualTo(LoginUiEvent.NavigateToAcceptInvite("invite-token-abc"))
+        }
+    }
+
+    @Test
+    fun `google cancelled does nothing`() = testScope.runTest {
+        viewModel.uiEvents.test {
+            viewModel.onGoogleResult(GoogleIdTokenResult.Cancelled)
+            advanceUntilIdle()
+
+            expectNoEvents()
+        }
+        assertThat(fakeAuthNetworkDataSource.googleSignInRequests).isEmpty()
+        assertThat(viewModel.uiState.value.isLoading).isFalse()
+    }
+
+    @Test
+    fun `google no account shows a snackbar`() = testScope.runTest {
+        viewModel.uiEvents.test {
+            viewModel.onGoogleResult(GoogleIdTokenResult.NoGoogleAccount)
+            advanceUntilIdle()
+
+            assertThat(awaitItem()).isEqualTo(LoginUiEvent.ShowSnackbar(R.string.error_google_no_account))
+        }
+    }
+
+    @Test
+    fun `google credential failure shows a snackbar`() = testScope.runTest {
+        viewModel.uiEvents.test {
+            viewModel.onGoogleResult(GoogleIdTokenResult.Failure(IllegalStateException("boom")))
+            advanceUntilIdle()
+
+            assertThat(awaitItem()).isEqualTo(LoginUiEvent.ShowSnackbar(R.string.error_google_sign_in_failed))
+        }
+    }
+
+    @Test
+    fun `google invalid token shows the generic google snackbar not field errors`() = testScope.runTest {
+        fakeAuthNetworkDataSource.googleSignInError =
+            AuthHttpException(message = "Invalid token", statusCode = 401, code = "INVALID_GOOGLE_TOKEN")
+
+        viewModel.uiEvents.test {
+            viewModel.onGoogleResult(GoogleIdTokenResult.Success("id-token"))
+            advanceUntilIdle()
+
+            assertThat(awaitItem()).isEqualTo(LoginUiEvent.ShowSnackbar(R.string.error_google_sign_in_failed))
+        }
+        assertThat(viewModel.uiState.value.emailError).isNull()
+        assertThat(viewModel.uiState.value.passwordError).isNull()
+        assertThat(viewModel.uiState.value.isLoading).isFalse()
+    }
+
+    @Test
+    fun `google email exists tells the user to log in with the password and connect google`() = testScope.runTest {
+        fakeAuthNetworkDataSource.googleSignInError =
+            AuthHttpException(message = "exists", statusCode = 409, code = "GOOGLE_EMAIL_EXISTS")
+
+        viewModel.uiEvents.test {
+            viewModel.onGoogleResult(GoogleIdTokenResult.Success("id-token"))
+            advanceUntilIdle()
+
+            assertThat(awaitItem()).isEqualTo(LoginUiEvent.ShowSnackbar(R.string.error_google_email_exists))
+        }
+        assertThat(sessionManager.userSession.value).isInstanceOf(UserSession.Anonymous::class.java)
+    }
+
+    @Test
+    fun `google sign-in with the backend unreachable shows the server error banner`() = testScope.runTest {
+        fakeAuthNetworkDataSource.googleSignInError = UnknownHostException("api.pocket-chef.app")
+
+        viewModel.onGoogleResult(GoogleIdTokenResult.Success("id-token"))
+        advanceUntilIdle()
+
+        assertThat(statusBanner.message.value?.message).isEqualTo(R.string.status_banner_server_error)
+    }
+
+    @Test
+    fun `google sign-in on a 404 from an older backend shows the generic google snackbar`() = testScope.runTest {
+        fakeAuthNetworkDataSource.googleSignInError = AuthHttpException(message = "Not Found", statusCode = 404)
+
+        viewModel.uiEvents.test {
+            viewModel.onGoogleResult(GoogleIdTokenResult.Success("id-token"))
+            advanceUntilIdle()
+
+            assertThat(awaitItem()).isEqualTo(LoginUiEvent.ShowSnackbar(R.string.error_google_sign_in_failed))
+        }
     }
 }

@@ -27,6 +27,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -49,8 +50,12 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.tenmilelabs.chefai.BuildConfig
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.auth.ui.google.GoogleSignInButton
+import com.tenmilelabs.chefai.auth.ui.google.rememberGoogleIdTokenRequester
 import com.tenmilelabs.chefai.core.ui.components.AppVersionText
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatBlockButton
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatCheckbox
@@ -82,6 +87,8 @@ fun LoginScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
     val context = LocalContext.current
+    val googleRequester = rememberGoogleIdTokenRequester()
+    val scope = rememberCoroutineScope()
 
     // Handle UI events
     LaunchedEffect(viewModel, snackbarHostState) {
@@ -119,6 +126,10 @@ fun LoginScreen(
         onLoginClick = viewModel::onLoginClick,
         onCreateAccountClick = viewModel::onCreateAccountClick,
         onForgotPasswordClick = viewModel::onForgotPasswordClick,
+        onGoogleClick = {
+            scope.launch { viewModel.onGoogleResult(googleRequester.request(context)) }
+        },
+        showGoogleButton = BuildConfig.GOOGLE_SIGN_IN_CONFIGURED,
         onNavigateBack = onNavigateBack,
         onDeveloperOptionsClick = onNavigateToDeveloperOptions,
         appVersion = appVersionLabel,
@@ -138,6 +149,9 @@ fun LoginScreenContent(
     onLoginClick: () -> Unit = {},
     onCreateAccountClick: () -> Unit = {},
     onForgotPasswordClick: () -> Unit = {},
+    onGoogleClick: () -> Unit = {},
+    /** Hidden when the build has no Google Web client ID (`BuildConfig.GOOGLE_SIGN_IN_CONFIGURED`). */
+    showGoogleButton: Boolean = false,
     onNavigateBack: () -> Unit = {},
     onDeveloperOptionsClick: (() -> Unit)? = null,
     appVersion: String,
@@ -242,6 +256,16 @@ fun LoginScreenContent(
                             loading = uiState.isLoading,
                             modifier = Modifier.testTag("LoginButton"),
                         )
+
+                        if (showGoogleButton) {
+                            Spacer(modifier = Modifier.height(AuthMetrics.FieldGap))
+
+                            GoogleSignInButton(
+                                onClick = onGoogleClick,
+                                enabled = !uiState.isLoading,
+                                modifier = Modifier.testTag("GoogleSignInButton"),
+                            )
+                        }
 
                         Spacer(modifier = Modifier.height(AuthMetrics.ButtonToFooterGap))
 
@@ -456,6 +480,7 @@ private fun LoginScreenPreview() {
                 password = "Password123!"
             ),
             focusManager = LocalFocusManager.current,
+            showGoogleButton = true,
             onDeveloperOptionsClick = {},
             appVersion = "1.0-a1b2c3d-debug",
         )
@@ -472,6 +497,7 @@ private fun LoginScreenDarkPreview() {
                 password = "Password123!"
             ),
             focusManager = LocalFocusManager.current,
+            showGoogleButton = true,
             onDeveloperOptionsClick = {},
             appVersion = "1.0-a1b2c3d-debug",
         )
@@ -489,6 +515,7 @@ private fun LoginScreenLandscapePreview() {
                 password = "Password123!"
             ),
             focusManager = LocalFocusManager.current,
+            showGoogleButton = true,
             onDeveloperOptionsClick = {},
             appVersion = "1.0-a1b2c3d-debug",
         )
@@ -509,6 +536,7 @@ private fun LoginScreenLandscapeDarkPreview() {
                 password = "Password123!"
             ),
             focusManager = LocalFocusManager.current,
+            showGoogleButton = true,
             onDeveloperOptionsClick = {},
             appVersion = "1.0-a1b2c3d-debug",
         )

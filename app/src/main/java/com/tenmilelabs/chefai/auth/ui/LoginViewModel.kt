@@ -7,6 +7,7 @@ import com.tenmilelabs.chefai.auth.data.local.SecurePreferencesInterface
 import com.tenmilelabs.chefai.auth.data.network.AuthHttpException
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
+import com.tenmilelabs.chefai.auth.ui.google.GoogleIdTokenResult
 import com.tenmilelabs.chefai.core.data.sync.ConnectivityObserver
 import com.tenmilelabs.chefai.core.ui.banner.StatusBannerController
 import com.tenmilelabs.chefai.core.ui.banner.StatusBannerPlacement
@@ -23,6 +24,11 @@ import timber.log.Timber
 import java.io.IOException
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.seconds
+
+/** `ErrorResponse.code` of `POST /auth/google` when the email already has a password account. */
+internal const val GOOGLE_EMAIL_EXISTS = "GOOGLE_EMAIL_EXISTS"
+
+private val SERVER_ERROR_CODES = setOf(500, 502, 503)
 
 /** How long a login error banner stays up. */
 internal val LOGIN_BANNER_DURATION = 5.seconds
@@ -163,18 +169,69 @@ class LoginViewModel @Inject constructor(
                     // AccountUpgradeUseCase has already completed inside SessionManager.login()
                     // (awaited, not fire-and-forget) by the time this runs, so getCurrentUserId()
                     // is stable — see SessionManager.login()'s doc and ADR-014 §7.
-                    val pendingInviteToken = securePreferences.getPendingInviteToken().first()
-                    if (pendingInviteToken != null) {
-                        _uiEvent.emit(LoginUiEvent.NavigateToAcceptInvite(pendingInviteToken))
-                    } else {
-                        _uiEvent.emit(LoginUiEvent.NavigateToHome)
-                    }
+                    navigateAfterSignIn()
                 },
                 onFailure = { exception ->
                     Timber.e(exception, "Login failed")
                     handleLoginError(exception)
                 }
             )
+        }
+    }
+
+    /**
+     * The picker's outcome, forwarded by the screen (the Activity-bound request itself lives in the
+     * UI layer, see [GoogleIdTokenResult]). Success continues like a password login; cancelling is
+     * silent; everything else is a message.
+     */
+    fun onGoogleResult(result: GoogleIdTokenResult) {
+        when (result) {
+            GoogleIdTokenResult.Cancelled -> Unit
+            GoogleIdTokenResult.NoGoogleAccount -> viewModelScope.launch {
+                _uiEvent.emit(LoginUiEvent.ShowSnackbar(R.string.error_google_no_account))
+            }
+            is GoogleIdTokenResult.Failure -> viewModelScope.launch {
+                // The cause is a Credential Manager exception; it carries no token.
+                Timber.e(result.cause, "Google credential request failed")
+                _uiEvent.emit(LoginUiEvent.ShowSnackbar(R.string.error_google_sign_in_failed))
+            }
+            is GoogleIdTokenResult.Success -> viewModelScope.launch {
+                _uiState.value = _uiState.value.copy(isLoading = true)
+
+                val signIn = sessionManager.loginWithGoogle(result.idToken)
+
+                _uiState.value = _uiState.value.copy(isLoading = false)
+
+                signIn.fold(
+                    onSuccess = { navigateAfterSignIn() },
+                    onFailure = { exception ->
+                        Timber.e(exception, "Google sign-in failed")
+                        handleGoogleError(exception)
+                    },
+                )
+            }
+        }
+    }
+
+    /** Pending-invite aware success navigation, shared by password and Google sign-in. */
+    private suspend fun navigateAfterSignIn() {
+        val pendingInviteToken = securePreferences.getPendingInviteToken().first()
+        if (pendingInviteToken != null) {
+            _uiEvent.emit(LoginUiEvent.NavigateToAcceptInvite(pendingInviteToken))
+        } else {
+            _uiEvent.emit(LoginUiEvent.NavigateToHome)
+        }
+    }
+
+    private suspend fun handleGoogleError(exception: Throwable) {
+        when {
+            exception is IOException -> reportUnreachableBackend()
+            exception is AuthHttpException && exception.code == GOOGLE_EMAIL_EXISTS ->
+                _uiEvent.emit(LoginUiEvent.ShowSnackbar(R.string.error_google_email_exists))
+            exception is AuthHttpException && exception.statusCode in SERVER_ERROR_CODES -> reportUnreachableBackend()
+            // INVALID_GOOGLE_TOKEN, an older backend's 404, anything else: field errors make no
+            // sense for Google, so it is always the generic message.
+            else -> _uiEvent.emit(LoginUiEvent.ShowSnackbar(R.string.error_google_sign_in_failed))
         }
     }
 
