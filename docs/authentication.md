@@ -502,6 +502,7 @@ if (sessionManager.isTokenExpired()) {
 - [x] Anonymous → authenticated upgrade flow
 - [x] Store user profile locally during login
 - [x] Wire real user ID into repositories (replace hardcoded test UUID)
+- [ ] Sign in with Google — proposed in [ADR-019](adrs/adr-019-sign-in-with-google.md)
 - [ ] Add biometric authentication option
 - [ ] Implement "Remember Me" functionality
 - [ ] Add session timeout handling
