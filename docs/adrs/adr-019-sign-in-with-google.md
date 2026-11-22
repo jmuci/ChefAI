@@ -86,23 +86,22 @@ mirrored in `sql/create_tables.sql`.
 
 Matching is on `sub`, never on email alone: a Google account's email can change, `sub` cannot.
 
-**Username** for a new user: derived from the token's `given_name` (fallback: the email local
-part), sanitised to `InputValidator`'s rules (`[a-zA-Z0-9_.-]`, 3–100 chars, not reserved), with a
-numeric suffix until it is free. Editable later, if and when a profile edit screen exists.
+**Names** for a new user: the token's `name` goes into `users.display_name`, which is what other
+users see (sync's creator rows prefer it over `user_name`). `user_name` is filled from
+`given_name` (fallback: the email local part), reduced to `InputValidator`'s character set
+(`[a-zA-Z0-9_.-]`, 3–100 chars, not reserved), since the column is `NOT NULL` and registration
+validates it that way. Editable later, if and when a profile edit screen exists.
 
-**Usernames must be unique, and today they are not.** Verified against the backend at `bc1f3eb`:
-`UserTable.user_name` is a plain `text` column with no index, `create_tables.sql` has
-`user_name TEXT NOT NULL` without `UNIQUE`, and `AuthService.register` checks only the email. Only
-`email` is unique. This is a **prerequisite**, best done with the registration work already in
-progress:
+**Usernames are not unique, and stay that way.** At backend `bc1f3eb`, `user_name` has no index
+and `register` checks only the email. Nothing looks a user up by username: login and the
+existing-account check use email, household invites use a token or `inviteeEmail`, and sync uses
+the name only as a display fallback. Identity is the UUID and the email; the username is a label,
+so duplicates are fine and Google sign-in needs no collision handling. If @mentions, public profile
+URLs or invite-by-username ever arrive, that feature adds a unique index on `lower(user_name)` and
+renames existing duplicates first.
 
-- a unique index on `lower(user_name)` (case-insensitive, so `Jose` and `jose` collide), added by
-  hand in `DatabaseInit` like the `password_hash` change;
-- before creating it, find duplicates already in production (`GROUP BY lower(user_name) HAVING
-  count(*) > 1`) and rename them, or the index creation fails at boot;
-- `register` returns `409 USERNAME_TAKEN`, and the Android register screen shows it;
-- add `deleted-user` (`DeletedUser.USERNAME`) to `InputValidator`'s reserved names, so nobody can
-  register the deletion placeholder's name.
+Related, not part of this ADR: the username rules are handle rules (no spaces, no accents), so
+"José García" cannot register by email today, although the field behaves as a display name.
 
 ## Decision 3: An email that already has an account gets 409; linking is explicit and signed in
 
@@ -192,11 +191,9 @@ deletion screen asks for whichever the account has; the auth response (or `GET /
 ## Consequences
 
 - **Public API (backend):** new `POST /auth/google` and `POST /auth/google/link`; the deletion
-  request gains an optional `googleIdToken`; the auth response may gain `hasPassword`/`providers`;
-  `register` gains a `409 USERNAME_TAKEN`. All additive except that last one, which turns a
-  registration that succeeds today into an error.
-- **Deploy order:** username uniqueness and password reset first, then the Google endpoints, then
-  the client. A client calling `/auth/google` on an older backend gets 404, which surfaces as a
+  request gains an optional `googleIdToken`; the auth response may gain `hasPassword`/`providers`.
+  All additive.
+- **Deploy order:** password reset first, then the Google endpoints, then the client. A client calling `/auth/google` on an older backend gets 404, which surfaces as a
   sign-in error, not data loss.
 - **Google-only accounts have no password.** Adding one later is a "set password" flow; the
   password-reset flow being built can probably serve it (reset on an account with no password).
@@ -205,15 +202,16 @@ deletion screen asks for whichever the account has; the auth response (or `GET /
 - **Tests:** Android — `loginWithGoogle` success/failure/upgrade with the existing fakes, and the
   ViewModel's handling of each `GoogleIdTokenResult`, including the 409 message. Backend —
   verifier rejections (bad `aud`, expired, unverified email, bad signature) with a locally signed
-  token, the three lookup branches, `/link` (email mismatch, `sub` owned by someone else), and
-  `USERNAME_TAKEN` case-insensitively.
+  token, the three lookup branches, `/link` (email mismatch, `sub` owned by someone else), and a
+  Google `name` with spaces/accents landing in `display_name` while `user_name` still validates.
 
 ## Resolved (Nov 2026)
 
 - **Existing email → 409**, not auto-link (Decision 3).
 - **Email verification** is being added to registration alongside password reset (Resend), as
   separate work.
-- **Usernames must be unique** — they are not today; made a prerequisite (Decision 2).
+- **Usernames need not be unique** — email and UUID are the identity; the username is a display
+  label (Decision 2).
 
 ## Open question: nonce
 
