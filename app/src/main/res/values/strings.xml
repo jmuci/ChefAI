@@ -655,4 +655,39 @@
     <string name="saved_plan_repeated">Plan scheduled from your saved plan</string>
     <string name="saved_plan_repeat_failed">Couldn\'t schedule this saved plan</string>
 
+    <!-- Password reset (forgot / reset screens) -->
+    <string name="app_dest_title_forgot_password">Forgot password</string>
+    <string name="app_dest_title_reset_password">Reset password</string>
+    <string name="login_forgot_password">Forgot password?</string>
+    <string name="forgot_password_title">Reset your password</string>
+    <string name="forgot_password_subtitle">Enter the email you signed up with and we\'ll send you a link to choose a new password.</string>
+    <string name="forgot_password_send_button">Send reset link</string>
+    <string name="forgot_password_sent_title">Check your email</string>
+    <string name="forgot_password_sent_body">If an account exists for %1$s, we\'ve sent a link. It expires in 30 minutes. Check spam.</string>
+    <string name="forgot_password_resend">Resend</string>
+    <string name="forgot_password_resend_countdown">Resend in %1$d s</string>
+    <string name="forgot_password_back_to_sign_in">Back to sign in</string>
+    <string name="forgot_password_error_invalid_email">Enter a valid email address</string>
+    <string name="forgot_password_error_rate_limited">Too many attempts, try again later</string>
+    <string name="forgot_password_error_network">Couldn\'t reach the server. Check your connection and try again.</string>
+    <string name="forgot_password_error_unknown">Something went wrong. Please try again.</string>
+    <string name="reset_password_validating">Checking your link…</string>
+    <string name="reset_password_title">Choose a new password</string>
+    <string name="reset_password_subtitle">Pick something you haven\'t used here before.</string>
+    <string name="reset_password_new_label">New password</string>
+    <string name="reset_password_confirm_label">Confirm new password</string>
+    <string name="reset_password_submit_button">Update password</string>
+    <string name="reset_password_error_too_short">Password must be at least 8 characters</string>
+    <string name="reset_password_error_mismatch">Passwords don\'t match</string>
+    <string name="reset_password_expired_title">This link has expired</string>
+    <string name="reset_password_expired_body">Reset links work once and expire after 30 minutes. Request a new one to continue.</string>
+    <string name="reset_password_request_new_link">Request a new link</string>
+    <string name="reset_password_done_title">Password updated</string>
+    <string name="reset_password_done_body">Password updated. Sign in with your new password.</string>
+    <string name="reset_password_done_signed_out_others">Other devices were signed out.</string>
+    <string name="reset_password_sign_in">Sign in</string>
+    <string name="reset_password_error_network">Couldn\'t reach the server. Check your connection and try again.</string>
+    <string name="reset_password_error_unknown">Something went wrong. Please try again.</string>
+    <string name="reset_password_retry">Try again</string>
+
 </resources>

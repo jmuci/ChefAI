@@ -36,6 +36,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
+import kotlinx.coroutines.flow.first
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.FloatingActionButton
@@ -58,6 +59,8 @@ import com.tenmilelabs.chefai.BuildConfig
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.ui.LoginScreen
 import com.tenmilelabs.chefai.auth.ui.RegisterScreen
+import com.tenmilelabs.chefai.auth.ui.forgot.ForgotPasswordScreen
+import com.tenmilelabs.chefai.auth.ui.reset.ResetPasswordScreen
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatButton
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatButtonVariant
 import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
@@ -108,6 +111,8 @@ fun ChefAINavGraph(
     onPendingSharedUrlConsumed: () -> Unit = {},
     pendingInviteToken: String? = null,
     onPendingInviteTokenConsumed: () -> Unit = {},
+    pendingResetToken: String? = null,
+    onPendingResetTokenConsumed: () -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val backPressedDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
@@ -128,6 +133,18 @@ fun ChefAINavGraph(
         if (pendingInviteToken != null) {
             navActions.navigateToAcceptInvite(pendingInviteToken)
             onPendingInviteTokenConsumed()
+        }
+    }
+
+    // A password-reset App Link jumps straight to the reset screen, token in hand, whatever screen
+    // is on top. The token goes into the route's SavedStateHandle and nowhere else.
+    LaunchedEffect(pendingResetToken) {
+        if (pendingResetToken != null) {
+            // On a cold start this effect runs before the Scaffold has composed the NavHost, so the
+            // graph isn't set yet and navigate() throws. The back stack emits once it is.
+            navController.currentBackStackEntryFlow.first()
+            navActions.navigateToResetPassword(pendingResetToken)
+            onPendingResetTokenConsumed()
         }
     }
 
@@ -473,12 +490,38 @@ fun ChefAINavGraph(
                 onNavigateToHome = { navActions.navigateToHome() },
                 onNavigateToRegister = { navActions.navigateToRegister() },
                 onNavigateToAcceptInvite = { token -> navActions.navigateToAcceptInvite(token) },
+                onNavigateToForgotPassword = { email -> navActions.navigateToForgotPassword(email) },
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToDeveloperOptions = if (BuildConfig.DEBUG) {
                     { navActions.navigateToDeveloperOptions() }
                 } else {
                     null
                 },
+            )
+        }
+        composable(
+            route = AppDestinations.FORGOT_PASSWORD.route,
+            arguments = listOf(
+                navArgument(AppDestinationArgs.EMAIL_ARG) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            ),
+        ) {
+            ForgotPasswordScreen(
+                onNavigateToLogin = { navActions.navigateToLoginAfterPasswordReset() },
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+        composable(
+            route = AppDestinations.RESET_PASSWORD.route,
+            arguments = listOf(navArgument(AppDestinationArgs.RESET_TOKEN_ARG) { type = NavType.StringType }),
+        ) {
+            ResetPasswordScreen(
+                onNavigateToForgotPassword = { navActions.navigateToForgotPasswordFromResetLink() },
+                onNavigateToLogin = { navActions.navigateToLoginAfterPasswordReset() },
+                onNavigateBack = { navController.popBackStack() },
             )
         }
         composable(route = AppDestinations.REGISTER.route) {
@@ -564,6 +607,8 @@ fun ChefAINavGraph(
                 if (currentRoute != AppDestinations.LOGIN.route &&
                     currentRoute != AppDestinations.REGISTER.route &&
                     currentRoute != AppDestinations.ACCEPT_INVITE.route &&
+                    currentRoute != AppDestinations.FORGOT_PASSWORD.route &&
+                    currentRoute != AppDestinations.RESET_PASSWORD.route &&
                     currentRoute !in recipeDetailRoutes &&
                     currentRoute !in ownHeaderRoutes &&
                     currentRoute !in wizardRoutes
@@ -728,6 +773,8 @@ fun ChefAINavGraph(
                     currentRoute == AppDestinations.REGISTER.route ||
                     currentRoute == AppDestinations.IMPORT_RECIPE.route ||
                     currentRoute == AppDestinations.ACCEPT_INVITE.route ||
+                    currentRoute == AppDestinations.FORGOT_PASSWORD.route ||
+                    currentRoute == AppDestinations.RESET_PASSWORD.route ||
                     currentRoute in wizardRoutes
                 val showBottomNav = !hideNav && !isExpanded
                 // The status banner rides on top of the bottom nav, in the same slot, so it surfaces
@@ -781,6 +828,8 @@ fun ChefAINavGraph(
                 currentRoute == AppDestinations.REGISTER.route ||
                 currentRoute == AppDestinations.IMPORT_RECIPE.route ||
                 currentRoute == AppDestinations.ACCEPT_INVITE.route ||
+                currentRoute == AppDestinations.FORGOT_PASSWORD.route ||
+                currentRoute == AppDestinations.RESET_PASSWORD.route ||
                 currentRoute in wizardRoutes
 
             // Consumed as well as applied, so a screen's own imePadding() only adds the part of

@@ -55,6 +55,9 @@ sealed interface LoginUiEvent {
     data object NavigateToHome : LoginUiEvent
     data object NavigateToRegister : LoginUiEvent
 
+    /** [email] is whatever is typed so far (possibly blank), to prefill the forgot-password form. */
+    data class NavigateToForgotPassword(val email: String) : LoginUiEvent
+
     /** A household invite was pending sign-in (ADR-014 §7) — resume the join instead of Home. */
     data class NavigateToAcceptInvite(val token: String) : LoginUiEvent
 }
@@ -239,6 +242,12 @@ class LoginViewModel @Inject constructor(
             displayDuration = LOGIN_BANNER_DURATION,
             placement = StatusBannerPlacement.TOP,
         )
+    }
+
+    fun onForgotPasswordClick() {
+        viewModelScope.launch {
+            _uiEvent.emit(LoginUiEvent.NavigateToForgotPassword(_uiState.value.email.trim()))
+        }
     }
 
     fun onCreateAccountClick() {

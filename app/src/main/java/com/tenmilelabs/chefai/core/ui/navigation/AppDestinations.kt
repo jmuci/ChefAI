@@ -3,8 +3,10 @@ package com.tenmilelabs.chefai.core.ui.navigation
 import android.net.Uri
 import androidx.annotation.StringRes
 import androidx.navigation.NavHostController
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.DRAFT_ID_ARG
+import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.EMAIL_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.IMPORT_URL_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.INVITE_TOKEN_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.MEAL_PLAN_DAY_ID_ARG
@@ -12,6 +14,7 @@ import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.MEAL_PLAN_ID
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.MEAL_PLAN_SLOT_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.PREFILL_URL_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.RECIPE_ID_ARG
+import com.tenmilelabs.chefai.core.ui.navigation.AppDestinationArgs.RESET_TOKEN_ARG
 import com.tenmilelabs.chefai.core.ui.navigation.ScreenBaseRoutes.RECIPE_DETAILS
 import com.tenmilelabs.chefai.mealplans.domain.model.MealSlot
 import java.net.URLEncoder
@@ -36,6 +39,8 @@ internal object ScreenBaseRoutes {
     const val HOUSEHOLD = "household_screen"
     const val ACCEPT_INVITE = "accept_invite_screen"
     const val LOGIN = "login_screen"
+    const val FORGOT_PASSWORD = "forgot_password_screen"
+    const val RESET_PASSWORD = "reset_password_screen"
     const val REGISTER = "register_screen"
     const val MEAL_PLAN_DETAIL = "meal_plan_detail"
     const val MEAL_PLAN_SHOPPING_LIST = "meal_plan_shopping_list"
@@ -112,6 +117,16 @@ object AppDestinationArgs {
      * and types it in by hand. URL-encoded in the route for the same reason as [PREFILL_URL_ARG].
      */
     const val INVITE_TOKEN_ARG = "inviteToken"
+
+    /** The email typed on Login, optional on [ScreenBaseRoutes.FORGOT_PASSWORD] (URL-encoded in the route). */
+    const val EMAIL_ARG = "email"
+
+    /**
+     * The 43-char base64url password-reset token from an App Link. A credential: lives only in the
+     * destination's `SavedStateHandle`, is never logged, and the route pattern (not the filled-in
+     * route) is all `currentRoute` ever sees.
+     */
+    const val RESET_TOKEN_ARG = "resetToken"
 }
 
 /**
@@ -175,6 +190,14 @@ enum class AppDestinations(
     ),
     LOGIN(R.string.app_dest_title_login, ScreenBaseRoutes.LOGIN),
     REGISTER(R.string.app_dest_title_register, ScreenBaseRoutes.REGISTER),
+    FORGOT_PASSWORD(
+        R.string.app_dest_title_forgot_password,
+        "${ScreenBaseRoutes.FORGOT_PASSWORD}?${EMAIL_ARG}={${EMAIL_ARG}}"
+    ),
+    RESET_PASSWORD(
+        R.string.app_dest_title_reset_password,
+        "${ScreenBaseRoutes.RESET_PASSWORD}/{$RESET_TOKEN_ARG}"
+    ),
 }
 
 
@@ -235,6 +258,40 @@ class NavigationActions(private val navController: NavHostController) {
         navController.navigate(ScreenBaseRoutes.LOGIN) {
             launchSingleTop = true
         }
+    }
+
+    /**
+     * Lands on Login with nothing of the reset flow left under it, so Back from Login doesn't
+     * return to a spent Forgot/Reset screen. Home is always the start destination.
+     */
+    fun navigateToLoginAfterPasswordReset() {
+        navController.navigate(ScreenBaseRoutes.LOGIN) {
+            popUpTo(navController.graph.findStartDestination().id)
+            launchSingleTop = true
+        }
+    }
+
+    /** @param email prefilled from Login, if the user had typed one. */
+    fun navigateToForgotPassword(email: String? = null) {
+        val route = if (email.isNullOrBlank()) {
+            ScreenBaseRoutes.FORGOT_PASSWORD
+        } else {
+            "${ScreenBaseRoutes.FORGOT_PASSWORD}?${EMAIL_ARG}=${URLEncoder.encode(email, "UTF-8")}"
+        }
+        navController.navigate(route) { launchSingleTop = true }
+    }
+
+    /** From an expired reset link: replaces it, so Back doesn't return to the dead screen. */
+    fun navigateToForgotPasswordFromResetLink() {
+        navController.navigate(ScreenBaseRoutes.FORGOT_PASSWORD) {
+            popUpTo(AppDestinations.RESET_PASSWORD.route) { inclusive = true }
+            launchSingleTop = true
+        }
+    }
+
+    /** @param token from [com.tenmilelabs.chefai.core.util.ResetPasswordLinkParser]; never logged. */
+    fun navigateToResetPassword(token: String) {
+        navController.navigate("${ScreenBaseRoutes.RESET_PASSWORD}/${URLEncoder.encode(token, "UTF-8")}")
     }
 
     fun navigateToRegister() {
