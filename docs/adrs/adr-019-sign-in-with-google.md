@@ -61,7 +61,7 @@ with a local key. Checks: signature against Google's published keys, `iss` ∈
 {`accounts.google.com`, `https://accounts.google.com`}, `aud` == our **Web** OAuth client ID,
 `exp` in the future, `email_verified == true`. Failure → `401 INVALID_GOOGLE_TOKEN`.
 
-**Schema** (Postgres, one migration):
+**Schema** (Postgres):
 
 - `users.password_hash` becomes nullable (Google-only accounts have none).
 - New `user_identities(id uuid pk, user_id uuid fk → users, provider text, subject text,
@@ -70,37 +70,62 @@ with a local key. Checks: signature against Google's published keys, `iss` ∈
 A table rather than a `users.google_sub` column, so a second provider (Sign in with Apple, if an
 iOS client ever ships) is a row, not another migration.
 
+The backend has no migration tool: `DatabaseInit` runs `SchemaUtils.createMissingTablesAndColumns`,
+which creates the new table but **does not relax `NOT NULL` on an existing column**. The
+`password_hash` change needs a hand-written idempotent `ALTER TABLE users ALTER COLUMN
+password_hash DROP NOT NULL` in `DatabaseInit` (as the recipe `slug` and search-index changes do),
+mirrored in `sql/create_tables.sql`.
+
 **Lookup order** on `POST /auth/google`:
 
 1. `user_identities` row for (`google`, `sub`) → sign that user in.
-2. Else an existing user with the same email → **link** (Decision 3), insert the identity row,
-   sign in.
+2. Else an existing user with the same email (emails are stored lower-cased by
+   `InputValidator.sanitizeEmail`; compare the token's email the same way) →
+   **`409 GOOGLE_EMAIL_EXISTS`** (Decision 3). Nothing is created or linked.
 3. Else create a user (no password), insert the identity row, sign in.
 
 Matching is on `sub`, never on email alone: a Google account's email can change, `sub` cannot.
 
 **Username** for a new user: derived from the token's `given_name` (fallback: the email local
-part), with a numeric suffix on collision if usernames are unique. Editable later, if and when a
-profile edit screen exists.
+part), sanitised to `InputValidator`'s rules (`[a-zA-Z0-9_.-]`, 3–100 chars, not reserved), with a
+numeric suffix until it is free. Editable later, if and when a profile edit screen exists.
 
-## Decision 3: Linking an existing email + password account — auto-link, then drop the password if it was never proven
+**Usernames must be unique, and today they are not.** Verified against the backend at `bc1f3eb`:
+`UserTable.user_name` is a plain `text` column with no index, `create_tables.sql` has
+`user_name TEXT NOT NULL` without `UNIQUE`, and `AuthService.register` checks only the email. Only
+`email` is unique. This is a **prerequisite**, best done with the registration work already in
+progress:
 
-When step 2 matches an email, we link automatically: Google has verified the user owns that
-mailbox, so this is the account they meant. Returning `409` and making them type a password first
-is the safer-looking alternative but recreates the friction this ADR removes, and most users who
-hit it have forgotten the password (there is no reset flow).
+- a unique index on `lower(user_name)` (case-insensitive, so `Jose` and `jose` collide), added by
+  hand in `DatabaseInit` like the `password_hash` change;
+- before creating it, find duplicates already in production (`GROUP BY lower(user_name) HAVING
+  count(*) > 1`) and rename them, or the index creation fails at boot;
+- `register` returns `409 USERNAME_TAKEN`, and the Android register screen shows it;
+- add `deleted-user` (`DeletedUser.USERNAME`) to `InputValidator`'s reserved names, so nobody can
+  register the deletion placeholder's name.
 
-**Pre-account-takeover guard.** Registration does not verify email ownership today (to confirm on
-the backend). So an attacker could register `victim@gmail.com` with a password before the victim
-ever signs in with Google; plain auto-linking would leave the attacker a working password on the
-victim's account. Therefore, when linking to an account whose email was never verified:
+## Decision 3: An email that already has an account gets 409; linking is explicit and signed in
 
-- set `password_hash = NULL`, and
-- revoke all of that user's refresh tokens.
+When step 2 matches an email, `POST /auth/google` returns `409 GOOGLE_EMAIL_EXISTS` and creates
+nothing. The app says "An account with this email already exists — sign in with your password,
+then connect Google from your profile."
 
-The legitimate owner loses nothing (they just signed in with Google); an attacker loses access.
-If registration ever gains email verification, accounts with a verified email keep their password
-on link.
+**Linking** is a separate, authenticated call: `POST /auth/google/link { idToken }` with the
+user's access token. The server verifies the token (Decision 2), requires its email to equal the
+signed-in account's email, and inserts the `user_identities` row (`409` if that `sub` already
+belongs to another user). After that, step 1 of the lookup signs them in with Google.
+
+Why not auto-link on a matching verified email: registration does not verify email ownership yet,
+so an attacker could register `victim@gmail.com` with a password first and keep that password
+after the victim's Google sign-in linked to it. Auto-linking safely means dropping the password
+and revoking sessions on link, which is more machinery and a surprise for honest users. With 409,
+the account's own credentials are always needed to attach a new way in.
+
+**Depends on password reset.** A user who hits the 409 and has forgotten their password is stuck
+until password reset exists — today there is none. The same flow is the way out of the squatting
+case above: the real owner of `victim@gmail.com` resets the password through their own mailbox,
+which locks out whoever registered it. Email verification and password reset (via Resend) are
+being built separately; **Google sign-in should not ship to users before password reset does.**
 
 ## Decision 4: Android integration
 
@@ -166,27 +191,42 @@ deletion screen asks for whichever the account has; the auth response (or `GET /
 
 ## Consequences
 
-- **Public API (backend):** a new `POST /auth/google`; the deletion request gains an optional
-  `googleIdToken`; the auth response may gain `hasPassword`/`providers`. All additive.
-- **Deploy order:** backend first. A client calling `/auth/google` on an older backend gets 404,
-  which surfaces as a sign-in error, not data loss.
-- **No password reset needed for Google-only users**, but an auto-linked account whose password was
-  dropped (Decision 3) can only use Google from then on. Adding a password later needs a
-  "set password" flow that does not exist.
+- **Public API (backend):** new `POST /auth/google` and `POST /auth/google/link`; the deletion
+  request gains an optional `googleIdToken`; the auth response may gain `hasPassword`/`providers`;
+  `register` gains a `409 USERNAME_TAKEN`. All additive except that last one, which turns a
+  registration that succeeds today into an error.
+- **Deploy order:** username uniqueness and password reset first, then the Google endpoints, then
+  the client. A client calling `/auth/google` on an older backend gets 404, which surfaces as a
+  sign-in error, not data loss.
+- **Google-only accounts have no password.** Adding one later is a "set password" flow; the
+  password-reset flow being built can probably serve it (reset on an account with no password).
 - **Anonymous upgrade, account switch and sync are untouched:** they key off our user UUID, which
   Google sign-in returns like any login.
 - **Tests:** Android — `loginWithGoogle` success/failure/upgrade with the existing fakes, and the
-  ViewModel's handling of each `GoogleIdTokenResult`. Backend — verifier rejections (bad `aud`,
-  expired, unverified email, bad signature) with a locally signed token, and the three lookup
-  branches including the password-drop link.
+  ViewModel's handling of each `GoogleIdTokenResult`, including the 409 message. Backend —
+  verifier rejections (bad `aud`, expired, unverified email, bad signature) with a locally signed
+  token, the three lookup branches, `/link` (email mismatch, `sub` owned by someone else), and
+  `USERNAME_TAKEN` case-insensitively.
 
-## Open questions
+## Resolved (Nov 2026)
 
-1. **Auto-link vs 409** (Decision 3) — proposed auto-link with the password-drop guard.
-2. **Does the backend verify email at registration?** Decides whether Decision 3 ever keeps a
-   password on link.
-3. **Nonce.** Credential Manager can embed a nonce in the ID token. Checking it means a
-   server-issued nonce (`GET /auth/google/nonce`) and an extra round trip. Proposed: skip in v1 —
-   tokens are short-lived, audience-bound and travel over TLS — and add it if the threat model
-   changes.
-4. **Are usernames unique** on the backend? Decides whether Decision 2 needs the collision suffix.
+- **Existing email → 409**, not auto-link (Decision 3).
+- **Email verification** is being added to registration alongside password reset (Resend), as
+  separate work.
+- **Usernames must be unique** — they are not today; made a prerequisite (Decision 2).
+
+## Open question: nonce
+
+A Google ID token is valid for about an hour. Anyone who obtains one issued for our app — from a
+log, a crash report, a compromised device — can post it to `/auth/google` within that hour and get
+a session. A nonce closes that: the server issues a random value, the app puts it in the Google
+request, Google signs it into the token, and the server accepts each nonce once.
+
+Cost: an endpoint (`GET /auth/google/nonce`; it can be stateless — an HMAC of a random value and an
+expiry — with only "used" nonces stored until expiry) and one extra round trip, which the screen
+can make on open, before the button is tapped.
+
+Today's exposure is small: the token only travels over TLS, and the app's Ktor logging is
+`HEADERS` in debug and `NONE` in release, so request bodies are never logged. **Proposed: skip the
+nonce in v1**; never log the token, and add the nonce if tokens ever pass through anything that
+records request bodies.
