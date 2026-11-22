@@ -22,7 +22,18 @@ interface SecurePreferencesInterface {
         refreshToken: String,
         tokenExpiry: Long,
         pendingUpgradeFrom: UUID? = null,
+        hasPassword: Boolean = true,
+        providers: List<String> = emptyList(),
     )
+
+    /** Whether the signed-in account has a password. Defaults to true when never stored. */
+    fun getHasPassword(): Flow<Boolean>
+
+    /** Linked identity providers of the signed-in account (e.g. `"google"`). Empty when never stored. */
+    fun getProviders(): Flow<List<String>>
+
+    /** Rewrites the sign-in methods alone, e.g. after linking Google from the profile. */
+    suspend fun saveSignInMethods(hasPassword: Boolean, providers: List<String>)
 
     /** The anonymous id an interrupted login still has to upgrade from, or null. See [saveAuthData]. */
     fun getPendingUpgradeFrom(): Flow<UUID?>

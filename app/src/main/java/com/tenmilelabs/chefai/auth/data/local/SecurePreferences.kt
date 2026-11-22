@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -59,6 +60,9 @@ class SecurePreferences @Inject constructor(
         private val KEY_PENDING_INVITE_SAVED_AT = longPreferencesKey("pending_invite_saved_at")
         private val KEY_PENDING_UPGRADE_FROM = stringPreferencesKey("pending_upgrade_from")
         private val KEY_PENDING_ACCOUNT_WIPE = booleanPreferencesKey("pending_account_wipe")
+        // Plaintext: flags and provider names, not credentials.
+        private val KEY_HAS_PASSWORD = booleanPreferencesKey("has_password")
+        private val KEY_PROVIDERS = stringSetPreferencesKey("providers")
     }
 
     private val dataStore: DataStore<Preferences> = context.dataStore
@@ -122,6 +126,8 @@ class SecurePreferences @Inject constructor(
         refreshToken: String,
         tokenExpiry: Long,
         pendingUpgradeFrom: UUID?,
+        hasPassword: Boolean,
+        providers: List<String>,
     ) {
         try {
             dataStore.edit { prefs ->
@@ -132,6 +138,8 @@ class SecurePreferences @Inject constructor(
                 } else {
                     prefs.remove(KEY_PENDING_UPGRADE_FROM)
                 }
+                prefs[KEY_HAS_PASSWORD] = hasPassword
+                prefs[KEY_PROVIDERS] = providers.toSet()
                 prefs[KEY_USER_UUID] = encrypt(userUuid.toString())
                 prefs[KEY_DISPLAY_NAME] = encrypt(displayName)
                 prefs[KEY_EMAIL] = encrypt(email)
@@ -143,6 +151,26 @@ class SecurePreferences @Inject constructor(
             Timber.d("Auth data saved securely (AES256-GCM encrypted) for user: $userUuid")
         } catch (e: Exception) {
             Timber.e(e, "Failed to save auth data")
+            throw e
+        }
+    }
+
+    override fun getHasPassword(): Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_HAS_PASSWORD] ?: true
+    }
+
+    override fun getProviders(): Flow<List<String>> = dataStore.data.map { prefs ->
+        prefs[KEY_PROVIDERS].orEmpty().sorted()
+    }
+
+    override suspend fun saveSignInMethods(hasPassword: Boolean, providers: List<String>) {
+        try {
+            dataStore.edit { prefs ->
+                prefs[KEY_HAS_PASSWORD] = hasPassword
+                prefs[KEY_PROVIDERS] = providers.toSet()
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to save sign-in methods")
             throw e
         }
     }
@@ -210,6 +238,8 @@ class SecurePreferences @Inject constructor(
                 prefs.remove(KEY_ACCESS_TOKEN)
                 prefs.remove(KEY_REFRESH_TOKEN)
                 prefs.remove(KEY_TOKEN_EXPIRY)
+                prefs.remove(KEY_HAS_PASSWORD)
+                prefs.remove(KEY_PROVIDERS)
                 // An upgrade still pending at logout never re-parented anything: the rows are
                 // still the anonymous session's, which is where logout returns.
                 prefs.remove(KEY_PENDING_UPGRADE_FROM)

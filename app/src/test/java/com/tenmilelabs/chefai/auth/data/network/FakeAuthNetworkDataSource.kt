@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.auth.data.network
 
 import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
+import com.tenmilelabs.chefai.auth.data.network.dto.GoogleSignInRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.LoginRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.LogoutRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RefreshTokenRequest
@@ -112,6 +113,35 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
     override suspend fun logout(request: LogoutRequest) {
         logoutRequests += request
         logoutError?.let { throw it }
+    }
+
+    /** Every [googleSignIn] request, in order. */
+    val googleSignInRequests = mutableListOf<GoogleSignInRequest>()
+
+    /** Thrown by [googleSignIn] after recording the request, e.g. an `AuthHttpException(code = ...)`. */
+    var googleSignInError: Exception? = null
+
+    /** Returned by [googleSignIn]; null yields a default response. */
+    var googleAuthResponse: AuthResponse? = null
+
+    override suspend fun googleSignIn(request: GoogleSignInRequest): AuthResponse {
+        googleSignInRequests += request
+        if (networkDelayMs > 0) {
+            delay(networkDelayMs)
+        }
+        googleSignInError?.let { throw it }
+        return googleAuthResponse ?: createDefaultAuthResponse(username = "google-user", email = "google@example.com")
+    }
+
+    /** Every [linkGoogle] request, in order. */
+    val linkGoogleRequests = mutableListOf<GoogleSignInRequest>()
+
+    /** Thrown by [linkGoogle] after recording the request. */
+    var linkGoogleError: Exception? = null
+
+    override suspend fun linkGoogle(request: GoogleSignInRequest) {
+        linkGoogleRequests += request
+        linkGoogleError?.let { throw it }
     }
 
     /**

@@ -15,6 +15,8 @@ class FakeSecurePreferences : SecurePreferencesInterface {
 
     companion object {
         private const val KEY_USER_UUID = "user_uuid"
+        private const val KEY_HAS_PASSWORD = "has_password"
+        private const val KEY_PROVIDERS = "providers"
         private const val KEY_DISPLAY_NAME = "display_name"
         private const val KEY_EMAIL = "email"
         private const val KEY_AVATAR_URL = "avatar_url"
@@ -38,9 +40,13 @@ class FakeSecurePreferences : SecurePreferencesInterface {
         refreshToken: String,
         tokenExpiry: Long,
         pendingUpgradeFrom: UUID?,
+        hasPassword: Boolean,
+        providers: List<String>,
     ) {
         storage.value = storage.value.toMutableMap().apply {
             put(KEY_USER_UUID, userUuid.toString())
+            put(KEY_HAS_PASSWORD, hasPassword)
+            put(KEY_PROVIDERS, providers)
             put(KEY_DISPLAY_NAME, displayName)
             put(KEY_EMAIL, email)
             put(KEY_AVATAR_URL, avatarUrl)
@@ -49,6 +55,22 @@ class FakeSecurePreferences : SecurePreferencesInterface {
             put(KEY_TOKEN_EXPIRY, tokenExpiry)
             if (pendingUpgradeFrom != null) put(KEY_PENDING_UPGRADE_FROM, pendingUpgradeFrom.toString()) else remove(KEY_PENDING_UPGRADE_FROM)
             // KEY_LOCAL_USER_ID is preserved (not replaced)
+        }
+    }
+
+    override fun getHasPassword(): Flow<Boolean> = storage.map { prefs ->
+        prefs[KEY_HAS_PASSWORD] as? Boolean ?: true
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    override fun getProviders(): Flow<List<String>> = storage.map { prefs ->
+        prefs[KEY_PROVIDERS] as? List<String> ?: emptyList()
+    }
+
+    override suspend fun saveSignInMethods(hasPassword: Boolean, providers: List<String>) {
+        storage.value = storage.value.toMutableMap().apply {
+            put(KEY_HAS_PASSWORD, hasPassword)
+            put(KEY_PROVIDERS, providers)
         }
     }
 
@@ -95,6 +117,8 @@ class FakeSecurePreferences : SecurePreferencesInterface {
             remove(KEY_ACCESS_TOKEN)
             remove(KEY_REFRESH_TOKEN)
             remove(KEY_TOKEN_EXPIRY)
+            remove(KEY_HAS_PASSWORD)
+            remove(KEY_PROVIDERS)
             remove(KEY_PENDING_UPGRADE_FROM)
             remove(KEY_PENDING_INVITE_TOKEN)
             // KEY_LOCAL_USER_ID is intentionally preserved

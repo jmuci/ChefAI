@@ -5,6 +5,7 @@ import com.tenmilelabs.chefai.auth.data.mapper.toAuthToken
 import com.tenmilelabs.chefai.auth.data.mapper.toUser
 import com.tenmilelabs.chefai.auth.data.network.AuthHttpException
 import com.tenmilelabs.chefai.auth.data.network.AuthNetworkDataSource
+import com.tenmilelabs.chefai.auth.data.network.dto.GoogleSignInRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.LoginRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.LogoutRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RefreshTokenRequest
@@ -12,6 +13,7 @@ import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
 import com.tenmilelabs.chefai.auth.data.network.dto.RegisterRequest
 import com.tenmilelabs.chefai.auth.domain.model.AuthToken
 import com.tenmilelabs.chefai.auth.domain.model.AuthenticatedHousehold
+import com.tenmilelabs.chefai.auth.domain.model.SignInMethods
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.auth.domain.usecase.AccountUpgradeUseCase
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
@@ -149,7 +151,11 @@ class SessionManager @Inject constructor(
 
                 _userSession.value = UserSession.Authenticated(
                     user = user,
-                    authToken = authToken
+                    authToken = authToken,
+                    signInMethods = SignInMethods(
+                        hasPassword = securePreferences.getHasPassword().first(),
+                        providers = securePreferences.getProviders().first(),
+                    ),
                 )
 
                 // login()/register() persist auth data before accountSwitchHandler.handleLogin
@@ -388,6 +394,72 @@ class SessionManager @Inject constructor(
     }
 
     /**
+     * Signs in (or up) with a Google ID token from Credential Manager via `POST /auth/google`.
+     * Same shape and post-response pipeline as [login] ([completeAuthentication]); the token is
+     * used once and neither stored nor logged. Failures — notably [AuthHttpException] with
+     * `code = "GOOGLE_EMAIL_EXISTS"` or `"INVALID_GOOGLE_TOKEN"` — come back as
+     * [Result.failure] with the session restored to anonymous.
+     */
+    suspend fun loginWithGoogle(idToken: String): Result<User> {
+        return try {
+            Timber.d("Google sign-in attempt")
+
+            // Capture the current anonymous userId BEFORE changing session state
+            val previousSession = _userSession.value
+            val anonymousUserId = (previousSession as? UserSession.Anonymous)?.localUserId
+
+            _userSession.value = UserSession.Loading
+
+            val response = authNetworkDataSource.get().googleSignIn(GoogleSignInRequest(idToken = idToken))
+
+            val user = completeAuthentication(response, anonymousUserId)
+
+            Timber.d("Google sign-in successful for user: ${user.uuid}")
+            Result.success(user)
+        } catch (e: CancellationException) {
+            // See [login].
+            withContext(NonCancellable) { enterAnonymousSession() }
+            throw e
+        } catch (e: Exception) {
+            Timber.e(e, "Google sign-in failed")
+            enterAnonymousSession()
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Links the signed-in account to the Google identity behind [idToken]
+     * (`POST /auth/google/link`) and refreshes [SignInMethods] on success. Failures (e.g.
+     * `GOOGLE_EMAIL_MISMATCH`, `GOOGLE_IDENTITY_TAKEN`) come back as [Result.failure]; the session
+     * is untouched either way.
+     */
+    suspend fun linkGoogle(idToken: String): Result<Unit> {
+        return try {
+            authNetworkDataSource.get().linkGoogle(GoogleSignInRequest(idToken = idToken))
+            val current = _userSession.value as? UserSession.Authenticated
+            if (current != null) {
+                val providers = (current.signInMethods.providers + SignInMethods.GOOGLE_PROVIDER).distinct()
+                updateSignInMethods(current.user.uuid, current.signInMethods.copy(providers = providers))
+            }
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.w(e, "Linking Google failed")
+            Result.failure(e)
+        }
+    }
+
+    /** Persists [methods] and publishes them, unless the session has moved on from [userId]. */
+    private suspend fun updateSignInMethods(userId: UUID, methods: SignInMethods) {
+        securePreferences.saveSignInMethods(methods.hasPassword, methods.providers)
+        val current = _userSession.value
+        if (current is UserSession.Authenticated && current.user.uuid == userId) {
+            _userSession.value = current.copy(signInMethods = methods)
+        }
+    }
+
+    /**
      * Registers a new user with the backend API.
      * If the user was in an anonymous session with local recipes, those recipes are
      * reassigned to the authenticated user via [AccountUpgradeUseCase].
@@ -446,6 +518,7 @@ class SessionManager @Inject constructor(
         user: User = response.toUser(),
     ): User {
         val authToken = response.toAuthToken()
+        val signInMethods = SignInMethods(hasPassword = response.hasPassword, providers = response.providers)
 
         // Persisted before the account switch and upgrade below, not after. Those two rewrite
         // local ownership — the upgrade reassigns every anonymous recipe, bookmark and meal
@@ -462,6 +535,8 @@ class SessionManager @Inject constructor(
             refreshToken = authToken.refreshToken,
             tokenExpiry = authToken.expiresAt,
             pendingUpgradeFrom = anonymousUserId,
+            hasPassword = signInMethods.hasPassword,
+            providers = signInMethods.providers,
         )
 
         val accountSwitchOutcome = accountSwitchHandler.handleLogin(
@@ -489,7 +564,8 @@ class SessionManager @Inject constructor(
 
         _userSession.value = UserSession.Authenticated(
             user = user,
-            authToken = authToken
+            authToken = authToken,
+            signInMethods = signInMethods,
         )
 
         // Persist the authenticated user to Room before sync fires so that pulled
