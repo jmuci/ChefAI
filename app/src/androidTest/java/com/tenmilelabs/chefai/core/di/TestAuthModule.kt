@@ -10,6 +10,8 @@ import com.tenmilelabs.chefai.auth.data.repository.DefaultAccountRepository
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.TokenProvider
 import com.tenmilelabs.chefai.auth.domain.repository.AccountRepository
+import com.tenmilelabs.chefai.auth.domain.repository.FakePasswordResetRepository
+import com.tenmilelabs.chefai.auth.domain.repository.PasswordResetRepository
 import com.tenmilelabs.chefai.collections.data.repository.DefaultCollectionsRepository
 import com.tenmilelabs.chefai.collections.domain.repository.CollectionsRepository
 import com.tenmilelabs.chefai.core.data.repository.DataStoreUserPreferencesRepository
@@ -73,6 +75,14 @@ abstract class TestAuthModule {
         fun bindAuthNetworkDataSource(
             fake: FakeAuthNetworkDataSource
         ): AuthNetworkDataSource = fake
+
+        /** Shared with tests so they can script the reset outcome and read back what was sent. */
+        @Provides
+        @Singleton
+        fun provideFakePasswordResetRepository(): FakePasswordResetRepository = FakePasswordResetRepository()
+
+        @Provides
+        fun bindPasswordResetRepository(fake: FakePasswordResetRepository): PasswordResetRepository = fake
     }
 
     /**

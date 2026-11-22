@@ -3,11 +3,15 @@ package com.tenmilelabs.chefai.core.di
 import com.tenmilelabs.chefai.auth.data.network.AccountApiService
 import com.tenmilelabs.chefai.auth.data.network.AccountNetworkDataSource
 import com.tenmilelabs.chefai.auth.data.network.AuthApiService
+import com.tenmilelabs.chefai.auth.data.network.PasswordResetApiService
+import com.tenmilelabs.chefai.auth.data.network.PasswordResetNetworkDataSource
 import com.tenmilelabs.chefai.auth.data.repository.DefaultAccountRepository
+import com.tenmilelabs.chefai.auth.data.repository.DefaultPasswordResetRepository
 import com.tenmilelabs.chefai.auth.data.network.AuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.TokenProvider
 import com.tenmilelabs.chefai.auth.domain.repository.AccountRepository
+import com.tenmilelabs.chefai.auth.domain.repository.PasswordResetRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -49,4 +53,16 @@ abstract class AuthModule {
     @Binds
     @Singleton
     abstract fun bindAccountRepository(repository: DefaultAccountRepository): AccountRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindPasswordResetNetworkDataSource(
+        service: PasswordResetApiService
+    ): PasswordResetNetworkDataSource
+
+    @Binds
+    @Singleton
+    abstract fun bindPasswordResetRepository(
+        repository: DefaultPasswordResetRepository
+    ): PasswordResetRepository
 }
