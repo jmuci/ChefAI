@@ -551,6 +551,10 @@
     <string name="profile_menu_signed_in_as">Signed in as</string>
     <string name="profile_menu_logout">Logout</string>
     <string name="profile_menu_logging_out">Logging out\u2026</string>
+    <string name="profile_menu_connect_google">Connect Google</string>
+    <string name="google_connected">Google connected. You can now sign in with Google.</string>
+    <string name="error_google_email_mismatch">That Google account uses a different email than this account.</string>
+    <string name="error_google_identity_taken">That Google account is already connected to another Pocket Chef account.</string>
     <string name="logout_offline_dialog_title">Log out while offline?</string>
     <plurals name="logout_offline_dialog_message">
         <item quantity="one">%d change hasn\'t been uploaded yet. It stays on this device and uploads when you sign back in, but it\'s deleted if a different account signs in here first.</item>

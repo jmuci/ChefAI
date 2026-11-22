@@ -2,7 +2,11 @@ package com.tenmilelabs.chefai.auth.ui
 
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.auth.data.network.AuthHttpException
+import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
 import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.auth.ui.google.GoogleIdTokenResult
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.auth.domain.usecase.LogoutUseCase
 import com.tenmilelabs.chefai.core.data.sync.FakeConnectivityObserver
@@ -24,11 +28,14 @@ class UserProfileViewModelTest {
     private val pusher = FakePendingChangesPusher()
     private val connectivity = FakeConnectivityObserver()
     private lateinit var sessionManager: SessionManager
+    private lateinit var authSource: FakeAuthNetworkDataSource
 
     private suspend fun signedInViewModel(): UserProfileViewModel {
-        sessionManager = createTestSessionManagerWithAuthSource().first
+        val (manager, source) = createTestSessionManagerWithAuthSource()
+        sessionManager = manager
+        authSource = source
         sessionManager.login("cook@example.com", "hunter2")
-        return UserProfileViewModel(LogoutUseCase(sessionManager, pusher, connectivity))
+        return UserProfileViewModel(LogoutUseCase(sessionManager, pusher, connectivity), sessionManager)
     }
 
     private fun assertSignedIn() =
@@ -130,5 +137,108 @@ class UserProfileViewModelTest {
 
         assertThat(viewModel.logoutState.value).isEqualTo(LogoutUiState.Idle)
         assertSignedIn()
+    }
+
+    // --- Connect Google (ADR-019) ---
+
+    @Test
+    fun `connecting google links the account and says so`() = runTest {
+        val viewModel = signedInViewModel()
+
+        viewModel.effects.test {
+            viewModel.onAction(UserProfileAction.GoogleLinkPicked(GoogleIdTokenResult.Success("id-token")))
+
+            assertThat(awaitItem()).isEqualTo(UserProfileEffect.ShowMessage(R.string.google_connected))
+        }
+        assertThat(authSource.linkGoogleRequests.map { it.idToken }).containsExactly("id-token")
+        val session = sessionManager.userSession.value as UserSession.Authenticated
+        assertThat(session.signInMethods.hasGoogle).isTrue()
+    }
+
+    @Test
+    fun `connecting google with a different email explains the mismatch`() = runTest {
+        val viewModel = signedInViewModel()
+        authSource.linkGoogleError =
+            AuthHttpException(message = "mismatch", statusCode = 409, code = "GOOGLE_EMAIL_MISMATCH")
+
+        viewModel.effects.test {
+            viewModel.onAction(UserProfileAction.GoogleLinkPicked(GoogleIdTokenResult.Success("id-token")))
+
+            assertThat(awaitItem()).isEqualTo(UserProfileEffect.ShowMessage(R.string.error_google_email_mismatch))
+        }
+        assertThat((sessionManager.userSession.value as UserSession.Authenticated).signInMethods.hasGoogle).isFalse()
+    }
+
+    @Test
+    fun `connecting a google account owned by someone else explains it is taken`() = runTest {
+        val viewModel = signedInViewModel()
+        authSource.linkGoogleError =
+            AuthHttpException(message = "taken", statusCode = 409, code = "GOOGLE_IDENTITY_TAKEN")
+
+        viewModel.effects.test {
+            viewModel.onAction(UserProfileAction.GoogleLinkPicked(GoogleIdTokenResult.Success("id-token")))
+
+            assertThat(awaitItem()).isEqualTo(UserProfileEffect.ShowMessage(R.string.error_google_identity_taken))
+        }
+    }
+
+    @Test
+    fun `connecting google with an invalid token shows the generic failure`() = runTest {
+        val viewModel = signedInViewModel()
+        authSource.linkGoogleError =
+            AuthHttpException(message = "bad", statusCode = 401, code = "INVALID_GOOGLE_TOKEN")
+
+        viewModel.effects.test {
+            viewModel.onAction(UserProfileAction.GoogleLinkPicked(GoogleIdTokenResult.Success("id-token")))
+
+            assertThat(awaitItem()).isEqualTo(UserProfileEffect.ShowMessage(R.string.error_google_sign_in_failed))
+        }
+    }
+
+    @Test
+    fun `connecting google while offline shows the network error`() = runTest {
+        val viewModel = signedInViewModel()
+        authSource.linkGoogleError = IOException("no route")
+
+        viewModel.effects.test {
+            viewModel.onAction(UserProfileAction.GoogleLinkPicked(GoogleIdTokenResult.Success("id-token")))
+
+            assertThat(awaitItem()).isEqualTo(UserProfileEffect.ShowMessage(R.string.error_network_error))
+        }
+    }
+
+    @Test
+    fun `cancelling the google picker is silent`() = runTest {
+        val viewModel = signedInViewModel()
+
+        viewModel.effects.test {
+            viewModel.onAction(UserProfileAction.GoogleLinkPicked(GoogleIdTokenResult.Cancelled))
+
+            expectNoEvents()
+        }
+        assertThat(authSource.linkGoogleRequests).isEmpty()
+    }
+
+    @Test
+    fun `no google account on the device shows a message and links nothing`() = runTest {
+        val viewModel = signedInViewModel()
+
+        viewModel.effects.test {
+            viewModel.onAction(UserProfileAction.GoogleLinkPicked(GoogleIdTokenResult.NoGoogleAccount))
+
+            assertThat(awaitItem()).isEqualTo(UserProfileEffect.ShowMessage(R.string.error_google_no_account))
+        }
+        assertThat(authSource.linkGoogleRequests).isEmpty()
+    }
+
+    @Test
+    fun `a failed google credential request shows the generic failure`() = runTest {
+        val viewModel = signedInViewModel()
+
+        viewModel.effects.test {
+            viewModel.onAction(UserProfileAction.GoogleLinkPicked(GoogleIdTokenResult.Failure(IllegalStateException("x"))))
+
+            assertThat(awaitItem()).isEqualTo(UserProfileEffect.ShowMessage(R.string.error_google_sign_in_failed))
+        }
     }
 }
