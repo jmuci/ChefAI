@@ -1,7 +1,7 @@
 # ADR 019 – Sign in with Google
 
 **Date:** November 2026
-**Status:** Proposed
+**Status:** Accepted (Android implemented Nov 2026; backend half pending)
 **Author:** Claude (Opus 5.5), on behalf of Jose Mucientes
 **Related:** [ADR-007](adr-007-anonymous-first.md) (anonymous-first),
 [ADR-008](adr-008-data-handling-across-sessions.md) (data across sessions),
@@ -213,6 +213,28 @@ deletion screen asks for whichever the account has; the auth response (or `GET /
   separate work.
 - **Usernames need not be unique** — email and UUID are the identity; the username is a display
   label (Decision 2).
+
+## Implementation notes (Android, Nov 2026)
+
+Built as specified, with these differences from the plan and from the text above:
+
+- **Sign-in methods live on the session, not on `User`.** `hasPassword` / `providers` are a
+  `SignInMethods` value carried by `UserSession.Authenticated` (like `household`), persisted in
+  `SecurePreferences`. `User` is untouched.
+- **`SessionManager.linkGoogle` landed with the network layer** (task A3, not A5), because the
+  profile menu's "Connect Google" row needs it and it shares the data-source call.
+- **"Connect Google" is a row in the profile menu** (`UserProfileViewModel`), next to Logout, which
+  is where logout also lives. The Settings screen only gained the Google deletion confirmation.
+- **Register -> Login on `GOOGLE_EMAIL_EXISTS`:** the picker result carries only the ID token, so the
+  email to prefill is read from the token's payload without verification (display only), and the
+  explanation goes on the app-wide status banner so it survives the navigation.
+- **Deletion:** the existing `WrongPassword` result also covers a rejected Google token (the same
+  JSON `401`); the dialog picks the message from the proof. For a Google-only account the ViewModel
+  validates the public-recipe choice *before* asking the screen for the picker.
+- **Versions:** `androidx.credentials:credentials` and `credentials-play-services-auth` 1.6.0,
+  `com.google.android.libraries.identity.googleid:googleid` 1.2.1.
+- **Not verified on a device**; the backend endpoints do not exist yet, so everything is tested
+  against fakes and Ktor `MockEngine`.
 
 ## Open question: nonce
 

@@ -1,8 +1,12 @@
 package com.tenmilelabs.chefai.settings.ui
 
+import com.tenmilelabs.chefai.auth.domain.model.DeletionProof
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
 import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.auth.ui.google.GoogleIdTokenResult
+import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
 import com.tenmilelabs.chefai.auth.domain.model.AccountDeletionPreview
 import com.tenmilelabs.chefai.auth.domain.model.AccountDeletionPreviewResult
 import com.tenmilelabs.chefai.auth.domain.model.DeleteAccountResult
@@ -48,6 +52,29 @@ class SettingsViewModelTest {
         val sessionManager = createTestSessionManagerWithAuthSource().first
         sessionManager.login("cook@example.com", "hunter2")
         return settingsViewModel(sessionManager = sessionManager)
+    }
+
+    /** Signed in through Google only: the account has no password. */
+    private suspend fun googleOnlyViewModel(): SettingsViewModel {
+        val (sessionManager, authSource) = createTestSessionManagerWithAuthSource()
+        authSource.googleAuthResponse = AuthResponse(
+            token = "t",
+            refreshToken = "r",
+            userId = UuidV7Generator.newId().toString(),
+            username = "Jose",
+            email = "jose@example.com",
+            expiresIn = 3600,
+            hasPassword = false,
+            providers = listOf("google"),
+        )
+        sessionManager.loginWithGoogle("sign-in-token")
+        return settingsViewModel(sessionManager = sessionManager)
+    }
+
+    /** Opens the dialog for a Google-only account; no password is typed, there is none. */
+    private fun SettingsViewModel.openGoogleDialog(preview: AccountDeletionPreview) {
+        accountRepository.previewResult = AccountDeletionPreviewResult.Success(preview)
+        onAction(SettingsAction.DeleteAccountClicked)
     }
 
     /** Keeps [SettingsViewModel.uiState] hot, so `.value` reflects every action straight away. */
@@ -221,7 +248,7 @@ class SettingsViewModelTest {
 
             assertThat(awaitItem()).isEqualTo(SettingsEffect.AccountDeleted)
         }
-        assertThat(accountRepository.deleteCalls).containsExactly("hunter2" to null)
+        assertThat(accountRepository.deleteCalls).containsExactly(DeletionProof.Password("hunter2") to null)
         // Anonymous again, so the section is gone.
         assertThat(viewModel.deleteState).isEqualTo(DeleteAccountUiState.Unavailable)
     }
@@ -243,7 +270,7 @@ class SettingsViewModelTest {
         assertThat((viewModel.deleteState as DeleteAccountUiState.Confirming).error).isNull()
 
         viewModel.onAction(SettingsAction.DeleteAccountConfirmed)
-        assertThat(accountRepository.deleteCalls).containsExactly("hunter2" to PublicRecipeDisposition.DELETE)
+        assertThat(accountRepository.deleteCalls).containsExactly(DeletionProof.Password("hunter2") to PublicRecipeDisposition.DELETE)
     }
 
     @Test
@@ -326,6 +353,140 @@ class SettingsViewModelTest {
         viewModel.onAction(SettingsAction.DeleteAccountPasswordChanged("  "))
 
         viewModel.onAction(SettingsAction.DeleteAccountConfirmed)
+
+        assertThat(accountRepository.deleteCalls).isEmpty()
+    }
+
+
+    // --- Google-only accounts (ADR-019 Decision 5) ---
+
+    @Test
+    fun `a google-only account opens the dialog in Google mode and can submit without a password`() = runTest {
+        val viewModel = googleOnlyViewModel()
+        collect(viewModel)
+
+        viewModel.openGoogleDialog(preview())
+
+        val state = viewModel.deleteState as DeleteAccountUiState.Confirming
+        assertThat(state.usesGoogle).isTrue()
+        assertThat(state.canSubmit).isTrue()
+    }
+
+    @Test
+    fun `a password account does not use Google`() = runTest {
+        val viewModel = signedInViewModel()
+        collect(viewModel)
+
+        viewModel.openDialog(preview())
+
+        assertThat((viewModel.deleteState as DeleteAccountUiState.Confirming).usesGoogle).isFalse()
+    }
+
+    @Test
+    fun `confirming a google-only account asks the screen for the Google picker instead of deleting`() = runTest {
+        val viewModel = googleOnlyViewModel()
+        collect(viewModel)
+        viewModel.openGoogleDialog(preview())
+
+        viewModel.effects.test {
+            viewModel.onAction(SettingsAction.DeleteAccountConfirmed)
+
+            assertThat(awaitItem()).isEqualTo(SettingsEffect.RequestGoogleConfirmation)
+        }
+        assertThat(accountRepository.deleteCalls).isEmpty()
+    }
+
+    @Test
+    fun `a google-only account with public recipes must choose before the picker opens`() = runTest {
+        val viewModel = googleOnlyViewModel()
+        collect(viewModel)
+        viewModel.openGoogleDialog(preview(publicRecipeCount = 2))
+
+        viewModel.effects.test {
+            viewModel.onAction(SettingsAction.DeleteAccountConfirmed)
+
+            expectNoEvents()
+        }
+        val state = viewModel.deleteState as DeleteAccountUiState.Confirming
+        assertThat(state.error).isEqualTo(DeleteAccountError.PUBLIC_RECIPE_CHOICE_MISSING)
+    }
+
+    @Test
+    fun `a google token deletes the account, signs out and emits AccountDeleted`() = runTest {
+        val viewModel = googleOnlyViewModel()
+        collect(viewModel)
+        viewModel.openGoogleDialog(preview(publicRecipeCount = 2))
+        viewModel.onAction(SettingsAction.PublicRecipesChoiceChanged(PublicRecipeDisposition.ANONYMIZE))
+
+        viewModel.effects.test {
+            viewModel.onAction(SettingsAction.DeleteAccountGoogleResult(GoogleIdTokenResult.Success("fresh-token")))
+
+            assertThat(awaitItem()).isEqualTo(SettingsEffect.AccountDeleted)
+        }
+        assertThat(accountRepository.deleteCalls)
+            .containsExactly(DeletionProof.GoogleToken("fresh-token") to PublicRecipeDisposition.ANONYMIZE)
+        assertThat(viewModel.deleteState).isEqualTo(DeleteAccountUiState.Unavailable)
+    }
+
+    @Test
+    fun `a rejected google token shows the Google error and keeps the dialog`() = runTest {
+        val viewModel = googleOnlyViewModel()
+        collect(viewModel)
+        accountRepository.deleteResult = DeleteAccountResult.WrongPassword
+        viewModel.openGoogleDialog(preview())
+
+        viewModel.onAction(SettingsAction.DeleteAccountGoogleResult(GoogleIdTokenResult.Success("old-token")))
+
+        val state = viewModel.deleteState as DeleteAccountUiState.Confirming
+        assertThat(state.error).isEqualTo(DeleteAccountError.GOOGLE_REAUTH_FAILED)
+        assertThat(state.isSubmitting).isFalse()
+    }
+
+    @Test
+    fun `cancelling the google picker changes nothing`() = runTest {
+        val viewModel = googleOnlyViewModel()
+        collect(viewModel)
+        viewModel.openGoogleDialog(preview())
+        val before = viewModel.deleteState
+
+        viewModel.onAction(SettingsAction.DeleteAccountGoogleResult(GoogleIdTokenResult.Cancelled))
+
+        assertThat(viewModel.deleteState).isEqualTo(before)
+        assertThat(accountRepository.deleteCalls).isEmpty()
+    }
+
+    @Test
+    fun `no google account on the device shows its own error`() = runTest {
+        val viewModel = googleOnlyViewModel()
+        collect(viewModel)
+        viewModel.openGoogleDialog(preview())
+
+        viewModel.onAction(SettingsAction.DeleteAccountGoogleResult(GoogleIdTokenResult.NoGoogleAccount))
+
+        assertThat((viewModel.deleteState as DeleteAccountUiState.Confirming).error)
+            .isEqualTo(DeleteAccountError.GOOGLE_NO_ACCOUNT)
+        assertThat(accountRepository.deleteCalls).isEmpty()
+    }
+
+    @Test
+    fun `a failed google credential request shows the generic error`() = runTest {
+        val viewModel = googleOnlyViewModel()
+        collect(viewModel)
+        viewModel.openGoogleDialog(preview())
+
+        viewModel.onAction(SettingsAction.DeleteAccountGoogleResult(GoogleIdTokenResult.Failure(IllegalStateException("x"))))
+
+        assertThat((viewModel.deleteState as DeleteAccountUiState.Confirming).error)
+            .isEqualTo(DeleteAccountError.GENERIC)
+    }
+
+    @Test
+    fun `a stray google result on a password account is ignored`() = runTest {
+        val viewModel = signedInViewModel()
+        collect(viewModel)
+        viewModel.openDialog(preview())
+
+        viewModel.onAction(SettingsAction.DeleteAccountGoogleResult(GoogleIdTokenResult.Success("token")))
 
         assertThat(accountRepository.deleteCalls).isEmpty()
     }

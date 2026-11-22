@@ -44,6 +44,7 @@ import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.domain.model.AccountDeletionPreview
 import com.tenmilelabs.chefai.auth.domain.model.PublicRecipeDisposition
 import com.tenmilelabs.chefai.auth.ui.PasswordVisibilityToggle
+import com.tenmilelabs.chefai.auth.ui.google.rememberGoogleIdTokenRequester
 import com.tenmilelabs.chefai.core.domain.model.RecipeLanguage
 import com.tenmilelabs.chefai.core.domain.model.WeekStart
 import com.tenmilelabs.chefai.core.domain.units.MeasurementSystem
@@ -74,6 +75,7 @@ fun SettingsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val currentOnAccountDeleted by rememberUpdatedState(onAccountDeleted)
+    val googleRequester = rememberGoogleIdTokenRequester()
 
     LaunchedEffect(viewModel) {
         viewModel.effects.collect { effect ->
@@ -81,6 +83,11 @@ fun SettingsScreen(
                 SettingsEffect.AccountDeleted -> {
                     Toast.makeText(context, R.string.delete_account_done, Toast.LENGTH_LONG).show()
                     currentOnAccountDeleted()
+                }
+                // A fresh Google sign-in is the re-authentication; the picker needs the Activity.
+                SettingsEffect.RequestGoogleConfirmation -> {
+                    val picked = googleRequester.request(context)
+                    viewModel.onAction(SettingsAction.DeleteAccountGoogleResult(picked))
                 }
             }
         }
@@ -269,10 +276,10 @@ private fun DeleteAccountDialog(
             ) {
                 Text(
                     text = stringResource(
-                        if (state.isSubmitting) {
-                            R.string.delete_account_confirm_button_loading
-                        } else {
-                            R.string.delete_account_confirm_button
+                        when {
+                            state.isSubmitting -> R.string.delete_account_confirm_button_loading
+                            state.usesGoogle -> R.string.delete_account_confirm_with_google
+                            else -> R.string.delete_account_confirm_button
                         },
                     ),
                     // An explicit color overrides TextButton's disabled tint, so dim it by hand
@@ -338,34 +345,39 @@ private fun DeleteAccountDialogBody(
             fontWeight = FontWeight.ExtraBold,
         )
 
-        FlatField(
-            value = state.password,
-            onValueChange = { onAction(SettingsAction.DeleteAccountPasswordChanged(it)) },
-            label = stringResource(R.string.delete_account_password_label),
-            leadingIcon = ChefAIIcons.Lock,
-            trailing = {
-                PasswordVisibilityToggle(
-                    isVisible = state.isPasswordVisible,
-                    onToggle = { onAction(SettingsAction.DeleteAccountPasswordVisibilityToggled) },
-                )
-            },
-            visualTransformation = if (state.isPasswordVisible) {
-                VisualTransformation.None
-            } else {
-                PasswordVisualTransformation()
-            },
-            errorText = state.error
-                ?.takeIf { it == DeleteAccountError.WRONG_PASSWORD }
-                ?.let { stringResource(it.messageRes) },
-            enabled = !state.isSubmitting,
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Password,
-                imeAction = ImeAction.Done,
-            ),
-            keyboardActions = KeyboardActions(
-                onDone = { onAction(SettingsAction.DeleteAccountConfirmed) },
-            ),
-        )
+        if (state.usesGoogle) {
+            // No password on this account: the confirm button runs a fresh Google sign-in instead.
+            DialogParagraph(stringResource(R.string.delete_account_google_hint))
+        } else {
+            FlatField(
+                value = state.password,
+                onValueChange = { onAction(SettingsAction.DeleteAccountPasswordChanged(it)) },
+                label = stringResource(R.string.delete_account_password_label),
+                leadingIcon = ChefAIIcons.Lock,
+                trailing = {
+                    PasswordVisibilityToggle(
+                        isVisible = state.isPasswordVisible,
+                        onToggle = { onAction(SettingsAction.DeleteAccountPasswordVisibilityToggled) },
+                    )
+                },
+                visualTransformation = if (state.isPasswordVisible) {
+                    VisualTransformation.None
+                } else {
+                    PasswordVisualTransformation()
+                },
+                errorText = state.error
+                    ?.takeIf { it == DeleteAccountError.WRONG_PASSWORD }
+                    ?.let { stringResource(it.messageRes) },
+                enabled = !state.isSubmitting,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done,
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = { onAction(SettingsAction.DeleteAccountConfirmed) },
+                ),
+            )
+        }
 
         // Everything that isn't about one field: conflict, rate limit, expired session, other.
         state.error
@@ -448,6 +460,8 @@ private val DeleteAccountError.messageRes: Int
         DeleteAccountError.PUBLIC_RECIPE_CHOICE_MISSING -> R.string.delete_account_error_choice_missing
         DeleteAccountError.PUBLIC_RECIPES_CHANGED -> R.string.delete_account_error_public_recipes_changed
         DeleteAccountError.WRONG_PASSWORD -> R.string.delete_account_error_wrong_password
+        DeleteAccountError.GOOGLE_REAUTH_FAILED -> R.string.delete_account_error_google_reauth
+        DeleteAccountError.GOOGLE_NO_ACCOUNT -> R.string.error_google_no_account
         DeleteAccountError.CONFLICT -> R.string.delete_account_error_conflict
         DeleteAccountError.RATE_LIMITED -> R.string.delete_account_error_rate_limited
         DeleteAccountError.SESSION_EXPIRED -> R.string.delete_account_error_session_expired
@@ -662,6 +676,36 @@ private fun DeleteAccountDialogDarkPreview() {
                 ),
                 onAction = {},
             )
+        }
+    }
+}
+
+private val PreviewGoogleDeletion = DeleteAccountUiState.Confirming(
+    preview = AccountDeletionPreview(publicRecipeCount = 0, privateRecipeCount = 4, ownsHousehold = false),
+    usesGoogle = true,
+    error = DeleteAccountError.GOOGLE_REAUTH_FAILED,
+)
+
+@Preview(name = "Delete account dialog, Google – light", showBackground = true)
+@Composable
+private fun DeleteAccountGoogleDialogPreview() {
+    ChefAITheme {
+        Surface {
+            DeleteAccountDialogBody(state = PreviewGoogleDeletion, onAction = {})
+        }
+    }
+}
+
+@Preview(
+    name = "Delete account dialog, Google – dark",
+    showBackground = true,
+    uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+private fun DeleteAccountGoogleDialogDarkPreview() {
+    ChefAITheme {
+        Surface {
+            DeleteAccountDialogBody(state = PreviewGoogleDeletion, onAction = {})
         }
     }
 }

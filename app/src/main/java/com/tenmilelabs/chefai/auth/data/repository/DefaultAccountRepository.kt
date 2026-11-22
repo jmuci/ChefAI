@@ -7,6 +7,7 @@ import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.AccountDeletionPreview
 import com.tenmilelabs.chefai.auth.domain.model.AccountDeletionPreviewResult
 import com.tenmilelabs.chefai.auth.domain.model.DeleteAccountResult
+import com.tenmilelabs.chefai.auth.domain.model.DeletionProof
 import com.tenmilelabs.chefai.auth.domain.model.PublicRecipeDisposition
 import com.tenmilelabs.chefai.auth.domain.repository.AccountRepository
 import kotlinx.coroutines.CancellationException
@@ -17,7 +18,7 @@ import javax.inject.Singleton
 /**
  * Both calls retry once after a token refresh when the JWT itself is rejected — the same single
  * refresh-then-retry `SyncWorker` and `DefaultRecipeSearchRepository` do, never a loop. A wrong
- * password is a different `401` (see [com.tenmilelabs.chefai.auth.data.network.AccountApiService])
+ * password or a rejected Google token is a different `401` (see [com.tenmilelabs.chefai.auth.data.network.AccountApiService])
  * and is returned as is: refreshing on it would spend a refresh token for nothing.
  */
 @Singleton
@@ -53,16 +54,16 @@ class DefaultAccountRepository @Inject constructor(
     }
 
     override suspend fun deleteAccount(
-        password: String,
+        proof: DeletionProof,
         publicRecipes: PublicRecipeDisposition?,
     ): DeleteAccountResult = guarded(onFailure = DeleteAccountResult.Failed) {
         val disposition = publicRecipes?.name
-        var result = networkDataSource.deleteAccount(password, disposition)
+        var result = networkDataSource.deleteAccount(proof, disposition)
         if (result is DeleteAccountNetworkResult.Unauthenticated) {
             if (sessionManager.refreshToken().isFailure) {
                 return@guarded DeleteAccountResult.SessionExpired
             }
-            result = networkDataSource.deleteAccount(password, disposition)
+            result = networkDataSource.deleteAccount(proof, disposition)
         }
         when (result) {
             DeleteAccountNetworkResult.Deleted -> DeleteAccountResult.Deleted

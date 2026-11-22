@@ -193,6 +193,56 @@ When a user logs out (through `LogoutUseCase`, which wraps `SessionManager.logou
 - the app returns to an anonymous session
 - the anonymous `localUserId` is preserved
 - local data is not cleared
+- the profile menu then calls `clearGoogleCredentialState` (Credential Manager
+  `clearCredentialState`, best effort) so a later auto-select flow cannot silently sign the same
+  Google account back in. It lives in the UI layer because it needs a Context; `LogoutUseCase`
+  stays Context-free.
+
+### Sign in with Google
+
+Design: [ADR-019](adrs/adr-019-sign-in-with-google.md). Android exchanges a Google ID token for our
+own tokens; nothing after the exchange knows about Google.
+
+```
+GoogleIdTokenRequester (auth/ui/google, Activity context)
+  -> GoogleIdTokenResult.Success(idToken)
+  -> LoginViewModel / RegisterViewModel.onGoogleResult
+  -> SessionManager.loginWithGoogle(idToken)
+  -> POST /auth/google { idToken }  ->  AuthResponse (same shape as /auth/login)
+  -> completeAuthentication(...)    (the pipeline shared with login() and register())
+```
+
+- **Button:** "Continue with Google" on both Login and Register (for Google they are the same
+  action). Hidden unless the build has a Web client ID: `-PchefaiGoogleWebClientId=...` or
+  `~/.gradle/gradle.properties` -> `BuildConfig.GOOGLE_WEB_CLIENT_ID`, `GOOGLE_SIGN_IN_CONFIGURED`.
+- **Request:** `GetSignInWithGoogleOption`, the explicit flow that always shows the account chooser.
+  The requester is a plain class used from the composable; ViewModels only see the sealed
+  `GoogleIdTokenResult` (`Success` / `Cancelled` / `NoGoogleAccount` / `Failure`). Cancelled is silent.
+- **Pipeline:** `SessionManager.completeAuthentication` persists the auth data with
+  `pendingUpgradeFrom`, runs the account switch and the anonymous upgrade, publishes the session,
+  starts sync. `login`, `register` and `loginWithGoogle` all go through it.
+- **Existing email:** the backend answers `409 GOOGLE_EMAIL_EXISTS` (nothing is created or linked).
+  Login shows "log in with your password, then connect Google from your profile". Register saves the
+  token's email as the login prefill (read unverified from the JWT payload, display only), raises a
+  top banner (it survives navigation) and navigates to Login. `AuthHttpException.code` carries the
+  backend's `ErrorResponse.code`.
+- **Linking:** the profile menu shows "Connect Google" when signed in and `"google"` is not in
+  `signInMethods.providers`. It runs the requester, then `SessionManager.linkGoogle` ->
+  `POST /auth/google/link`; `204` refreshes the providers, `GOOGLE_EMAIL_MISMATCH` /
+  `GOOGLE_IDENTITY_TAKEN` have their own messages.
+- **Sign-in methods:** `AuthResponse.hasPassword` / `providers` (defaults `true` / empty for an older
+  backend) are stored in `SecurePreferences` (plaintext: flags, not credentials), cleared on logout,
+  and exposed as `UserSession.Authenticated.signInMethods`.
+- **Account deletion:** `DeleteAccountUseCase` / `AccountRepository.deleteAccount` take a sealed
+  `DeletionProof` (`Password` or `GoogleToken`). Settings asks for the password when
+  `hasPassword`; otherwise the dialog's button reads "Confirm with Google", the ViewModel emits
+  `RequestGoogleConfirmation`, the screen runs the picker and answers with a **fresh** token (the
+  backend rejects one older than 5 minutes). The `401` maps to the existing wrong-credentials
+  result, shown as a Google-specific message when the proof was a token.
+- **Never logged:** ID tokens, refresh tokens, passwords. `GoogleSignInRequest`, `DeleteAccountRequest`
+  and `DeletionProof` redact in `toString`.
+- **Not done (ADR-019 "Open question: nonce"):** no nonce, so a leaked ID token could be replayed
+  for about an hour. See phase F of the implementation plan.
 
 ### Switching accounts
 
@@ -502,7 +552,7 @@ if (sessionManager.isTokenExpired()) {
 - [x] Anonymous → authenticated upgrade flow
 - [x] Store user profile locally during login
 - [x] Wire real user ID into repositories (replace hardcoded test UUID)
-- [ ] Sign in with Google — proposed in [ADR-019](adrs/adr-019-sign-in-with-google.md)
+- [x] Sign in with Google — [ADR-019](adrs/adr-019-sign-in-with-google.md) (Android done; needs the backend endpoints and Google Cloud setup, see below)
 - [ ] Add biometric authentication option
 - [ ] Implement "Remember Me" functionality
 - [ ] Add session timeout handling

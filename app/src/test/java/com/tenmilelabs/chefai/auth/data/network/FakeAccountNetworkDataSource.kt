@@ -1,5 +1,7 @@
 package com.tenmilelabs.chefai.auth.data.network
 
+import com.tenmilelabs.chefai.auth.domain.model.DeletionProof
+
 /** Queue-driven: each call takes the next result, and repeats the last one once the queue is empty. */
 class FakeAccountNetworkDataSource : AccountNetworkDataSource {
 
@@ -11,7 +13,7 @@ class FakeAccountNetworkDataSource : AccountNetworkDataSource {
 
     var previewCalls = 0
         private set
-    val deleteCalls = mutableListOf<Pair<String, String?>>()
+    val deleteCalls = mutableListOf<Pair<DeletionProof, String?>>()
 
     override suspend fun getDeletionPreview(): AccountDeletionPreviewNetworkResult {
         previewCalls++
@@ -19,8 +21,8 @@ class FakeAccountNetworkDataSource : AccountNetworkDataSource {
         return if (previewResults.size > 1) previewResults.removeFirst() else previewResults.first()
     }
 
-    override suspend fun deleteAccount(password: String, publicRecipes: String?): DeleteAccountNetworkResult {
-        deleteCalls += password to publicRecipes
+    override suspend fun deleteAccount(proof: DeletionProof, publicRecipes: String?): DeleteAccountNetworkResult {
+        deleteCalls += proof to publicRecipes
         errorToThrow?.let { throw it }
         return if (deleteResults.size > 1) deleteResults.removeFirst() else deleteResults.first()
     }

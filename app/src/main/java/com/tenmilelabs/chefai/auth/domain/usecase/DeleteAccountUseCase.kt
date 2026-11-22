@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.auth.domain.usecase
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.AccountDeletionPreview
 import com.tenmilelabs.chefai.auth.domain.model.DeleteAccountResult
+import com.tenmilelabs.chefai.auth.domain.model.DeletionProof
 import com.tenmilelabs.chefai.auth.domain.model.PublicRecipeDisposition
 import com.tenmilelabs.chefai.auth.domain.repository.AccountRepository
 import com.tenmilelabs.chefai.core.di.IoDispatcher
@@ -28,7 +29,7 @@ class DeleteAccountUseCase @Inject constructor(
 ) {
 
     suspend operator fun invoke(
-        password: String,
+        proof: DeletionProof,
         preview: AccountDeletionPreview,
         publicRecipes: PublicRecipeDisposition?,
     ): DeleteAccountResult {
@@ -41,7 +42,7 @@ class DeleteAccountUseCase @Inject constructor(
         // Set before the request: if the process dies after the server deletes the account but
         // before endLocalSession runs, the next cold start finishes the wipe (SessionManager).
         sessionManager.setAccountDeletionPending(true)
-        val result = accountRepository.deleteAccount(password, disposition)
+        val result = accountRepository.deleteAccount(proof, disposition)
         when (result) {
             DeleteAccountResult.Deleted -> endLocalSession()
             // The server answered and didn't delete: nothing to finish later.

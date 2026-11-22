@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.auth.data.network
 
+import com.tenmilelabs.chefai.auth.domain.model.DeletionProof
 import com.google.common.truth.Truth.assertThat
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -83,7 +84,7 @@ class AccountApiServiceTest {
     fun `deleteAccount posts the password and choice and maps 204 to Deleted`() = runTest {
         val subject = service(MockEngine { respond(content = "", status = HttpStatusCode.NoContent) })
 
-        val result = subject.deleteAccount(password = "hunter2", publicRecipes = "ANONYMIZE")
+        val result = subject.deleteAccount(DeletionProof.Password("hunter2"), publicRecipes = "ANONYMIZE")
 
         assertThat(result).isEqualTo(DeleteAccountNetworkResult.Deleted)
         assertThat(lastRequest.url.encodedPath).isEqualTo("/api/v1/me/delete")
@@ -95,7 +96,7 @@ class AccountApiServiceTest {
     fun `deleteAccount leaves publicRecipes out of the body when there is no choice`() = runTest {
         val subject = service(MockEngine { respond(content = "", status = HttpStatusCode.NoContent) })
 
-        subject.deleteAccount(password = "hunter2", publicRecipes = null)
+        subject.deleteAccount(DeletionProof.Password("hunter2"), publicRecipes = null)
 
         assertThat(lastBody).isEqualTo("""{"password":"hunter2"}""")
     }
@@ -104,14 +105,14 @@ class AccountApiServiceTest {
     fun `deleteAccount maps the password check's JSON 401 to WrongPassword`() = runTest {
         val subject = service(jsonEngine("""{"message":"Invalid password"}""", HttpStatusCode.Unauthorized))
 
-        assertThat(subject.deleteAccount("wrong", null)).isEqualTo(DeleteAccountNetworkResult.WrongPassword)
+        assertThat(subject.deleteAccount(DeletionProof.Password("wrong"), null)).isEqualTo(DeleteAccountNetworkResult.WrongPassword)
     }
 
     @Test
     fun `deleteAccount maps the JWT challenge's plain-text 401 to Unauthenticated`() = runTest {
         val subject = service(jwtChallengeEngine())
 
-        assertThat(subject.deleteAccount("hunter2", null)).isEqualTo(DeleteAccountNetworkResult.Unauthenticated)
+        assertThat(subject.deleteAccount(DeletionProof.Password("hunter2"), null)).isEqualTo(DeleteAccountNetworkResult.Unauthenticated)
     }
 
     @Test
@@ -123,7 +124,7 @@ class AccountApiServiceTest {
             )
         )
 
-        assertThat(subject.deleteAccount("hunter2", null))
+        assertThat(subject.deleteAccount(DeletionProof.Password("hunter2"), null))
             .isEqualTo(DeleteAccountNetworkResult.PublicRecipeChoiceRequired(publicRecipeCount = 4))
     }
 
@@ -131,14 +132,41 @@ class AccountApiServiceTest {
     fun `deleteAccount maps any other 400 to Failed`() = runTest {
         val subject = service(jsonEngine("""{"message":"Invalid request format"}""", HttpStatusCode.BadRequest))
 
-        assertThat(subject.deleteAccount("hunter2", null)).isEqualTo(DeleteAccountNetworkResult.Failed(400))
+        assertThat(subject.deleteAccount(DeletionProof.Password("hunter2"), null)).isEqualTo(DeleteAccountNetworkResult.Failed(400))
     }
 
     @Test
     fun `deleteAccount maps 409 to Conflict and 429 to RateLimited`() = runTest {
-        assertThat(service(jsonEngine("""{"message":"retry"}""", HttpStatusCode.Conflict)).deleteAccount("p", null))
+        assertThat(service(jsonEngine("""{"message":"retry"}""", HttpStatusCode.Conflict)).deleteAccount(DeletionProof.Password("p"), null))
             .isEqualTo(DeleteAccountNetworkResult.Conflict)
-        assertThat(service(MockEngine { respond("", HttpStatusCode.TooManyRequests) }).deleteAccount("p", null))
+        assertThat(service(MockEngine { respond("", HttpStatusCode.TooManyRequests) }).deleteAccount(DeletionProof.Password("p"), null))
             .isEqualTo(DeleteAccountNetworkResult.RateLimited)
+    }
+
+
+    @Test
+    fun `deleteAccount with a Google proof posts googleIdToken and no password`() = runTest {
+        val subject = service(MockEngine { respond(content = "", status = HttpStatusCode.NoContent) })
+
+        val result = subject.deleteAccount(DeletionProof.GoogleToken("g-token"), publicRecipes = "DELETE")
+
+        assertThat(result).isEqualTo(DeleteAccountNetworkResult.Deleted)
+        assertThat(lastBody).isEqualTo("""{"googleIdToken":"g-token","publicRecipes":"DELETE"}""")
+    }
+
+    @Test
+    fun `deleteAccount maps a rejected Google token's JSON 401 to WrongPassword`() = runTest {
+        val subject = service(
+            jsonEngine("""{"message":"Invalid token","code":"INVALID_GOOGLE_TOKEN"}""", HttpStatusCode.Unauthorized)
+        )
+
+        assertThat(subject.deleteAccount(DeletionProof.GoogleToken("old"), null))
+            .isEqualTo(DeleteAccountNetworkResult.WrongPassword)
+    }
+
+    @Test
+    fun `a deletion proof never prints its secret`() {
+        assertThat(DeletionProof.Password("hunter2").toString()).doesNotContain("hunter2")
+        assertThat(DeletionProof.GoogleToken("g-token").toString()).doesNotContain("g-token")
     }
 }

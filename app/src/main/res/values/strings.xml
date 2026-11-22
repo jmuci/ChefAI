@@ -517,6 +517,9 @@
     <string name="delete_account_public_recipes_anonymize">Keep them, credited to \u201cDeleted user\u201d</string>
     <string name="delete_account_password_label">Enter your password to confirm</string>
     <string name="delete_account_confirm_button">Delete my account</string>
+    <string name="delete_account_confirm_with_google">Confirm with Google</string>
+    <string name="delete_account_google_hint">Your account has no password. You\'ll confirm by signing in with Google.</string>
+    <string name="delete_account_error_google_reauth">Google couldn\'t confirm it\'s you. Try again.</string>
     <string name="delete_account_confirm_button_loading">Deleting\u2026</string>
     <string name="delete_account_error_choice_missing">Choose what happens to your public recipes.</string>
     <string name="delete_account_error_public_recipes_changed">You have public recipes. Choose what happens to them.</string>

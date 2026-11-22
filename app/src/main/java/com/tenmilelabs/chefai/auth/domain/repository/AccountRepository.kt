@@ -2,6 +2,7 @@ package com.tenmilelabs.chefai.auth.domain.repository
 
 import com.tenmilelabs.chefai.auth.domain.model.AccountDeletionPreviewResult
 import com.tenmilelabs.chefai.auth.domain.model.DeleteAccountResult
+import com.tenmilelabs.chefai.auth.domain.model.DeletionProof
 import com.tenmilelabs.chefai.auth.domain.model.PublicRecipeDisposition
 
 /**
@@ -17,11 +18,11 @@ interface AccountRepository {
     suspend fun getDeletionPreview(): AccountDeletionPreviewResult
 
     /**
-     * `POST /api/v1/me/delete`. [publicRecipes] is omitted from the body when `null`, which is
-     * what the server expects from a user with no public recipes.
+     * `POST /api/v1/me/delete`, re-authenticating with [proof]. [publicRecipes] is omitted from the
+     * body when `null`, which is what the server expects from a user with no public recipes.
      */
     suspend fun deleteAccount(
-        password: String,
+        proof: DeletionProof,
         publicRecipes: PublicRecipeDisposition?,
     ): DeleteAccountResult
 }

@@ -11,14 +11,19 @@ data class AccountDeletionPreviewResponse(
 )
 
 /**
- * Request for `POST /api/v1/me/delete`. [publicRecipes] is `"DELETE"` or `"ANONYMIZE"`, and is
- * left out of the JSON entirely when `null` — the client `Json` doesn't encode defaults.
+ * Request for `POST /api/v1/me/delete`. Exactly one of [password] and [googleIdToken] is set (the
+ * server answers 400 otherwise). [publicRecipes] is `"DELETE"` or `"ANONYMIZE"`. Null fields are
+ * left out of the JSON entirely — the client `Json` doesn't encode defaults.
  */
 @Serializable
 data class DeleteAccountRequest(
-    val password: String,
+    val password: String? = null,
+    val googleIdToken: String? = null,
     val publicRecipes: String? = null,
-)
+) {
+    override fun toString(): String =
+        "DeleteAccountRequest(credential=<redacted>, publicRecipes=$publicRecipes)"
+}
 
 /** The `400` body when the public-recipe choice is missing. */
 @Serializable
