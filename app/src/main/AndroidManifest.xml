@@ -43,7 +43,7 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
             <!--
-                Household invite links. android:autoVerify requires
+                Household invite and password-reset links. android:autoVerify requires
                 https://pocket-chef.app/.well-known/assetlinks.json to be served with this app's
                 signing cert fingerprint, or Android falls back to a disambiguation dialog instead
                 of opening the app directly — see ADR-014 §6, a deploy-pipeline dependency outside
@@ -58,6 +58,8 @@
                     android:scheme="https"
                     android:host="pocket-chef.app"
                     android:pathPrefix="/invite" />
+                <!-- Password reset links: same host, so the same assetlinks.json covers them. -->
+                <data android:pathPrefix="/reset-password" />
             </intent-filter>
         </activity>
 

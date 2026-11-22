@@ -18,6 +18,7 @@ import com.tenmilelabs.chefai.core.ui.navigation.ChefAINavGraph
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.core.ui.timer.FloatingRecipeTimerWidget
 import com.tenmilelabs.chefai.core.util.InviteLinkParser
+import com.tenmilelabs.chefai.core.util.ResetPasswordLinkParser
 import com.tenmilelabs.chefai.core.util.extractSharedRecipeUrl
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -26,12 +27,13 @@ class MainActivity : ComponentActivity() {
 
     private var pendingSharedUrl by mutableStateOf<String?>(null)
     private var pendingInviteToken by mutableStateOf<String?>(null)
+    private var pendingResetToken by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         consumeShareIntent(intent)
-        consumeInviteIntent(intent)
+        consumeAppLinkIntent(intent)
         setContent {
             ChefAITheme {
                 Surface(tonalElevation = 5.dp) {
@@ -42,6 +44,8 @@ class MainActivity : ComponentActivity() {
                             onPendingSharedUrlConsumed = { pendingSharedUrl = null },
                             pendingInviteToken = pendingInviteToken,
                             onPendingInviteTokenConsumed = { pendingInviteToken = null },
+                            pendingResetToken = pendingResetToken,
+                            onPendingResetTokenConsumed = { pendingResetToken = null },
                         )
                         // Lives above the nav graph, not inside it, so a timer survives
                         // navigating between screens instead of being torn down with the route.
@@ -56,7 +60,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         consumeShareIntent(intent)
-        consumeInviteIntent(intent)
+        consumeAppLinkIntent(intent)
     }
 
     /**
@@ -85,7 +89,9 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Handles an App Link (`https://pocket-chef.app/invite?token=...`) landing on this activity.
+     * Handles an App Link landing on this activity: a household invite
+     * (`https://pocket-chef.app/invite?token=...`) or a password reset
+     * (`https://pocket-chef.app/reset-password?token=...`).
      *
      * Mirrors [consumeShareIntent]: the token is read once and the data URI is cleared from the
      * intent as it's read, for the same reason — `getIntent()` keeps returning this same launching
@@ -93,9 +99,13 @@ class MainActivity : ComponentActivity() {
      * re-runs [onCreate] against it; without clearing it, a link the user already resolved (joined,
      * declined, or dismissed) would re-open the accept screen underneath them every time.
      */
-    private fun consumeInviteIntent(intent: Intent) {
+    private fun consumeAppLinkIntent(intent: Intent) {
         if (intent.action != Intent.ACTION_VIEW) return
-        pendingInviteToken = InviteLinkParser.extractToken(intent.data?.toString())
+        val url = intent.data?.toString()
+        // At most one parser matches: they accept different paths on the same host. The reset
+        // token is a credential, so the URL is never logged here.
+        pendingInviteToken = InviteLinkParser.extractToken(url)
+        pendingResetToken = ResetPasswordLinkParser.extractToken(url)
         intent.data = null
     }
 }

@@ -181,6 +181,7 @@ for areas without one — update those, not this table, when behaviour changes.
 | Conflict resolution | LWW on `updatedAt` — [ADR-006](docs/adrs/adr-006-sync-protocol.md) | `SyncState.CONFLICT` defined but unused |
 | Recipe search | Done — [feature-status](docs/feature-status.md#recipe-search) | Filters, typo tolerance, history, search-by-ingredients |
 | Recipe URL import | Done — [ADR-010](docs/adrs/adr-010-client-side-recipe-scraping.md), language [ADR-016](docs/adrs/adr-016-recipe-language.md), [share target](docs/feature-status.md#recipe-url-import--share-target) | No per-site scrapers, no nutrition; search/timer/diet keywords English-only |
+| Password reset | Done (Android) — [authentication](docs/authentication.md#password-reset-nov-2026), [plan](docs/plans/password-reset.md) | Needs backend routes + assetlinks live; Maestro flow unrun; English only |
 | Recipe images | Done — [ADR-012](docs/adrs/adr-012-recipe-image-upload.md) | No real thumbnails; delete not undoable (server copy kept 30 days); #144 at ~50 users |
 | Recipe delete | Soft delete from details — [feature-status](docs/feature-status.md#recipe-delete) | No undo, no swipe-to-delete |
 | Starred & go-to | Done (Android) — [feature-status](docs/feature-status.md#starred--go-to-recipes) | Backend doesn't store the flags yet |

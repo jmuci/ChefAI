@@ -378,6 +378,29 @@ fun provideHttpClient(tokenProvider: TokenProvider, /* … */) = HttpClient(OkHt
 }
 ```
 
+## Password reset (Nov 2026)
+
+Forgot-password by emailed link; plan and API contract in [plans/password-reset.md](plans/password-reset.md).
+
+- **Flow**: Login → "Forgot password?" → `ForgotPasswordScreen` (`auth/ui/forgot`, email prefilled from
+  Login) → `POST /auth/password-reset/request` → "Check your email" with a 60 s resend cooldown →
+  the email's `https://pocket-chef.app/reset-password?token=…` App Link → `ResetPasswordScreen`
+  (`auth/ui/reset`) → `validate` on entry, `confirm` on submit → "Sign in" (no auto-login).
+- **Anti-enumeration**: `request` answers `202` for any well-formed email, so the Sent screen reads
+  "If an account exists for …" and never says whether one does.
+- **Data**: `PasswordResetRepository` → `PasswordResetApiService` (unauthenticated Ktor calls,
+  sealed `PasswordResetResult`: Success / InvalidToken / Validation / RateLimited / Network / Unknown).
+- **Deep link**: `ResetPasswordLinkParser` accepts only https, host `pocket-chef.app`, path exactly
+  `/reset-password` and a 43-char base64url token. `MainActivity` hands a parsed token to
+  `ChefAINavGraph`, which waits for the NavHost graph (cold start) and opens the route. The token
+  lives only in the route's `SavedStateHandle`; it and the password are never logged.
+- **After a reset** the server revokes every refresh token, so a signed-in device is signed out at
+  its next refresh by the existing refresh-rejection handling; the Done screen just says so.
+- **Tests**: JVM (parser table, both ViewModels with a cooldown test via virtual time, API service
+  with MockEngine, repository mapping); instrumented (screens, plus a cold-start VIEW intent in
+  `ResetPasswordDeepLinkTest`); Maestro `.maestro/auth/password_reset.yaml` against a local
+  backend in development mode (reads the link from `GET /dev/outbox`).
+
 ## Current Development Setup (Nov 2026)
 
 **Auth API calls are implemented.** `SessionManager.login()`, `register()`, and `refreshToken()` all

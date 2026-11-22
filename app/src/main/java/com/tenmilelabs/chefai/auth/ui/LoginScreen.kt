@@ -73,6 +73,7 @@ fun LoginScreen(
     onNavigateToHome: () -> Unit = {},
     onNavigateToRegister: () -> Unit = {},
     onNavigateToAcceptInvite: (String) -> Unit = {},
+    onNavigateToForgotPassword: (String) -> Unit = {},
     /** Pops back to wherever Log in was opened from; wired to the same pop the system back uses. */
     onNavigateBack: () -> Unit = {},
     /** `null` hides the Developer options link — the caller passes one on debug builds only. */
@@ -98,6 +99,7 @@ fun LoginScreen(
                 LoginUiEvent.NavigateToRegister -> {
                     onNavigateToRegister()
                 }
+                is LoginUiEvent.NavigateToForgotPassword -> onNavigateToForgotPassword(event.email)
                 is LoginUiEvent.NavigateToAcceptInvite -> {
                     onNavigateToAcceptInvite(event.token)
                 }
@@ -116,6 +118,7 @@ fun LoginScreen(
         onPasswordVisibilityToggle = viewModel::onPasswordVisibilityToggle,
         onLoginClick = viewModel::onLoginClick,
         onCreateAccountClick = viewModel::onCreateAccountClick,
+        onForgotPasswordClick = viewModel::onForgotPasswordClick,
         onNavigateBack = onNavigateBack,
         onDeveloperOptionsClick = onNavigateToDeveloperOptions,
         appVersion = appVersionLabel,
@@ -134,6 +137,7 @@ fun LoginScreenContent(
     onPasswordVisibilityToggle: () -> Unit = {},
     onLoginClick: () -> Unit = {},
     onCreateAccountClick: () -> Unit = {},
+    onForgotPasswordClick: () -> Unit = {},
     onNavigateBack: () -> Unit = {},
     onDeveloperOptionsClick: (() -> Unit)? = null,
     appVersion: String,
@@ -210,6 +214,15 @@ fun LoginScreenContent(
                             error = uiState.passwordError,
                             modifier = Modifier.fillMaxWidth(),
                             onDone = onLoginClick
+                        )
+
+                        Text(
+                            text = stringResource(R.string.login_forgot_password),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.chefColors.accentText,
+                            modifier = Modifier
+                                .flatClickable(onClick = onForgotPasswordClick, role = Role.Button)
+                                .testTag("ForgotPasswordButton"),
                         )
 
                         Spacer(modifier = Modifier.height(AuthMetrics.FieldGap))

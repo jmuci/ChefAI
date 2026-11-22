@@ -113,6 +113,17 @@ language detection is [ADR-016](adrs/adr-016-recipe-language.md). The share-targ
   (security review A6, #354).
 - Shared text with no link shows a toast.
 
+## Password reset
+
+Done on Android. Login's "Forgot password?" opens `ForgotPasswordScreen`; the emailed App Link opens
+`ResetPasswordScreen`. Details in [authentication.md](authentication.md#password-reset-nov-2026).
+
+- Needs the backend's `/auth/password-reset/*` routes and a verified `assetlinks.json` on
+  pocket-chef.app (the same one the household invite links use) for the link to open the app directly.
+- Gaps: English only; the 60 s resend cooldown is per screen visit (leaving and returning allows an
+  immediate resend — the server's per-email throttle is the real limit); no "open mail app" button;
+  the Maestro flow has not been run against a live backend.
+
 ## Recipe delete
 
 Soft delete via a button on the recipe details screen. No undo, no list swipe-to-delete, no delete
