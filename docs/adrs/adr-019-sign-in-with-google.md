@@ -55,9 +55,10 @@ Alternatives rejected:
 
 ## Decision 2: Backend verification and identity model
 
-**Verification** uses a library (Google's `google-api-client` `GoogleIdTokenVerifier`, or Nimbus
-JOSE + Google's JWKS), behind a small `GoogleIdTokenVerifier` interface so tests can sign tokens
-with a local key. Checks: signature against Google's published keys, `iss` ∈
+**Verification** uses `com.auth0:java-jwt` + `com.auth0:jwks-rsa` against Google's JWKS — both
+already on the backend's classpath through `ktor-server-auth-jwt`, so no new artifact — behind a
+small `GoogleIdTokenVerifier` interface so tests can sign tokens with a local key. (Google's
+`google-api-client` or Nimbus JOSE would also work but add a dependency.) Checks: signature against Google's published keys, `iss` ∈
 {`accounts.google.com`, `https://accounts.google.com`}, `aud` == our **Web** OAuth client ID,
 `exp` in the future, `email_verified == true`. Failure → `401 INVALID_GOOGLE_TOKEN`.
 
@@ -172,7 +173,7 @@ auto-select flow cannot silently sign the same Google account back in.
 
 ## Decision 5: Account deletion for Google accounts
 
-`DELETE` account accepts either `password` or `googleIdToken`. The server verifies the Google
+`POST /api/v1/me/delete` accepts either `password` or `googleIdToken`. The server verifies the Google
 token as in Decision 2, requires its `sub` to match one of the user's identities, and requires
 `iat` within the last 5 minutes (re-authentication, not a token the client happened to keep). The
 deletion screen asks for whichever the account has; the auth response (or `GET /account`) gains
@@ -227,4 +228,8 @@ can make on open, before the button is tapped.
 Today's exposure is small: the token only travels over TLS, and the app's Ktor logging is
 `HEADERS` in debug and `NONE` in release, so request bodies are never logged. **Proposed: skip the
 nonce in v1**; never log the token, and add the nonce if tokens ever pass through anything that
-records request bodies.
+records request bodies. Trade-offs in full, and the follow-up task if approved:
+[implementation plan, phase F](../archive/prompts/google-sign-in-plan.md#f--follow-up-nonce-do-not-start-without-the-users-sign-off).
+
+The task-by-task implementation plan is
+[docs/archive/prompts/google-sign-in-plan.md](../archive/prompts/google-sign-in-plan.md).
