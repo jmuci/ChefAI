@@ -20,6 +20,14 @@ val releaseApiBaseUrl: String =
     (project.findProperty("chefaiApiBaseUrl") as String?) ?: "https://api.pocket-chef.app"
 
 /**
+ * The Google OAuth **Web** client ID used as `serverClientId` for Sign in with Google (and the
+ * audience the backend expects). Not a secret. From `-PchefaiGoogleWebClientId=…` or
+ * `~/.gradle/gradle.properties`; blank hides the "Continue with Google" button.
+ */
+val googleWebClientId: String =
+    (project.findProperty("chefaiGoogleWebClientId") as String?) ?: ""
+
+/**
  * Short hash of the commit a debug build was made from, shown next to its version name. Falls back
  * to "unknown" outside a git checkout (e.g. a source tarball) rather than failing the build.
  */
@@ -45,6 +53,8 @@ android {
         buildConfigField("String", "REMOTE_API_BASE_URL", "\"${releaseApiBaseUrl}\"")
         // False only when chefaiApiBaseUrl is passed blank, so Developer options can refuse it.
         buildConfigField("boolean", "REMOTE_API_CONFIGURED", "${releaseApiBaseUrl.isNotBlank()}")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${googleWebClientId}\"")
+        buildConfigField("boolean", "GOOGLE_SIGN_IN_CONFIGURED", "${googleWebClientId.isNotBlank()}")
     }
 
     buildTypes {
@@ -122,6 +132,9 @@ dependencies {
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.core)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.google.googleid)
     implementation(libs.material)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.process)
