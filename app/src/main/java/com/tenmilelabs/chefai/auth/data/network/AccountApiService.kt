@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.auth.data.network
 import com.tenmilelabs.chefai.BuildConfig
 import com.tenmilelabs.chefai.auth.data.network.dto.AccountDeletionErrorResponse
 import com.tenmilelabs.chefai.auth.data.network.dto.DeleteAccountRequest
+import com.tenmilelabs.chefai.auth.domain.model.DeletionProof
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.expectSuccess
@@ -24,9 +25,10 @@ internal const val PUBLIC_RECIPE_CHOICE_REQUIRED = "PUBLIC_RECIPE_CHOICE_REQUIRE
  *
  * Telling the two `401`s on `POST /me/delete` apart matters, because only one of them should ever
  * trigger a token refresh. The backend's JWT challenge answers with a **plain-text** body ("Token
- * is not valid or has expired"), while the route's own password check answers with a JSON
- * `ErrorResponse` ("Invalid password"). So a JSON 401 is [DeleteAccountNetworkResult.WrongPassword]
- * and anything else is [DeleteAccountNetworkResult.Unauthenticated].
+ * is not valid or has expired"), while the route's own proof check answers with a JSON
+ * `ErrorResponse` ("Invalid password", or `INVALID_GOOGLE_TOKEN` for a Google proof). So a JSON 401
+ * is [DeleteAccountNetworkResult.WrongPassword] and anything else is
+ * [DeleteAccountNetworkResult.Unauthenticated].
  */
 @Singleton
 class AccountApiService @Inject constructor(
@@ -46,10 +48,14 @@ class AccountApiService @Inject constructor(
         }
     }
 
-    override suspend fun deleteAccount(password: String, publicRecipes: String?): DeleteAccountNetworkResult {
+    override suspend fun deleteAccount(proof: DeletionProof, publicRecipes: String?): DeleteAccountNetworkResult {
+        val body = when (proof) {
+            is DeletionProof.Password -> DeleteAccountRequest(password = proof.value, publicRecipes = publicRecipes)
+            is DeletionProof.GoogleToken -> DeleteAccountRequest(googleIdToken = proof.value, publicRecipes = publicRecipes)
+        }
         val response = client.post("$BASE_URL/delete") {
             contentType(ContentType.Application.Json)
-            setBody(DeleteAccountRequest(password = password, publicRecipes = publicRecipes))
+            setBody(body)
             expectSuccess = false
         }
         return when (response.status) {

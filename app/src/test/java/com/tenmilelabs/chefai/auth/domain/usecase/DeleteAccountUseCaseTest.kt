@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.auth.domain.usecase
 
+import com.tenmilelabs.chefai.auth.domain.model.DeletionProof
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.AccountDeletionPreview
@@ -33,16 +34,16 @@ class DeleteAccountUseCaseTest {
     fun `with no public recipes the choice is never sent, even if one was passed`() = runTest {
         val deleteAccount = signedInUseCase()
 
-        deleteAccount("hunter2", noPublicRecipes, PublicRecipeDisposition.DELETE)
+        deleteAccount(DeletionProof.Password("hunter2"), noPublicRecipes, PublicRecipeDisposition.DELETE)
 
-        assertThat(repository.deleteCalls).containsExactly("hunter2" to null)
+        assertThat(repository.deleteCalls).containsExactly(DeletionProof.Password("hunter2") to null)
     }
 
     @Test
     fun `with public recipes and no choice it stops before calling the server`() = runTest {
         val deleteAccount = signedInUseCase()
 
-        val result = deleteAccount("hunter2", twoPublicRecipes, publicRecipes = null)
+        val result = deleteAccount(DeletionProof.Password("hunter2"), twoPublicRecipes, publicRecipes = null)
 
         assertThat(result).isEqualTo(DeleteAccountResult.PublicRecipeChoiceRequired(2))
         assertThat(repository.deleteCalls).isEmpty()
@@ -53,9 +54,9 @@ class DeleteAccountUseCaseTest {
     fun `with public recipes the choice is sent`() = runTest {
         val deleteAccount = signedInUseCase()
 
-        deleteAccount("hunter2", twoPublicRecipes, PublicRecipeDisposition.ANONYMIZE)
+        deleteAccount(DeletionProof.Password("hunter2"), twoPublicRecipes, PublicRecipeDisposition.ANONYMIZE)
 
-        assertThat(repository.deleteCalls).containsExactly("hunter2" to PublicRecipeDisposition.ANONYMIZE)
+        assertThat(repository.deleteCalls).containsExactly(DeletionProof.Password("hunter2") to PublicRecipeDisposition.ANONYMIZE)
     }
 
     @Test
@@ -63,7 +64,7 @@ class DeleteAccountUseCaseTest {
         val deleteAccount = signedInUseCase()
         repository.deleteResult = DeleteAccountResult.Deleted
 
-        val result = deleteAccount("hunter2", noPublicRecipes, null)
+        val result = deleteAccount(DeletionProof.Password("hunter2"), noPublicRecipes, null)
 
         assertThat(result).isEqualTo(DeleteAccountResult.Deleted)
         assertThat(sessionManager.userSession.value).isInstanceOf(UserSession.Anonymous::class.java)
@@ -75,7 +76,7 @@ class DeleteAccountUseCaseTest {
         val deleteAccount = signedInUseCase()
         repository.deleteResult = DeleteAccountResult.WrongPassword
 
-        val result = deleteAccount("wrong", noPublicRecipes, null)
+        val result = deleteAccount(DeletionProof.Password("wrong"), noPublicRecipes, null)
 
         assertThat(result).isEqualTo(DeleteAccountResult.WrongPassword)
         assertThat(sessionManager.userSession.value).isInstanceOf(UserSession.Authenticated::class.java)
@@ -86,7 +87,7 @@ class DeleteAccountUseCaseTest {
         val deleteAccount = signedInUseCase()
         repository.deleteResult = DeleteAccountResult.Failed
 
-        deleteAccount("hunter2", noPublicRecipes, null)
+        deleteAccount(DeletionProof.Password("hunter2"), noPublicRecipes, null)
 
         assertThat(sessionManager.isAccountDeletionPending()).isTrue()
     }
@@ -96,7 +97,7 @@ class DeleteAccountUseCaseTest {
         val deleteAccount = signedInUseCase()
         repository.deleteResult = DeleteAccountResult.WrongPassword
 
-        deleteAccount("wrong", noPublicRecipes, null)
+        deleteAccount(DeletionProof.Password("wrong"), noPublicRecipes, null)
 
         assertThat(sessionManager.isAccountDeletionPending()).isFalse()
     }
@@ -106,8 +107,41 @@ class DeleteAccountUseCaseTest {
         val deleteAccount = signedInUseCase()
         repository.deleteResult = DeleteAccountResult.Deleted
 
-        deleteAccount("hunter2", noPublicRecipes, null)
+        deleteAccount(DeletionProof.Password("hunter2"), noPublicRecipes, null)
 
+        assertThat(sessionManager.isAccountDeletionPending()).isFalse()
+    }
+
+
+    @Test
+    fun `a Google proof is passed to the repository and a successful deletion ends the session`() = runTest {
+        val deleteAccount = signedInUseCase()
+
+        val result = deleteAccount(DeletionProof.GoogleToken("g-token"), noPublicRecipes, null)
+
+        assertThat(result).isEqualTo(DeleteAccountResult.Deleted)
+        assertThat(repository.deleteCalls).containsExactly(DeletionProof.GoogleToken("g-token") to null)
+        assertThat(sessionManager.userSession.value).isInstanceOf(UserSession.Anonymous::class.java)
+    }
+
+    @Test
+    fun `with public recipes and no choice a Google proof also stops before calling the server`() = runTest {
+        val deleteAccount = signedInUseCase()
+
+        val result = deleteAccount(DeletionProof.GoogleToken("g-token"), twoPublicRecipes, publicRecipes = null)
+
+        assertThat(result).isEqualTo(DeleteAccountResult.PublicRecipeChoiceRequired(2))
+        assertThat(repository.deleteCalls).isEmpty()
+    }
+
+    @Test
+    fun `a rejected Google token keeps the session and clears the wipe marker`() = runTest {
+        val deleteAccount = signedInUseCase()
+        repository.deleteResult = DeleteAccountResult.WrongPassword
+
+        deleteAccount(DeletionProof.GoogleToken("old"), noPublicRecipes, null)
+
+        assertThat(sessionManager.userSession.value).isInstanceOf(UserSession.Authenticated::class.java)
         assertThat(sessionManager.isAccountDeletionPending()).isFalse()
     }
 }

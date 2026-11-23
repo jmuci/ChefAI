@@ -1,5 +1,6 @@
 package com.tenmilelabs.chefai.auth.data.repository
 
+import com.tenmilelabs.chefai.auth.domain.model.DeletionProof
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.auth.data.network.AccountDeletionPreviewNetworkResult
 import com.tenmilelabs.chefai.auth.data.network.DeleteAccountNetworkResult
@@ -88,10 +89,10 @@ class DefaultAccountRepositoryTest {
         val repository = signedInRepository()
         network.deleteResults += DeleteAccountNetworkResult.Deleted
 
-        val result = repository.deleteAccount("hunter2", PublicRecipeDisposition.DELETE)
+        val result = repository.deleteAccount(DeletionProof.Password("hunter2"), PublicRecipeDisposition.DELETE)
 
         assertThat(result).isEqualTo(DeleteAccountResult.Deleted)
-        assertThat(network.deleteCalls).containsExactly("hunter2" to "DELETE")
+        assertThat(network.deleteCalls).containsExactly(DeletionProof.Password("hunter2") to "DELETE")
     }
 
     @Test
@@ -102,7 +103,7 @@ class DefaultAccountRepositoryTest {
         authNetwork.shouldThrowError = true
         network.deleteResults += DeleteAccountNetworkResult.WrongPassword
 
-        val result = repository.deleteAccount("wrong", null)
+        val result = repository.deleteAccount(DeletionProof.Password("wrong"), null)
 
         assertThat(result).isEqualTo(DeleteAccountResult.WrongPassword)
         assertThat(network.deleteCalls).hasSize(1)
@@ -114,12 +115,12 @@ class DefaultAccountRepositoryTest {
         network.deleteResults += DeleteAccountNetworkResult.Unauthenticated
         network.deleteResults += DeleteAccountNetworkResult.Deleted
 
-        val result = repository.deleteAccount("hunter2", PublicRecipeDisposition.ANONYMIZE)
+        val result = repository.deleteAccount(DeletionProof.Password("hunter2"), PublicRecipeDisposition.ANONYMIZE)
 
         assertThat(result).isEqualTo(DeleteAccountResult.Deleted)
         assertThat(network.deleteCalls).containsExactly(
-            "hunter2" to "ANONYMIZE",
-            "hunter2" to "ANONYMIZE",
+            DeletionProof.Password("hunter2") to "ANONYMIZE",
+            DeletionProof.Password("hunter2") to "ANONYMIZE",
         ).inOrder()
     }
 
@@ -128,7 +129,7 @@ class DefaultAccountRepositoryTest {
         val repository = signedInRepository()
         network.deleteResults += DeleteAccountNetworkResult.Unauthenticated
 
-        assertThat(repository.deleteAccount("hunter2", null)).isEqualTo(DeleteAccountResult.SessionExpired)
+        assertThat(repository.deleteAccount(DeletionProof.Password("hunter2"), null)).isEqualTo(DeleteAccountResult.SessionExpired)
         assertThat(network.deleteCalls).hasSize(2)
     }
 
@@ -144,7 +145,7 @@ class DefaultAccountRepositoryTest {
         for ((networkResult, expected) in cases) {
             network.deleteResults.clear()
             network.deleteResults += networkResult
-            assertThat(repository.deleteAccount("hunter2", null)).isEqualTo(expected)
+            assertThat(repository.deleteAccount(DeletionProof.Password("hunter2"), null)).isEqualTo(expected)
         }
     }
 
@@ -153,6 +154,29 @@ class DefaultAccountRepositoryTest {
         val repository = signedInRepository()
         network.errorToThrow = IOException("offline")
 
-        assertThat(repository.deleteAccount("hunter2", null)).isEqualTo(DeleteAccountResult.Failed)
+        assertThat(repository.deleteAccount(DeletionProof.Password("hunter2"), null)).isEqualTo(DeleteAccountResult.Failed)
+    }
+
+
+    @Test
+    fun `a Google proof is forwarded to the network as is`() = runTest {
+        val repository = signedInRepository()
+        network.deleteResults += DeleteAccountNetworkResult.Deleted
+
+        val result = repository.deleteAccount(DeletionProof.GoogleToken("g-token"), null)
+
+        assertThat(result).isEqualTo(DeleteAccountResult.Deleted)
+        assertThat(network.deleteCalls).containsExactly(DeletionProof.GoogleToken("g-token") to null)
+    }
+
+    @Test
+    fun `a rejected Google token is returned as is, without refreshing or retrying`() = runTest {
+        val repository = signedInRepository()
+        network.deleteResults += DeleteAccountNetworkResult.WrongPassword
+
+        val result = repository.deleteAccount(DeletionProof.GoogleToken("old"), null)
+
+        assertThat(result).isEqualTo(DeleteAccountResult.WrongPassword)
+        assertThat(network.deleteCalls).hasSize(1)
     }
 }

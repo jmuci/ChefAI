@@ -20,7 +20,8 @@ sealed interface DeleteAccountUiState {
 
     /**
      * The confirmation dialog: what will be deleted, the public-recipe choice when there are any,
-     * and the password re-entry.
+     * and the re-authentication: the password re-entry, or [usesGoogle] for an account with no
+     * password, which confirms with a fresh Google sign-in instead (ADR-019 Decision 5).
      *
      * @param publicRecipes `null` until the user picks — there is no preselected default.
      * @param error the latest failed attempt; cleared as soon as the user edits anything.
@@ -32,8 +33,9 @@ sealed interface DeleteAccountUiState {
         val isPasswordVisible: Boolean = false,
         val isSubmitting: Boolean = false,
         val error: DeleteAccountError? = null,
+        val usesGoogle: Boolean = false,
     ) : DeleteAccountUiState {
-        val canSubmit: Boolean get() = password.isNotBlank() && !isSubmitting
+        val canSubmit: Boolean get() = (usesGoogle || password.isNotBlank()) && !isSubmitting
     }
 }
 
@@ -45,6 +47,12 @@ enum class DeleteAccountError {
     /** The server says there are public recipes the preview didn't show (published since). */
     PUBLIC_RECIPES_CHANGED,
     WRONG_PASSWORD,
+
+    /** The Google re-authentication was rejected (e.g. an old or invalid token). */
+    GOOGLE_REAUTH_FAILED,
+
+    /** There is no Google account on the device to confirm with. */
+    GOOGLE_NO_ACCOUNT,
     CONFLICT,
     RATE_LIMITED,
     SESSION_EXPIRED,
@@ -56,4 +64,11 @@ enum class DeleteAccountError {
 sealed interface SettingsEffect {
     /** The account is gone and the device is back to a fresh anonymous session. */
     data object AccountDeleted : SettingsEffect
+
+    /**
+     * The user confirmed a deletion of a Google-only account: the screen must run the Google
+     * account picker (it needs the Activity) and answer with
+     * [SettingsAction.DeleteAccountGoogleResult].
+     */
+    data object RequestGoogleConfirmation : SettingsEffect
 }

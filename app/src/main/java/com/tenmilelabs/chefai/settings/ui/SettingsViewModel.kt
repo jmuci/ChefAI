@@ -5,10 +5,13 @@ import androidx.lifecycle.viewModelScope
 import com.tenmilelabs.chefai.auth.domain.SessionManager
 import com.tenmilelabs.chefai.auth.domain.model.AccountDeletionPreviewResult
 import com.tenmilelabs.chefai.auth.domain.model.DeleteAccountResult
+import com.tenmilelabs.chefai.auth.domain.model.DeletionProof
 import com.tenmilelabs.chefai.auth.domain.model.PublicRecipeDisposition
+import com.tenmilelabs.chefai.auth.domain.model.SignInMethods
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.auth.domain.repository.AccountRepository
 import com.tenmilelabs.chefai.auth.domain.usecase.DeleteAccountUseCase
+import com.tenmilelabs.chefai.auth.ui.google.GoogleIdTokenResult
 import com.tenmilelabs.chefai.core.domain.model.RecipeLanguage
 import com.tenmilelabs.chefai.core.domain.model.WeekStart
 import com.tenmilelabs.chefai.core.domain.repository.UserPreferencesRepository
@@ -24,6 +27,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 /** Everything the settings screen renders. */
@@ -46,6 +50,9 @@ sealed interface SettingsAction {
     data class DeleteAccountPasswordChanged(val password: String) : SettingsAction
     data object DeleteAccountPasswordVisibilityToggled : SettingsAction
     data object DeleteAccountConfirmed : SettingsAction
+
+    /** The Google picker (run by the screen after [SettingsEffect.RequestGoogleConfirmation]) finished. */
+    data class DeleteAccountGoogleResult(val result: GoogleIdTokenResult) : SettingsAction
     data object DeleteAccountDismissed : SettingsAction
 }
 
@@ -110,7 +117,8 @@ class SettingsViewModel @Inject constructor(
             SettingsAction.DeleteAccountPasswordVisibilityToggled -> updateConfirming {
                 it.copy(isPasswordVisible = !it.isPasswordVisible)
             }
-            SettingsAction.DeleteAccountConfirmed -> submitDeletion()
+            SettingsAction.DeleteAccountConfirmed -> confirmDeletion()
+            is SettingsAction.DeleteAccountGoogleResult -> onGoogleConfirmation(action.result)
             SettingsAction.DeleteAccountDismissed -> deleteAccountState.update { state ->
                 // Mid-request the dialog stays: the deletion may already have happened.
                 if (state is DeleteAccountUiState.Confirming && state.isSubmitting) state else DeleteAccountUiState.Idle
@@ -123,7 +131,10 @@ class SettingsViewModel @Inject constructor(
         deleteAccountState.value = DeleteAccountUiState.LoadingPreview
         viewModelScope.launch {
             deleteAccountState.value = when (val result = accountRepository.getDeletionPreview()) {
-                is AccountDeletionPreviewResult.Success -> DeleteAccountUiState.Confirming(result.preview)
+                is AccountDeletionPreviewResult.Success -> DeleteAccountUiState.Confirming(
+                    preview = result.preview,
+                    usesGoogle = !currentSignInMethods().hasPassword,
+                )
                 AccountDeletionPreviewResult.SessionExpired ->
                     DeleteAccountUiState.PreviewFailed(DeleteAccountError.SESSION_EXPIRED)
                 AccountDeletionPreviewResult.Failed ->
@@ -132,14 +143,49 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    private fun submitDeletion() {
+    private fun currentSignInMethods(): SignInMethods =
+        (sessionManager.userSession.value as? UserSession.Authenticated)?.signInMethods ?: SignInMethods()
+
+    private fun confirmDeletion() {
+        val confirming = deleteAccountState.value as? DeleteAccountUiState.Confirming ?: return
+        if (!confirming.canSubmit) return
+        if (!confirming.usesGoogle) {
+            submitDeletion(DeletionProof.Password(confirming.password))
+            return
+        }
+        // Checked before the picker, so a missing choice isn't discovered after a Google sign-in.
+        if (confirming.preview.requiresPublicRecipeChoice && confirming.publicRecipes == null) {
+            updateConfirming { it.copy(error = DeleteAccountError.PUBLIC_RECIPE_CHOICE_MISSING) }
+            return
+        }
+        updateConfirming { it.copy(error = null) }
+        viewModelScope.launch { _effects.send(SettingsEffect.RequestGoogleConfirmation) }
+    }
+
+    private fun onGoogleConfirmation(result: GoogleIdTokenResult) {
+        val confirming = deleteAccountState.value as? DeleteAccountUiState.Confirming ?: return
+        if (!confirming.usesGoogle || confirming.isSubmitting) return
+        when (result) {
+            GoogleIdTokenResult.Cancelled -> Unit
+            GoogleIdTokenResult.NoGoogleAccount ->
+                updateConfirming { it.copy(error = DeleteAccountError.GOOGLE_NO_ACCOUNT) }
+            is GoogleIdTokenResult.Failure -> {
+                // The cause is a Credential Manager exception; it carries no token.
+                Timber.e(result.cause, "Google credential request failed")
+                updateConfirming { it.copy(error = DeleteAccountError.GENERIC) }
+            }
+            is GoogleIdTokenResult.Success -> submitDeletion(DeletionProof.GoogleToken(result.idToken))
+        }
+    }
+
+    private fun submitDeletion(proof: DeletionProof) {
         val confirming = deleteAccountState.value as? DeleteAccountUiState.Confirming ?: return
         if (!confirming.canSubmit) return
         deleteAccountState.value = confirming.copy(isSubmitting = true, error = null)
 
         viewModelScope.launch {
             val result = deleteAccount(
-                password = confirming.password,
+                proof = proof,
                 preview = confirming.preview,
                 publicRecipes = confirming.publicRecipes,
             )
@@ -164,7 +210,9 @@ private fun DeleteAccountUiState.Confirming.afterFailure(result: DeleteAccountRe
     return when (result) {
         // Not reachable here; handled before this is called.
         DeleteAccountResult.Deleted -> stopped
-        DeleteAccountResult.WrongPassword -> stopped.copy(error = DeleteAccountError.WRONG_PASSWORD)
+        DeleteAccountResult.WrongPassword -> stopped.copy(
+            error = if (usesGoogle) DeleteAccountError.GOOGLE_REAUTH_FAILED else DeleteAccountError.WRONG_PASSWORD,
+        )
         is DeleteAccountResult.PublicRecipeChoiceRequired ->
             if (preview.publicRecipeCount == result.publicRecipeCount && preview.requiresPublicRecipeChoice) {
                 stopped.copy(error = DeleteAccountError.PUBLIC_RECIPE_CHOICE_MISSING)

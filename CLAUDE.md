@@ -178,6 +178,7 @@ for areas without one — update those, not this table, when behaviour changes.
 | Meal plans — saved plans | Done — [ADR-018](docs/adrs/adr-018-saved-meal-plans.md) | Photo device-local; template doesn't follow source edits; no rename/detail/household sharing |
 | Cook history | Syncs as an event log — [ADR-017](docs/adrs/adr-017-cook-history-sync.md) | No `userId` column (account switch keys off plans) |
 | Households | Done — [ADR-014](docs/adrs/adr-014-households.md) | — |
+| Sign in with Google | Android done — [ADR-019](docs/adrs/adr-019-sign-in-with-google.md) | Backend endpoints + Google Cloud setup outstanding, not run on a device; no nonce; ships only after password reset |
 | Conflict resolution | LWW on `updatedAt` — [ADR-006](docs/adrs/adr-006-sync-protocol.md) | `SyncState.CONFLICT` defined but unused |
 | Recipe search | Done — [feature-status](docs/feature-status.md#recipe-search) | Filters, typo tolerance, history, search-by-ingredients |
 | Recipe URL import | Done — [ADR-010](docs/adrs/adr-010-client-side-recipe-scraping.md), language [ADR-016](docs/adrs/adr-016-recipe-language.md), [share target](docs/feature-status.md#recipe-url-import--share-target) | No per-site scrapers, no nutrition; search/timer/diet keywords English-only |

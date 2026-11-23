@@ -31,6 +31,20 @@ object DeletedUser {
     const val DISPLAY_NAME = "Deleted user"
 }
 
+/**
+ * How the user proves it is them when deleting the account (ADR-019 Decision 5): the password, or —
+ * for an account with none — a Google ID token obtained moments ago. Neither value is ever printed.
+ */
+sealed interface DeletionProof {
+    data class Password(val value: String) : DeletionProof {
+        override fun toString(): String = "Password(<redacted>)"
+    }
+
+    data class GoogleToken(val value: String) : DeletionProof {
+        override fun toString(): String = "GoogleToken(<redacted>)"
+    }
+}
+
 sealed interface AccountDeletionPreviewResult {
     data class Success(val preview: AccountDeletionPreview) : AccountDeletionPreviewResult
 
@@ -45,7 +59,11 @@ sealed interface DeleteAccountResult {
     /** `204`. The account is gone server-side; every credential this device holds is dead. */
     data object Deleted : DeleteAccountResult
 
-    /** `401` from the password re-check — not an expired session. */
+    /**
+     * `401` from the re-check of the [DeletionProof] — a wrong password, or a Google token the
+     * server rejected (`INVALID_GOOGLE_TOKEN`, including one older than five minutes). Not an
+     * expired session.
+     */
     data object WrongPassword : DeleteAccountResult
 
     /**
