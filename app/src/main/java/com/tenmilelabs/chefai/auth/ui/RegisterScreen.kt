@@ -20,6 +20,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,7 +39,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.tenmilelabs.chefai.BuildConfig
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.auth.ui.google.GoogleSignInButton
+import com.tenmilelabs.chefai.auth.ui.google.rememberGoogleIdTokenRequester
+import kotlinx.coroutines.launch
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatBlockButton
 import com.tenmilelabs.chefai.core.ui.components.flat.FlatField
 import com.tenmilelabs.chefai.core.ui.components.flat.flatClickable
@@ -61,6 +66,8 @@ fun RegisterScreen(
     val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
     val context = LocalContext.current
+    val googleRequester = rememberGoogleIdTokenRequester()
+    val scope = rememberCoroutineScope()
 
     // Handle UI events
     @Suppress("CompositionLocalAccess")
@@ -104,6 +111,10 @@ fun RegisterScreen(
         onConfirmPasswordVisibilityToggle = viewModel::onConfirmPasswordVisibilityToggle,
         onRegisterClick = viewModel::onRegisterClick,
         onLoginClick = viewModel::onLoginClick,
+        onGoogleClick = {
+            scope.launch { viewModel.onGoogleResult(googleRequester.request(context)) }
+        },
+        showGoogleButton = BuildConfig.GOOGLE_SIGN_IN_CONFIGURED,
         onNavigateBack = onNavigateBack,
     )
 }
@@ -121,6 +132,9 @@ fun RegisterScreenContent(
     onConfirmPasswordVisibilityToggle: () -> Unit = {},
     onRegisterClick: () -> Unit = {},
     onLoginClick: () -> Unit = {},
+    onGoogleClick: () -> Unit = {},
+    /** Hidden when the build has no Google Web client ID (`BuildConfig.GOOGLE_SIGN_IN_CONFIGURED`). */
+    showGoogleButton: Boolean = false,
     onNavigateBack: () -> Unit = {},
 ) {
     Surface(
@@ -211,6 +225,16 @@ fun RegisterScreenContent(
                     loading = uiState.isLoading,
                     modifier = Modifier.testTag("RegisterButton"),
                 )
+
+                if (showGoogleButton) {
+                    Spacer(modifier = Modifier.height(AuthMetrics.FieldGap))
+
+                    GoogleSignInButton(
+                        onClick = onGoogleClick,
+                        enabled = !uiState.isLoading,
+                        modifier = Modifier.testTag("GoogleSignInButton"),
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(AuthMetrics.ButtonToFooterGap))
 
@@ -351,7 +375,8 @@ private fun RegisterScreenPreview() {
                 confirmPassword = "Password123!"
             ),
             focusManager = LocalFocusManager.current,
-            scrollState = rememberScrollState()
+            scrollState = rememberScrollState(),
+            showGoogleButton = true,
         )
     }
 }
@@ -368,7 +393,8 @@ private fun RegisterScreenDarkPreview() {
                 confirmPassword = "Password123!"
             ),
             focusManager = LocalFocusManager.current,
-            scrollState = rememberScrollState()
+            scrollState = rememberScrollState(),
+            showGoogleButton = true,
         )
     }
 }

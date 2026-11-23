@@ -225,6 +225,10 @@
     <string name="status_banner_dismiss">Dismiss</string>
     <string name="error_login_failed">Login failed. Please try again.</string>
     <string name="error_registration_failed">Registration failed. Please try again.</string>
+    <string name="continue_with_google">Continue with Google</string>
+    <string name="error_google_sign_in_failed">Google sign-in failed. Please try again.</string>
+    <string name="error_google_no_account">No Google account on this device. Add one in your device settings and try again.</string>
+    <string name="error_google_email_exists">An account with this email already exists. Log in with your password, then connect Google from your profile.</string>
     <string name="error_loading_home">Error Loading Home Screen</string>
 
     <!-- Recipe Editor -->

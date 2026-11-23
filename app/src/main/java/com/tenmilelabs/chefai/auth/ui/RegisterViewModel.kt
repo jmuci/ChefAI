@@ -6,6 +6,11 @@ import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.auth.data.local.SecurePreferencesInterface
 import com.tenmilelabs.chefai.auth.data.network.AuthHttpException
 import com.tenmilelabs.chefai.auth.domain.SessionManager
+import com.tenmilelabs.chefai.auth.ui.google.GoogleIdTokenResult
+import com.tenmilelabs.chefai.auth.ui.google.googleIdTokenEmail
+import com.tenmilelabs.chefai.core.ui.banner.StatusBannerController
+import com.tenmilelabs.chefai.core.ui.banner.StatusBannerPlacement
+import com.tenmilelabs.chefai.core.ui.banner.StatusBannerTone
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +25,7 @@ import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * UiState for the registration screen.
@@ -58,6 +64,7 @@ sealed interface RegisterUiEvent {
 class RegisterViewModel @Inject constructor(
     private val sessionManager: SessionManager,
     private val securePreferences: SecurePreferencesInterface,
+    private val statusBanner: StatusBannerController,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RegisterUiState())
@@ -142,6 +149,68 @@ class RegisterViewModel @Inject constructor(
                     handleRegistrationError(exception)
                 }
             )
+        }
+    }
+
+    /**
+     * The picker's outcome, forwarded by the screen. For Google, registering and logging in are the
+     * same call. A `GOOGLE_EMAIL_EXISTS` answer sends the user to Login with the email prefilled:
+     * the explanation goes on the app-wide banner, which survives the navigation (a snackbar
+     * collected by this screen would not).
+     */
+    fun onGoogleResult(result: GoogleIdTokenResult) {
+        when (result) {
+            GoogleIdTokenResult.Cancelled -> Unit
+            GoogleIdTokenResult.NoGoogleAccount -> viewModelScope.launch {
+                _uiEvent.emit(RegisterUiEvent.ShowSnackbar(R.string.error_google_no_account))
+            }
+            is GoogleIdTokenResult.Failure -> viewModelScope.launch {
+                // The cause is a Credential Manager exception; it carries no token.
+                Timber.e(result.cause, "Google credential request failed")
+                _uiEvent.emit(RegisterUiEvent.ShowSnackbar(R.string.error_google_sign_in_failed))
+            }
+            is GoogleIdTokenResult.Success -> viewModelScope.launch {
+                _uiState.value = _uiState.value.copy(isLoading = true)
+
+                val signIn = sessionManager.loginWithGoogle(result.idToken)
+
+                _uiState.value = _uiState.value.copy(isLoading = false)
+
+                signIn.fold(
+                    onSuccess = { _ ->
+                        val pendingInviteToken = securePreferences.getPendingInviteToken().first()
+                        if (pendingInviteToken != null) {
+                            _uiEvent.emit(RegisterUiEvent.NavigateToAcceptInvite(pendingInviteToken))
+                        } else {
+                            _uiEvent.emit(RegisterUiEvent.NavigateToHome)
+                        }
+                    },
+                    onFailure = { exception ->
+                        Timber.e(exception, "Google sign-in failed")
+                        handleGoogleError(exception, result.idToken)
+                    },
+                )
+            }
+        }
+    }
+
+    private suspend fun handleGoogleError(exception: Throwable, idToken: String) {
+        when {
+            // The IOException cases keep their specific wording.
+            exception is IOException -> handleRegistrationError(exception)
+            exception is AuthHttpException && exception.code == GOOGLE_EMAIL_EXISTS -> {
+                googleIdTokenEmail(idToken)?.let { securePreferences.saveLastLoginEmail(it) }
+                statusBanner.show(
+                    message = R.string.error_google_email_exists,
+                    tone = StatusBannerTone.WARNING,
+                    displayDuration = 8.seconds,
+                    placement = StatusBannerPlacement.TOP,
+                )
+                _uiEvent.emit(RegisterUiEvent.NavigateToLogin)
+            }
+            exception is AuthHttpException && exception.statusCode in setOf(500, 502, 503) ->
+                _uiEvent.emit(RegisterUiEvent.ShowSnackbar(R.string.error_server_error))
+            else -> _uiEvent.emit(RegisterUiEvent.ShowSnackbar(R.string.error_google_sign_in_failed))
         }
     }
 
