@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableStateOf
@@ -43,7 +44,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import com.tenmilelabs.chefai.BuildConfig
 import com.tenmilelabs.chefai.R
+import com.tenmilelabs.chefai.auth.ui.google.clearGoogleCredentialState
+import com.tenmilelabs.chefai.auth.ui.google.rememberGoogleIdTokenRequester
 import com.tenmilelabs.chefai.auth.domain.model.AuthToken
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.core.domain.model.User
@@ -59,6 +63,7 @@ import com.tenmilelabs.chefai.core.ui.components.flat.flatClickable
 import com.tenmilelabs.chefai.core.ui.icons.ChefAIIcons
 import com.tenmilelabs.chefai.core.ui.theme.ChefAITheme
 import com.tenmilelabs.chefai.core.ui.theme.chefColors
+import kotlinx.coroutines.launch
 import java.util.UUID
 
 /** The profile-specific geometry; the panel's own lives in [FlatMenuMetrics]. */
@@ -97,6 +102,7 @@ private object MenuMetrics {
  *   sessions alike — the settings behind it are device preferences, not account properties.
  * @param onHousehold Callback invoked to open the household screen. Authenticated only — an
  *   anonymous session has no account to share a household with.
+ * @param onMessage Callback invoked with a one-line outcome to show the user (e.g. after "Connect Google").
  * @param modifier Modifier for styling
  * @param viewModel ViewModel for handling logout logic
  */
@@ -107,20 +113,29 @@ fun UserProfileMenu(
     onLogout: (LogoutNotice?) -> Unit = {},
     onSettings: () -> Unit = {},
     onHousehold: () -> Unit = {},
+    onMessage: (messageRes: Int) -> Unit = {},
     viewModel: UserProfileViewModel = hiltViewModel()
 ) {
     val userSession by rememberUserSession()
     val logoutState by viewModel.logoutState.collectAsStateWithLifecycle()
     var expanded by remember { mutableStateOf(false) }
     val currentOnLogout by rememberUpdatedState(onLogout)
+    val currentOnMessage by rememberUpdatedState(onMessage)
+    val context = LocalContext.current
+    val googleRequester = rememberGoogleIdTokenRequester()
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(viewModel) {
         viewModel.effects.collect { effect ->
             when (effect) {
                 is UserProfileEffect.LoggedOut -> {
                     expanded = false
+                    // Best effort, after the session has ended: stops a later auto-select flow from
+                    // silently signing the same Google account back in.
+                    clearGoogleCredentialState(context)
                     currentOnLogout(effect.notice)
                 }
+                is UserProfileEffect.ShowMessage -> currentOnMessage(effect.message)
             }
         }
     }
@@ -152,6 +167,15 @@ fun UserProfileMenu(
                         },
                         isLoggingOut = logoutState == LogoutUiState.LoggingOut,
                         onLogout = { viewModel.onAction(UserProfileAction.LogoutClicked) },
+                        showConnectGoogle = BuildConfig.GOOGLE_SIGN_IN_CONFIGURED &&
+                            !session.signInMethods.hasGoogle,
+                        onConnectGoogle = {
+                            expanded = false
+                            scope.launch {
+                                val picked = googleRequester.request(context)
+                                viewModel.onAction(UserProfileAction.GoogleLinkPicked(picked))
+                            }
+                        },
                     )
 
                     is UserSession.Anonymous -> AnonymousRows(
@@ -235,6 +259,8 @@ private fun AuthenticatedRows(
     onSettings: () -> Unit,
     onLogout: () -> Unit,
     isLoggingOut: Boolean = false,
+    showConnectGoogle: Boolean = false,
+    onConnectGoogle: () -> Unit = {},
 ) {
     MenuHeader(displayName = displayName)
     FlatMenuRow(
@@ -250,6 +276,15 @@ private fun AuthenticatedRows(
         onClick = onSettings,
         modifier = Modifier.testTag("SettingsMenuItem"),
     )
+    if (showConnectGoogle) {
+        RowRule()
+        FlatMenuRow(
+            label = stringResource(R.string.profile_menu_connect_google),
+            icon = ChefAIIcons.Link,
+            onClick = onConnectGoogle,
+            modifier = Modifier.testTag("ConnectGoogleMenuItem"),
+        )
+    }
     RowRule()
     FlatMenuRow(
         label = stringResource(
@@ -409,6 +444,7 @@ private fun PreviewPanel(session: UserSession) {
                     onHousehold = {},
                     onSettings = {},
                     onLogout = {},
+                    showConnectGoogle = true,
                 )
 
                 is UserSession.Anonymous -> AnonymousRows(onLogin = {}, onSettings = {})

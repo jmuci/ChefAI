@@ -640,6 +640,9 @@ fun ChefAINavGraph(
                             onLogin = { navActions.navigateToLogin() },
                             onSettings = { navActions.navigateToSettings() },
                             onHousehold = { navActions.navigateToHousehold() },
+                            onMessage = { message ->
+                                navScope.launch { snackbarHostState.showSnackbar(resources.getString(message)) }
+                            },
                         )
                     }
                     val trailingActions: @Composable RowScope.() -> Unit = {
