@@ -370,62 +370,7 @@ class SessionManager @Inject constructor(
                 LoginRequest(email = email, password = password)
             )
 
-            val authToken = response.toAuthToken()
-            val user = response.toUser()
-
-            // Persisted before the account switch and upgrade below, not after. Those two rewrite
-            // local ownership — the upgrade reassigns every anonymous recipe, bookmark and meal
-            // plan to user.uuid — so a throw between them and this write used to leave the catch
-            // dropping back to an anonymous session whose id no longer owns any of it.
-            // pendingUpgradeFrom rides in the same write so a process death before the upgrade
-            // commits is finished by the next loadSession (completePendingUpgrade).
-            securePreferences.saveAuthData(
-                userUuid = user.uuid,
-                displayName = user.displayName,
-                email = user.email,
-                avatarUrl = user.avatarUrl,
-                accessToken = authToken.accessToken,
-                refreshToken = authToken.refreshToken,
-                tokenExpiry = authToken.expiresAt,
-                pendingUpgradeFrom = anonymousUserId,
-            )
-
-            val accountSwitchOutcome = accountSwitchHandler.handleLogin(
-                newUserId = user.uuid,
-                anonymousUserId = anonymousUserId,
-                isCredentialLogin = true,
-            )
-
-            // Run the anonymous → authenticated data upgrade if we had anonymous data
-            if (anonymousUserId != null && accountSwitchOutcome != AccountSwitchOutcome.CLEARED_DATABASE) {
-                try {
-                    val upgraded = accountUpgradeUseCaseProvider.get()
-                        .execute(anonymousUserId, user)
-                    securePreferences.clearPendingUpgradeFrom()
-                    Timber.d("Upgraded $upgraded anonymous recipes to authenticated user")
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    // The marker stays set, so the next session restore tries again.
-                    Timber.e(e, "Account upgrade failed, but login succeeded. Recipes may not be transferred.")
-                }
-            } else if (accountSwitchOutcome == AccountSwitchOutcome.CLEARED_DATABASE) {
-                Timber.d("Skipped anonymous data upgrade because local database was cleared for account switch")
-            }
-
-            _userSession.value = UserSession.Authenticated(
-                user = user,
-                authToken = authToken
-            )
-
-            // Persist the authenticated user to Room before sync fires so that pulled
-            // recipes (which reference this creatorId) satisfy the FK constraint.
-            persistAuthenticatedUser(user)
-            attachHouseholdState(user)
-
-            // Trigger sync: push any local recipes and start periodic sync
-            syncSchedulerProvider.get().requestImmediateSync()
-            syncSchedulerProvider.get().schedulePeriodicSync()
+            val user = completeAuthentication(response, anonymousUserId)
 
             Timber.d("Login successful for user: ${user.uuid}")
             Result.success(user)
@@ -460,7 +405,6 @@ class SessionManager @Inject constructor(
             // Make API call to backend for registration
             val response = registerOrRecoverLostResponse(username, email, password)
 
-            val authToken = response.toAuthToken()
             val responseUser = response.toUser()
             // Use the username from the registration form if the backend doesn't return it
             val user = if (responseUser.displayName.isBlank()) {
@@ -469,55 +413,7 @@ class SessionManager @Inject constructor(
                 responseUser
             }
 
-            // Persisted before the upgrade below, with pendingUpgradeFrom, for the same reasons as
-            // in [login].
-            securePreferences.saveAuthData(
-                userUuid = user.uuid,
-                displayName = user.displayName,
-                email = user.email,
-                avatarUrl = user.avatarUrl,
-                accessToken = authToken.accessToken,
-                refreshToken = authToken.refreshToken,
-                tokenExpiry = authToken.expiresAt,
-                pendingUpgradeFrom = anonymousUserId,
-            )
-
-            val accountSwitchOutcome = accountSwitchHandler.handleLogin(
-                newUserId = user.uuid,
-                anonymousUserId = anonymousUserId,
-                isCredentialLogin = true,
-            )
-
-            // Run the anonymous → authenticated data upgrade if we had anonymous data
-            if (anonymousUserId != null && accountSwitchOutcome != AccountSwitchOutcome.CLEARED_DATABASE) {
-                try {
-                    val upgraded = accountUpgradeUseCaseProvider.get()
-                        .execute(anonymousUserId, user)
-                    securePreferences.clearPendingUpgradeFrom()
-                    Timber.d("Upgraded $upgraded anonymous recipes to authenticated user")
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    // The marker stays set, so the next session restore tries again.
-                    Timber.e(e, "Account upgrade failed, but registration succeeded.")
-                }
-            } else if (accountSwitchOutcome == AccountSwitchOutcome.CLEARED_DATABASE) {
-                Timber.d("Skipped anonymous data upgrade because local database was cleared for account switch")
-            }
-
-            _userSession.value = UserSession.Authenticated(
-                user = user,
-                authToken = authToken
-            )
-
-            // Persist the authenticated user to Room before sync fires so that pulled
-            // recipes (which reference this creatorId) satisfy the FK constraint.
-            persistAuthenticatedUser(user)
-            attachHouseholdState(user)
-
-            // Trigger sync: push any local recipes and start periodic sync
-            syncSchedulerProvider.get().requestImmediateSync()
-            syncSchedulerProvider.get().schedulePeriodicSync()
+            completeAuthentication(response, anonymousUserId, user)
 
             Timber.d("Registration successful for user: ${user.uuid}")
             Result.success(user)
@@ -532,6 +428,80 @@ class SessionManager @Inject constructor(
             enterAnonymousSession()
             Result.failure(e)
         }
+    }
+
+    /**
+     * The shared tail of every successful credential exchange ([login], [register]): persist the
+     * auth data, run the account switch and the anonymous upgrade, publish the authenticated
+     * session, then start sync. One copy of the ordering ADR-008 depends on.
+     *
+     * [anonymousUserId] is the anonymous session captured before it was set to Loading.
+     * [user] is the user to persist (callers may adjust the one in [response], e.g. a display
+     * name fallback) and [authToken] its tokens. Throws on failure; the caller restores the
+     * anonymous session.
+     */
+    private suspend fun completeAuthentication(
+        response: AuthResponse,
+        anonymousUserId: UUID?,
+        user: User = response.toUser(),
+    ): User {
+        val authToken = response.toAuthToken()
+
+        // Persisted before the account switch and upgrade below, not after. Those two rewrite
+        // local ownership — the upgrade reassigns every anonymous recipe, bookmark and meal
+        // plan to user.uuid — so a throw between them and this write used to leave the catch
+        // dropping back to an anonymous session whose id no longer owns any of it.
+        // pendingUpgradeFrom rides in the same write so a process death before the upgrade
+        // commits is finished by the next loadSession (completePendingUpgrade).
+        securePreferences.saveAuthData(
+            userUuid = user.uuid,
+            displayName = user.displayName,
+            email = user.email,
+            avatarUrl = user.avatarUrl,
+            accessToken = authToken.accessToken,
+            refreshToken = authToken.refreshToken,
+            tokenExpiry = authToken.expiresAt,
+            pendingUpgradeFrom = anonymousUserId,
+        )
+
+        val accountSwitchOutcome = accountSwitchHandler.handleLogin(
+            newUserId = user.uuid,
+            anonymousUserId = anonymousUserId,
+            isCredentialLogin = true,
+        )
+
+        // Run the anonymous → authenticated data upgrade if we had anonymous data
+        if (anonymousUserId != null && accountSwitchOutcome != AccountSwitchOutcome.CLEARED_DATABASE) {
+            try {
+                val upgraded = accountUpgradeUseCaseProvider.get()
+                    .execute(anonymousUserId, user)
+                securePreferences.clearPendingUpgradeFrom()
+                Timber.d("Upgraded $upgraded anonymous recipes to authenticated user")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // The marker stays set, so the next session restore tries again.
+                Timber.e(e, "Account upgrade failed, but sign-in succeeded. Recipes may not be transferred.")
+            }
+        } else if (accountSwitchOutcome == AccountSwitchOutcome.CLEARED_DATABASE) {
+            Timber.d("Skipped anonymous data upgrade because local database was cleared for account switch")
+        }
+
+        _userSession.value = UserSession.Authenticated(
+            user = user,
+            authToken = authToken
+        )
+
+        // Persist the authenticated user to Room before sync fires so that pulled
+        // recipes (which reference this creatorId) satisfy the FK constraint.
+        persistAuthenticatedUser(user)
+        attachHouseholdState(user)
+
+        // Trigger sync: push any local recipes and start periodic sync
+        syncSchedulerProvider.get().requestImmediateSync()
+        syncSchedulerProvider.get().schedulePeriodicSync()
+
+        return user
     }
 
     /**
