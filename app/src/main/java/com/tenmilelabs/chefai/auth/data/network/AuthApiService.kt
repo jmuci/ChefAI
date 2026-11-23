@@ -3,6 +3,7 @@ package com.tenmilelabs.chefai.auth.data.network
 import com.tenmilelabs.chefai.BuildConfig
 import com.tenmilelabs.chefai.auth.data.network.dto.ApiErrorResponse
 import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
+import com.tenmilelabs.chefai.auth.data.network.dto.GoogleSignInRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.LoginRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.LogoutRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RefreshTokenRequest
@@ -14,7 +15,9 @@ import io.ktor.client.plugins.expectSuccess
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,6 +28,8 @@ val REGISTER_ENDPOINT = "$AUTH_BASE_URL/auth/register"
 val LOGIN_ENDPOINT = "$AUTH_BASE_URL/auth/login"
 val REFRESH_ENDPOINT = "$AUTH_BASE_URL/auth/refresh"
 val LOGOUT_ENDPOINT = "$AUTH_BASE_URL/auth/logout"
+val GOOGLE_ENDPOINT = "$AUTH_BASE_URL/auth/google"
+val GOOGLE_LINK_ENDPOINT = "$AUTH_BASE_URL/auth/google/link"
 
 /**
  * Implementation of AuthNetworkDataSource using Ktor HTTP client.
@@ -102,12 +107,52 @@ class AuthApiService @Inject constructor(
             )
         }
     }
+
+    override suspend fun googleSignIn(request: GoogleSignInRequest): AuthResponse {
+        val httpResponse = client.post(GOOGLE_ENDPOINT) {
+            header("Content-Type", "application/json")
+            setBody(request)
+            expectSuccess = false
+        }
+
+        if (!httpResponse.status.isSuccess()) throw httpResponse.toAuthHttpException("Google sign-in failed")
+
+        return httpResponse.body()
+    }
+
+    override suspend fun linkGoogle(request: GoogleSignInRequest) {
+        val httpResponse = client.post(GOOGLE_LINK_ENDPOINT) {
+            header("Content-Type", "application/json")
+            setBody(request)
+            expectSuccess = false
+        }
+
+        if (!httpResponse.status.isSuccess()) throw httpResponse.toAuthHttpException("Linking Google failed")
+    }
+
+    /** Reads the error body leniently: a non-JSON body (e.g. a proxy's 502 page) still yields an exception. */
+    private suspend fun HttpResponse.toAuthHttpException(fallbackMessage: String): AuthHttpException {
+        val errorBody: ApiErrorResponse? = try {
+            body()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+        return AuthHttpException(
+            message = errorBody?.message ?: errorBody?.error ?: fallbackMessage,
+            statusCode = status.value,
+            code = errorBody?.code,
+        )
+    }
 }
 
 /**
- * Exception thrown when an authentication API call fails.
+ * Exception thrown when an authentication API call fails. [code] is the backend's machine-readable
+ * reason (`ErrorResponse.code`), when it sent one.
  */
 data class AuthHttpException(
     override val message: String,
-    val statusCode: Int
+    val statusCode: Int,
+    val code: String? = null,
 ) : Exception(message)

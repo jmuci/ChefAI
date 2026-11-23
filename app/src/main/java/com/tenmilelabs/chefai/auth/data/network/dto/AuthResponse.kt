@@ -12,7 +12,11 @@ data class AuthResponse(
     val userId: String,
     val username: String,
     val email: String,
-    val expiresIn: Long // Expiration time in seconds
+    val expiresIn: Long, // Expiration time in seconds
+    /** False for an account created with Google only. Absent from older backends: assume true. */
+    val hasPassword: Boolean = true,
+    /** Linked identity providers, e.g. `["google"]`. Absent from older backends. */
+    val providers: List<String> = emptyList(),
 )
 
 /**
@@ -59,11 +63,21 @@ data class LogoutRequest(
     val refreshToken: String
 )
 
+/** Request body for `POST /auth/google` and `POST /auth/google/link`. Never log [idToken]. */
+@Serializable
+data class GoogleSignInRequest(
+    val idToken: String
+) {
+    override fun toString(): String = "GoogleSignInRequest(idToken=<redacted>)"
+}
+
 /**
  * Error response from the API.
  */
 @Serializable
 data class ApiErrorResponse(
     val message: String? = null,
-    val error: String? = null
+    val error: String? = null,
+    /** Machine-readable reason, e.g. `GOOGLE_EMAIL_EXISTS`. */
+    val code: String? = null,
 )

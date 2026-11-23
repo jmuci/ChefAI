@@ -3,8 +3,10 @@ package com.tenmilelabs.chefai.auth.domain
 import com.google.common.truth.Truth.assertThat
 import com.tenmilelabs.chefai.auth.data.local.FakeSecurePreferences
 import com.tenmilelabs.chefai.auth.data.network.FakeAuthNetworkDataSource
+import com.tenmilelabs.chefai.auth.data.network.AuthHttpException
 import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
 import com.tenmilelabs.chefai.auth.data.network.dto.TokenRefreshResponse
+import com.tenmilelabs.chefai.auth.domain.model.SignInMethods
 import com.tenmilelabs.chefai.auth.domain.model.UserSession
 import com.tenmilelabs.chefai.auth.domain.usecase.AccountUpgradeUseCase
 import com.tenmilelabs.chefai.core.data.local.UuidV7Generator
@@ -644,6 +646,178 @@ class SessionManagerTest {
 
         coVerify(exactly = 0) { mockDatabase.clearAllTables() }
         assertThat(sessionManager.getStoredCurrentUserId()).isEqualTo(newUserId)
+    }
+
+    // --- Sign in with Google (ADR-019) ---
+
+    private fun googleAuthResponse(userId: UUID = UuidV7Generator.newId()) = AuthResponse(
+        token = "google_access",
+        refreshToken = "google_refresh",
+        userId = userId.toString(),
+        username = "Jose Garcia",
+        email = "jose@example.com",
+        expiresIn = 3600,
+        hasPassword = false,
+        providers = listOf("google"),
+    )
+
+    @Test
+    fun `google sign-in from anonymous upgrades local data and clears the pending marker`() = testScope.runTest {
+        // Given: an anonymous session owning a recipe
+        sessionManager.loadSession()
+        val anonUserId = (sessionManager.userSession.first() as UserSession.Anonymous).localUserId
+        val recipe = createRecipeForUser(anonUserId)
+        fakeRecipeDao.seed(users = listOf(requireNotNull(fakeUserDao.getUserById(anonUserId))), recipes = listOf(recipe))
+        fakeAuthNetworkDataSource.googleAuthResponse = googleAuthResponse()
+
+        // When: signing in with a Google ID token
+        val result = sessionManager.loginWithGoogle("id-token")
+
+        // Then: the token went to the backend once, the recipe moved to the account, and the marker is gone
+        assertThat(result.isSuccess).isTrue()
+        assertThat(fakeAuthNetworkDataSource.googleSignInRequests.map { it.idToken }).containsExactly("id-token")
+        val session = sessionManager.userSession.value as UserSession.Authenticated
+        assertThat(fakeRecipeDao.getRecipeById(recipe.uuid)?.creatorId).isEqualTo(session.user.uuid)
+        assertThat(fakeSecurePreferences.getPendingUpgradeFrom().first()).isNull()
+        assertThat(fakeSyncManager.immediateSyncCount).isEqualTo(1)
+        assertThat(fakeSyncManager.periodicSyncCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `google sign-in publishes and persists the sign-in methods`() = testScope.runTest {
+        sessionManager.loadSession()
+        fakeAuthNetworkDataSource.googleAuthResponse = googleAuthResponse()
+
+        sessionManager.loginWithGoogle("id-token")
+
+        val expected = SignInMethods(hasPassword = false, providers = listOf("google"))
+        assertThat((sessionManager.userSession.value as UserSession.Authenticated).signInMethods).isEqualTo(expected)
+        assertThat(fakeSecurePreferences.getHasPassword().first()).isFalse()
+        assertThat(fakeSecurePreferences.getProviders().first()).containsExactly("google")
+    }
+
+    @Test
+    fun `a password login keeps the default sign-in methods`() = testScope.runTest {
+        sessionManager.login("test@example.com", "password123")
+
+        val methods = (sessionManager.userSession.value as UserSession.Authenticated).signInMethods
+        assertThat(methods).isEqualTo(SignInMethods(hasPassword = true, providers = emptyList()))
+    }
+
+    @Test
+    fun `load session restores the stored sign-in methods`() = testScope.runTest {
+        sessionManager.loadSession()
+        fakeAuthNetworkDataSource.googleAuthResponse = googleAuthResponse()
+        sessionManager.loginWithGoogle("id-token")
+
+        val restored = SessionManager(
+            securePreferences = fakeSecurePreferences,
+            authNetworkDataSource = { fakeAuthNetworkDataSource },
+            userDao = fakeUserDao,
+            accountSwitchHandler = accountSwitchHandler,
+            accountUpgradeUseCaseProvider = accountUpgradeUseCaseProvider,
+            syncSchedulerProvider = { FakeSyncManager() },
+            householdRepositoryProvider = { fakeHouseholdRepository },
+            applicationScope = testScope
+        ).apply { uuidGenerator = { UuidV7Generator.newId() } }
+        advanceUntilIdle()
+
+        val session = restored.userSession.value as UserSession.Authenticated
+        assertThat(session.signInMethods).isEqualTo(SignInMethods(hasPassword = false, providers = listOf("google")))
+    }
+
+    @Test
+    fun `google sign-in as a different account after logout switches the stored account`() = testScope.runTest {
+        // Given: a previous account signed in and out on this device
+        val previousUserId = UuidV7Generator.newId()
+        fakeAuthNetworkDataSource.authResponse = AuthResponse(
+            token = "t", refreshToken = "r", userId = previousUserId.toString(),
+            username = "previous", email = "previous@example.com", expiresIn = 3600,
+        )
+        sessionManager.login("previous@example.com", "password123")
+        sessionManager.logout()
+        assertThat(sessionManager.getStoredCurrentUserId()).isEqualTo(previousUserId)
+
+        // When: a different account signs in with Google
+        val newUserId = UuidV7Generator.newId()
+        fakeAuthNetworkDataSource.googleAuthResponse = googleAuthResponse(newUserId)
+        val result = sessionManager.loginWithGoogle("id-token")
+
+        // Then: the account switch ran and the session is the new account's
+        assertThat(result.isSuccess).isTrue()
+        assertThat(sessionManager.getStoredCurrentUserId()).isEqualTo(newUserId)
+        assertThat((sessionManager.userSession.value as UserSession.Authenticated).user.uuid).isEqualTo(newUserId)
+    }
+
+    @Test
+    fun `google sign-in 409 returns the coded failure and restores the anonymous session`() = testScope.runTest {
+        sessionManager.loadSession()
+        val anonUserId = (sessionManager.userSession.value as UserSession.Anonymous).localUserId
+        fakeSyncManager.reset()
+        fakeAuthNetworkDataSource.googleSignInError =
+            AuthHttpException(message = "exists", statusCode = 409, code = "GOOGLE_EMAIL_EXISTS")
+
+        val result = sessionManager.loginWithGoogle("id-token")
+
+        val error = result.exceptionOrNull() as AuthHttpException
+        assertThat(error.code).isEqualTo("GOOGLE_EMAIL_EXISTS")
+        assertThat(sessionManager.userSession.value).isEqualTo(UserSession.Anonymous(anonUserId))
+        assertThat(fakeSyncManager.immediateSyncCount).isEqualTo(0)
+    }
+
+    @Test
+    fun `google sign-in rethrows cancellation and restores the anonymous session`() = testScope.runTest {
+        fakeAuthNetworkDataSource.googleSignInError = CancellationException("caller went away")
+
+        val thrown = try {
+            sessionManager.loginWithGoogle("id-token")
+            null
+        } catch (e: CancellationException) {
+            e
+        }
+
+        assertThat(thrown).isNotNull()
+        assertThat(sessionManager.userSession.value).isInstanceOf(UserSession.Anonymous::class.java)
+    }
+
+    @Test
+    fun `cancelling the caller's job mid google sign-in settles the session back to anonymous`() = testScope.runTest {
+        fakeAuthNetworkDataSource.networkDelayMs = 1_000
+        val job = launch { sessionManager.loginWithGoogle("id-token") }
+        advanceTimeBy(500)
+        assertThat(sessionManager.userSession.value).isEqualTo(UserSession.Loading)
+
+        job.cancel()
+        advanceUntilIdle()
+
+        assertThat(job.isCancelled).isTrue()
+        assertThat(sessionManager.userSession.value).isInstanceOf(UserSession.Anonymous::class.java)
+    }
+
+    @Test
+    fun `linking google adds the provider to the session and storage`() = testScope.runTest {
+        sessionManager.login("test@example.com", "password123")
+
+        val result = sessionManager.linkGoogle("id-token")
+
+        assertThat(result.isSuccess).isTrue()
+        assertThat(fakeAuthNetworkDataSource.linkGoogleRequests.map { it.idToken }).containsExactly("id-token")
+        val methods = (sessionManager.userSession.value as UserSession.Authenticated).signInMethods
+        assertThat(methods).isEqualTo(SignInMethods(hasPassword = true, providers = listOf("google")))
+        assertThat(fakeSecurePreferences.getProviders().first()).containsExactly("google")
+    }
+
+    @Test
+    fun `linking google that the backend rejects leaves the session untouched`() = testScope.runTest {
+        sessionManager.login("test@example.com", "password123")
+        fakeAuthNetworkDataSource.linkGoogleError =
+            AuthHttpException(message = "mismatch", statusCode = 409, code = "GOOGLE_EMAIL_MISMATCH")
+
+        val result = sessionManager.linkGoogle("id-token")
+
+        assertThat((result.exceptionOrNull() as AuthHttpException).code).isEqualTo("GOOGLE_EMAIL_MISMATCH")
+        val methods = (sessionManager.userSession.value as UserSession.Authenticated).signInMethods
+        assertThat(methods.providers).isEmpty()
     }
 
     // --- Account Upgrade Tests ---

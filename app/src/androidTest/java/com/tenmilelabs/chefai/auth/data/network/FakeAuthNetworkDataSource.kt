@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.auth.data.network
 
 import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
+import com.tenmilelabs.chefai.auth.data.network.dto.GoogleSignInRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.LoginRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.LogoutRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RefreshTokenRequest
@@ -94,6 +95,16 @@ class FakeAuthNetworkDataSource : AuthNetworkDataSource {
     }
 
     override suspend fun logout(request: LogoutRequest) = Unit
+
+    /** Thrown by [googleSignIn], e.g. an `AuthHttpException(code = ...)`. */
+    var googleSignInError: Exception? = null
+
+    override suspend fun googleSignIn(request: GoogleSignInRequest): AuthResponse {
+        googleSignInError?.let { throw it }
+        return createAuthResponse(username = "google-user", email = "google@example.com")
+    }
+
+    override suspend fun linkGoogle(request: GoogleSignInRequest) = Unit
 
     /**
      * Creates a fake auth response for testing.

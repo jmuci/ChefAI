@@ -1,6 +1,7 @@
 package com.tenmilelabs.chefai.auth.data.network
 
 import com.tenmilelabs.chefai.auth.data.network.dto.AuthResponse
+import com.tenmilelabs.chefai.auth.data.network.dto.GoogleSignInRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.LoginRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.LogoutRequest
 import com.tenmilelabs.chefai.auth.data.network.dto.RefreshTokenRequest
@@ -31,4 +32,18 @@ interface AuthNetworkDataSource {
      * [AuthHttpException] on any other status.
      */
     suspend fun logout(request: LogoutRequest)
+
+    /**
+     * Exchanges a Google ID token for our own tokens (`POST /auth/google`). Failures carry the
+     * backend's error code in [AuthHttpException.code] (`INVALID_GOOGLE_TOKEN`,
+     * `GOOGLE_EMAIL_EXISTS`).
+     */
+    suspend fun googleSignIn(request: GoogleSignInRequest): AuthResponse
+
+    /**
+     * Links the signed-in account to a Google identity (`POST /auth/google/link`, authenticated;
+     * `204` on success). Failures carry `INVALID_GOOGLE_TOKEN`, `GOOGLE_EMAIL_MISMATCH` or
+     * `GOOGLE_IDENTITY_TAKEN` in [AuthHttpException.code].
+     */
+    suspend fun linkGoogle(request: GoogleSignInRequest)
 }

@@ -40,6 +40,11 @@ sealed class UserSession {
          * against the server's own membership table regardless of what this field currently says.
          */
         val household: AuthenticatedHousehold? = null,
+        /**
+         * Whether the account has a password and which providers are linked (ADR-019). Defaulted
+         * for the same reason as [household]: existing call sites stay untouched.
+         */
+        val signInMethods: SignInMethods = SignInMethods(),
     ) : UserSession()
 }
 
