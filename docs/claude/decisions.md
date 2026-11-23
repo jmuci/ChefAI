@@ -23,6 +23,7 @@ One line each, on purpose — the ADR is the source of truth, and longer summari
 | 016 | [Recipe Language](../adrs/adr-016-recipe-language.md) | Oct 2026 | ISO 639-1 per recipe, detected at import; ask only when unsure. |
 | 017 | [Cook History Sync](../adrs/adr-017-cook-history-sync.md) | Oct 2026 | Event log keyed by client id; un-mark tombstones, and a tombstone is final. |
 | 018 | [Saved Meal Plans](../adrs/adr-018-saved-meal-plans.md) | Nov 2026 | A saved plan is a template snapshot in its own table, synced LWW. |
+| 019 | [Sign in with Google](../adrs/adr-019-sign-in-with-google.md) | Nov 2026 | *Proposed.* Google ID token exchanged once for our own JWTs; identities keyed by `sub`. |
 
 ## Merged or Superseded
 
