@@ -46,6 +46,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -374,7 +375,11 @@ private fun MealPlanDetailContent(
         if (state.totalCount > 0) {
             SectionRule()
             FlatBlockButton(
-                text = stringResource(R.string.meal_plan_shopping_list_button, state.shoppingListItemCount),
+                text = pluralStringResource(
+                    R.plurals.meal_plan_shopping_list_button,
+                    state.shoppingListItemCount,
+                    state.shoppingListItemCount,
+                ),
                 onClick = onShoppingListClick,
                 leadingIcon = ChefAIIcons.ShoppingCart,
                 modifier = Modifier.padding(16.dp),

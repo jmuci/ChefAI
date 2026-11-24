@@ -3,7 +3,7 @@ package com.tenmilelabs.chefai.core.data.local
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
-import android.net.Uri
+import androidx.core.net.toUri
 import timber.log.Timber
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -63,7 +63,7 @@ internal fun writeFileAtomically(directory: File, name: String, bytes: ByteArray
  * @return the JPEG bytes, or `null` if the uri is unparseable, not an image, or undecodable.
  */
 internal fun decodePickedImageAsJpeg(context: Context, uri: String, label: String): ByteArray? {
-    val parsed = runCatching { Uri.parse(uri) }.getOrNull()
+    val parsed = runCatching { uri.toUri() }.getOrNull()
     if (parsed == null) {
         Timber.w("Could not parse picked image uri for %s", label)
         return null

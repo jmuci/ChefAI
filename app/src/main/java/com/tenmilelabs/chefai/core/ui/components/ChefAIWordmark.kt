@@ -10,7 +10,7 @@ import com.tenmilelabs.chefai.R
 import com.tenmilelabs.chefai.core.ui.theme.chefColors
 
 /**
- * The accent wordmark that stands in for a logo on the auth screens — "ChefAI" set as a small
+ * The accent wordmark that stands in for a logo on the auth screens — the app name set as a small
  * identity kicker rather than the 120dp chef-hat drawable it replaces.
  *
  * 13px/800 uppercase, `.1em` tracking: close to `titleSmall` (13px/800, `.08em`) but the handoff

@@ -95,7 +95,7 @@ fun <T> DragReorderColumn(
                             onDragCancel = { drag = null },
                             onDrag = { change, dragAmount ->
                                 change.consume()
-                                drag = drag?.copy(offsetPx = drag!!.offsetPx + dragAmount.y)
+                                drag = drag?.let { it.copy(offsetPx = it.offsetPx + dragAmount.y) }
                             },
                         )
                     }

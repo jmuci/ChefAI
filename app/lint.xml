@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- Base64 certificate data for downloadable Google Fonts, not prose. -->
+    <issue id="Typos">
+        <ignore path="src/main/res/values/font_certs.xml" />
+    </issue>
+</lint>
