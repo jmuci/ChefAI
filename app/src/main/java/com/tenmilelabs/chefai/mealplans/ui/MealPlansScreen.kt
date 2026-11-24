@@ -27,7 +27,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.zIndex
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -102,12 +102,12 @@ fun MealPlansScreen(
     val pendingRepeatSavedPlanId by viewModel.pendingRepeatSavedPlanId.collectAsStateWithLifecycle()
     val repeatDefaultDate by viewModel.repeatDefaultDate.collectAsStateWithLifecycle()
 
-    val context = LocalContext.current
+    val resources = LocalResources.current
     LaunchedEffect(viewModel, snackbarHostState) {
         viewModel.events.collect { event ->
             when (event) {
                 is MealPlansEvent.ShowMessage ->
-                    snackbarHostState.showSnackbar(context.getString(event.messageRes))
+                    snackbarHostState.showSnackbar(resources.getString(event.messageRes))
 
                 // This screen is popped by the navigation, so the snackbars are posted by the
                 // nav graph (on a scope that outlives it) rather than launched here.
@@ -122,9 +122,9 @@ fun MealPlansScreen(
                     snackbarHostState.currentSnackbarData?.dismiss()
                     val result = snackbarHostState.showSnackbar(
                         message = event.recipeTitle
-                            ?.let { context.getString(R.string.meal_plan_meal_removed, it) }
-                            ?: context.getString(R.string.meal_plan_meal_removed_unnamed),
-                        actionLabel = context.getString(R.string.meal_plan_undo),
+                            ?.let { resources.getString(R.string.meal_plan_meal_removed, it) }
+                            ?: resources.getString(R.string.meal_plan_meal_removed_unnamed),
+                        actionLabel = resources.getString(R.string.meal_plan_undo),
                         withDismissAction = true,
                     )
                     if (result == SnackbarResult.ActionPerformed) viewModel.onUndoRemoveMeal(event.removed)

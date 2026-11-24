@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -66,6 +67,7 @@ fun RegisterScreen(
     val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
     val context = LocalContext.current
+    val resources = LocalResources.current
     val googleRequester = rememberGoogleIdTokenRequester()
     val scope = rememberCoroutineScope()
 
@@ -76,7 +78,7 @@ fun RegisterScreen(
             when (event) {
                 is RegisterUiEvent.ShowSnackbar -> {
                     snackbarHostState?.showSnackbar(
-                        message = context.getString(event.message),
+                        message = resources.getString(event.message),
                         duration = SnackbarDuration.Short
                     )
                 }

@@ -43,6 +43,7 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -102,6 +103,7 @@ fun MealPlanDetailScreen(
     val addRecipeQuery by viewModel.addRecipeQuery.collectAsStateWithLifecycle()
     val addRecipeRecipes by viewModel.addRecipeRecipes.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val resources = LocalResources.current
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -115,9 +117,9 @@ fun MealPlanDetailScreen(
                     snackbarHostState.currentSnackbarData?.dismiss()
                     val result = snackbarHostState.showSnackbar(
                         message = event.recipeTitle
-                            ?.let { context.getString(R.string.meal_plan_meal_removed, it) }
-                            ?: context.getString(R.string.meal_plan_meal_removed_unnamed),
-                        actionLabel = context.getString(R.string.meal_plan_undo),
+                            ?.let { resources.getString(R.string.meal_plan_meal_removed, it) }
+                            ?: resources.getString(R.string.meal_plan_meal_removed_unnamed),
+                        actionLabel = resources.getString(R.string.meal_plan_undo),
                         withDismissAction = true,
                     )
                     if (result == SnackbarResult.ActionPerformed) viewModel.onUndoRemoveMeal(event.removed)

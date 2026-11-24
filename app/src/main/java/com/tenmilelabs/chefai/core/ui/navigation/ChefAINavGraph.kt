@@ -26,7 +26,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.tenmilelabs.chefai.auth.ui.UserProfileMenu
@@ -205,7 +205,7 @@ fun ChefAINavGraph(
             // The add-meal hand-off lives in *this entry's* handle, not the ViewModel's — the two
             // are different instances. See AddMealRequest.
             val tabHandle = backStackEntry.savedStateHandle
-            val context = LocalContext.current
+            val resources = LocalResources.current
             MealPlansScreen(
                 snackbarHostState = snackbarHostState,
                 // A recipe picked for a date seeds a new plan rather than becoming a one-meal plan:
@@ -233,9 +233,9 @@ fun ChefAINavGraph(
                 onPlanRepeated = { overlappingPlanName ->
                     navScope.launch {
                         overlappingPlanName?.let {
-                            snackbarHostState.showSnackbar(context.getString(R.string.meal_plan_overlap_notice, it))
+                            snackbarHostState.showSnackbar(resources.getString(R.string.meal_plan_overlap_notice, it))
                         }
-                        snackbarHostState.showSnackbar(context.getString(R.string.saved_plan_repeated))
+                        snackbarHostState.showSnackbar(resources.getString(R.string.saved_plan_repeated))
                     }
                 },
             )
@@ -329,14 +329,14 @@ fun ChefAINavGraph(
                     navController.getBackStackEntry(ScreenBaseRoutes.MEAL_PLAN_WIZARD_GRAPH)
                 }
                 val wizardViewModel: CreateMealPlanViewModel = hiltViewModel(parentEntry)
-                val context = LocalContext.current
+                val resources = LocalResources.current
 
                 // Non-blocking: the plan is created either way and the week view shows both. On
                 // navScope because this destination is popped by the navigation just before it.
                 fun noteCreated(planName: String?, savedPlanFailed: Boolean) {
                     val messages = listOfNotNull(
-                        planName?.let { context.getString(R.string.meal_plan_overlap_notice, it) },
-                        if (savedPlanFailed) context.getString(R.string.saved_plan_save_failed) else null,
+                        planName?.let { resources.getString(R.string.meal_plan_overlap_notice, it) },
+                        if (savedPlanFailed) resources.getString(R.string.saved_plan_save_failed) else null,
                     )
                     if (messages.isEmpty()) return
                     // One after the other: showSnackbar suspends until each is dismissed.
@@ -357,7 +357,7 @@ fun ChefAINavGraph(
                                 noteCreated(event.overlappingPlanName, event.savedPlanFailed)
                             }
                             is CreateMealPlanEvent.ShowError -> {
-                                snackbarHostState.showSnackbar(context.getString(event.message))
+                                snackbarHostState.showSnackbar(resources.getString(event.message))
                             }
                         }
                     }
@@ -626,7 +626,7 @@ fun ChefAINavGraph(
                         ChefAINavigation.None
                     }
                     val profileMenu: @Composable () -> Unit = {
-                        val resources = LocalContext.current.resources
+                        val resources = LocalResources.current
                         UserProfileMenu(
                             // Detail screens (meal plan, shopping list, household) are keyed by id, not
                             // by session, so they would keep rendering the departed account's data
