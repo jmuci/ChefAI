@@ -1,21 +1,18 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
+# R8 rules for the release build (isMinifyEnabled = true).
 #
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Most libraries ship their own consumer rules (Room, Hilt, WorkManager, kotlinx.serialization,
+# Ktor, Coil, OkHttp), so this file only covers what they don't. Before adding a rule, check
+# app/build/outputs/mapping/release/missing_rules.txt and prefer the narrowest keep that works.
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Keep file and line numbers so Play Console stack traces stay readable after de-obfuscation with
+# mapping.txt, but hide the original source file names.
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
-
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Credential Manager loads its Play Services provider by reflection; without this, Sign in with
+# Google fails at runtime with "no provider dependencies found" in a minified build.
+# https://developer.android.com/identity/sign-in/credential-manager#proguard
+-if class androidx.credentials.CredentialManager
+-keep class androidx.credentials.playservices.** {
+  *** *(...);
+}

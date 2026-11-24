@@ -31,7 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -70,13 +70,13 @@ fun RecipeSearchBar(
 ) {
     val query by viewModel.query.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    val resources = LocalResources.current
 
     LaunchedEffect(viewModel) {
         viewModel.uiEvents.collect { event ->
             when (event) {
                 is SearchUiEvent.ShowSnackbar -> snackbarHostState.showSnackbar(
-                    message = context.getString(event.messageRes),
+                    message = resources.getString(event.messageRes),
                     duration = SnackbarDuration.Short,
                 )
             }

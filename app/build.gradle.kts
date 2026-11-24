@@ -36,6 +36,39 @@ val gitCommitHash: String = providers.exec {
     isIgnoreExitValue = true
 }.standardOutput.asText.get().trim().ifEmpty { "unknown" }
 
+/**
+ * Reads a release setting from a Gradle property (`-P…` or `~/.gradle/gradle.properties`) first,
+ * then an environment variable (CI). Blank counts as unset.
+ */
+fun releaseSetting(property: String, env: String): String? =
+    ((project.findProperty(property) as String?) ?: System.getenv(env))?.takeIf { it.isNotBlank() }
+
+/**
+ * Play rejects an upload whose versionCode is not higher than every earlier one. CI passes
+ * `-PchefaiVersionCode=<run number>`; a local build falls back to the commit count on this branch,
+ * which only grows as long as published history is never rewritten.
+ */
+val appVersionCode: Int = releaseSetting("chefaiVersionCode", "CHEFAI_VERSION_CODE")?.toInt()
+    ?: providers.exec {
+        commandLine("git", "rev-list", "--count", "HEAD")
+        isIgnoreExitValue = true
+    }.standardOutput.asText.get().trim().toIntOrNull()
+    ?: 1
+val appVersionName: String = releaseSetting("chefaiVersionName", "CHEFAI_VERSION_NAME") ?: "1.0.0"
+
+/**
+ * Upload-key signing for Play (Play App Signing re-signs with the app key). All four values come
+ * from `~/.gradle/gradle.properties` or the environment, never from the repo. If any is missing,
+ * the release build is left unsigned rather than failing, so CI and local `assembleRelease` keep
+ * working without the key. See docs/release-checklist.md.
+ */
+val uploadStoreFile = releaseSetting("chefaiUploadStoreFile", "CHEFAI_UPLOAD_STORE_FILE")
+val uploadStorePassword = releaseSetting("chefaiUploadStorePassword", "CHEFAI_UPLOAD_STORE_PASSWORD")
+val uploadKeyAlias = releaseSetting("chefaiUploadKeyAlias", "CHEFAI_UPLOAD_KEY_ALIAS")
+val uploadKeyPassword = releaseSetting("chefaiUploadKeyPassword", "CHEFAI_UPLOAD_KEY_PASSWORD")
+val hasUploadKey = listOf(uploadStoreFile, uploadStorePassword, uploadKeyAlias, uploadKeyPassword)
+    .all { it != null }
+
 android {
     namespace = "com.tenmilelabs.chefai"
     compileSdk = 36
@@ -44,8 +77,8 @@ android {
         applicationId = "com.tenmilelabs.chefai"
         minSdk = 28
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
         testInstrumentationRunner = "com.tenmilelabs.chefai.HiltTestRunner"
 
         // The deployed host, in every build type: release talks to it directly (API_BASE_URL
@@ -57,9 +90,22 @@ android {
         buildConfigField("boolean", "GOOGLE_SIGN_IN_CONFIGURED", "${googleWebClientId.isNotBlank()}")
     }
 
+    signingConfigs {
+        if (hasUploadKey) {
+            create("upload") {
+                storeFile = file(requireNotNull(uploadStoreFile))
+                storePassword = uploadStorePassword
+                keyAlias = uploadKeyAlias
+                keyPassword = uploadKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            if (hasUploadKey) signingConfig = signingConfigs.getByName("upload")
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

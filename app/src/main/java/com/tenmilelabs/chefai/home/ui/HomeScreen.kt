@@ -16,7 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -49,14 +49,14 @@ fun HomeScreen(
     onRecipeClick: (UUID) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    val resources = LocalResources.current
 
     LaunchedEffect(Unit) {
         viewModel.uiEvents.collect { event ->
             when (event) {
                 is HomeUiEvent.ShowSnackbar -> {
                     snackbarHostState.showSnackbar(
-                        message = context.getString(event.message),
+                        message = resources.getString(event.message),
                         duration = SnackbarDuration.Short,
                     )
                 }

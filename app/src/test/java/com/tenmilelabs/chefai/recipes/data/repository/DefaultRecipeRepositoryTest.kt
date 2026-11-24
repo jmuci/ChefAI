@@ -454,6 +454,23 @@ class DefaultRecipeRepositoryTest {
     }
 
     @Test
+    fun `updateRecipe() leaves a soft-deleted recipe deleted`() = runTest {
+        // Given: a recipe loaded for editing, then soft-deleted (#128)
+        val original = requireNotNull(recipeRepository.getRecipeStream(recipeId1).first())
+        recipeRepository.softDeleteRecipe(recipeId1)
+        val tombstone = requireNotNull(recipeDao.getRecipeById(recipeId1))
+
+        // When: the stale copy is saved
+        recipeRepository.updateRecipe(original.copy(title = "Resurrected?"))
+
+        // Then: the tombstone is untouched, so nothing is pushed as a live update
+        val saved = requireNotNull(recipeDao.getRecipeById(recipeId1))
+        assertThat(saved.deletedAt).isEqualTo(tombstone.deletedAt)
+        assertThat(saved.syncState).isEqualTo(tombstone.syncState)
+        assertThat(saved.title).isEqualTo(tombstone.title)
+    }
+
+    @Test
     fun `softDeleteRecipe() stamps the tombstone later than a stored version that is ahead of the clock`() = runTest {
         val ahead = System.currentTimeMillis() + 3_600_000L
         recipeDao.upsertRecipe(requireNotNull(recipeDao.getRecipeById(recipeId1)).copy(updatedAt = ahead))

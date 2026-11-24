@@ -13,6 +13,7 @@ import com.tenmilelabs.chefai.R
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import timber.log.Timber
 
 /**
  * Fires the "timer done" notification for [RecipeTimerController]. The channel is created eagerly
@@ -45,7 +46,13 @@ class RecipeTimerNotifier @Inject constructor(
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .build()
-        NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
+        // The permission can be revoked between the check above and this call; a lost
+        // "timer done" notification is not worth a crash.
+        try {
+            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
+        } catch (e: SecurityException) {
+            Timber.w(e, "Timer notification dropped: POST_NOTIFICATIONS revoked")
+        }
     }
 
     private fun hasNotificationPermission(): Boolean =

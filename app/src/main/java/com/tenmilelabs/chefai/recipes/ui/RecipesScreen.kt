@@ -22,7 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -50,7 +50,7 @@ fun RecipesScreen(
     onRecipeCardClick: (UUID) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    val resources = LocalResources.current
 
     PullToRefreshBox(
         modifier = Modifier.testTag("RecipesScreen"),
@@ -72,7 +72,7 @@ fun RecipesScreen(
             when (event) {
                 is RecipesUiEvent.ShowSnackbar -> {
                     snackbarHostState.showSnackbar(
-                        message = context.getString(event.message),
+                        message = resources.getString(event.message),
                         duration = SnackbarDuration.Short
                     )
                 }

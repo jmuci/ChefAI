@@ -220,8 +220,14 @@ class DefaultRecipeRepository @Inject constructor(
         // Update the recipe entity. The caller stamps the device clock, which may be behind the
         // version this edit replaces (e.g. one stamped by the server on accept).
         val entity = recipe.toRoomEntity()
-        val previousUpdatedAt = recipeDao.getRecipeById(recipe.uuid)?.updatedAt
-        recipeDao.upsertRecipe(entity.copy(updatedAt = nextUpdatedAt(previousUpdatedAt, entity.updatedAt)))
+        val previous = recipeDao.getRecipeById(recipe.uuid)
+        // toRoomEntity() writes deletedAt = null and PENDING: saving over a tombstone would bring
+        // the recipe back and push it as a live update (#128). A deleted recipe stays deleted.
+        if (previous?.deletedAt != null) {
+            Timber.w("Ignoring update to soft-deleted recipe %s", recipe.uuid)
+            return
+        }
+        recipeDao.upsertRecipe(entity.copy(updatedAt = nextUpdatedAt(previous?.updatedAt, entity.updatedAt)))
 
         // Replace steps: delete old, insert new
         recipeStepDao.deleteAllForRecipe(recipe.uuid)

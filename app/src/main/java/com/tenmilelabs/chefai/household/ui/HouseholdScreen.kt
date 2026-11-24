@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -60,6 +61,7 @@ fun HouseholdScreen(
     val pendingInvites by viewModel.pendingInvites.collectAsStateWithLifecycle()
     val outstandingInvites by viewModel.outstandingInvites.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val resources = LocalResources.current
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -73,12 +75,12 @@ fun HouseholdScreen(
                     context.startActivity(
                         Intent.createChooser(
                             sendIntent,
-                            context.getString(R.string.household_share_chooser_title),
+                            resources.getString(R.string.household_share_chooser_title),
                         )
                     )
                 }
                 HouseholdEvent.InviteSent ->
-                    snackbarHostState.showSnackbar(context.getString(R.string.household_invite_sent))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.household_invite_sent))
                 HouseholdEvent.LeftHousehold -> onNavigateBack()
                 // The pending-invite list and (on accept) the household itself are both live Room
                 // flows already driving this screen's state — nothing further to do here.
