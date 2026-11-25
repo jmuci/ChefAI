@@ -97,3 +97,16 @@ The button only shows when `chefaiGoogleWebClientId` is set at build time.
   import a recipe from the share sheet, generate a meal plan, shopping list, timer notification,
   invite link, password reset link, delete account.
 - [ ] Check Play Console → Android vitals and the pre-launch report for crashes on the test track.
+
+## 8. Open decisions (not blocking, but decide before v1)
+
+- [ ] **Dark theme.** The dark palette is provisional (`TODO(dark)` in `ColorSchemes.kt` and
+  `ChefColors.kt`, contrast unverified). Either check contrast on every screen in dark mode, or
+  ship v1 light-only.
+- [ ] **Crash reporting.** Release has none (Timber logs only in debug). Play vitals gives crash
+  counts and de-obfuscated traces with no SDK; Crashlytics or Sentry add breadcrumbs and
+  non-fatals, but each is a new dependency and a line in the Data safety form.
+- [ ] **Meal plan with fewer recipes than slots (#260).** Today it repeats recipes round-robin.
+  The alternative is to leave the extra slots empty as "Add recipe" gaps.
+- [ ] **Dependency upgrades.** Lint lists about 46 newer versions (AGP, Compose BOM, Ktor, …).
+  Upgrade after v1 ships, not right before it.

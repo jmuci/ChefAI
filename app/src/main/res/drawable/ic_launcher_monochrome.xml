@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Themed-icon layer (Android 13+): the system tints it, so only its alpha matters. The 108dp
+    adaptive-icon canvas shows its central 72dp at most and guarantees the central 66dp, so a
+    30dp inset leaves the 48dp chef hat inside the safe zone.
+-->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/ic_lucide_chef_hat"
+    android:inset="30dp" />

@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_dest_title_create_recipe">Create Recipe</string>
     <string name="app_dest_title_home">Home</string>
     <string name="app_dest_title_login">Login</string>
@@ -14,32 +14,17 @@
     <string name="app_dest_title_developer_options">Developer options</string>
     <string name="app_dest_title_household">Household</string>
     <string name="app_dest_title_accept_invite">Accept Invite</string>
-    <string name="app_name">ChefAI</string>
-    <string name="button_select_photo">Select Photo from Gallery</string>
-    <string name="content_description_add_ingredient">Add ingredient</string>
-    <string name="content_description_add_step">Add step</string>
+    <string name="app_name">Pocket Chef</string>
     <string name="content_description_delete_step">Delete step</string>
     <string name="content_description_drag_handle">Drag to reorder</string>
-    <string name="content_description_move_down">Move down</string>
-    <string name="content_description_move_up">Move up</string>
     <string name="content_description_remove">Remove</string>
     <string name="content_description_remove_image">Remove image</string>
-    <string name="create_recipe_action_label">Recipe creation coming soon</string>
-    <string name="create_recipe_header">Fill in all the fields</string>
     <string name="divider_or">or</string>
     <string name="fab_close_menu_content_description">Close recipe actions</string>
     <string name="fab_create_recipe">Create recipe</string>
     <string name="fab_import_recipe">Import recipe</string>
     <string name="fab_open_menu_content_description">Open recipe actions</string>
-    <string name="home_recipe_suggestions_dietary_subtitle">Based on your seleceted dietary preferences</string>
-    <string name="home_recipe_suggestions_dietary_title">More low-carb alternatives</string>
-    <string name="home_recipe_suggestions_subtitle">Based on your taste profile</string>
-    <string name="home_recipe_suggestions_title">For You</string>
-    <string name="home_screen_title">Home</string>
     <string name="image_selected">Image selected</string>
-    <string name="import_recipe_action_label">Recipe import coming soon</string>
-    <string name="ingredient_display_format">%1$s %2$s %3$s</string>
-    <string name="ingredient_quantity_format">%1$s %2$s</string>
     <string name="ingredients">Ingredients</string>
     <string name="label_add_labels">Add Labels</string>
     <string name="label_add_step">Add Step</string>
@@ -58,10 +43,7 @@
     <string name="label_unit">Unit</string>
     <string name="loading_recipe_details_error">Failed to load recipe details</string>
     <string name="loading_recipes_error">Error while loading recipes!</string>
-    <string name="loading_recipes_success">Successfully loaded recipes!</string>
-    <string name="meal_plans_screen_title">Meal Plans</string>
     <string name="no_ingredients_listed">No ingredients listed for this recipe.</string>
-    <string name="no_items_added">No items added yet</string>
     <string name="no_recipes_subtitle">Start browsing recipes and bookmark the ones you like to populate your collection.</string>
     <string name="no_recipes_title">No recipes in your collection</string>
     <string name="no_filtered_recipes_title">No matching recipes</string>
@@ -73,7 +55,7 @@
     <string name="no_go_to_recipes_subtitle">Bookmark a recipe, then tap its repeat icon to mark the ones you\'d happily eat every week.</string>
     <string name="no_filtered_recipes_subtitle">None of the recipes in your collection match this filter. Try another one, or tap All.</string>
     <string name="no_steps_listed">No steps listed for this recipe.</string>
-    <string name="nutrition_calories_format">%1$d kcal</string>
+    <string name="nutrition_calories_format" tools:ignore="PluralsCandidate">%1$d kcal</string>
     <string name="nutrition_protein_format">%1$dg protein</string>
     <string name="placeholder_add_labels">Type and press Enter…</string>
     <string name="placeholder_add_step">Describe the next step…</string>
@@ -90,7 +72,6 @@
     <string name="placeholder_unit">cup, tsp…</string>
 
     <!-- Recipe scaling: the portions stepper on the recipe details screen -->
-    <string name="portions_label">Portions</string>
     <string name="portions_estimated">This recipe didn\'t say how much it makes — scaling from %1$d.</string>
     <string name="decrease_portions_content_description">Decrease portions</string>
     <string name="increase_portions_content_description">Increase portions</string>
@@ -98,9 +79,6 @@
         <item quantity="one">%1$d portion</item>
         <item quantity="other">%1$d portions</item>
     </plurals>
-    <string name="recipe_details_error">Failed to open the detailed view. Please try again later.</string>
-    <string name="recipe_details_screen_title">Recipe Steps</string>
-    <string name="recipe_hyperlink">See original recipe online</string>
     <string name="recipe_image_content_description">Recipe Image</string>
     <string name="recipe_not_found_error">Recipe Not Found!</string>
     <string name="recipe_stat_prep">Prep</string>
@@ -110,12 +88,10 @@
     <string name="recipe_section_instructions">Instructions</string>
     <string name="recipe_timer_notification_channel_name">Recipe timers</string>
     <string name="recipe_timer_notification_title">Timer done</string>
-    <string name="recipe_timer_widget_content_description">Recipe step timer</string>
     <string name="view_more">View more</string>
     <string name="view_less">View less</string>
     <string name="view_recipe_button">View Recipe</string>
     <string name="save_to_collection_content_description">Save to collection</string>
-    <string name="remove_from_collection_content_description">Remove from collection</string>
     <string name="bookmarked_content_description">Saved to collection</string>
     <string name="starred_content_description">Starred in collection</string>
     <string name="bookmark_menu_bookmark">Bookmark</string>
@@ -125,10 +101,6 @@
     <string name="go_to_mark_content_description">Mark as go-to recipe</string>
     <string name="go_to_unmark_content_description">Remove from go-to recipes</string>
     <string name="recipe_not_found_error_subtitle">Oops! This was not supposed to happen. Please navigate back and try again later.</string>
-    <string name="recipe_steps">Recipe Instructions</string>
-    <string name="recipes_screen_title">Recipes</string>
-    <string name="recipes_subtitle">Browse recipes and pick your next meal.</string>
-    <string name="recipes_title">Ready to cook?</string>
     <string name="recipe_filter_all">All</string>
     <string name="recipe_filter_cooked_before">Cooked before</string>
     <string name="recipe_filter_starred">Starred</string>
@@ -174,30 +146,18 @@
     <string name="search_category_healthy">Healthy</string>
     <string name="search_category_cookies">Cookies</string>
     <string name="search_category_comfort_food">Comfort Food</string>
-    <string name="section_basic_information">Basic Information</string>
     <string name="section_ingredients">Ingredients *</string>
     <string name="section_instructions">Instructions *</string>
     <string name="section_labels">Labels</string>
-    <string name="section_recipe_photo">Recipe Photo</string>
     <string name="section_tags">Tags</string>
-    <string name="servings_format">%1$d servings</string>
     <string name="recipe_servings_format">Serves %1$d</string>
     <string name="snackbar_save_error">Failed to save recipe.</string>
     <string name="start_step_timer_content_description">Start timer for this step</string>
-    <string name="step_number_format">%1$d.</string>
     <string name="step_timer_label_format">Step %1$d</string>
     <string name="step_timer_cancel_content_description">Cancel timer</string>
     <string name="step_timer_pause_content_description">Pause timer</string>
     <string name="step_timer_replaced_message">Replaced the timer for %1$s</string>
     <string name="step_timer_resume_content_description">Resume timer</string>
-    <string name="steps">Steps</string>
-    <string name="title_home">Home</string>
-    <string name="title_meal_plans">Meal Plans</string>
-    <string name="title_recipes">Recipes</string>
-    <string name="home_recipe_suggestions_dessets_title">Sweet Dreams</string>
-    <string name="home_recipe_suggestions_desserts_subtitle">Because we know you have sweet tooth...</string>
-    <string name="home_recipe_suggestions_world_cuisine_title">Around the world: Italy</string>
-    <string name="home_recipe_suggestions_world_cuisine_subtitle">Travel to italy through it\'s cuisine this week.</string>
     <string name="welcome_back">Welcome Back</string>
     <string name="login_subtitle">Enter your credentials to continue</string>
     <string name="login_button">Log In</string>
@@ -211,7 +171,7 @@
     <string name="content_description_show_password">Show password</string>
     <string name="content_description_hide_password">Hide password</string>
     <string name="remember_me">Remember me</string>
-    <string name="create_account_subtitle">Join ChefAI and start your culinary journey</string>
+    <string name="create_account_subtitle">Join Pocket Chef and start your culinary journey</string>
     <string name="register_button">Create Account</string>
     <string name="already_have_account">Already have an account?</string>
     <string name="login">Log In</string>
@@ -261,16 +221,13 @@
     <string name="privacy_private">Private</string>
     <string name="visibility_public_description">Anyone can find and view this recipe.</string>
     <string name="visibility_private_description">Only you can see this recipe.</string>
-    <string name="privacy_private_badge_content_description">Private recipe</string>
 
     <!-- Meal Plans -->
     <string name="no_meal_plans_title">No meal plans yet</string>
     <string name="no_meal_plans_subtitle">Tap + to create your first meal plan and let us help you eat well this week!</string>
     <string name="meal_plan_error">Failed to load meal plans</string>
     <string name="meal_plan_deleted">Meal plan deleted</string>
-    <string name="meal_plan_created">Meal plan created! 🎉</string>
     <string name="meal_plan_save_error">Failed to save meal plan</string>
-    <string name="meal_plan_default_name">Week plan</string>
     <string name="meal_plan_not_found">Meal plan not found</string>
     <string name="meal_plan_not_found_subtitle">This meal plan may have been deleted.</string>
     <string name="app_dest_title_meal_plan_detail">Meal Plan</string>
@@ -292,7 +249,7 @@
     <string name="slot_picker_create_plan">+ Create new meal plan</string>
     <string name="slot_picker_add_new_day">+ Add to new day</string>
     <string name="meal_plan_recipe_unavailable">Recipe not available</string>
-    <string name="meal_plan_progress">%1$d of %2$d meals cooked</string>
+    <string name="meal_plan_progress" tools:ignore="PluralsCandidate">%1$d of %2$d meals cooked</string>
     <string name="meal_plan_progress_none">Nothing cooked yet — pick a day to start</string>
     <string name="meal_plan_progress_complete">Every meal cooked. Great week! 🎉</string>
     <string name="meal_plan_preferences_title">Plan preferences</string>
@@ -388,12 +345,14 @@
         <item quantity="one">%d item</item>
         <item quantity="other">%d items</item>
     </plurals>
-    <string name="meal_plan_shopping_list_button">Shopping list · %1$d items</string>
+    <plurals name="meal_plan_shopping_list_button">
+        <item quantity="one">Shopping list · %1$d item</item>
+        <item quantity="other">Shopping list · %1$d items</item>
+    </plurals>
 
     <!-- Shopping List -->
     <string name="app_dest_title_shopping_list">Shopping list</string>
-    <string name="shopping_list_open">Shopping list</string>
-    <string name="shopping_list_progress">%1$d of %2$d picked up</string>
+    <string name="shopping_list_progress" tools:ignore="PluralsCandidate">%1$d of %2$d picked up</string>
     <string name="shopping_list_uncheck_all">Uncheck all</string>
     <string name="shopping_list_checked_by">Checked by %1$s</string>
     <string name="shopping_list_add_label">Add an item</string>
@@ -401,7 +360,6 @@
     <string name="shopping_list_add_action">Add to list</string>
     <string name="shopping_list_empty_title">Nothing to buy yet</string>
     <string name="shopping_list_empty_subtitle">Build this plan first, or add ingredients to its recipes.</string>
-    <string name="shopping_list_toggle_error">Couldn\'t update this item</string>
     <string name="shopping_list_item_removed">Removed %1$s</string>
     <string name="shopping_list_undo">Undo</string>
     <string name="shopping_list_show_actions">Show actions for %1$s</string>
@@ -409,7 +367,6 @@
     <string name="shopping_list_edit_item">Rename %1$s</string>
     <string name="shopping_list_rename_title">Rename item</string>
     <string name="shopping_list_rename_label">Name</string>
-    <string name="shopping_list_clear_error">Couldn\'t clear the list</string>
 
     <!-- Meal Plan Wizard -->
     <string name="app_dest_title_meal_plan_wizard">Create Meal Plan</string>
@@ -448,7 +405,7 @@
     <string name="import_recipe_title">Import Recipe</string>
     <string name="share_target_label">Pocket Chef</string>
     <string name="share_no_link_found">No recipe link found in what was shared</string>
-    <string name="import_recipe_lede">Paste a link and ChefAI reads the ingredients and steps off the page.</string>
+    <string name="import_recipe_lede">Paste a link and Pocket Chef reads the ingredients and steps off the page.</string>
     <string name="import_recipe_url_label">Recipe URL</string>
     <string name="import_recipe_url_placeholder">Paste a recipe link…</string>
     <string name="import_recipe_button">Import</string>

@@ -144,7 +144,7 @@ fun HomeContent(
 }
 
 /**
- * "Wednesday, August 12" — today's date, shown under the "ChefAI" wordmark. Exposed so the app
+ * "Wednesday, August 12" — today's date, shown under the app-name wordmark. Exposed so the app
  * shell's header, which owns the Home top bar, can build the same subtitle it shows next to the
  * title (see `mealPlanDetailSubtitle` for the equivalent on the meal-plan-detail header).
  */

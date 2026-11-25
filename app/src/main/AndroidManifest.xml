@@ -54,11 +54,15 @@
 
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="https"
-                    android:host="pocket-chef.app"
-                    android:pathPrefix="/invite" />
-                <!-- Password reset links: same host, so the same assetlinks.json covers them. -->
+                <!--
+                    One attribute per <data>: Android merges every <data> in a filter, so scheme,
+                    host and both path prefixes all combine (https://pocket-chef.app/invite… and
+                    …/reset-password…). Password reset shares the host, so the same
+                    assetlinks.json covers it.
+                -->
+                <data android:scheme="https" />
+                <data android:host="pocket-chef.app" />
+                <data android:pathPrefix="/invite" />
                 <data android:pathPrefix="/reset-password" />
             </intent-filter>
         </activity>

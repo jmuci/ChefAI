@@ -30,7 +30,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import kotlinx.coroutines.launch
@@ -76,7 +76,7 @@ fun ShoppingListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val draft by viewModel.draft.collectAsStateWithLifecycle()
-    val resources = LocalContext.current.resources
+    val resources = LocalResources.current
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->

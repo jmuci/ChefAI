@@ -135,7 +135,6 @@ android {
     }
     buildFeatures {
         compose = true
-        viewBinding = true
         buildConfig = true
     }
     packaging {
@@ -181,10 +180,8 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.google.googleid)
-    implementation(libs.material)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.process)
-    implementation(libs.androidx.navigation.ui.ktx)
     implementation(libs.kotlinx.coroutines.android)
 
     // Jetpack Compose ===
@@ -234,13 +231,8 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     // If this project uses any Kotlin source, use Kotlin Symbol Processing (KSP)
     ksp(libs.androidx.room.compiler)
-    // If this project only uses Java source, use the Java annotationProcessor
-    // No additional plugins are necessary
-    annotationProcessor(libs.androidx.room.compiler)
     // optional - Kotlin Extensions and Coroutines support for Room
     implementation(libs.androidx.room.ktx)
-    // optional - Guava support for Room, including Optional and ListenableFuture
-    implementation(libs.androidx.room.guava)
     // optional - Test helpers
     testImplementation(libs.androidx.room.testing)
 
@@ -257,9 +249,6 @@ dependencies {
     implementation(libs.kotlinx.serialization.json) // latest for 2.x Kotlin
 
 
-    // Login for Ktor requests
-    implementation(libs.logback.core)
-    implementation(libs.slf4j.android)
     implementation(libs.ktor.client.logging)
 
     implementation(libs.timber)

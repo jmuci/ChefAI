@@ -654,7 +654,7 @@ fun ChefAINavGraph(
 
                     when (currentRoute) {
                         AppDestinations.HOME.route -> {
-                            // "ChefAI" wordmark + today's date (01) — the one other screen using
+                            // App-name wordmark + today's date (01) — the one other screen using
                             // ChefAITopAppBarWithSubtitle, alongside meal-plan detail below. The app
                             // name, not titleRes ("Home"): the design shows the wordmark here, not a
                             // screen title.

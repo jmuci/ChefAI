@@ -16,7 +16,7 @@ fun printMealPlan(context: Context, document: MealPlanPrintDocument) {
         .setMediaSize(PrintAttributes.MediaSize.ISO_A4.asLandscape())
         .build()
     printManager.print(
-        "${document.planName} — ChefAI",
+        "${document.planName} — Pocket Chef",
         MealPlanPrintAdapter(document),
         attributes,
     )

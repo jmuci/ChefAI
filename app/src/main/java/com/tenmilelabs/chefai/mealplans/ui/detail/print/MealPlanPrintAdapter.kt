@@ -14,6 +14,7 @@ import android.print.PrintDocumentInfo
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
+import androidx.core.graphics.withTranslation
 import com.tenmilelabs.chefai.mealplans.domain.print.MealPlanPrintDocument
 import com.tenmilelabs.chefai.mealplans.domain.print.PrintTableBlock
 import java.io.FileOutputStream
@@ -157,23 +158,20 @@ class MealPlanPrintAdapter(
             val textLeft = columnLeft + CELL_PADDING
             val textWidth = (columnWidth - CELL_PADDING * 2).toInt().coerceAtLeast(1)
 
-            canvas.save()
-            canvas.translate(textLeft, tableTop + CELL_PADDING)
+            canvas.withTranslation(textLeft, tableTop + CELL_PADDING) {
+                var y = drawWrapped(this, column.label, textWidth, dayLabelPaint, 0f)
+                y += ROW_GAP
 
-            var y = drawWrapped(canvas, column.label, textWidth, dayLabelPaint, 0f)
-            y += ROW_GAP
+                column.meals.forEach { meal ->
+                    val titleText = meal.slotLabel?.let { "$it: ${meal.title}" } ?: meal.title
+                    y += drawWrapped(this, titleText, textWidth, mealTitlePaint, y)
 
-            column.meals.forEach { meal ->
-                val titleText = meal.slotLabel?.let { "$it: ${meal.title}" } ?: meal.title
-                y += drawWrapped(canvas, titleText, textWidth, mealTitlePaint, y)
-
-                if (meal.topIngredients.isNotEmpty()) {
-                    y += drawWrapped(canvas, meal.topIngredients.joinToString(", "), textWidth, ingredientPaint, y)
+                    if (meal.topIngredients.isNotEmpty()) {
+                        y += drawWrapped(this, meal.topIngredients.joinToString(", "), textWidth, ingredientPaint, y)
+                    }
+                    y += MEAL_GAP
                 }
-                y += MEAL_GAP
             }
-
-            canvas.restore()
         }
     }
 
@@ -183,10 +181,7 @@ class MealPlanPrintAdapter(
             .setAlignment(Layout.Alignment.ALIGN_NORMAL)
             .setIncludePad(false)
             .build()
-        canvas.save()
-        canvas.translate(0f, y)
-        layout.draw(canvas)
-        canvas.restore()
+        canvas.withTranslation(0f, y) { layout.draw(this) }
         return layout.height.toFloat()
     }
 
